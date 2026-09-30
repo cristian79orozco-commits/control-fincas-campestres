@@ -4,7 +4,10 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg?logo=typescript)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-6-purple.svg?logo=vite)](https://vitejs.dev/)
 [![Supabase](https://img.shields.io/badge/Supabase-Database%20%26%20Storage-3ECF8E.svg?logo=supabase)](https://supabase.com/)
+[![GitHub Pages](https://img.shields.io/badge/Sitio%20Web-Activo%20en%20Línea-2ea44f.svg?logo=github)](https://cristian79orozco-commits.github.io/control-fincas-campestres/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+> 🌐 **Sitio Web Activo en Producción:** [https://cristian79orozco-commits.github.io/control-fincas-campestres/](https://cristian79orozco-commits.github.io/control-fincas-campestres/)
 
 Plataforma web moderna y de alto rendimiento diseñada para la gestión, exhibición y reserva directa de fincas campestres y casas de recreo en **Santa Elena, Valle del Cauca, Colombia**.
 
