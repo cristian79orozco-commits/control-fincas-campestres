@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import {
   ClipboardList, Plus, Edit3, Trash2, X, Save, CreditCard,
-  Calendar, Users, DollarSign, ChevronDown, ChevronUp, FileCheck, MessageCircle
+  Calendar, Users, DollarSign, ChevronDown, ChevronUp, FileCheck, MessageCircle,
+  FileText, CheckCircle
 } from 'lucide-react';
-import type { Reserva, ReservaEstado, Cliente, Finca, Pago, PagoTipo, CotizacionDB } from '../types';
+import type { Reserva, ReservaEstado, Cliente, Finca, Pago, PagoTipo, CotizacionDB, CierreReserva, ConfiguracionGeneral } from '../types';
 import { calcularSaldo } from '../types';
 import { AdminDocumentos } from './AdminDocumentos';
 import { WhatsAppModal } from '../components/WhatsAppModal';
+import { AdminCierreModal } from './AdminCierreModal';
+import { AdminExpedienteModal } from './AdminExpedienteModal';
 import {
   plantillaRecordatorioPago,
   plantillaBienvenida,
@@ -19,8 +22,16 @@ interface AdminReservasProps {
   clientes: Cliente[];
   fincas: Finca[];
   cotizaciones: CotizacionDB[];
+  configuracion?: ConfiguracionGeneral;
+  userEmail?: string | null;
   onGuardar: (datos: Partial<Reserva>) => Promise<{ success: boolean; id?: string; error?: string }>;
   onCambiarEstado: (id: string, estado: ReservaEstado) => Promise<{ success: boolean; error?: string }>;
+  onCerrarReserva?: (
+    reservaId: string,
+    datosCierre: Partial<CierreReserva>,
+    pagoLiquidacion?: { valor: number; tipo: PagoTipo; observacion?: string }
+  ) => Promise<{ success: boolean; error?: string }>;
+  onReabrirReserva?: (reservaId: string) => Promise<{ success: boolean; error?: string }>;
   onEliminar: (id: string) => Promise<{ success: boolean; error?: string }>;
   onRegistrarPago: (reservaId: string, pago: { tipo: PagoTipo; fecha: string; valor: number; observacion?: string }) => Promise<{ success: boolean; error?: string }>;
   onEliminarPago: (pagoId: string) => Promise<{ success: boolean; error?: string }>;
@@ -83,6 +94,10 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
   openConfirm,
   cotizacionInicial,
   onCotizacionInicialUsada,
+  configuracion,
+  userEmail,
+  onCerrarReserva,
+  onReabrirReserva,
 }) => {
   const [form, setForm] = useState<Partial<Reserva>>(FORM_VACIO);
   const [editando, setEditando] = useState(false);
@@ -92,6 +107,8 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
   const [pagoReservaId, setPagoReservaId] = useState<string | null>(null);
   const [guardandoPago, setGuardandoPago] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<ReservaEstado | 'todas'>('todas');
+  const [reservaParaCierre, setReservaParaCierre] = useState<Reserva | null>(null);
+  const [reservaParaExpediente, setReservaParaExpediente] = useState<Reserva | null>(null);
   const [modalWaReserva, setModalWaReserva] = useState<{
     abierto: boolean;
     reserva?: Reserva;
@@ -445,6 +462,25 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                     <button className="btn btn-sm btn-primary" title="Registrar pago" onClick={() => { setPagoReservaId(r.id); setPagoForm(PAGO_VACIO); }}>
                       <CreditCard size={13} />
                     </button>
+                    {/* Botón rápido para Cierre formal si está activa */}
+                    {r.estado === 'activa' && onCerrarReserva && (
+                      <button
+                        className="btn btn-sm"
+                        style={{ color: 'var(--success)', borderColor: 'var(--success)' }}
+                        title="Realizar Cierre de Reserva y Check-out"
+                        onClick={() => setReservaParaCierre(r)}
+                      >
+                        <CheckCircle size={13} />
+                      </button>
+                    )}
+                    {/* Botón Ver Expediente Completo */}
+                    <button
+                      className="btn btn-sm"
+                      title="Ver Expediente Histórico Completo"
+                      onClick={() => setReservaParaExpediente(r)}
+                    >
+                      <FileText size={13} />
+                    </button>
                     <button className="btn btn-sm" onClick={() => abrirEdicion(r)} title="Editar"><Edit3 size={13} /></button>
                     <button className="btn btn-sm btn-danger" onClick={() => handleEliminar(r)} title="Eliminar"><Trash2 size={13} /></button>
                     <button
@@ -528,6 +564,44 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
               estado: 'enviado',
             });
           }}
+        />
+      )}
+
+      {/* Modal Cierre de Reserva */}
+      {reservaParaCierre && onCerrarReserva && (
+        <AdminCierreModal
+          isOpen={!!reservaParaCierre}
+          reserva={reservaParaCierre}
+          userEmail={userEmail}
+          onClose={() => setReservaParaCierre(null)}
+          onConfirmarCierre={async (datosCierre, pagoLiq) => {
+            const res = await onCerrarReserva(reservaParaCierre.id, datosCierre, pagoLiq);
+            if (!res.success) {
+              throw new Error(res.error || 'Error al cerrar reserva');
+            }
+          }}
+          showToast={showToast}
+        />
+      )}
+
+      {/* Modal Expediente Histórico */}
+      {reservaParaExpediente && (
+        <AdminExpedienteModal
+          isOpen={!!reservaParaExpediente}
+          reserva={reservaParaExpediente}
+          configuracion={configuracion}
+          onClose={() => setReservaParaExpediente(null)}
+          onReabrir={onReabrirReserva ? async (id) => {
+            const res = await onReabrirReserva(id);
+            if (res.success) {
+              showToast('Reserva reabierta como activa ✅', 'success');
+              setReservaParaExpediente(null);
+            } else {
+              showToast(`Error: ${res.error}`, 'error');
+            }
+          } : undefined}
+          onRegistrarComunicacion={onRegistrarComunicacion}
+          showToast={showToast}
         />
       )}
     </div>

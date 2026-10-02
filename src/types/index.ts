@@ -150,6 +150,27 @@ export interface Reserva {
   observaciones?: string | null;
   created_at?: string;
   updated_at?: string;
+  // Fase 6: Cierre y Snapshots inmutables para blindaje histórico
+  fecha_cierre?: string | null;
+  cerrada_por?: string | null;
+  notas_cierre?: string | null;
+  cliente_snapshot?: {
+    id?: string;
+    nombre: string;
+    apellido?: string | null;
+    whatsapp?: string | null;
+    telefono?: string | null;
+    correo?: string | null;
+  } | null;
+  finca_snapshot?: {
+    id?: string;
+    nombre: string;
+    zona?: string | null;
+    capacidad?: number | null;
+    precio_pp?: number | null;
+  } | null;
+  cotizacion_snapshot?: Record<string, any> | null;
+  cierre?: CierreReserva | null;
   // Relaciones expandidas
   clientes?: Pick<Cliente, 'id' | 'nombre' | 'apellido' | 'whatsapp' | 'telefono'>;
   fincas?: Pick<Finca, 'id' | 'nombre'>;
@@ -226,6 +247,7 @@ export type AdminSection =
   | 'cotizaciones'
   | 'reservas'
   | 'menus'
+  | 'historial'
   | 'whatsapp'
   | 'configuracion'
   | 'personalizacion';
@@ -413,3 +435,73 @@ export interface ContenidoSitio {
   created_at?: string;
   updated_at?: string;
 }
+
+// ---------------------------------------------------------------
+// FASE 6 — Historial y Cierre de Reservas
+// ---------------------------------------------------------------
+
+export type EstadoEntregaFinca = 'excelente' | 'bueno' | 'con_observaciones' | 'danos_reportados';
+
+export interface CierreReserva {
+  id?: string;
+  reserva_id: string;
+  fecha_cierre: string;
+  responsable?: string | null;
+  estado_cierre: ReservaEstado;
+  calificacion?: number | null; // 1 a 5 estrellas
+  estado_entrega_finca?: EstadoEntregaFinca;
+  deposito_garantia_devuelto?: boolean;
+  valor_deposito_devuelto?: number;
+  notas_cierre?: string | null;
+  observaciones_entrega?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface FiltrosHistorial {
+  busqueda: string;
+  fechaDesde: string;
+  fechaHasta: string;
+  mes: string; // 'todos' | '01'..'12'
+  anio: string; // 'todos' | '2024'..'2030'
+  fincaId: string; // 'todas' | id
+  clienteId: string; // 'todos' | id
+  estado: string; // 'todas' | 'completada' | 'cancelada' | 'no_show' | 'activa'
+}
+
+/**
+ * Helpers para garantizar que aun si un cliente o finca es modificado o desactivado,
+ * el historial obtenga siempre los datos inmutables preservados en el snapshot.
+ */
+export function obtenerNombreClienteHistorico(reserva: Reserva): string {
+  if (reserva.cliente_snapshot?.nombre) {
+    return `${reserva.cliente_snapshot.nombre} ${reserva.cliente_snapshot.apellido || ''}`.trim();
+  }
+  if (reserva.clientes?.nombre) {
+    return `${reserva.clientes.nombre} ${reserva.clientes.apellido || ''}`.trim();
+  }
+  return 'Cliente no especificado';
+}
+
+export function obtenerContactoClienteHistorico(reserva: Reserva): {
+  whatsapp?: string;
+  telefono?: string;
+  correo?: string;
+} {
+  return {
+    whatsapp: reserva.cliente_snapshot?.whatsapp || reserva.clientes?.whatsapp || undefined,
+    telefono: reserva.cliente_snapshot?.telefono || reserva.clientes?.telefono || undefined,
+    correo: reserva.cliente_snapshot?.correo || undefined,
+  };
+}
+
+export function obtenerNombreFincaHistorico(reserva: Reserva): string {
+  if (reserva.finca_snapshot?.nombre) {
+    return reserva.finca_snapshot.nombre;
+  }
+  if (reserva.fincas?.nombre) {
+    return reserva.fincas.nombre;
+  }
+  return 'Finca no especificada';
+}
+

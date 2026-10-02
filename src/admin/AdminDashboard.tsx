@@ -3,7 +3,7 @@ import {
   LayoutDashboard, LogOut, Lock, LogIn, ShieldCheck, Database,
   Home, Users, FileText, ClipboardList, Calendar, MessageCircle,
   Menu, X, TrendingUp, CheckCircle, AlertTriangle, Clock, UtensilsCrossed, Settings,
-  Palette
+  Palette, History
 } from 'lucide-react';
 import { AdminFincaForm } from './AdminFincaForm';
 import { AdminCalendar } from './AdminCalendar';
@@ -13,12 +13,13 @@ import { AdminClientes } from './AdminClientes';
 import { AdminCotizaciones } from './AdminCotizaciones';
 import { AdminReservas } from './AdminReservas';
 import { AdminMenus } from './AdminMenus';
+import { AdminHistorial } from './AdminHistorial';
 import { AdminConfiguracion } from './AdminConfiguracion';
 import { AdminPersonalizacion } from './AdminPersonalizacion';
 import type {
   Finca, BloqueoDisponibilidad, Cliente, CotizacionDB, CotizacionEstado,
   Reserva, ReservaEstado, PagoTipo, AdminSection, Menu as MenuType, Comunicacion,
-  ConfiguracionGeneral, ContenidoSitio
+  ConfiguracionGeneral, ContenidoSitio, CierreReserva
 } from '../types';
 
 interface AdminDashboardProps {
@@ -51,6 +52,13 @@ interface AdminDashboardProps {
   onEliminarReserva: (id: string) => Promise<{ success: boolean; error?: string }>;
   onRegistrarPago: (reservaId: string, pago: { tipo: PagoTipo; fecha: string; valor: number; observacion?: string }) => Promise<{ success: boolean; error?: string }>;
   onEliminarPago: (pagoId: string) => Promise<{ success: boolean; error?: string }>;
+  // Fase 6: Cierre y Reabrir Reservas
+  onCerrarReserva?: (
+    reservaId: string,
+    datosCierre: Partial<CierreReserva>,
+    pagoLiquidacion?: { valor: number; tipo: PagoTipo; observacion?: string }
+  ) => Promise<{ success: boolean; error?: string }>;
+  onReabrirReserva?: (reservaId: string) => Promise<{ success: boolean; error?: string }>;
   // Menús (Fase 2)
   menus: MenuType[];
   onGuardarMenu: (menuData: Partial<MenuType>, imagenesUrls?: string[]) => Promise<{ success: boolean; id?: string; error?: string }>;
@@ -83,6 +91,7 @@ const NAV_ITEMS: { section: AdminSection; label: string; icon: React.ReactNode }
   { section: 'cotizaciones', label: 'Cotizaciones',   icon: <FileText size={16} /> },
   { section: 'reservas',     label: 'Reservas',       icon: <ClipboardList size={16} /> },
   { section: 'menus',        label: 'Menús',          icon: <UtensilsCrossed size={16} /> },
+  { section: 'historial',    label: 'Historial',      icon: <History size={16} /> },
   { section: 'whatsapp',     label: 'Comunicaciones', icon: <MessageCircle size={16} /> },
   { section: 'configuracion', label: 'Configuración',  icon: <Settings size={16} /> },
   { section: 'personalizacion', label: 'Personalización del sitio', icon: <Palette size={16} /> },
@@ -118,6 +127,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onEliminarReserva,
   onRegistrarPago,
   onEliminarPago,
+  onCerrarReserva,
+  onReabrirReserva,
   onGuardarMenu,
   onCambiarEstadoMenu,
   onEliminarMenu,
@@ -316,6 +327,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="stat-val" style={{ color: 'var(--primary)' }}>{menus.filter(m => m.activo).length}</div>
                   <div className="stat-lbl">Menús activos</div>
                 </div>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('historial')}>
+                  <div className="stat-val" style={{ color: 'var(--primary)' }}>
+                    {reservas.filter(r => r.estado === 'completada').length}
+                  </div>
+                  <div className="stat-lbl">Cerradas / Historial</div>
+                </div>
                 <div className="stat-card">
                   <div className="stat-val" style={{ color: 'var(--danger)', fontSize: '1.1rem' }}>{formatCOP(totalSaldoPendiente)}</div>
                   <div className="stat-lbl">Saldo por cobrar</div>
@@ -450,8 +467,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               clientes={clientes}
               fincas={fincas}
               cotizaciones={cotizaciones}
+              configuracion={configuracion}
+              userEmail={userEmail}
               onGuardar={onGuardarReserva}
               onCambiarEstado={onCambiarEstadoReserva}
+              onCerrarReserva={onCerrarReserva}
+              onReabrirReserva={onReabrirReserva}
               onEliminar={onEliminarReserva}
               onRegistrarPago={onRegistrarPago}
               onEliminarPago={onEliminarPago}
@@ -472,6 +493,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               onGuardar={onGuardarMenu}
               onCambiarEstado={onCambiarEstadoMenu}
               onEliminar={onEliminarMenu}
+              showToast={showToast}
+              openConfirm={openConfirm}
+            />
+          )}
+
+          {/* ===== SECCIÓN: HISTORIAL Y CIERRES (FASE 6) ===== */}
+          {activeSection === 'historial' && (
+            <AdminHistorial
+              reservas={reservas}
+              fincas={fincas}
+              clientes={clientes}
+              configuracion={configuracion}
+              userEmail={userEmail}
+              onCerrarReserva={onCerrarReserva}
+              onReabrirReserva={onReabrirReserva}
+              onRegistrarComunicacion={onRegistrarComunicacion}
               showToast={showToast}
               openConfirm={openConfirm}
             />

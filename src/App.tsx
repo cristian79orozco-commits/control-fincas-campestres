@@ -81,6 +81,8 @@ export const App: React.FC = () => {
     reservas,
     guardar: guardarReserva,
     cambiarEstado: cambiarEstadoReserva,
+    cerrarReserva,
+    reabrirReserva,
     eliminar: eliminarReserva,
     registrarPago,
     eliminarPago,
@@ -337,6 +339,8 @@ export const App: React.FC = () => {
             onEliminarCotizacion={eliminarCotizacion}
             onGuardarReserva={guardarReserva}
             onCambiarEstadoReserva={cambiarEstadoReserva}
+            onCerrarReserva={cerrarReserva}
+            onReabrirReserva={reabrirReserva}
             onEliminarReserva={eliminarReserva}
             onRegistrarPago={registrarPago}
             onEliminarPago={eliminarPago}

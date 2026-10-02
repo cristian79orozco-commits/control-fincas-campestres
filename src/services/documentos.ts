@@ -18,8 +18,13 @@
  */
 
 import jsPDF from 'jspdf';
-import type { Reserva, Pago, Menu, Cliente, Finca, CotizacionDB, ConfiguracionGeneral } from '../types';
-import { calcularSaldo } from '../types';
+import type { Reserva, Pago, Menu, Cliente, Finca, CotizacionDB, ConfiguracionGeneral, CierreReserva } from '../types';
+import {
+  calcularSaldo,
+  obtenerNombreClienteHistorico,
+  obtenerNombreFincaHistorico,
+  obtenerContactoClienteHistorico,
+} from '../types';
 import { getConfiguracionGlobal } from './configuracion';
 
 export interface PropuestaAlimentacionDatos {
@@ -840,3 +845,229 @@ export function generarDocCotizacion(cotizacion: CotizacionDB, configParam?: Con
   pie(doc, config);
   doc.save(`Cotizacion_${cotizacion.id.slice(0, 8)}.pdf`);
 }
+
+// ---------------------------------------------------------------
+// 7. EXPEDIENTE COMPLETO Y ACTA DE CIERRE (Fase 6)
+// ---------------------------------------------------------------
+export function generarExpedienteCompleto(
+  reserva: Reserva,
+  cierre?: CierreReserva | null,
+  configParam?: ConfiguracionGeneral
+) {
+  const config = configParam || getConfiguracionGlobal();
+  const doc = new jsPDF();
+  const ancho = doc.internal.pageSize.getWidth();
+  const col2 = 110;
+
+  const cliNombre = obtenerNombreClienteHistorico(reserva);
+  const cliContacto = obtenerContactoClienteHistorico(reserva);
+  const finNombre = obtenerNombreFincaHistorico(reserva);
+  const saldo = calcularSaldo(reserva);
+  const totalPagado = reserva.valor_total - saldo;
+  const numExpediente = `EXP-${reserva.id.slice(0, 8).toUpperCase()}`;
+
+  encabezado(doc, 'EXPEDIENTE HISTÓRICO Y ACTA DE CIERRE', numExpediente, config);
+
+  let y = 47;
+
+  // Estado general
+  doc.setFillColor(245, 247, 246);
+  doc.roundedRect(14, y, ancho - 28, 12, 1.5, 1.5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(26, 107, 94);
+  doc.text(`EXPEDIENTE DE AUDITORÍA: ${numExpediente}`, 18, y + 5);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(90, 85, 75);
+  const estadoStr = (reserva.estado || 'completada').toUpperCase();
+  const fechaCierreStr = reserva.fecha_cierre || cierre?.fecha_cierre
+    ? formatFecha((reserva.fecha_cierre || cierre?.fecha_cierre || '').split('T')[0])
+    : formatFecha(new Date().toISOString().split('T')[0]);
+  doc.text(`Estado: ${estadoStr}  •  Fecha de Cierre: ${fechaCierreStr}  •  Registros Inmutables Protegidos`, 18, y + 9);
+  doc.setTextColor(30, 27, 19);
+  y += 16;
+
+  // Bloque 1: Datos del Huésped / Cliente
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(26, 107, 94);
+  doc.text('1. EXPEDIENTE DEL CLIENTE / HUÉSPED TITULAR', 14, y);
+  doc.setTextColor(30, 27, 19);
+  y += 5;
+
+  doc.setFillColor(252, 252, 252);
+  doc.setDrawColor(220, 225, 222);
+  doc.rect(14, y, ancho - 28, 22, 'FD');
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Nombre completo: ${cliNombre}`, 18, y + 5.5);
+  doc.text(`Teléfono / Celular: ${cliContacto.telefono || 'No registrado'}`, 18, y + 10.5);
+  doc.text(`WhatsApp: ${cliContacto.whatsapp || 'No registrado'}`, 18, y + 15.5);
+
+  doc.text(`Correo: ${cliContacto.correo || 'No registrado'}`, col2, y + 5.5);
+  doc.text(`Identificador de Cliente: ${reserva.cliente_id.slice(0, 13)}…`, col2, y + 10.5);
+  doc.text(`Integridad: Datos preservados en Snapshot inmutable`, col2, y + 15.5);
+  y += 26;
+
+  // Bloque 2: Datos de la Finca Campestre y Estancia
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(26, 107, 94);
+  doc.text('2. DETALLES DE LA FINCA Y ESTANCIA', 14, y);
+  doc.setTextColor(30, 27, 19);
+  y += 5;
+
+  doc.setFillColor(252, 252, 252);
+  doc.rect(14, y, ancho - 28, 24, 'FD');
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Finca Campestre: ${finNombre}`, 18, y + 5.5);
+  const zonaFinca = reserva.finca_snapshot?.zona || (reserva.fincas as any)?.zona || 'Santa Elena, El Cerrito';
+  doc.text(`Ubicación / Sector: ${zonaFinca}`, 18, y + 10.5);
+  doc.text(`Número de Huéspedes: ${reserva.personas} personas`, 18, y + 15.5);
+
+  const [y1, m1, d1] = (reserva.fecha_inicio || '').split('-');
+  const [y2, m2, d2] = (reserva.fecha_fin || '').split('-');
+  const dt1 = new Date(reserva.fecha_inicio);
+  const dt2 = new Date(reserva.fecha_fin);
+  const nochesCalc = Math.max(1, Math.round((dt2.getTime() - dt1.getTime()) / (1000 * 3600 * 24)));
+
+  doc.text(`Fecha de Entrada (Check-in): ${d1}/${m1}/${y1}`, col2, y + 5.5);
+  doc.text(`Fecha de Salida (Check-out): ${d2}/${m2}/${y2}`, col2, y + 10.5);
+  doc.text(`Total Noches de Alojamiento: ${nochesCalc} noche(s)`, col2, y + 15.5);
+  y += 28;
+
+  // Bloque 3: Balance Económico y Liquidación
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(26, 107, 94);
+  doc.text('3. DESGLOSE ECONÓMICO Y LIQUIDACIÓN DEFINITIVA', 14, y);
+  doc.setTextColor(30, 27, 19);
+  y += 5;
+
+  doc.setFillColor(248, 249, 248);
+  doc.rect(14, y, ancho - 28, 26, 'FD');
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Concepto', 18, y + 5.5);
+  doc.text('Monto COP', 182, y + 5.5, { align: 'right' });
+  doc.line(14, y + 7.5, ancho - 14, y + 7.5);
+
+  const costoAlim = reserva.costo_alimentacion || 0;
+  const servAlim = reserva.alimentacion || 'Sin alimentación';
+  doc.text(`Alojamiento por la estancia (${nochesCalc} noches, ${reserva.personas} pers.)`, 18, y + 12);
+  doc.text(formatCOP(reserva.valor_total - costoAlim), 182, y + 12, { align: 'right' });
+
+  if (costoAlim > 0) {
+    doc.text(`Servicio de Alimentación (${servAlim})`, 18, y + 16.5);
+    doc.text(formatCOP(costoAlim), 182, y + 16.5, { align: 'right' });
+  }
+
+  // Fila total liquidado
+  doc.setFont('helvetica', 'bold');
+  doc.text('VALOR TOTAL CONTRATADO:', 18, y + 21.5);
+  doc.text(formatCOP(reserva.valor_total), 182, y + 21.5, { align: 'right' });
+  y += 30;
+
+  // Bloque 4: Historial de Pagos y Abonos
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(26, 107, 94);
+  doc.text('4. HISTORIAL DE RECAUDO Y MOVIMIENTOS FINANCIEROS', 14, y);
+  doc.setTextColor(30, 27, 19);
+  y += 5;
+
+  const pagos = reserva.pagos || [];
+  doc.setFillColor(26, 107, 94);
+  doc.rect(14, y, ancho - 28, 6, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Fecha', 18, y + 4.2);
+  doc.text('Tipo de Pago', 48, y + 4.2);
+  doc.text('Detalle / Observación', 90, y + 4.2);
+  doc.text('Valor COP', 182, y + 4.2, { align: 'right' });
+  doc.setTextColor(30, 27, 19);
+  y += 6;
+
+  if (pagos.length === 0) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.text('No hay registros detallados de abonos adicionales en la base de datos.', 18, y + 5);
+    y += 8;
+  } else {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    pagos.forEach((p, idx) => {
+      const fondo = idx % 2 === 0 ? 255 : 248;
+      doc.setFillColor(fondo, fondo, fondo);
+      doc.rect(14, y, ancho - 28, 5.5, 'F');
+      doc.text(formatFecha(p.fecha), 18, y + 4);
+      doc.text(p.tipo.toUpperCase(), 48, y + 4);
+      doc.text((p.observacion || 'Abono verificado').slice(0, 42), 90, y + 4);
+      const signo = p.tipo === 'devolucion' ? '-' : '+';
+      doc.text(`${signo}${formatCOP(p.valor)}`, 182, y + 4, { align: 'right' });
+      y += 5.5;
+    });
+  }
+
+  // Resumen de saldo final
+  doc.setFillColor(saldo <= 0 ? 230 : 255, saldo <= 0 ? 245 : 235, saldo <= 0 ? 236 : 235);
+  doc.rect(14, y, ancho - 28, 7, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text(`Total Recaudado: ${formatCOP(totalPagado)}`, 18, y + 4.8);
+  doc.text(`Saldo Pendiente al Cierre: ${formatCOP(saldo)}`, 182, y + 4.8, { align: 'right' });
+  y += 11;
+
+  // Bloque 5: Acta de Cierre Operativo y Check-out
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(26, 107, 94);
+  doc.text('5. ACTA DE CIERRE OPERATIVO, ENTREGA Y OBSERVACIONES', 14, y);
+  doc.setTextColor(30, 27, 19);
+  y += 5;
+
+  doc.setFillColor(252, 252, 252);
+  doc.setDrawColor(220, 225, 222);
+  doc.rect(14, y, ancho - 28, 26, 'FD');
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'normal');
+
+  const responsableCierre = reserva.cerrada_por || cierre?.responsable || 'Administración de Fincas';
+  const calif = cierre?.calificacion ? `${cierre.calificacion} / 5 Estrellas ★` : 'No calificada';
+  const estadoFinca = cierre?.estado_entrega_finca
+    ? cierre.estado_entrega_finca.replace('_', ' ').toUpperCase()
+    : 'ENTREGA CONFORME EN BUEN ESTADO';
+  const depGarantia = cierre?.deposito_garantia_devuelto
+    ? `Depósito de garantía devuelto (${formatCOP(cierre?.valor_deposito_devuelto || 0)})`
+    : 'Sin retenciones de depósito reportadas';
+
+  doc.text(`Responsable de Cierre: ${responsableCierre}`, 18, y + 5);
+  doc.text(`Calificación de la Estadía: ${calif}`, 18, y + 9.5);
+  doc.text(`Estado de Entrega del Inmueble: ${estadoFinca}`, 18, y + 14);
+  doc.text(`Garantía: ${depGarantia}`, 18, y + 18.5);
+
+  const notasFinales = reserva.notas_cierre || cierre?.notas_cierre || reserva.observaciones || 'Operación finalizada a entera satisfacción sin novedades pendientes.';
+  doc.text(`Observaciones de Cierre: ${notasFinales.slice(0, 110)}`, 18, y + 23);
+  y += 30;
+
+  // Firmas institucionales
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text('Por la Empresa Administradora:', 14, y);
+  doc.text('Por el Cliente / Huésped Titular:', col2, y);
+  y += 12;
+  doc.setDrawColor(30, 27, 19);
+  doc.line(14, y, 80, y);
+  doc.line(col2, y, col2 + 66, y);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.text(`${responsableCierre} • ${config.nombre_empresa}`, 14, y + 4);
+  doc.text(`${cliNombre}`, col2, y + 4);
+
+  pie(doc, config);
+  doc.save(`Expediente_${reserva.id.slice(0, 8)}.pdf`);
+}
+
