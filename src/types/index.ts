@@ -113,6 +113,8 @@ export interface CotizacionDB {
   fecha_fin: string;
   personas: number;
   noches?: number;
+  menu_id?: string | null;
+  cantidad_alimentacion?: number;
   alimentacion?: string | null;
   precio_base_pp: number;
   subtotal_alojamiento: number;
@@ -126,6 +128,7 @@ export interface CotizacionDB {
   updated_at?: string;
   clientes?: Pick<Cliente, 'id' | 'nombre' | 'apellido' | 'whatsapp'>;
   fincas?: Pick<Finca, 'id' | 'nombre'>;
+  menus?: Pick<Menu, 'id' | 'nombre' | 'categoria' | 'precio_pp'>;
 }
 
 export type ReservaEstado = 'activa' | 'completada' | 'cancelada' | 'no_show';
@@ -140,6 +143,9 @@ export interface Reserva {
   personas: number;
   valor_total: number;
   separacion: number;
+  menu_id?: string | null;
+  alimentacion?: string | null;
+  costo_alimentacion?: number;
   estado: ReservaEstado;
   observaciones?: string | null;
   created_at?: string;
@@ -147,6 +153,7 @@ export interface Reserva {
   // Relaciones expandidas
   clientes?: Pick<Cliente, 'id' | 'nombre' | 'apellido' | 'whatsapp' | 'telefono'>;
   fincas?: Pick<Finca, 'id' | 'nombre'>;
+  menus?: Pick<Menu, 'id' | 'nombre' | 'categoria' | 'precio_pp'>;
   pagos?: Pago[];
 }
 
@@ -173,6 +180,43 @@ export function calcularSaldo(reserva: Reserva): number {
   return reserva.valor_total - totalPagado;
 }
 
+// ---------------------------------------------------------------
+// FASE 2 — Tipos de Menús y Alimentación
+// ---------------------------------------------------------------
+
+export type MenuCategoria =
+  | 'Desayuno'
+  | 'Almuerzo'
+  | 'Cena'
+  | 'Parrilla'
+  | 'Refrigerio'
+  | 'Menú especial'
+  | 'Paquetes';
+
+export interface MenuImagen {
+  id?: number | string;
+  menu_id: string;
+  url: string;
+  alt?: string | null;
+  orden: number;
+  es_principal: boolean;
+  created_at?: string;
+}
+
+export interface Menu {
+  id: string;
+  nombre: string;
+  descripcion?: string | null;
+  categoria: MenuCategoria;
+  precio_pp: number;
+  condiciones?: string | null;
+  imagen_url?: string | null;
+  activo: boolean;
+  created_at?: string;
+  updated_at?: string;
+  menu_imagenes?: MenuImagen[];
+}
+
 // Panel admin: secciones del sidebar
 export type AdminSection =
   | 'dashboard'
@@ -181,4 +225,6 @@ export type AdminSection =
   | 'clientes'
   | 'cotizaciones'
   | 'reservas'
+  | 'menus'
   | 'whatsapp';
+

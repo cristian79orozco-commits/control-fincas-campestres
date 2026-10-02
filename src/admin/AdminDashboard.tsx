@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   LayoutDashboard, LogOut, Lock, LogIn, ShieldCheck, Database,
   Home, Users, FileText, ClipboardList, Calendar, MessageCircle,
-  Menu, X, TrendingUp, CheckCircle, AlertTriangle, Clock
+  Menu, X, TrendingUp, CheckCircle, AlertTriangle, Clock, UtensilsCrossed
 } from 'lucide-react';
 import { AdminFincaForm } from './AdminFincaForm';
 import { AdminCalendar } from './AdminCalendar';
@@ -10,9 +10,10 @@ import { AdminWaConfig } from './AdminWaConfig';
 import { AdminClientes } from './AdminClientes';
 import { AdminCotizaciones } from './AdminCotizaciones';
 import { AdminReservas } from './AdminReservas';
+import { AdminMenus } from './AdminMenus';
 import type {
   Finca, BloqueoDisponibilidad, Cliente, CotizacionDB, CotizacionEstado,
-  Reserva, ReservaEstado, PagoTipo, AdminSection
+  Reserva, ReservaEstado, PagoTipo, AdminSection, Menu as MenuType
 } from '../types';
 
 interface AdminDashboardProps {
@@ -45,6 +46,11 @@ interface AdminDashboardProps {
   onEliminarReserva: (id: string) => Promise<{ success: boolean; error?: string }>;
   onRegistrarPago: (reservaId: string, pago: { tipo: PagoTipo; fecha: string; valor: number; observacion?: string }) => Promise<{ success: boolean; error?: string }>;
   onEliminarPago: (pagoId: string) => Promise<{ success: boolean; error?: string }>;
+  // Menús (Fase 2)
+  menus: MenuType[];
+  onGuardarMenu: (menuData: Partial<MenuType>, imagenesUrls?: string[]) => Promise<{ success: boolean; id?: string; error?: string }>;
+  onCambiarEstadoMenu: (id: string, activo: boolean) => Promise<{ success: boolean; error?: string }>;
+  onEliminarMenu: (id: string) => Promise<{ success: boolean; error?: string }>;
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   openConfirm: (title: string, message: string, onConfirm: () => void) => void;
 }
@@ -56,6 +62,7 @@ const NAV_ITEMS: { section: AdminSection; label: string; icon: React.ReactNode }
   { section: 'clientes',     label: 'Clientes',       icon: <Users size={16} /> },
   { section: 'cotizaciones', label: 'Cotizaciones',   icon: <FileText size={16} /> },
   { section: 'reservas',     label: 'Reservas',       icon: <ClipboardList size={16} /> },
+  { section: 'menus',        label: 'Menús',          icon: <UtensilsCrossed size={16} /> },
   { section: 'whatsapp',     label: 'WhatsApp',       icon: <MessageCircle size={16} /> },
 ];
 
@@ -71,6 +78,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   cotizaciones,
   reservas,
   metricasReservas,
+  menus,
   onLogin,
   onLogout,
   onSaveFinca,
@@ -88,6 +96,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onEliminarReserva,
   onRegistrarPago,
   onEliminarPago,
+  onGuardarMenu,
+  onCambiarEstadoMenu,
+  onEliminarMenu,
   showToast,
   openConfirm,
 }) => {
@@ -267,6 +278,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="stat-val">{clientes.length}</div>
                   <div className="stat-lbl">Clientes</div>
                 </div>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('menus')}>
+                  <div className="stat-val" style={{ color: 'var(--primary)' }}>{menus.filter(m => m.activo).length}</div>
+                  <div className="stat-lbl">Menús activos</div>
+                </div>
                 <div className="stat-card">
                   <div className="stat-val" style={{ color: 'var(--danger)', fontSize: '1.1rem' }}>{formatCOP(totalSaldoPendiente)}</div>
                   <div className="stat-lbl">Saldo por cobrar</div>
@@ -383,6 +398,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               cotizaciones={cotizaciones}
               clientes={clientes}
               fincas={fincas}
+              menus={menus}
               onGuardar={onGuardarCotizacion}
               onCambiarEstado={onCambiarEstadoCotizacion}
               onEliminar={onEliminarCotizacion}
@@ -408,6 +424,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               openConfirm={openConfirm}
               cotizacionInicial={cotizacionParaReserva}
               onCotizacionInicialUsada={() => setCotizacionParaReserva(null)}
+            />
+          )}
+
+          {/* ===== SECCIÓN: MENÚS (FASE 2) ===== */}
+          {activeSection === 'menus' && (
+            <AdminMenus
+              menus={menus}
+              clientes={clientes}
+              fincas={fincas}
+              onGuardar={onGuardarMenu}
+              onCambiarEstado={onCambiarEstadoMenu}
+              onEliminar={onEliminarMenu}
+              showToast={showToast}
+              openConfirm={openConfirm}
             />
           )}
 

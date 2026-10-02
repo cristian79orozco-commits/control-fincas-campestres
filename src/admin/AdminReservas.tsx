@@ -96,8 +96,13 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
         personas: cotizacionInicial.personas,
         valor_total: cotizacionInicial.total,
         separacion: 0,
+        menu_id: cotizacionInicial.menu_id || null,
+        alimentacion: cotizacionInicial.alimentacion || null,
+        costo_alimentacion: cotizacionInicial.costo_alimentacion || 0,
         estado: 'activa',
-        observaciones: '',
+        observaciones: cotizacionInicial.alimentacion && cotizacionInicial.alimentacion !== 'Sin alimentación'
+          ? `Incluye menú: ${cotizacionInicial.alimentacion}`
+          : '',
       });
       setEditando(true);
       onCotizacionInicialUsada?.();

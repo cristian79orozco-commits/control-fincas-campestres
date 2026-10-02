@@ -10,8 +10,18 @@
  */
 
 import jsPDF from 'jspdf';
-import type { Reserva, Pago } from '../types';
+import type { Reserva, Pago, Menu, Cliente, Finca } from '../types';
 import { calcularSaldo } from '../types';
+
+export interface PropuestaAlimentacionDatos {
+  menu: Menu;
+  cliente?: Pick<Cliente, 'nombre' | 'apellido' | 'whatsapp' | 'correo'> | null;
+  finca?: { nombre: string; zona?: string } | null;
+  personas?: number;
+  cantidadServicios?: number;
+  fechaEvento?: string;
+  notasEspeciales?: string;
+}
 
 // ---------------------------------------------------------------
 // Helpers de formato
@@ -412,3 +422,232 @@ export function generarPazYSalvo(reserva: Reserva): void {
   pie(doc);
   doc.save(`PazYSalvo_${reserva.id.slice(0, 8)}.pdf`);
 }
+
+// ================================================================
+// 5. PROPUESTA DE ALIMENTACIÓN (FASE 2)
+// ================================================================
+
+async function urlABase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionDatos): Promise<void> {
+  const {
+    menu,
+    cliente,
+    finca,
+    personas = 10,
+    cantidadServicios = 1,
+    fechaEvento,
+    notasEspeciales,
+  } = datos;
+
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const ancho = doc.internal.pageSize.getWidth();
+  const num = `PROP-ALIM-${(menu.id || 'MEN').slice(0, 8).toUpperCase()}`;
+
+  encabezado(doc, 'PROPUESTA DE SERVICIO GASTRONÓMICO', num);
+
+  let y = 46;
+
+  // Franja datos cliente y finca
+  doc.setFillColor(244, 241, 234);
+  doc.rect(0, y, ancho, 32, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(26, 107, 94);
+  doc.text('DATOS DE LA SOLICITUD', 14, y + 8);
+  doc.setTextColor(30, 27, 19);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  const col2 = ancho / 2 + 4;
+
+  const nombreCli = cliente ? `${cliente.nombre} ${cliente.apellido || ''}`.trim() : 'Cliente particular';
+  doc.text(`Cliente: ${nombreCli}`, 14, y + 17);
+  doc.text(`Finca / Lugar: ${finca?.nombre || 'Finca Campestre'}`, col2, y + 17);
+
+  const contactoCli = cliente?.whatsapp || cliente?.correo || 'Coordinación directa';
+  doc.text(`Contacto: ${contactoCli}`, 14, y + 26);
+  doc.text(`Comensales: ${personas} personas · ${cantidadServicios} servicio(s)`, col2, y + 26);
+
+  y += 38;
+
+  // DETALLE DEL MENÚ
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(26, 107, 94);
+  doc.text('MENÚ SELECCIONADO', 14, y);
+  doc.setTextColor(30, 27, 19);
+
+  // Badge categoría
+  doc.setFillColor(230, 243, 240);
+  doc.roundedRect(ancho - 55, y - 4.5, 41, 6, 2, 2, 'F');
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(26, 107, 94);
+  doc.text(menu.categoria.toUpperCase(), ancho - 34.5, y - 0.5, { align: 'center' });
+  doc.setTextColor(30, 27, 19);
+
+  y += 7;
+
+  // Título del Menú
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text(menu.nombre, 14, y);
+  y += 6;
+
+  // Descripción del menú
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(75, 70, 60);
+  const descLineas = doc.splitTextToSize(
+    menu.descripcion || 'Servicio gastronómico completo elaborado con ingredientes frescos y preparación artesanal campesina.',
+    182
+  );
+  doc.text(descLineas, 14, y);
+  y += descLineas.length * 4.5 + 4;
+  doc.setTextColor(30, 27, 19);
+
+  // Intentar cargar e incrustar imagen si está disponible
+  const imagenUrl = menu.imagen_url || (menu.menu_imagenes && menu.menu_imagenes[0]?.url);
+  if (imagenUrl) {
+    try {
+      const b64 = await urlABase64(imagenUrl);
+      if (b64) {
+        doc.setDrawColor(219, 212, 195);
+        doc.setFillColor(248, 247, 244);
+        doc.roundedRect(14, y, 75, 45, 2, 2, 'FD');
+        doc.addImage(b64, 'JPEG', 15, y + 1, 73, 43);
+
+        // Cuadro lateral de resumen rápido al lado de la foto
+        doc.setFillColor(244, 241, 234);
+        doc.roundedRect(95, y, ancho - 109, 45, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(26, 107, 94);
+        doc.text('ASPECTOS DESTACADOS', 100, y + 8);
+        doc.setTextColor(30, 27, 19);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.text(`• Categoría: ${menu.categoria}`, 100, y + 16);
+        doc.text(`• Valor individual: ${formatCOP(menu.precio_pp)} /pp`, 100, y + 23);
+        doc.text(`• Servicio para: ${personas} personas`, 100, y + 30);
+        doc.text(`• Total servicios: ${cantidadServicios}`, 100, y + 37);
+
+        y += 50;
+      }
+    } catch {
+      // Si falla la imagen, continuamos limpiamente
+    }
+  }
+
+  y = linea(doc, y);
+  y += 2;
+
+  // TABLA DE LIQUIDACIÓN
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(26, 107, 94);
+  doc.text('COTIZACIÓN Y VALOR DEL SERVICIO', 14, y);
+  doc.setTextColor(30, 27, 19);
+  y += 7;
+
+  // Cabecera de tabla
+  doc.setFillColor(244, 241, 234);
+  doc.rect(14, y - 4, 182, 8, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text('Concepto / Menú', 16, y);
+  doc.text('Precio / Persona', 90, y);
+  doc.text('Comensales', 130, y);
+  doc.text('Subtotal', 182, y, { align: 'right' });
+  y += 6;
+  y = linea(doc, y);
+  y += 3;
+
+  const totalServicio = (menu.precio_pp || 0) * personas * cantidadServicios;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.text(menu.nombre.slice(0, 38), 16, y);
+  doc.text(formatCOP(menu.precio_pp), 90, y);
+  doc.text(`${personas} pers. × ${cantidadServicios} serv.`, 130, y);
+  doc.text(formatCOP(totalServicio), 182, y, { align: 'right' });
+  y += 8;
+
+  y = linea(doc, y);
+  y += 3;
+
+  // Total destacado
+  doc.setFillColor(230, 243, 240);
+  doc.rect(14, y - 4, 182, 10, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(26, 107, 94);
+  doc.text('VALOR TOTAL PROPUESTA:', 18, y + 2.5);
+  doc.text(formatCOP(totalServicio), 182, y + 2.5, { align: 'right' });
+  doc.setTextColor(30, 27, 19);
+  y += 14;
+
+  // CONDICIONES
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(26, 107, 94);
+  doc.text('CONDICIONES Y POLÍTICAS DEL SERVICIO', 14, y);
+  doc.setTextColor(30, 27, 19);
+  y += 6;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.8);
+  const condicionesLista = [
+    menu.condiciones ? `• ${menu.condiciones}` : '• Preparación con ingredientes seleccionados y frescos de la región.',
+    '• Para confirmar el servicio de alimentación se requiere el 50% de anticipo junto con la reserva.',
+    '• Toda modificación en el número de comensales debe notificarse con al menos 48 horas de anticipación.',
+    '• Incluye menaje estándar, vajilla campestre y atención durante el horario pactado del servicio.',
+  ];
+
+  if (notasEspeciales) {
+    condicionesLista.push(`• Observaciones particulares: ${notasEspeciales}`);
+  }
+
+  for (const cond of condicionesLista) {
+    const lines = doc.splitTextToSize(cond, 182);
+    doc.text(lines, 14, y);
+    y += lines.length * 4.2;
+  }
+
+  // Firmas
+  y += 10;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.text('Atentamente,', 14, y);
+  doc.text('Aceptado por el cliente:', col2, y);
+  y += 14;
+  doc.setDrawColor(30, 27, 19);
+  doc.line(14, y, 80, y);
+  doc.line(col2, y, col2 + 66, y);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text('Coordinación Gastronómica Fincas', 14, y + 4.5);
+  doc.text(nombreCli, col2, y + 4.5);
+
+  pie(doc);
+
+  const nombreLimpio = menu.nombre.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 25);
+  doc.save(`Propuesta_Alimentacion_${nombreLimpio}.pdf`);
+}
+

@@ -13,6 +13,7 @@ import { useDisponibilidad } from './hooks/useDisponibilidad';
 import { useClientes } from './hooks/useClientes';
 import { useCotizaciones } from './hooks/useCotizaciones';
 import { useReservas } from './hooks/useReservas';
+import { useMenus } from './hooks/useMenus';
 import { DEFAULT_WA_NUMBER } from './services/supabase';
 import type { ViewType } from './types';
 
@@ -77,6 +78,14 @@ export const App: React.FC = () => {
     eliminarPago,
     metricas: metricasReservas,
   } = useReservas();
+
+  // Fase 2: Hook de menús y alimentación
+  const {
+    menus,
+    guardar: guardarMenu,
+    cambiarEstado: cambiarEstadoMenu,
+    eliminar: eliminarMenu,
+  } = useMenus();
 
   // Sincronizar tema con el DOM
   useEffect(() => {
@@ -174,6 +183,7 @@ export const App: React.FC = () => {
             finca={selectedFinca}
             bloques={bloquesFinca}
             waNumberGlobal={waNumberGlobal}
+            menus={menus}
             onBackToCatalog={() => handleViewChange('cliente')}
           />
         </main>
@@ -212,6 +222,10 @@ export const App: React.FC = () => {
             onEliminarReserva={eliminarReserva}
             onRegistrarPago={registrarPago}
             onEliminarPago={eliminarPago}
+            menus={menus}
+            onGuardarMenu={guardarMenu}
+            onCambiarEstadoMenu={cambiarEstadoMenu}
+            onEliminarMenu={eliminarMenu}
             showToast={showToast}
             openConfirm={openConfirm}
           />

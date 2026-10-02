@@ -3,12 +3,13 @@ import { ArrowLeft, MapPin, Users, Check, Sparkles, Image as ImageIcon } from 'l
 import { CalendarPicker } from './CalendarPicker';
 import { QuoteCalculator } from './QuoteCalculator';
 import { GalleryLightbox } from './GalleryLightbox';
-import type { Finca, BloqueoDisponibilidad } from '../types';
+import type { Finca, BloqueoDisponibilidad, Menu } from '../types';
 
 interface FincaDetailProps {
   finca: Finca;
   bloques: BloqueoDisponibilidad[];
   waNumberGlobal: string;
+  menus?: Menu[];
   onBackToCatalog: () => void;
 }
 
@@ -31,8 +32,10 @@ export const FincaDetail: React.FC<FincaDetailProps> = ({
   finca,
   bloques,
   waNumberGlobal,
+  menus = [],
   onBackToCatalog,
 }) => {
+
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
   const [personas, setPersonas] = useState(Math.min(finca.capacidad || 10, 12));
@@ -176,11 +179,13 @@ export const FincaDetail: React.FC<FincaDetailProps> = ({
           personas={personas}
           plan={plan}
           waNumberGlobal={waNumberGlobal}
+          menus={menus}
           onFechaInicioChange={setFechaInicio}
           onFechaFinChange={setFechaFin}
           onPersonasChange={setPersonas}
           onPlanChange={setPlan}
         />
+
       </div>
 
       {/* Lightbox para visualización de fotos */}

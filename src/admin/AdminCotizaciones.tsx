@@ -3,12 +3,14 @@ import {
   FileText, Plus, Edit3, Trash2, X, Save, ChevronDown, ArrowRight,
   Calendar, Users, Utensils, DollarSign, Tag
 } from 'lucide-react';
-import type { CotizacionDB, CotizacionEstado, Cliente, Finca } from '../types';
+import type { CotizacionDB, CotizacionEstado, Cliente, Finca, Menu } from '../types';
+import { generarPropuestaAlimentacion } from '../services/documentos';
 
 interface AdminCotizacionesProps {
   cotizaciones: CotizacionDB[];
   clientes: Cliente[];
   fincas: Finca[];
+  menus?: Menu[];
   onGuardar: (datos: Partial<CotizacionDB>) => Promise<{ success: boolean; id?: string; error?: string }>;
   onCambiarEstado: (id: string, estado: CotizacionEstado) => Promise<{ success: boolean; error?: string }>;
   onEliminar: (id: string) => Promise<{ success: boolean; error?: string }>;
@@ -35,6 +37,8 @@ const VACIO: Partial<CotizacionDB> = {
   fecha_inicio: '',
   fecha_fin: '',
   personas: 1,
+  menu_id: null,
+  cantidad_alimentacion: 1,
   alimentacion: 'Sin alimentación',
   precio_base_pp: 0,
   subtotal_alojamiento: 0,
@@ -45,6 +49,7 @@ const VACIO: Partial<CotizacionDB> = {
   estado: 'borrador',
   notas: '',
 };
+
 
 function calcTotal(f: Partial<CotizacionDB>): number {
   return (f.subtotal_alojamiento || 0) + (f.costo_alimentacion || 0)
@@ -70,6 +75,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
   cotizaciones,
   clientes,
   fincas,
+  menus = [],
   onGuardar,
   onCambiarEstado,
   onEliminar,
@@ -81,21 +87,72 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<CotizacionEstado | 'todas'>('todas');
+  const [modoAlimentacionPersonalizada, setModoAlimentacionPersonalizada] = useState(false);
 
-  const abrirNuevo = () => { setForm(VACIO); setEditando(true); };
-  const abrirEdicion = (c: CotizacionDB) => { setForm({ ...c }); setEditando(true); };
+  const abrirNuevo = () => {
+    setForm(VACIO);
+    setModoAlimentacionPersonalizada(false);
+    setEditando(true);
+  };
+  const abrirEdicion = (c: CotizacionDB) => {
+    setForm({ ...c });
+    setModoAlimentacionPersonalizada(!c.menu_id && !!c.alimentacion && c.alimentacion !== 'Sin alimentación');
+    setEditando(true);
+  };
   const cerrar = () => { setForm(VACIO); setEditando(false); };
 
   // Recalcular subtotal cuando cambian fechas, personas, precio
   const recalcular = (f: Partial<CotizacionDB>): Partial<CotizacionDB> => {
     const n = noches(f.fecha_inicio || '', f.fecha_fin || '');
     const subtotal = n * (f.personas || 1) * (f.precio_base_pp || 0);
-    const total = subtotal + (f.costo_alimentacion || 0) - (f.descuento || 0) + (f.recargo || 0);
-    return { ...f, subtotal_alojamiento: subtotal, total };
+
+    // Si tiene menú vinculado, recalcular costo de alimentación automáticamente
+    let costoAlim = f.costo_alimentacion ?? 0;
+    if (f.menu_id && !modoAlimentacionPersonalizada) {
+      const m = menus.find(x => x.id === f.menu_id);
+      if (m) {
+        const cant = f.cantidad_alimentacion || n;
+        costoAlim = (m.precio_pp || 0) * (f.personas || 1) * cant;
+      }
+    }
+
+    const total = subtotal + costoAlim - (f.descuento || 0) + (f.recargo || 0);
+    return { ...f, subtotal_alojamiento: subtotal, costo_alimentacion: costoAlim, total };
   };
 
   const updateField = (campo: keyof CotizacionDB, valor: any) => {
     setForm(prev => recalcular({ ...prev, [campo]: valor }));
+  };
+
+  // Al seleccionar menú
+  const handleMenuSelect = (menuId: string) => {
+    if (menuId === 'custom') {
+      setModoAlimentacionPersonalizada(true);
+      setForm(prev => ({ ...prev, menu_id: null, alimentacion: '' }));
+      return;
+    }
+    setModoAlimentacionPersonalizada(false);
+    if (!menuId) {
+      setForm(prev => recalcular({
+        ...prev,
+        menu_id: null,
+        alimentacion: 'Sin alimentación',
+        costo_alimentacion: 0,
+      }));
+      return;
+    }
+    const m = menus.find(x => x.id === menuId);
+    if (!m) return;
+    const n = noches(form.fecha_inicio || '', form.fecha_fin || '');
+    const cant = form.cantidad_alimentacion || n;
+    const costo = (m.precio_pp || 0) * (form.personas || 1) * cant;
+    setForm(prev => recalcular({
+      ...prev,
+      menu_id: m.id,
+      alimentacion: `${m.categoria}: ${m.nombre}`,
+      cantidad_alimentacion: cant,
+      costo_alimentacion: costo,
+    }));
   };
 
   // Al seleccionar finca, copiar precio_pp
@@ -103,6 +160,36 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
     const finca = fincas.find(f => f.id === fincaId);
     setForm(prev => recalcular({ ...prev, finca_id: fincaId, precio_base_pp: finca?.precio_pp || 0 }));
   };
+
+  // Descargar PDF de alimentación
+  const handleDescargarPdfAlimentacion = async (c: CotizacionDB) => {
+    const m = menus.find(x => x.id === c.menu_id) || (c.alimentacion && c.alimentacion !== 'Sin alimentación' ? {
+      id: c.menu_id || 'cotiz-menu',
+      nombre: c.alimentacion,
+      categoria: 'Almuerzo' as const,
+      precio_pp: (c.costo_alimentacion || 0) / Math.max(1, (c.personas || 1) * (c.cantidad_alimentacion || c.noches || 1)),
+      activo: true,
+    } : null);
+
+    if (!m) {
+      showToast('Esta cotización no incluye servicio de alimentación', 'info');
+      return;
+    }
+
+    try {
+      await generarPropuestaAlimentacion({
+        menu: m,
+        cliente: c.clientes,
+        finca: c.fincas,
+        personas: c.personas,
+        cantidadServicios: c.cantidad_alimentacion || c.noches || 1,
+      });
+      showToast('Propuesta de alimentación descargada en PDF ✅', 'success');
+    } catch {
+      showToast('Error generando PDF de propuesta de alimentación', 'error');
+    }
+  };
+
 
   const handleGuardar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,15 +300,52 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
                   <input type="date" value={form.fecha_fin || ''} min={form.fecha_inicio || ''} onChange={e => updateField('fecha_fin', e.target.value)} />
                 </div>
 
-                {/* Personas y alimentación */}
+                {/* Personas */}
                 <div className="field">
                   <label><Users size={11} style={{ display:'inline', verticalAlign:'-1px' }} /> Personas</label>
                   <input type="number" min={1} max={fincaSeleccionada?.capacidad || 100} value={form.personas || 1} onChange={e => updateField('personas', +e.target.value)} />
                 </div>
+
+                {/* Selección de Menú */}
                 <div className="field">
-                  <label><Utensils size={11} style={{ display:'inline', verticalAlign:'-1px' }} /> Alimentación</label>
-                  <input value={form.alimentacion || ''} onChange={e => updateField('alimentacion', e.target.value)} placeholder="Ej. Sin alimentación" />
+                  <label><Utensils size={11} style={{ display:'inline', verticalAlign:'-1px' }} /> Menú de Alimentación</label>
+                  <select
+                    value={modoAlimentacionPersonalizada ? 'custom' : (form.menu_id || '')}
+                    onChange={e => handleMenuSelect(e.target.value)}
+                  >
+                    <option value="">— Sin alimentación ($0) —</option>
+                    {menus.filter(m => m.activo).map(m => (
+                      <option key={m.id} value={m.id}>
+                        [{m.categoria}] {m.nombre} — {formatCOP(m.precio_pp)}/pp
+                      </option>
+                    ))}
+                    <option value="custom">✏️ Personalizado / Texto libre</option>
+                  </select>
                 </div>
+
+                {/* Cantidad de servicios/días de alimentación */}
+                {(form.menu_id || modoAlimentacionPersonalizada || (form.costo_alimentacion || 0) > 0) && (
+                  <>
+                    <div className="field">
+                      <label>Servicios / Días de alimentación</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={form.cantidad_alimentacion || nochesCotiz || 1}
+                        onChange={e => updateField('cantidad_alimentacion', Math.max(1, +e.target.value))}
+                      />
+                    </div>
+
+                    <div className="field">
+                      <label>Detalle / Nombre alimentación</label>
+                      <input
+                        value={form.alimentacion || ''}
+                        onChange={e => updateField('alimentacion', e.target.value)}
+                        placeholder="Ej. Sancocho en leña"
+                      />
+                    </div>
+                  </>
+                )}
 
                 {/* Valores */}
                 <div className="field">
@@ -253,7 +377,12 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
               <div className="quote-card" style={{ margin: '0' }}>
                 <div className="quote-row"><span className="text-muted">Noches:</span><span>{nochesCotiz}</span></div>
                 <div className="quote-row"><span className="text-muted">Alojamiento ({nochesCotiz}n × {form.personas}pp):</span><span>{formatCOP(form.subtotal_alojamiento || 0)}</span></div>
-                {(form.costo_alimentacion || 0) > 0 && <div className="quote-row"><span className="text-muted">Alimentación:</span><span>+{formatCOP(form.costo_alimentacion || 0)}</span></div>}
+                {(form.costo_alimentacion || 0) > 0 && (
+                  <div className="quote-row">
+                    <span className="text-muted">Alimentación ({form.alimentacion || 'Menú'}):</span>
+                    <span>+{formatCOP(form.costo_alimentacion || 0)}</span>
+                  </div>
+                )}
                 {(form.descuento || 0) > 0 && <div className="quote-row"><span className="text-muted">Descuento:</span><span style={{ color: 'var(--success)' }}>−{formatCOP(form.descuento || 0)}</span></div>}
                 {(form.recargo || 0) > 0 && <div className="quote-row"><span className="text-muted">Recargo:</span><span style={{ color: 'var(--danger)' }}>+{formatCOP(form.recargo || 0)}</span></div>}
                 <div className="quote-row quote-total"><span>Total:</span><span>{formatCOP(calcTotal(form))}</span></div>
@@ -283,12 +412,19 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
           filtradas.map(c => {
             const clienteNombre = c.clientes ? `${c.clientes.nombre} ${c.clientes.apellido || ''}`.trim() : '—';
             const fincaNombre = c.fincas?.nombre || '—';
+            const tieneAlimentacion = (c.costo_alimentacion || 0) > 0 || (c.alimentacion && c.alimentacion !== 'Sin alimentación');
+
             return (
               <div key={c.id} className="avail-row" style={{ alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <Tag size={12} /> {fincaNombre}
                     <span className={`status-badge ${ESTADO_COLORS[c.estado]}`} style={{ fontSize: '0.68rem' }}>{c.estado}</span>
+                    {tieneAlimentacion && (
+                      <span className="status-badge s-avail" style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <Utensils size={10} /> {c.alimentacion || 'Con alimentación'}
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
                     <Calendar size={10} style={{ display:'inline', verticalAlign:'-1px' }} /> {formatFecha(c.fecha_inicio)} → {formatFecha(c.fecha_fin)}
@@ -297,10 +433,27 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
                   </div>
                   <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.9rem', marginTop: '0.15rem' }}>
                     {formatCOP(c.total)}
+                    {tieneAlimentacion && (
+                      <span style={{ fontSize: '0.72rem', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '0.45rem' }}>
+                        (incluye {formatCOP(c.costo_alimentacion)} en alimentación)
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* Botón generar propuesta PDF de alimentación */}
+                  {tieneAlimentacion && (
+                    <button
+                      className="btn btn-sm btn-primary"
+                      style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.55rem' }}
+                      title="Descargar Propuesta de Alimentación en PDF"
+                      onClick={() => handleDescargarPdfAlimentacion(c)}
+                    >
+                      <Utensils size={12} /> PDF Menú
+                    </button>
+                  )}
+
                   {/* Cambio rápido de estado */}
                   <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                     <select
