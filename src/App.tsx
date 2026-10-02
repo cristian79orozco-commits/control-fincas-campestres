@@ -14,6 +14,7 @@ import { useClientes } from './hooks/useClientes';
 import { useCotizaciones } from './hooks/useCotizaciones';
 import { useReservas } from './hooks/useReservas';
 import { useMenus } from './hooks/useMenus';
+import { useComunicaciones } from './hooks/useComunicaciones';
 import { DEFAULT_WA_NUMBER } from './services/supabase';
 import type { ViewType } from './types';
 
@@ -86,6 +87,13 @@ export const App: React.FC = () => {
     cambiarEstado: cambiarEstadoMenu,
     eliminar: eliminarMenu,
   } = useMenus();
+
+  // Fase 3: Hook de comunicaciones y WhatsApp
+  const {
+    comunicaciones,
+    registrarComunicacion,
+    limpiarHistorial: limpiarHistorialComunicaciones,
+  } = useComunicaciones();
 
   // Sincronizar tema con el DOM
   useEffect(() => {
@@ -226,6 +234,9 @@ export const App: React.FC = () => {
             onGuardarMenu={guardarMenu}
             onCambiarEstadoMenu={cambiarEstadoMenu}
             onEliminarMenu={eliminarMenu}
+            comunicaciones={comunicaciones}
+            onRegistrarComunicacion={registrarComunicacion}
+            onLimpiarHistorialComunicaciones={limpiarHistorialComunicaciones}
             showToast={showToast}
             openConfirm={openConfirm}
           />

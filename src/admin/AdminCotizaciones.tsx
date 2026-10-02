@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import {
   FileText, Plus, Edit3, Trash2, X, Save, ChevronDown, ArrowRight,
-  Calendar, Users, Utensils, DollarSign, Tag
+  Calendar, Users, Utensils, DollarSign, Tag, MessageCircle
 } from 'lucide-react';
 import type { CotizacionDB, CotizacionEstado, Cliente, Finca, Menu } from '../types';
 import { generarPropuestaAlimentacion } from '../services/documentos';
+import { WhatsAppModal } from '../components/WhatsAppModal';
+import { plantillaCotizacion, plantillaPropuestaAlimentacion } from '../services/whatsapp';
 
 interface AdminCotizacionesProps {
   cotizaciones: CotizacionDB[];
@@ -15,6 +17,7 @@ interface AdminCotizacionesProps {
   onCambiarEstado: (id: string, estado: CotizacionEstado) => Promise<{ success: boolean; error?: string }>;
   onEliminar: (id: string) => Promise<{ success: boolean; error?: string }>;
   onConvertirReserva?: (cotizacion: CotizacionDB) => void;
+  onRegistrarComunicacion?: (com: any) => void;
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   openConfirm: (title: string, message: string, onConfirm: () => void) => void;
 }
@@ -80,6 +83,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
   onCambiarEstado,
   onEliminar,
   onConvertirReserva,
+  onRegistrarComunicacion,
   showToast,
   openConfirm,
 }) => {
@@ -88,6 +92,20 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
   const [guardando, setGuardando] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<CotizacionEstado | 'todas'>('todas');
   const [modoAlimentacionPersonalizada, setModoAlimentacionPersonalizada] = useState(false);
+  const [modalWaCotiz, setModalWaCotiz] = useState<{
+    abierto: boolean;
+    cotizacion?: CotizacionDB;
+    titulo: string;
+    nombreDoc?: string;
+    mensaje: string;
+    onGenerarPdf?: () => void;
+    tipo: 'cotizacion' | 'menu';
+  }>({
+    abierto: false,
+    titulo: '',
+    mensaje: '',
+    tipo: 'cotizacion',
+  });
 
   const abrirNuevo = () => {
     setForm(VACIO);
@@ -188,6 +206,47 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
     } catch {
       showToast('Error generando PDF de propuesta de alimentación', 'error');
     }
+  };
+
+  const handleAbrirWaCotizacion = (c: CotizacionDB) => {
+    setModalWaCotiz({
+      abierto: true,
+      cotizacion: c,
+      titulo: `Cotización Oficial · ${c.fincas?.nombre || 'Finca'}`,
+      mensaje: plantillaCotizacion(c, c.fincas, c.clientes),
+      tipo: 'cotizacion',
+    });
+  };
+
+  const handleAbrirWaMenu = (c: CotizacionDB) => {
+    const m = menus.find(x => x.id === c.menu_id) || (c.alimentacion && c.alimentacion !== 'Sin alimentación' ? {
+      id: c.menu_id || 'cotiz-menu',
+      nombre: c.alimentacion,
+      categoria: 'Almuerzo' as const,
+      precio_pp: (c.costo_alimentacion || 0) / Math.max(1, (c.personas || 1) * (c.cantidad_alimentacion || c.noches || 1)),
+      activo: true,
+    } : null);
+
+    if (!m) {
+      showToast('Esta cotización no incluye servicio de alimentación', 'info');
+      return;
+    }
+
+    setModalWaCotiz({
+      abierto: true,
+      cotizacion: c,
+      titulo: `Propuesta de Menú · ${m.nombre}`,
+      nombreDoc: 'Propuesta de Alimentación (PDF)',
+      mensaje: plantillaPropuestaAlimentacion({
+        menu: m,
+        cliente: c.clientes,
+        finca: c.fincas,
+        personas: c.personas,
+        cantidadServicios: c.cantidad_alimentacion || c.noches || 1,
+      }),
+      onGenerarPdf: () => handleDescargarPdfAlimentacion(c),
+      tipo: 'menu',
+    });
   };
 
 
@@ -442,16 +501,36 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* Botón WhatsApp Cotización */}
+                  <button
+                    className="btn btn-sm"
+                    style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.55rem', color: '#25d366', borderColor: '#25d366' }}
+                    title="Enviar cotización por WhatsApp al cliente"
+                    onClick={() => handleAbrirWaCotizacion(c)}
+                  >
+                    <MessageCircle size={12} /> WhatsApp
+                  </button>
+
                   {/* Botón generar propuesta PDF de alimentación */}
                   {tieneAlimentacion && (
-                    <button
-                      className="btn btn-sm btn-primary"
-                      style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.55rem' }}
-                      title="Descargar Propuesta de Alimentación en PDF"
-                      onClick={() => handleDescargarPdfAlimentacion(c)}
-                    >
-                      <Utensils size={12} /> PDF Menú
-                    </button>
+                    <>
+                      <button
+                        className="btn btn-sm btn-primary"
+                        style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.55rem' }}
+                        title="Descargar Propuesta de Alimentación en PDF"
+                        onClick={() => handleDescargarPdfAlimentacion(c)}
+                      >
+                        <Utensils size={12} /> PDF Menú
+                      </button>
+                      <button
+                        className="btn btn-sm"
+                        style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.55rem', color: '#25d366', borderColor: '#25d366' }}
+                        title="Enviar Propuesta de Menú por WhatsApp"
+                        onClick={() => handleAbrirWaMenu(c)}
+                      >
+                        <Utensils size={12} /> WA Menú
+                      </button>
+                    </>
                   )}
 
                   {/* Cambio rápido de estado */}
@@ -484,6 +563,32 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
           })
         )}
       </div>
+
+      {/* Modal de WhatsApp para Cotizaciones y Menús */}
+      {modalWaCotiz.abierto && modalWaCotiz.cotizacion && (
+        <WhatsAppModal
+          isOpen={modalWaCotiz.abierto}
+          onClose={() => setModalWaCotiz(p => ({ ...p, abierto: false }))}
+          titulo={modalWaCotiz.titulo}
+          destinatarioNombre={modalWaCotiz.cotizacion.clientes ? `${modalWaCotiz.cotizacion.clientes.nombre} ${modalWaCotiz.cotizacion.clientes.apellido || ''}`.trim() : 'Cliente'}
+          telefonoInicial={modalWaCotiz.cotizacion.clientes?.whatsapp || ''}
+          mensajeInicial={modalWaCotiz.mensaje}
+          nombreDocumento={modalWaCotiz.nombreDoc}
+          onGenerarPdf={modalWaCotiz.onGenerarPdf}
+          onDespuesDeEnviar={(tel, msg) => {
+            showToast('Cotización enviada por WhatsApp al cliente ✅', 'success');
+            onRegistrarComunicacion?.({
+              cliente_id: modalWaCotiz.cotizacion?.cliente_id || null,
+              cotizacion_id: modalWaCotiz.cotizacion?.id || null,
+              tipo: modalWaCotiz.tipo,
+              destinatario: modalWaCotiz.cotizacion?.clientes ? `${modalWaCotiz.cotizacion.clientes.nombre} ${modalWaCotiz.cotizacion.clientes.apellido || ''}`.trim() : 'Cliente',
+              telefono: tel,
+              mensaje: msg,
+              estado: 'enviado',
+            });
+          }}
+        />
+      )}
     </div>
   );
 };

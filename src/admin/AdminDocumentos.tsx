@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Download, Lock, CheckCircle, AlertTriangle, CreditCard } from 'lucide-react';
+import { FileText, Download, Lock, CheckCircle, AlertTriangle, CreditCard, MessageCircle } from 'lucide-react';
 import type { Reserva, Pago } from '../types';
 import { calcularSaldo } from '../types';
 import {
@@ -8,51 +8,141 @@ import {
   generarEstadoCuenta,
   generarPazYSalvo,
 } from '../services/documentos';
+import {
+  plantillaSeparacion,
+  plantillaComprobantePago,
+  plantillaEstadoCuenta,
+  plantillaPazYSalvo,
+} from '../services/whatsapp';
+import { WhatsAppModal } from '../components/WhatsAppModal';
 
 interface AdminDocumentosProps {
   reserva: Reserva;
+  onRegistrarEnvio?: (com: any) => void;
+  showToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
-export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({ reserva }) => {
+export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
+  reserva,
+  onRegistrarEnvio,
+  showToast,
+}) => {
   const [generando, setGenerando] = useState<string | null>(null);
   const [pagoSeleccionado, setPagoSeleccionado] = useState<string>('');
+
+  // Estado del modal de WhatsApp
+  const [modalWa, setModalWa] = useState<{
+    abierto: boolean;
+    titulo: string;
+    nombreDoc: string;
+    mensaje: string;
+    onGenerarPdf: () => Promise<void> | void;
+    tipoComunicacion: 'separacion' | 'abono' | 'estado_cuenta' | 'paz_salvo';
+  }>({
+    abierto: false,
+    titulo: '',
+    nombreDoc: '',
+    mensaje: '',
+    onGenerarPdf: () => {},
+    tipoComunicacion: 'separacion',
+  });
 
   const saldo = calcularSaldo(reserva);
   const pagos: Pago[] = reserva.pagos || [];
   const pazYSalvoDisponible = saldo <= 0 && pagos.length > 0;
+  const clienteNombre = reserva.clientes ? `${reserva.clientes.nombre} ${reserva.clientes.apellido || ''}`.trim() : 'Cliente';
+  const telefonoCliente = reserva.clientes?.whatsapp || reserva.clientes?.telefono || '';
 
-  const ejecutar = async (tipo: string, fn: () => void) => {
+  const ejecutarDescarga = async (tipo: string, fn: () => void) => {
     setGenerando(tipo);
     try {
-      // jsPDF es síncrono, pero lo envolvemos para UI feedback
       await new Promise<void>(res => {
         setTimeout(() => { fn(); res(); }, 80);
       });
+      showToast?.('Documento PDF descargado ✅', 'success');
     } finally {
       setGenerando(null);
     }
   };
 
-  const handleSeparacion = () =>
-    ejecutar('separacion', () => generarDocSeparacion(reserva));
+  // Acciones WhatsApp
+  const abrirWaSeparacion = () => {
+    setModalWa({
+      abierto: true,
+      titulo: 'Enviar Separación por WhatsApp',
+      nombreDoc: 'Documento Oficial de Separación (PDF)',
+      mensaje: plantillaSeparacion(reserva),
+      onGenerarPdf: () => generarDocSeparacion(reserva),
+      tipoComunicacion: 'separacion',
+    });
+  };
 
-  const handleEstadoCuenta = () =>
-    ejecutar('estado_cuenta', () => generarEstadoCuenta(reserva));
+  const abrirWaEstadoCuenta = () => {
+    setModalWa({
+      abierto: true,
+      titulo: 'Enviar Estado de Cuenta por WhatsApp',
+      nombreDoc: 'Estado de Cuenta Consolidado (PDF)',
+      mensaje: plantillaEstadoCuenta(reserva),
+      onGenerarPdf: () => generarEstadoCuenta(reserva),
+      tipoComunicacion: 'estado_cuenta',
+    });
+  };
 
-  const handlePazYSalvo = () =>
-    ejecutar('paz_salvo', () => generarPazYSalvo(reserva));
+  const abrirWaPazYSalvo = () => {
+    setModalWa({
+      abierto: true,
+      titulo: 'Enviar Paz y Salvo por WhatsApp',
+      nombreDoc: 'Certificado de Paz y Salvo (PDF)',
+      mensaje: plantillaPazYSalvo(reserva),
+      onGenerarPdf: () => generarPazYSalvo(reserva),
+      tipoComunicacion: 'paz_salvo',
+    });
+  };
 
-  const handleComprobante = () => {
-    if (!pagoSeleccionado) return;
+  const abrirWaComprobante = () => {
+    if (!pagoSeleccionado) {
+      showToast?.('Selecciona primero un pago para enviar su comprobante', 'info');
+      return;
+    }
     const pago = pagos.find(p => p.id === pagoSeleccionado);
     if (!pago) return;
-    ejecutar('abono_' + pago.id, () => generarComprobantePago(reserva, pago));
+
+    setModalWa({
+      abierto: true,
+      titulo: 'Enviar Comprobante de Abono por WhatsApp',
+      nombreDoc: `Comprobante de Pago (${pago.tipo})`,
+      mensaje: plantillaComprobantePago(reserva, pago),
+      onGenerarPdf: () => generarComprobantePago(reserva, pago),
+      tipoComunicacion: 'abono',
+    });
+  };
+
+  const handleEnvioExitoso = (tel: string, msg: string) => {
+    showToast?.('WhatsApp abierto y documento generado correctamente ✅', 'success');
+    if (onRegistrarEnvio) {
+      onRegistrarEnvio({
+        cliente_id: reserva.cliente_id || null,
+        reserva_id: reserva.id,
+        tipo: modalWa.tipoComunicacion,
+        destinatario: clienteNombre,
+        telefono: tel,
+        mensaje: msg,
+        estado: 'enviado',
+      });
+    }
   };
 
   return (
-    <div style={{ display: 'grid', gap: '0.6rem' }}>
-      <div style={{ fontWeight: 600, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary)' }}>
-        <FileText size={15} /> Documentos de la reserva
+    <div style={{ display: 'grid', gap: '0.75rem' }}>
+      <div style={{ fontWeight: 600, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--primary)' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <FileText size={15} /> Documentos y Comunicaciones
+        </span>
+        {telefonoCliente && (
+          <span style={{ fontSize: '0.74rem', color: '#25d366', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+            <MessageCircle size={12} /> WhatsApp: {telefonoCliente}
+          </span>
+        )}
       </div>
 
       {/* Saldo pendiente */}
@@ -71,69 +161,115 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({ reserva }) => 
       >
         {saldo > 0
           ? <><AlertTriangle size={13} /> Saldo pendiente: ${saldo.toLocaleString('es-CO')} COP</>
-          : <><CheckCircle size={13} /> Reserva completamente pagada</>
+          : <><CheckCircle size={13} /> Reserva completamente pagada (Paz y Salvo habilitado)</>
         }
       </div>
 
-      {/* Botones de documentos */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
+      {/* Grid de documentos con descarga y envío por WhatsApp */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.6rem' }}>
         {/* 1. Separación */}
-        <button
-          className="btn btn-sm"
-          style={{ justifyContent: 'flex-start', gap: '0.4rem', fontSize: '0.78rem' }}
-          onClick={handleSeparacion}
-          disabled={generando === 'separacion'}
-          title="Descargar documento de separación"
-        >
-          <Download size={12} />
-          {generando === 'separacion' ? 'Generando…' : 'Separación'}
-        </button>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--rad-xs)', padding: '0.55rem 0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>Separación</span>
+          <div style={{ display: 'flex', gap: '0.3rem' }}>
+            <button
+              className="btn btn-sm"
+              onClick={() => ejecutarDescarga('separacion', () => generarDocSeparacion(reserva))}
+              disabled={generando === 'separacion'}
+              title="Descargar PDF de Separación"
+              style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
+            >
+              <Download size={11} /> PDF
+            </button>
+            <button
+              className="btn btn-sm"
+              onClick={abrirWaSeparacion}
+              title="Generar PDF y Enviar por WhatsApp"
+              style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', color: '#25d366', borderColor: '#25d366' }}
+            >
+              <MessageCircle size={11} /> WhatsApp
+            </button>
+          </div>
+        </div>
 
-        {/* 3. Estado de cuenta */}
-        <button
-          className="btn btn-sm"
-          style={{ justifyContent: 'flex-start', gap: '0.4rem', fontSize: '0.78rem' }}
-          onClick={handleEstadoCuenta}
-          disabled={generando === 'estado_cuenta'}
-          title="Descargar estado de cuenta"
-        >
-          <Download size={12} />
-          {generando === 'estado_cuenta' ? 'Generando…' : 'Estado de cuenta'}
-        </button>
+        {/* 2. Estado de cuenta */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--rad-xs)', padding: '0.55rem 0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>Estado de cuenta</span>
+          <div style={{ display: 'flex', gap: '0.3rem' }}>
+            <button
+              className="btn btn-sm"
+              onClick={() => ejecutarDescarga('estado_cuenta', () => generarEstadoCuenta(reserva))}
+              disabled={generando === 'estado_cuenta'}
+              title="Descargar PDF de Estado de Cuenta"
+              style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
+            >
+              <Download size={11} /> PDF
+            </button>
+            <button
+              className="btn btn-sm"
+              onClick={abrirWaEstadoCuenta}
+              title="Generar PDF y Enviar por WhatsApp"
+              style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', color: '#25d366', borderColor: '#25d366' }}
+            >
+              <MessageCircle size={11} /> WhatsApp
+            </button>
+          </div>
+        </div>
 
-        {/* 4. Paz y salvo */}
-        <button
-          className="btn btn-sm"
-          style={{
-            justifyContent: 'flex-start', gap: '0.4rem', fontSize: '0.78rem',
-            gridColumn: '1 / -1',
-            opacity: pazYSalvoDisponible ? 1 : 0.5,
-            cursor: pazYSalvoDisponible ? 'pointer' : 'not-allowed',
-          }}
-          onClick={pazYSalvoDisponible ? handlePazYSalvo : undefined}
-          disabled={!pazYSalvoDisponible || generando === 'paz_salvo'}
-          title={pazYSalvoDisponible ? 'Descargar paz y salvo' : 'Solo disponible cuando el saldo es cero'}
-        >
-          {pazYSalvoDisponible
-            ? <CheckCircle size={12} style={{ color: 'var(--success)' }} />
-            : <Lock size={12} />
-          }
-          {generando === 'paz_salvo' ? 'Generando…' : 'Paz y salvo'}
-          {!pazYSalvoDisponible && <span style={{ fontSize: '0.68rem', color: 'var(--text-faint)', marginLeft: 'auto' }}>Solo con saldo = 0</span>}
-        </button>
+        {/* 3. Paz y salvo */}
+        <div style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--rad-xs)',
+          padding: '0.55rem 0.7rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          opacity: pazYSalvoDisponible ? 1 : 0.6,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            {pazYSalvoDisponible
+              ? <CheckCircle size={12} style={{ color: 'var(--success)' }} />
+              : <Lock size={12} />
+            }
+            <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>Paz y salvo</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.3rem' }}>
+            <button
+              className="btn btn-sm"
+              onClick={pazYSalvoDisponible ? () => ejecutarDescarga('paz_salvo', () => generarPazYSalvo(reserva)) : undefined}
+              disabled={!pazYSalvoDisponible || generando === 'paz_salvo'}
+              title={pazYSalvoDisponible ? "Descargar Paz y Salvo" : "Requiere saldo = 0"}
+              style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
+            >
+              <Download size={11} /> PDF
+            </button>
+            <button
+              className="btn btn-sm"
+              onClick={pazYSalvoDisponible ? abrirWaPazYSalvo : undefined}
+              disabled={!pazYSalvoDisponible}
+              title={pazYSalvoDisponible ? "Generar y Enviar Paz y Salvo por WhatsApp" : "Requiere saldo = 0"}
+              style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', color: pazYSalvoDisponible ? '#25d366' : 'inherit', borderColor: pazYSalvoDisponible ? '#25d366' : 'var(--border)' }}
+            >
+              <MessageCircle size={11} /> WhatsApp
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* 2. Comprobante de abono — requiere seleccionar pago */}
+      {/* 4. Comprobante de abono específico */}
       {pagos.length > 0 && (
-        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <CreditCard size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--rad-xs)', padding: '0.65rem 0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', fontWeight: 500, minWidth: '130px' }}>
+            <CreditCard size={13} style={{ color: 'var(--primary)' }} /> Comprobante:
+          </div>
+
           <select
             value={pagoSeleccionado}
             onChange={e => setPagoSeleccionado(e.target.value)}
             className="btn btn-sm"
-            style={{ flex: 1, fontSize: '0.75rem', minWidth: '160px' }}
+            style={{ flex: 1, fontSize: '0.75rem', minWidth: '170px' }}
           >
-            <option value="">— Seleccionar pago —</option>
+            <option value="">— Seleccionar pago registrado —</option>
             {pagos.map(p => {
               const [y, m, d] = (p.fecha || '').split('-');
               return (
@@ -143,23 +279,48 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({ reserva }) => 
               );
             })}
           </select>
+
           <button
             className="btn btn-sm"
-            style={{ fontSize: '0.75rem', gap: '0.35rem' }}
-            onClick={handleComprobante}
+            style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.5rem' }}
+            onClick={() => {
+              const p = pagos.find(x => x.id === pagoSeleccionado);
+              if (p) ejecutarDescarga('abono_' + p.id, () => generarComprobantePago(reserva, p));
+            }}
             disabled={!pagoSeleccionado || generando?.startsWith('abono_')}
           >
-            <Download size={12} />
-            {generando?.startsWith('abono_') ? 'Generando…' : 'Comprobante'}
+            <Download size={11} /> PDF
+          </button>
+
+          <button
+            className="btn btn-sm"
+            style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.5rem', color: '#25d366', borderColor: '#25d366' }}
+            onClick={abrirWaComprobante}
+            disabled={!pagoSeleccionado}
+          >
+            <MessageCircle size={11} /> WhatsApp
           </button>
         </div>
       )}
 
       {pagos.length === 0 && (
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-faint)', fontStyle: 'italic' }}>
-          Registra pagos para generar comprobantes de abono.
+        <p style={{ fontSize: '0.75rem', color: 'var(--text-faint)', fontStyle: 'italic', margin: 0 }}>
+          Registra pagos en la reserva para generar y enviar comprobantes de abono.
         </p>
       )}
+
+      {/* Modal interactivo de WhatsApp */}
+      <WhatsAppModal
+        isOpen={modalWa.abierto}
+        onClose={() => setModalWa(p => ({ ...p, abierto: false }))}
+        titulo={modalWa.titulo}
+        destinatarioNombre={clienteNombre}
+        telefonoInicial={telefonoCliente}
+        mensajeInicial={modalWa.mensaje}
+        nombreDocumento={modalWa.nombreDoc}
+        onGenerarPdf={modalWa.onGenerarPdf}
+        onDespuesDeEnviar={handleEnvioExitoso}
+      />
     </div>
   );
 };

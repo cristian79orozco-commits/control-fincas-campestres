@@ -7,13 +7,14 @@ import {
 import { AdminFincaForm } from './AdminFincaForm';
 import { AdminCalendar } from './AdminCalendar';
 import { AdminWaConfig } from './AdminWaConfig';
+import { AdminComunicaciones } from './AdminComunicaciones';
 import { AdminClientes } from './AdminClientes';
 import { AdminCotizaciones } from './AdminCotizaciones';
 import { AdminReservas } from './AdminReservas';
 import { AdminMenus } from './AdminMenus';
 import type {
   Finca, BloqueoDisponibilidad, Cliente, CotizacionDB, CotizacionEstado,
-  Reserva, ReservaEstado, PagoTipo, AdminSection, Menu as MenuType
+  Reserva, ReservaEstado, PagoTipo, AdminSection, Menu as MenuType, Comunicacion
 } from '../types';
 
 interface AdminDashboardProps {
@@ -51,6 +52,10 @@ interface AdminDashboardProps {
   onGuardarMenu: (menuData: Partial<MenuType>, imagenesUrls?: string[]) => Promise<{ success: boolean; id?: string; error?: string }>;
   onCambiarEstadoMenu: (id: string, activo: boolean) => Promise<{ success: boolean; error?: string }>;
   onEliminarMenu: (id: string) => Promise<{ success: boolean; error?: string }>;
+  // Comunicaciones (Fase 3)
+  comunicaciones?: Comunicacion[];
+  onRegistrarComunicacion?: (com: any) => Promise<any>;
+  onLimpiarHistorialComunicaciones?: () => void;
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   openConfirm: (title: string, message: string, onConfirm: () => void) => void;
 }
@@ -63,7 +68,7 @@ const NAV_ITEMS: { section: AdminSection; label: string; icon: React.ReactNode }
   { section: 'cotizaciones', label: 'Cotizaciones',   icon: <FileText size={16} /> },
   { section: 'reservas',     label: 'Reservas',       icon: <ClipboardList size={16} /> },
   { section: 'menus',        label: 'Menús',          icon: <UtensilsCrossed size={16} /> },
-  { section: 'whatsapp',     label: 'WhatsApp',       icon: <MessageCircle size={16} /> },
+  { section: 'whatsapp',     label: 'Comunicaciones', icon: <MessageCircle size={16} /> },
 ];
 
 function formatCOP(v: number) { return '$' + v.toLocaleString('es-CO'); }
@@ -99,6 +104,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onGuardarMenu,
   onCambiarEstadoMenu,
   onEliminarMenu,
+  comunicaciones = [],
+  onRegistrarComunicacion,
+  onLimpiarHistorialComunicaciones,
   showToast,
   openConfirm,
 }) => {
@@ -403,6 +411,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               onCambiarEstado={onCambiarEstadoCotizacion}
               onEliminar={onEliminarCotizacion}
               onConvertirReserva={handleConvertirReserva}
+              onRegistrarComunicacion={onRegistrarComunicacion}
               showToast={showToast}
               openConfirm={openConfirm}
             />
@@ -420,6 +429,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               onEliminar={onEliminarReserva}
               onRegistrarPago={onRegistrarPago}
               onEliminarPago={onEliminarPago}
+              onRegistrarComunicacion={onRegistrarComunicacion}
               showToast={showToast}
               openConfirm={openConfirm}
               cotizacionInicial={cotizacionParaReserva}
@@ -441,11 +451,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             />
           )}
 
-          {/* ===== SECCIÓN: WHATSAPP ===== */}
+          {/* ===== SECCIÓN: COMUNICACIONES Y WHATSAPP (FASE 3) ===== */}
           {activeSection === 'whatsapp' && (
-            <AdminWaConfig
+            <AdminComunicaciones
               currentWaNumber={currentWaNumber}
               onSaveWaNumber={onSaveWaNumber}
+              clientes={clientes}
+              fincas={fincas}
+              reservas={reservas}
+              cotizaciones={cotizaciones}
+              menus={menus}
+              comunicaciones={comunicaciones}
+              onRegistrarComunicacion={onRegistrarComunicacion || (async () => {})}
+              onLimpiarHistorial={onLimpiarHistorialComunicaciones}
               showToast={showToast}
             />
           )}

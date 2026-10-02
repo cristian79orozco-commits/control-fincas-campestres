@@ -228,3 +228,32 @@ export type AdminSection =
   | 'menus'
   | 'whatsapp';
 
+// ---------------------------------------------------------------
+// FASE 3 — Tipos de Comunicaciones y WhatsApp
+// ---------------------------------------------------------------
+
+export type TipoComunicacion =
+  | 'cotizacion'
+  | 'separacion'
+  | 'abono'
+  | 'estado_cuenta'
+  | 'paz_salvo'
+  | 'menu'
+  | 'recordatorio_pago'
+  | 'bienvenida'
+  | 'personalizado';
+
+export interface Comunicacion {
+  id: string;
+  cliente_id?: string | null;
+  reserva_id?: string | null;
+  cotizacion_id?: string | null;
+  tipo: TipoComunicacion;
+  destinatario: string;
+  telefono: string;
+  mensaje: string;
+  estado: 'enviado' | 'preparado' | 'fallido';
+  created_at?: string;
+  clientes?: Pick<Cliente, 'id' | 'nombre' | 'apellido' | 'whatsapp' | 'telefono'>;
+}
+

@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
 import {
   ClipboardList, Plus, Edit3, Trash2, X, Save, CreditCard,
-  Calendar, Users, DollarSign, ChevronDown, ChevronUp, FileCheck
+  Calendar, Users, DollarSign, ChevronDown, ChevronUp, FileCheck, MessageCircle
 } from 'lucide-react';
 import type { Reserva, ReservaEstado, Cliente, Finca, Pago, PagoTipo, CotizacionDB } from '../types';
 import { calcularSaldo } from '../types';
 import { AdminDocumentos } from './AdminDocumentos';
+import { WhatsAppModal } from '../components/WhatsAppModal';
+import {
+  plantillaRecordatorioPago,
+  plantillaBienvenida,
+  plantillaSeparacion,
+} from '../services/whatsapp';
+import { generarDocSeparacion } from '../services/documentos';
 
 interface AdminReservasProps {
   reservas: Reserva[];
@@ -17,6 +24,7 @@ interface AdminReservasProps {
   onEliminar: (id: string) => Promise<{ success: boolean; error?: string }>;
   onRegistrarPago: (reservaId: string, pago: { tipo: PagoTipo; fecha: string; valor: number; observacion?: string }) => Promise<{ success: boolean; error?: string }>;
   onEliminarPago: (pagoId: string) => Promise<{ success: boolean; error?: string }>;
+  onRegistrarComunicacion?: (com: any) => void;
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   openConfirm: (title: string, message: string, onConfirm: () => void) => void;
   // Para recibir cotización pre-cargada al convertir
@@ -70,6 +78,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
   onEliminar,
   onRegistrarPago,
   onEliminarPago,
+  onRegistrarComunicacion,
   showToast,
   openConfirm,
   cotizacionInicial,
@@ -83,6 +92,20 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
   const [pagoReservaId, setPagoReservaId] = useState<string | null>(null);
   const [guardandoPago, setGuardandoPago] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<ReservaEstado | 'todas'>('todas');
+  const [modalWaReserva, setModalWaReserva] = useState<{
+    abierto: boolean;
+    reserva?: Reserva;
+    titulo: string;
+    nombreDoc?: string;
+    mensaje: string;
+    onGenerarPdf?: () => void;
+    tipo: any;
+  }>({
+    abierto: false,
+    titulo: '',
+    mensaje: '',
+    tipo: 'recordatorio_pago',
+  });
 
   // Si llega cotización pre-cargada, abrir formulario con sus datos
   React.useEffect(() => {
@@ -394,10 +417,32 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                     </div>
 
                     <button
-                      className="btn btn-sm btn-primary"
-                      title="Registrar pago"
-                      onClick={() => { setPagoReservaId(r.id); setPagoForm(PAGO_VACIO); }}
+                      className="btn btn-sm"
+                      style={{ color: '#25d366', borderColor: '#25d366' }}
+                      title="Enviar mensaje de WhatsApp al cliente"
+                      onClick={() => {
+                        if (saldo > 0) {
+                          setModalWaReserva({
+                            abierto: true,
+                            reserva: r,
+                            titulo: `Recordatorio de Saldo · ${r.fincas?.nombre || 'Finca'}`,
+                            mensaje: plantillaRecordatorioPago(r),
+                            tipo: 'recordatorio_pago',
+                          });
+                        } else {
+                          setModalWaReserva({
+                            abierto: true,
+                            reserva: r,
+                            titulo: `Bienvenida e Instrucciones · ${r.fincas?.nombre || 'Finca'}`,
+                            mensaje: plantillaBienvenida(r),
+                            tipo: 'bienvenida',
+                          });
+                        }
+                      }}
                     >
+                      <MessageCircle size={13} />
+                    </button>
+                    <button className="btn btn-sm btn-primary" title="Registrar pago" onClick={() => { setPagoReservaId(r.id); setPagoForm(PAGO_VACIO); }}>
                       <CreditCard size={13} />
                     </button>
                     <button className="btn btn-sm" onClick={() => abrirEdicion(r)} title="Editar"><Edit3 size={13} /></button>
@@ -405,14 +450,14 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                     <button
                       className="btn btn-sm"
                       onClick={() => setReservaExpandida(expanded ? null : r.id)}
-                      title={expanded ? 'Cerrar detalle' : 'Ver pagos'}
+                      title={expanded ? 'Cerrar detalle' : 'Ver pagos y documentos'}
                     >
                       {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                     </button>
                   </div>
                 </div>
 
-                {/* Panel expandido: detalle de pagos */}
+                {/* Panel expandido: detalle de pagos y documentos */}
                 {expanded && (
                   <div style={{ background: 'var(--surface-alt, var(--surface))', borderTop: '1px solid var(--border)', padding: '0.75rem 1rem 1rem', fontSize: '0.82rem' }}>
                     <div style={{ fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -448,9 +493,9 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                       <strong style={{ color: saldo > 0 ? 'var(--danger)' : 'var(--success)' }}>{formatCOP(saldo)}</strong>
                     </div>
 
-                    {/* Documentos PDF */}
+                    {/* Documentos PDF y Envíos por WhatsApp */}
                     <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
-                      <AdminDocumentos reserva={r} />
+                      <AdminDocumentos reserva={r} onRegistrarEnvio={onRegistrarComunicacion} showToast={showToast} />
                     </div>
                   </div>
                 )}
@@ -459,6 +504,32 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
           })
         )}
       </div>
+
+      {/* Modal WhatsApp para acciones rápidas de la reserva */}
+      {modalWaReserva.abierto && modalWaReserva.reserva && (
+        <WhatsAppModal
+          isOpen={modalWaReserva.abierto}
+          onClose={() => setModalWaReserva(p => ({ ...p, abierto: false }))}
+          titulo={modalWaReserva.titulo}
+          destinatarioNombre={modalWaReserva.reserva.clientes ? `${modalWaReserva.reserva.clientes.nombre} ${modalWaReserva.reserva.clientes.apellido || ''}`.trim() : 'Cliente'}
+          telefonoInicial={modalWaReserva.reserva.clientes?.whatsapp || modalWaReserva.reserva.clientes?.telefono || ''}
+          mensajeInicial={modalWaReserva.mensaje}
+          nombreDocumento={modalWaReserva.nombreDoc}
+          onGenerarPdf={modalWaReserva.onGenerarPdf}
+          onDespuesDeEnviar={(tel, msg) => {
+            showToast('Mensaje de WhatsApp enviado al cliente ✅', 'success');
+            onRegistrarComunicacion?.({
+              cliente_id: modalWaReserva.reserva?.cliente_id || null,
+              reserva_id: modalWaReserva.reserva?.id || null,
+              tipo: modalWaReserva.tipo,
+              destinatario: modalWaReserva.reserva?.clientes ? `${modalWaReserva.reserva.clientes.nombre} ${modalWaReserva.reserva.clientes.apellido || ''}`.trim() : 'Cliente',
+              telefono: tel,
+              mensaje: msg,
+              estado: 'enviado',
+            });
+          }}
+        />
+      )}
     </div>
   );
 };
