@@ -6,22 +6,8 @@ on:
       - main
   workflow_dispatch:
 
-# Permisos para GitHub Pages y token de ID
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# Permitir solo un despliegue concurrente
-concurrency:
-  group: 'pages'
-  cancel-in-progress: true
-
 jobs:
   build-and-deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout del repositorio
@@ -37,15 +23,14 @@ jobs:
         run: npm ci
 
       - name: Compilar para producción (Vite + React + TypeScript)
-        run: |
-          npm run build
-          cp dist/index.html dist/404.html
+        run: npm run build
 
-      - name: Subir artefacto de GitHub Pages
-        uses: actions/upload-pages-artifact@v3
+      - name: Desplegar en GitHub Pages (rama gh-pages)
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: './dist'
-
-      - name: Desplegar en GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+          force_orphan: true
+          enable_jekyll: false
+          commit_message: "deploy: ${{ github.event.head_commit.message }}"
