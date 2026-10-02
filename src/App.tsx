@@ -10,6 +10,9 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { useAuth } from './hooks/useAuth';
 import { useFincas } from './hooks/useFincas';
 import { useDisponibilidad } from './hooks/useDisponibilidad';
+import { useClientes } from './hooks/useClientes';
+import { useCotizaciones } from './hooks/useCotizaciones';
+import { useReservas } from './hooks/useReservas';
 import { DEFAULT_WA_NUMBER } from './services/supabase';
 import type { ViewType } from './types';
 
@@ -56,6 +59,24 @@ export const App: React.FC = () => {
     marcarDiasAdmin,
     eliminarBloqueo,
   } = useDisponibilidad(selectedFincaId);
+
+  // Fase 1: hooks nuevos (solo se cargan cuando es admin)
+  const { clientes, guardar: guardarCliente, desactivar: desactivarCliente } = useClientes();
+  const {
+    cotizaciones,
+    guardar: guardarCotizacion,
+    cambiarEstado: cambiarEstadoCotizacion,
+    eliminar: eliminarCotizacion,
+  } = useCotizaciones();
+  const {
+    reservas,
+    guardar: guardarReserva,
+    cambiarEstado: cambiarEstadoReserva,
+    eliminar: eliminarReserva,
+    registrarPago,
+    eliminarPago,
+    metricas: metricasReservas,
+  } = useReservas();
 
   // Sincronizar tema con el DOM
   useEffect(() => {
@@ -166,6 +187,10 @@ export const App: React.FC = () => {
             fincas={fincas}
             bloquesAdmin={bloquesAdmin}
             currentWaNumber={waNumberGlobal}
+            clientes={clientes}
+            cotizaciones={cotizaciones}
+            reservas={reservas}
+            metricasReservas={metricasReservas}
             onLogin={login}
             onLogout={() => {
               logout();
@@ -177,6 +202,16 @@ export const App: React.FC = () => {
             onMarcarDiasAdmin={marcarDiasAdmin}
             onEliminarBloqueo={eliminarBloqueo}
             onSaveWaNumber={handleSaveWaNumber}
+            onGuardarCliente={guardarCliente}
+            onDesactivarCliente={desactivarCliente}
+            onGuardarCotizacion={guardarCotizacion}
+            onCambiarEstadoCotizacion={cambiarEstadoCotizacion}
+            onEliminarCotizacion={eliminarCotizacion}
+            onGuardarReserva={guardarReserva}
+            onCambiarEstadoReserva={cambiarEstadoReserva}
+            onEliminarReserva={eliminarReserva}
+            onRegistrarPago={registrarPago}
+            onEliminarPago={eliminarPago}
             showToast={showToast}
             openConfirm={openConfirm}
           />

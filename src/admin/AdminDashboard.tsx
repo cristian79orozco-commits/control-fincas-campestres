@@ -1,10 +1,19 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, LogOut, Lock, LogIn, ShieldCheck, Database } from 'lucide-react';
+import {
+  LayoutDashboard, LogOut, Lock, LogIn, ShieldCheck, Database,
+  Home, Users, FileText, ClipboardList, Calendar, MessageCircle,
+  Menu, X, TrendingUp, CheckCircle, AlertTriangle, Clock
+} from 'lucide-react';
 import { AdminFincaForm } from './AdminFincaForm';
 import { AdminCalendar } from './AdminCalendar';
-import { AdminReservasTable } from './AdminReservasTable';
 import { AdminWaConfig } from './AdminWaConfig';
-import type { Finca, BloqueoDisponibilidad } from '../types';
+import { AdminClientes } from './AdminClientes';
+import { AdminCotizaciones } from './AdminCotizaciones';
+import { AdminReservas } from './AdminReservas';
+import type {
+  Finca, BloqueoDisponibilidad, Cliente, CotizacionDB, CotizacionEstado,
+  Reserva, ReservaEstado, PagoTipo, AdminSection
+} from '../types';
 
 interface AdminDashboardProps {
   isAdminLoggedIn: boolean;
@@ -12,6 +21,10 @@ interface AdminDashboardProps {
   fincas: Finca[];
   bloquesAdmin: BloqueoDisponibilidad[];
   currentWaNumber: string;
+  clientes: Cliente[];
+  cotizaciones: CotizacionDB[];
+  reservas: Reserva[];
+  metricasReservas: { total: number; activas: number; llegasHoy: number; salenHoy: number };
   onLogin: (email: string, pass: string) => Promise<{ success: boolean; message?: string }>;
   onLogout: () => void;
   onSaveFinca: (fincaData: Partial<Finca>, imagenesUrls: string[], planesStr: string) => Promise<{ success: boolean; id?: string; error?: string }>;
@@ -19,9 +32,34 @@ interface AdminDashboardProps {
   onMarcarDiasAdmin: (fincaId: string, fechas: string[], estado: 'ocupado' | 'libre', nombreCliente?: string) => Promise<{ success: boolean; error?: string }>;
   onEliminarBloqueo: (id: number | string) => Promise<{ success: boolean; error?: string }>;
   onSaveWaNumber: (num: string) => void;
+  // Clientes
+  onGuardarCliente: (datos: Partial<Cliente>) => Promise<{ success: boolean; id?: string; error?: string }>;
+  onDesactivarCliente: (id: string) => Promise<{ success: boolean; error?: string }>;
+  // Cotizaciones
+  onGuardarCotizacion: (datos: Partial<CotizacionDB>) => Promise<{ success: boolean; id?: string; error?: string }>;
+  onCambiarEstadoCotizacion: (id: string, estado: CotizacionEstado) => Promise<{ success: boolean; error?: string }>;
+  onEliminarCotizacion: (id: string) => Promise<{ success: boolean; error?: string }>;
+  // Reservas
+  onGuardarReserva: (datos: Partial<Reserva>) => Promise<{ success: boolean; id?: string; error?: string }>;
+  onCambiarEstadoReserva: (id: string, estado: ReservaEstado) => Promise<{ success: boolean; error?: string }>;
+  onEliminarReserva: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onRegistrarPago: (reservaId: string, pago: { tipo: PagoTipo; fecha: string; valor: number; observacion?: string }) => Promise<{ success: boolean; error?: string }>;
+  onEliminarPago: (pagoId: string) => Promise<{ success: boolean; error?: string }>;
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   openConfirm: (title: string, message: string, onConfirm: () => void) => void;
 }
+
+const NAV_ITEMS: { section: AdminSection; label: string; icon: React.ReactNode }[] = [
+  { section: 'dashboard',    label: 'Dashboard',      icon: <LayoutDashboard size={16} /> },
+  { section: 'fincas',       label: 'Fincas',         icon: <Home size={16} /> },
+  { section: 'disponibilidad', label: 'Disponibilidad', icon: <Calendar size={16} /> },
+  { section: 'clientes',     label: 'Clientes',       icon: <Users size={16} /> },
+  { section: 'cotizaciones', label: 'Cotizaciones',   icon: <FileText size={16} /> },
+  { section: 'reservas',     label: 'Reservas',       icon: <ClipboardList size={16} /> },
+  { section: 'whatsapp',     label: 'WhatsApp',       icon: <MessageCircle size={16} /> },
+];
+
+function formatCOP(v: number) { return '$' + v.toLocaleString('es-CO'); }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   isAdminLoggedIn,
@@ -29,6 +67,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   fincas,
   bloquesAdmin,
   currentWaNumber,
+  clientes,
+  cotizaciones,
+  reservas,
+  metricasReservas,
   onLogin,
   onLogout,
   onSaveFinca,
@@ -36,101 +78,111 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onMarcarDiasAdmin,
   onEliminarBloqueo,
   onSaveWaNumber,
+  onGuardarCliente,
+  onDesactivarCliente,
+  onGuardarCotizacion,
+  onCambiarEstadoCotizacion,
+  onEliminarCotizacion,
+  onGuardarReserva,
+  onCambiarEstadoReserva,
+  onEliminarReserva,
+  onRegistrarPago,
+  onEliminarPago,
   showToast,
   openConfirm,
 }) => {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+  const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Para "convertir cotización en reserva"
+  const [cotizacionParaReserva, setCotizacionParaReserva] = useState<CotizacionDB | null>(null);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!loginEmail || !loginPass) {
-      showToast('Por favor ingresa correo y contraseña', 'error');
-      return;
-    }
-
+    if (!loginEmail || !loginPass) { showToast('Ingresa correo y contraseña', 'error'); return; }
     setLoginLoading(true);
     const res = await onLogin(loginEmail, loginPass);
     setLoginLoading(false);
-
     if (res.success) {
-      showToast('Sesión iniciada correctamente · Bienvenido', 'success');
+      showToast('Sesión iniciada · Bienvenido', 'success');
       setLoginPass('');
     } else {
       showToast(res.message || 'Error de autenticación', 'error');
     }
   };
 
-  // Si no está autenticado, renderizar formulario de inicio de sesión
+  // ---- Pantalla de login ----
   if (!isAdminLoggedIn) {
     return (
       <div className="login-box">
-        <div className="login-icon">
-          <Lock size={26} />
-        </div>
+        <div className="login-icon"><Lock size={26} /></div>
         <div>
           <div className="login-title">Panel de Administración</div>
           <div className="login-sub">Acceso seguro mediante Supabase Auth</div>
         </div>
-
         <form onSubmit={handleLoginSubmit} style={{ display: 'grid', gap: '0.85rem' }}>
           <div className="field">
             <label>Correo electrónico</label>
-            <input
-              type="email"
-              placeholder="admin@fincas.com"
-              value={loginEmail}
-              autoComplete="username"
-              onChange={e => setLoginEmail(e.target.value)}
-            />
+            <input type="email" placeholder="admin@fincas.com" value={loginEmail} autoComplete="username" onChange={e => setLoginEmail(e.target.value)} />
           </div>
-
           <div className="field">
             <label>Contraseña</label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={loginPass}
-              autoComplete="current-password"
-              onChange={e => setLoginPass(e.target.value)}
-            />
+            <input type="password" placeholder="••••••••" value={loginPass} autoComplete="current-password" onChange={e => setLoginPass(e.target.value)} />
           </div>
-
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={loginLoading}
-            style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
-          >
+          <button type="submit" className="btn btn-primary" disabled={loginLoading} style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}>
             <LogIn size={16} /> {loginLoading ? 'Iniciando sesión…' : 'Ingresar al panel'}
           </button>
         </form>
-
         <p style={{ textAlign: 'center', fontSize: 'var(--text-xs)', color: 'var(--text-faint)', marginTop: '0.5rem' }}>
-          Conectado a la base de datos de <strong>Supabase</strong>
+          Conectado a <strong>Supabase</strong>
         </p>
       </div>
     );
   }
 
-  // Dashboard de administración activo
-  const ocupadasCount = bloquesAdmin.filter(b => b.estado === 'ocupado').length;
+  // ---- Dashboard de métricas ----
+  const hoy = new Date().toISOString().split('T')[0];
+  const cotizacionesPendientes = cotizaciones.filter(c => ['borrador', 'cotizada', 'pendiente'].includes(c.estado)).length;
+  const reservasActivas = reservas.filter(r => r.estado === 'activa');
+  const totalSaldoPendiente = reservasActivas.reduce((acc, r) => {
+    const pagado = (r.pagos || []).reduce((s, p) => s + (p.tipo === 'devolucion' ? -p.valor : p.valor), 0);
+    return acc + Math.max(0, r.valor_total - pagado);
+  }, 0);
+
+  const navigateTo = (section: AdminSection) => {
+    setActiveSection(section);
+    setSidebarOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleConvertirReserva = (cotizacion: CotizacionDB) => {
+    setCotizacionParaReserva(cotizacion);
+    navigateTo('reservas');
+  };
 
   return (
     <div className="admin-shell">
-      {/* Barra superior de administración */}
-      <div className="panel">
+      {/* ===== TOPBAR ===== */}
+      <div className="panel" style={{ marginBottom: '1rem' }}>
         <div className="flex" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div className="flex gap-sm">
+          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
+            {/* Hamburguesa móvil */}
+            <button
+              className="btn btn-sm"
+              style={{ display: 'none' }}
+              id="admin-sidebar-toggle"
+              onClick={() => setSidebarOpen(o => !o)}
+            >
+              <Menu size={16} />
+            </button>
             <div className="login-icon" style={{ width: '38px', height: '38px', borderRadius: '12px', flexShrink: 0 }}>
-              <LayoutDashboard size={18} />
+              <ShieldCheck size={18} />
             </div>
             <div>
               <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>Panel de Administración</div>
-              <div className="text-xs text-muted">
-                {userEmail || 'admin@fincas.com'} · Sesión activa
-              </div>
+              <div className="text-xs text-muted">{userEmail || 'admin@fincas.com'} · Sesión activa</div>
             </div>
           </div>
 
@@ -145,53 +197,238 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
-      {/* Métricas rápidas */}
-      <div className="admin-stats-row">
-        <div className="stat-card">
-          <div className="stat-val">{fincas.length}</div>
-          <div className="stat-lbl">Fincas activas</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-val" style={{ color: 'var(--danger)' }}>{ocupadasCount}</div>
-          <div className="stat-lbl">Fechas bloqueadas/ocupadas</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-val" style={{ color: 'var(--primary)' }}>+{currentWaNumber}</div>
-          <div className="stat-lbl">WhatsApp global activo</div>
+      {/* ===== LAYOUT: SIDEBAR + CONTENIDO ===== */}
+      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '1rem', alignItems: 'start' }}>
+
+        {/* SIDEBAR */}
+        <nav
+          className={`panel admin-sidebar${sidebarOpen ? ' open' : ''}`}
+          style={{ padding: '0.5rem 0', position: 'sticky', top: '80px' }}
+        >
+          {/* Botón cerrar en móvil */}
+          {sidebarOpen && (
+            <button
+              className="btn btn-sm"
+              style={{ position: 'absolute', top: '0.5rem', right: '0.5rem' }}
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X size={14} />
+            </button>
+          )}
+
+          {NAV_ITEMS.map(item => (
+            <button
+              key={item.section}
+              onClick={() => navigateTo(item.section)}
+              className={`admin-nav-btn${activeSection === item.section ? ' active' : ''}`}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+              {/* Badges */}
+              {item.section === 'cotizaciones' && cotizacionesPendientes > 0 && (
+                <span className="admin-nav-badge">{cotizacionesPendientes}</span>
+              )}
+              {item.section === 'reservas' && metricasReservas.activas > 0 && (
+                <span className="admin-nav-badge">{metricasReservas.activas}</span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        {/* CONTENIDO PRINCIPAL */}
+        <div style={{ minWidth: 0 }}>
+
+          {/* ===== SECCIÓN: DASHBOARD ===== */}
+          {activeSection === 'dashboard' && (
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              {/* Tarjetas de métricas */}
+              <div className="admin-stats-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('fincas')}>
+                  <div className="stat-val">{fincas.length}</div>
+                  <div className="stat-lbl">Fincas activas</div>
+                </div>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('reservas')}>
+                  <div className="stat-val" style={{ color: 'var(--primary)' }}>{metricasReservas.activas}</div>
+                  <div className="stat-lbl">Reservas activas</div>
+                </div>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('reservas')}>
+                  <div className="stat-val" style={{ color: 'var(--success)' }}>{metricasReservas.llegasHoy}</div>
+                  <div className="stat-lbl">Llegadas hoy</div>
+                </div>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('reservas')}>
+                  <div className="stat-val" style={{ color: 'var(--danger)' }}>{metricasReservas.salenHoy}</div>
+                  <div className="stat-lbl">Salidas hoy</div>
+                </div>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('cotizaciones')}>
+                  <div className="stat-val" style={{ color: 'var(--warning, #f59e0b)' }}>{cotizacionesPendientes}</div>
+                  <div className="stat-lbl">Cotizaciones pendientes</div>
+                </div>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('clientes')}>
+                  <div className="stat-val">{clientes.length}</div>
+                  <div className="stat-lbl">Clientes</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-val" style={{ color: 'var(--danger)', fontSize: '1.1rem' }}>{formatCOP(totalSaldoPendiente)}</div>
+                  <div className="stat-lbl">Saldo por cobrar</div>
+                </div>
+              </div>
+
+              {/* Accesos rápidos */}
+              <div className="panel">
+                <div className="panel-header" style={{ marginBottom: '1rem' }}>
+                  <div className="panel-title"><TrendingUp size={16} /> Accesos rápidos</div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.6rem' }}>
+                  {NAV_ITEMS.slice(1).map(item => (
+                    <button
+                      key={item.section}
+                      className="btn"
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-start', padding: '0.65rem 1rem' }}
+                      onClick={() => navigateTo(item.section)}
+                    >
+                      {item.icon} {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Próximas reservas */}
+              {reservasActivas.length > 0 && (
+                <div className="panel">
+                  <div className="panel-header">
+                    <div className="panel-title"><Clock size={16} /> Próximas llegadas</div>
+                  </div>
+                  <div className="avail-table">
+                    {reservasActivas
+                      .filter(r => r.fecha_inicio >= hoy)
+                      .sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))
+                      .slice(0, 5)
+                      .map(r => {
+                        const clienteNombre = r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim() : '—';
+                        const [y, m, d] = r.fecha_inicio.split('-');
+                        return (
+                          <div key={r.id} className="avail-row">
+                            <div>
+                              <div style={{ fontWeight: 600 }}>{r.fincas?.nombre || '—'}</div>
+                              <div className="text-xs text-muted">{d}/{m}/{y} · {r.personas} personas · {clienteNombre}</div>
+                            </div>
+                            <span className="status-badge s-avail">activa</span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+
+              {/* Alertas */}
+              {totalSaldoPendiente > 0 && (
+                <div className="panel" style={{ borderLeft: '3px solid var(--danger)' }}>
+                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', color: 'var(--danger)', fontWeight: 600 }}>
+                    <AlertTriangle size={16} /> Saldo pendiente por cobrar: {formatCOP(totalSaldoPendiente)} COP
+                  </div>
+                  <p className="text-xs text-muted" style={{ marginTop: '0.3rem' }}>
+                    Hay {reservasActivas.length} reserva{reservasActivas.length !== 1 ? 's' : ''} activa{reservasActivas.length !== 1 ? 's' : ''} con saldo pendiente.
+                  </p>
+                </div>
+              )}
+
+              {cotizacionesPendientes > 0 && (
+                <div className="panel" style={{ borderLeft: '3px solid var(--primary)', cursor: 'pointer' }} onClick={() => navigateTo('cotizaciones')}>
+                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', color: 'var(--primary)', fontWeight: 600 }}>
+                    <CheckCircle size={16} /> {cotizacionesPendientes} cotización{cotizacionesPendientes !== 1 ? 'es' : ''} pendiente{cotizacionesPendientes !== 1 ? 's' : ''} de atención
+                  </div>
+                  <p className="text-xs text-muted" style={{ marginTop: '0.3rem' }}>Haz clic para verlas →</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ===== SECCIÓN: FINCAS ===== */}
+          {activeSection === 'fincas' && (
+            <AdminFincaForm
+              fincas={fincas}
+              onSave={onSaveFinca}
+              onDelete={onDeleteFinca}
+              showToast={showToast}
+              openConfirm={openConfirm}
+            />
+          )}
+
+          {/* ===== SECCIÓN: DISPONIBILIDAD ===== */}
+          {activeSection === 'disponibilidad' && (
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              <AdminCalendar
+                fincas={fincas}
+                bloquesAdmin={bloquesAdmin}
+                onMarcarDias={onMarcarDiasAdmin}
+                showToast={showToast}
+              />
+            </div>
+          )}
+
+          {/* ===== SECCIÓN: CLIENTES ===== */}
+          {activeSection === 'clientes' && (
+            <AdminClientes
+              clientes={clientes}
+              onGuardar={onGuardarCliente}
+              onDesactivar={onDesactivarCliente}
+              showToast={showToast}
+              openConfirm={openConfirm}
+            />
+          )}
+
+          {/* ===== SECCIÓN: COTIZACIONES ===== */}
+          {activeSection === 'cotizaciones' && (
+            <AdminCotizaciones
+              cotizaciones={cotizaciones}
+              clientes={clientes}
+              fincas={fincas}
+              onGuardar={onGuardarCotizacion}
+              onCambiarEstado={onCambiarEstadoCotizacion}
+              onEliminar={onEliminarCotizacion}
+              onConvertirReserva={handleConvertirReserva}
+              showToast={showToast}
+              openConfirm={openConfirm}
+            />
+          )}
+
+          {/* ===== SECCIÓN: RESERVAS ===== */}
+          {activeSection === 'reservas' && (
+            <AdminReservas
+              reservas={reservas}
+              clientes={clientes}
+              fincas={fincas}
+              cotizaciones={cotizaciones}
+              onGuardar={onGuardarReserva}
+              onCambiarEstado={onCambiarEstadoReserva}
+              onEliminar={onEliminarReserva}
+              onRegistrarPago={onRegistrarPago}
+              onEliminarPago={onEliminarPago}
+              showToast={showToast}
+              openConfirm={openConfirm}
+              cotizacionInicial={cotizacionParaReserva}
+              onCotizacionInicialUsada={() => setCotizacionParaReserva(null)}
+            />
+          )}
+
+          {/* ===== SECCIÓN: WHATSAPP ===== */}
+          {activeSection === 'whatsapp' && (
+            <AdminWaConfig
+              currentWaNumber={currentWaNumber}
+              onSaveWaNumber={onSaveWaNumber}
+              showToast={showToast}
+            />
+          )}
         </div>
       </div>
 
-      {/* Contenido principal: Gestión de finca */}
-      <AdminFincaForm
-        fincas={fincas}
-        onSave={onSaveFinca}
-        onDelete={onDeleteFinca}
-        showToast={showToast}
-        openConfirm={openConfirm}
-      />
-
-      {/* Calendario de disponibilidad interactivo */}
-      <AdminCalendar
-        fincas={fincas}
-        bloquesAdmin={bloquesAdmin}
-        onMarcarDias={onMarcarDiasAdmin}
-        showToast={showToast}
-      />
-
-      {/* Tabla de reservas registradas */}
-      <AdminReservasTable
-        bloques={bloquesAdmin}
-        onEliminar={onEliminarBloqueo}
-        showToast={showToast}
-        openConfirm={openConfirm}
-      />
-
-      {/* Configuración de WhatsApp central */}
-      <AdminWaConfig
-        currentWaNumber={currentWaNumber}
-        onSaveWaNumber={onSaveWaNumber}
-        showToast={showToast}
-      />
+      {/* Overlay móvil sidebar */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 40 }}
+        />
+      )}
     </div>
   );
 };
