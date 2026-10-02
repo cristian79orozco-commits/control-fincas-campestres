@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import {
   FileText, Plus, Edit3, Trash2, X, Save, ChevronDown, ArrowRight,
-  Calendar, Users, Utensils, DollarSign, Tag, MessageCircle
+  Calendar, Users, Utensils, DollarSign, Tag, MessageCircle, Download
 } from 'lucide-react';
 import type { CotizacionDB, CotizacionEstado, Cliente, Finca, Menu } from '../types';
-import { generarPropuestaAlimentacion } from '../services/documentos';
+import { generarPropuestaAlimentacion, generarDocCotizacion } from '../services/documentos';
 import { WhatsAppModal } from '../components/WhatsAppModal';
 import { plantillaCotizacion, plantillaPropuestaAlimentacion } from '../services/whatsapp';
 
@@ -214,6 +214,8 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
       cotizacion: c,
       titulo: `Cotización Oficial · ${c.fincas?.nombre || 'Finca'}`,
       mensaje: plantillaCotizacion(c, c.fincas, c.clientes),
+      nombreDoc: 'Cotización Oficial (PDF)',
+      onGenerarPdf: () => generarDocCotizacion(c),
       tipo: 'cotizacion',
     });
   };
@@ -501,6 +503,19 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* Botón Descargar PDF Cotización */}
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.55rem' }}
+                    title="Descargar Cotización Formal en PDF"
+                    onClick={() => {
+                      generarDocCotizacion(c);
+                      showToast('Cotización descargada en PDF ✅', 'success');
+                    }}
+                  >
+                    <Download size={12} /> PDF Cotización
+                  </button>
+
                   {/* Botón WhatsApp Cotización */}
                   <button
                     className="btn btn-sm"

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   LayoutDashboard, LogOut, Lock, LogIn, ShieldCheck, Database,
   Home, Users, FileText, ClipboardList, Calendar, MessageCircle,
-  Menu, X, TrendingUp, CheckCircle, AlertTriangle, Clock, UtensilsCrossed
+  Menu, X, TrendingUp, CheckCircle, AlertTriangle, Clock, UtensilsCrossed, Settings
 } from 'lucide-react';
 import { AdminFincaForm } from './AdminFincaForm';
 import { AdminCalendar } from './AdminCalendar';
@@ -12,9 +12,11 @@ import { AdminClientes } from './AdminClientes';
 import { AdminCotizaciones } from './AdminCotizaciones';
 import { AdminReservas } from './AdminReservas';
 import { AdminMenus } from './AdminMenus';
+import { AdminConfiguracion } from './AdminConfiguracion';
 import type {
   Finca, BloqueoDisponibilidad, Cliente, CotizacionDB, CotizacionEstado,
-  Reserva, ReservaEstado, PagoTipo, AdminSection, Menu as MenuType, Comunicacion
+  Reserva, ReservaEstado, PagoTipo, AdminSection, Menu as MenuType, Comunicacion,
+  ConfiguracionGeneral
 } from '../types';
 
 interface AdminDashboardProps {
@@ -56,6 +58,11 @@ interface AdminDashboardProps {
   comunicaciones?: Comunicacion[];
   onRegistrarComunicacion?: (com: any) => Promise<any>;
   onLimpiarHistorialComunicaciones?: () => void;
+  // Configuración General (Fase 4)
+  configuracion?: ConfiguracionGeneral;
+  guardandoConfig?: boolean;
+  onGuardarConfiguracion?: (datos: Partial<ConfiguracionGeneral>) => Promise<{ success: boolean; error?: string }>;
+  onRestablecerConfiguracion?: () => Promise<{ success: boolean; error?: string }>;
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   openConfirm: (title: string, message: string, onConfirm: () => void) => void;
 }
@@ -69,6 +76,7 @@ const NAV_ITEMS: { section: AdminSection; label: string; icon: React.ReactNode }
   { section: 'reservas',     label: 'Reservas',       icon: <ClipboardList size={16} /> },
   { section: 'menus',        label: 'Menús',          icon: <UtensilsCrossed size={16} /> },
   { section: 'whatsapp',     label: 'Comunicaciones', icon: <MessageCircle size={16} /> },
+  { section: 'configuracion', label: 'Configuración',  icon: <Settings size={16} /> },
 ];
 
 function formatCOP(v: number) { return '$' + v.toLocaleString('es-CO'); }
@@ -107,6 +115,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   comunicaciones = [],
   onRegistrarComunicacion,
   onLimpiarHistorialComunicaciones,
+  configuracion,
+  guardandoConfig = false,
+  onGuardarConfiguracion,
+  onRestablecerConfiguracion,
   showToast,
   openConfirm,
 }) => {
@@ -466,6 +478,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               onLimpiarHistorial={onLimpiarHistorialComunicaciones}
               showToast={showToast}
             />
+          )}
+
+          {/* ===== SECCIÓN: CONFIGURACIÓN GENERAL (FASE 4) ===== */}
+          {activeSection === 'configuracion' && configuracion && (
+            <AdminConfiguracion
+              config={configuracion}
+              guardando={guardandoConfig}
+              onGuardar={onGuardarConfiguracion || (async () => ({ success: false, error: 'No configurado' }))}
+              onRestablecer={onRestablecerConfiguracion || (async () => ({ success: false, error: 'No configurado' }))}
+              onSaveWaNumber={onSaveWaNumber}
+              showToast={showToast}
+              openConfirm={openConfirm}
+            />
+          )}
+
+          {/* Fallback si la configuración aún está cargando */}
+          {activeSection === 'configuracion' && !configuracion && (
+            <div className="panel" style={{ padding: '3rem', textAlign: 'center' }}>
+              <div className="text-muted">Cargando configuración general...</div>
+            </div>
           )}
         </div>
       </div>

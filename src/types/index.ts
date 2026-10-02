@@ -226,7 +226,8 @@ export type AdminSection =
   | 'cotizaciones'
   | 'reservas'
   | 'menus'
-  | 'whatsapp';
+  | 'whatsapp'
+  | 'configuracion';
 
 // ---------------------------------------------------------------
 // FASE 3 — Tipos de Comunicaciones y WhatsApp
@@ -256,4 +257,57 @@ export interface Comunicacion {
   created_at?: string;
   clientes?: Pick<Cliente, 'id' | 'nombre' | 'apellido' | 'whatsapp' | 'telefono'>;
 }
+
+// ---------------------------------------------------------------
+// FASE 4 — Configuración General (Empresa y Documentos)
+// ---------------------------------------------------------------
+
+export interface RedesSociales {
+  facebook?: string;
+  instagram?: string;
+  tiktok?: string;
+}
+
+export interface ConfiguracionGeneral {
+  id: string; // 'general'
+  // 1. Datos de Empresa
+  nombre_empresa: string;
+  nit?: string | null;
+  eslogan?: string | null;
+  logo_url?: string | null;
+  telefono?: string | null;
+  whatsapp: string;
+  correo?: string | null;
+  direccion?: string | null;
+  ciudad?: string | null;
+  sitio_web?: string | null;
+  redes_sociales?: RedesSociales;
+
+  // 2. Configuración de Documentos
+  doc_logo_url?: string | null;
+  doc_encabezado?: string | null;
+  doc_pie_pagina?: string | null;
+  doc_contacto_info?: string | null;
+  terminos_condiciones?: string | null;
+  textos_legales?: string | null;
+  politicas_cancelacion?: string | null;
+
+  // 3. Consecutivos y Prefijos de Documentación
+  prefijo_cotizacion: string;
+  siguiente_cotizacion: number;
+  prefijo_separacion: string;
+  siguiente_separacion: number;
+  prefijo_abono: string;
+  siguiente_abono: number;
+  prefijo_estado_cuenta: string;
+  siguiente_estado_cuenta: number;
+  prefijo_paz_salvo: string;
+  siguiente_paz_salvo: number;
+  prefijo_propuesta_menu: string;
+  siguiente_propuesta_menu: number;
+
+  created_at?: string;
+  updated_at?: string;
+}
+
 

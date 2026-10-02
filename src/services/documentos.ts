@@ -1,17 +1,26 @@
 /**
- * Servicio de generación de documentos PDF — Fase 1
- * Utiliza jsPDF para crear documentos vinculados a reservas.
+ * Servicio de generación de documentos PDF — Fase 1, 2 y 4
+ * Utiliza jsPDF para crear documentos oficiales vinculados a reservas, cotizaciones y menús.
+ *
+ * Fase 4: Integración automática con ConfiguracionGeneral:
+ *  - Nombre, NIT, eslogan, logo y datos de contacto de la empresa
+ *  - Encabezados y pie de página parametrizados desde Supabase
+ *  - Términos, condiciones y cláusulas legales dinámicas
+ *  - Prefijos y numeración consecutiva configurable
  *
  * Documentos disponibles:
+ *  - cotizacion     : Propuesta formal de cotización
  *  - separacion     : Documento de separación / reserva inicial
  *  - abono          : Comprobante de abono de pago
  *  - estado_cuenta  : Estado de cuenta con historial de pagos
  *  - paz_salvo      : Paz y salvo (solo cuando saldo = 0)
+ *  - propuesta_alim : Propuesta gastronómica de menús
  */
 
 import jsPDF from 'jspdf';
-import type { Reserva, Pago, Menu, Cliente, Finca } from '../types';
+import type { Reserva, Pago, Menu, Cliente, Finca, CotizacionDB, ConfiguracionGeneral } from '../types';
 import { calcularSaldo } from '../types';
+import { getConfiguracionGlobal } from './configuracion';
 
 export interface PropuestaAlimentacionDatos {
   menu: Menu;
@@ -21,6 +30,7 @@ export interface PropuestaAlimentacionDatos {
   cantidadServicios?: number;
   fechaEvento?: string;
   notasEspeciales?: string;
+  config?: ConfiguracionGeneral;
 }
 
 // ---------------------------------------------------------------
@@ -41,36 +51,75 @@ function nombreCompleto(reserva: Reserva): string {
   return `${reserva.clientes.nombre} ${reserva.clientes.apellido || ''}`.trim();
 }
 
+async function urlABase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------
-// Encabezado común
+// Encabezado corporativo adaptable (Fase 4)
 // ---------------------------------------------------------------
-function encabezado(doc: jsPDF, titulo: string, numero?: string) {
+function encabezado(doc: jsPDF, titulo: string, numero?: string, configParam?: ConfiguracionGeneral) {
+  const config = configParam || getConfiguracionGlobal();
   const ancho = doc.internal.pageSize.getWidth();
 
-  // Franja verde
+  // Franja verde institucional
   doc.setFillColor(26, 107, 94);
-  doc.rect(0, 0, ancho, 38, 'F');
+  doc.rect(0, 0, ancho, 40, 'F');
 
-  // Nombre empresa
+  // Nombre de empresa
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.setTextColor(255, 255, 255);
-  doc.text('Control de Fincas Campestres', 14, 14);
+  doc.text(config.nombre_empresa || 'Control de Fincas Campestres', 14, 13);
+
+  // Eslogan o Encabezado institucional
+  if (config.eslogan) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(209, 234, 217);
+    doc.text(config.eslogan.slice(0, 75), 14, 19);
+  }
 
   // Título del documento
   doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(255, 255, 255);
+  doc.text(titulo, 14, 28);
+
+  // Información de contacto rápida (teléfono / nit)
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(titulo, 14, 24);
+  doc.setTextColor(220, 240, 235);
+  const infoExtra = [config.nit ? `NIT: ${config.nit}` : '', config.telefono || ''].filter(Boolean).join(' • ');
+  if (infoExtra) {
+    doc.text(infoExtra, 14, 35);
+  }
 
   // Número de documento (derecha)
   if (numero) {
-    doc.setFontSize(9);
-    doc.text(numero, ancho - 14, 24, { align: 'right' });
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text(numero, ancho - 14, 20, { align: 'right' });
   }
 
   // Fecha de emisión
   doc.setFontSize(8);
-  doc.text(`Emitido: ${formatFecha(new Date().toISOString().split('T')[0])}`, ancho - 14, 34, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(220, 240, 235);
+  doc.text(`Emitido: ${formatFecha(new Date().toISOString().split('T')[0])}`, ancho - 14, 29, { align: 'right' });
 
   doc.setTextColor(30, 27, 19);
 }
@@ -127,32 +176,45 @@ function fila(doc: jsPDF, y: number, izq: string, der: string, negrita = false):
 }
 
 // ---------------------------------------------------------------
-// PIE DE PÁGINA
+// PIE DE PÁGINA (Fase 4: parametrizable)
 // ---------------------------------------------------------------
-function pie(doc: jsPDF) {
+function pie(doc: jsPDF, configParam?: ConfiguracionGeneral) {
+  const config = configParam || getConfiguracionGlobal();
   const ancho = doc.internal.pageSize.getWidth();
   const alto = doc.internal.pageSize.getHeight();
 
   doc.setFillColor(26, 107, 94);
-  doc.rect(0, alto - 14, ancho, 14, 'F');
+  doc.rect(0, alto - 15, ancho, 15, 'F');
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
+  doc.setFontSize(7.2);
   doc.setTextColor(255, 255, 255);
-  doc.text('Control de Fincas Campestres — Documento generado automáticamente', ancho / 2, alto - 5.5, { align: 'center' });
+
+  const textoPie = config.doc_pie_pagina || 'Control de Fincas Campestres • Documento oficial generado automáticamente';
+  doc.text(textoPie, ancho / 2, alto - 8.5, { align: 'center' });
+
+  const textoContacto = config.doc_contacto_info || `${config.whatsapp ? `WhatsApp: +${config.whatsapp}` : ''} • ${config.correo || ''}`;
+  if (textoContacto.trim()) {
+    doc.setFontSize(6.5);
+    doc.setTextColor(209, 234, 217);
+    doc.text(textoContacto.trim(), ancho / 2, alto - 4, { align: 'center' });
+  }
+
   doc.setTextColor(30, 27, 19);
 }
 
 // ================================================================
 // 1. DOCUMENTO DE SEPARACIÓN
 // ================================================================
-export function generarDocSeparacion(reserva: Reserva): void {
+export function generarDocSeparacion(reserva: Reserva, configParam?: ConfiguracionGeneral): void {
+  const config = configParam || getConfiguracionGlobal();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const num = `SEP-${reserva.id.slice(0, 8).toUpperCase()}`;
+  const prefijo = config.prefijo_separacion || 'SEP-';
+  const num = `${prefijo}${reserva.id.slice(0, 8).toUpperCase()}`;
 
-  encabezado(doc, 'DOCUMENTO DE SEPARACIÓN', num);
+  encabezado(doc, 'DOCUMENTO DE SEPARACIÓN', num, config);
 
-  let y = 46;
+  let y = 48;
   y = datosClienteFinca(doc, reserva, y);
   y += 8;
   y = linea(doc, y);
@@ -187,51 +249,57 @@ export function generarDocSeparacion(reserva: Reserva): void {
   y += 6;
   y = linea(doc, y);
 
-  // Condiciones
+  // Condiciones (Fase 4: extraídas de configuración)
   y += 4;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
-  doc.text('CONDICIONES', 14, y);
+  doc.text('TÉRMINOS Y CONDICIONES', 14, y);
   y += 7;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  const condiciones = [
-    '• La separación garantiza la disponibilidad de la finca para las fechas indicadas.',
-    '• El saldo restante debe cancelarse antes de la fecha de llegada.',
-    '• En caso de cancelación, la separación no es reembolsable salvo acuerdo previo.',
-    '• Este documento no es una factura. La factura se emitirá al finalizar la reserva.',
-  ];
-  for (const c of condiciones) {
-    doc.text(c, 14, y);
-    y += 6;
+
+  const terminosTexto = config.terminos_condiciones || `• La separación garantiza la disponibilidad de la finca para las fechas indicadas.\n• El saldo restante debe cancelarse antes de la fecha de llegada.\n• En caso de cancelación, la separación no es reembolsable salvo acuerdo previo.\n• Este documento no es una factura comercial.`;
+  const lineasCondiciones = terminosTexto.split('\n');
+
+  for (const c of lineasCondiciones) {
+    if (c.trim()) {
+      const split = doc.splitTextToSize(c.trim(), 182);
+      doc.text(split, 14, y);
+      y += split.length * 4.5;
+    }
   }
 
   // Firma
-  y += 10;
+  y += 8;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.text('Recibido conforme:', 14, y);
+  doc.text('Por la administración:', doc.internal.pageSize.getWidth() / 2 + 10, y);
   y += 14;
   doc.setDrawColor(30, 27, 19);
-  doc.line(14, y, 90, y);
+  doc.line(14, y, 80, y);
+  doc.line(doc.internal.pageSize.getWidth() / 2 + 10, y, doc.internal.pageSize.getWidth() - 20, y);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.text('Firma del cliente', 14, y + 5);
+  doc.setFontSize(7.5);
+  doc.text('Firma del cliente', 14, y + 4.5);
+  doc.text(config.nombre_empresa || 'Administración', doc.internal.pageSize.getWidth() / 2 + 10, y + 4.5);
 
-  pie(doc);
+  pie(doc, config);
   doc.save(`Separacion_${reserva.id.slice(0, 8)}.pdf`);
 }
 
 // ================================================================
 // 2. COMPROBANTE DE ABONO
 // ================================================================
-export function generarComprobantePago(reserva: Reserva, pago: Pago): void {
+export function generarComprobantePago(reserva: Reserva, pago: Pago, configParam?: ConfiguracionGeneral): void {
+  const config = configParam || getConfiguracionGlobal();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const num = `PAG-${pago.id.slice(0, 8).toUpperCase()}`;
+  const prefijo = config.prefijo_abono || 'PAG-';
+  const num = `${prefijo}${pago.id.slice(0, 8).toUpperCase()}`;
 
-  encabezado(doc, 'COMPROBANTE DE ABONO', num);
+  encabezado(doc, 'COMPROBANTE DE ABONO / PAGO', num, config);
 
-  let y = 46;
+  let y = 48;
   y = datosClienteFinca(doc, reserva, y);
   y += 8;
   y = linea(doc, y);
@@ -273,22 +341,25 @@ export function generarComprobantePago(reserva: Reserva, pago: Pago): void {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(107, 100, 87);
-  doc.text('Este comprobante es válido como recibo de pago parcial o total de la reserva indicada.', 14, y, { maxWidth: 180 });
+  const textoLegal = config.textos_legales || 'Este comprobante es válido como recibo de pago parcial o total de la reserva indicada.';
+  doc.text(textoLegal, 14, y, { maxWidth: 182 });
 
-  pie(doc);
+  pie(doc, config);
   doc.save(`Abono_${pago.id.slice(0, 8)}.pdf`);
 }
 
 // ================================================================
 // 3. ESTADO DE CUENTA
 // ================================================================
-export function generarEstadoCuenta(reserva: Reserva): void {
+export function generarEstadoCuenta(reserva: Reserva, configParam?: ConfiguracionGeneral): void {
+  const config = configParam || getConfiguracionGlobal();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const num = `EC-${reserva.id.slice(0, 8).toUpperCase()}`;
+  const prefijo = config.prefijo_estado_cuenta || 'EC-';
+  const num = `${prefijo}${reserva.id.slice(0, 8).toUpperCase()}`;
 
-  encabezado(doc, 'ESTADO DE CUENTA', num);
+  encabezado(doc, 'ESTADO DE CUENTA', num, config);
 
-  let y = 46;
+  let y = 48;
   y = datosClienteFinca(doc, reserva, y);
   y += 8;
   y = linea(doc, y);
@@ -320,15 +391,12 @@ export function generarEstadoCuenta(reserva: Reserva): void {
     linea(doc, y);
     y += 3;
 
-    let totalPagado = 0;
     for (const p of pagos) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.text(formatFecha(p.fecha), 16, y);
       doc.text(p.tipo.replace('_', ' '), 50, y);
       if (p.observacion) doc.text(p.observacion.slice(0, 35), 90, y);
-      const signo = p.tipo === 'devolucion' ? -p.valor : p.valor;
-      totalPagado += signo;
       doc.text(formatCOP(Math.abs(p.valor)), 182, y, { align: 'right' });
       y += 6;
     }
@@ -349,14 +417,24 @@ export function generarEstadoCuenta(reserva: Reserva): void {
   doc.rect(14, y - 4, 182, 9, 'F');
   y = fila(doc, y, 'SALDO PENDIENTE:', formatCOP(saldo), true);
 
-  pie(doc);
+  // Texto legal
+  if (config.textos_legales) {
+    y += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(110, 105, 95);
+    doc.text(config.textos_legales, 14, y, { maxWidth: 182 });
+  }
+
+  pie(doc, config);
   doc.save(`EstadoCuenta_${reserva.id.slice(0, 8)}.pdf`);
 }
 
 // ================================================================
 // 4. PAZ Y SALVO
 // ================================================================
-export function generarPazYSalvo(reserva: Reserva): void {
+export function generarPazYSalvo(reserva: Reserva, configParam?: ConfiguracionGeneral): void {
+  const config = configParam || getConfiguracionGlobal();
   const saldo = calcularSaldo(reserva);
   if (saldo > 0) {
     alert('No es posible generar el Paz y Salvo: la reserva tiene saldo pendiente.');
@@ -364,18 +442,19 @@ export function generarPazYSalvo(reserva: Reserva): void {
   }
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const num = `PS-${reserva.id.slice(0, 8).toUpperCase()}`;
+  const prefijo = config.prefijo_paz_salvo || 'PS-';
+  const num = `${prefijo}${reserva.id.slice(0, 8).toUpperCase()}`;
   const ancho = doc.internal.pageSize.getWidth();
 
-  encabezado(doc, 'PAZ Y SALVO', num);
+  encabezado(doc, 'CERTIFICADO DE PAZ Y SALVO', num, config);
 
   let y = 56;
 
   // Sello visual
   doc.setFillColor(209, 234, 217);
-  doc.roundedRect(ancho / 2 - 40, y, 80, 22, 4, 4, 'F');
+  doc.roundedRect(ancho / 2 - 45, y, 90, 22, 4, 4, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
+  doc.setFontSize(12.5);
   doc.setTextColor(26, 107, 94);
   doc.text('✓ PAGADO EN SU TOTALIDAD', ancho / 2, y + 14, { align: 'center' });
   doc.setTextColor(30, 27, 19);
@@ -388,61 +467,44 @@ export function generarPazYSalvo(reserva: Reserva): void {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(26, 107, 94);
-  doc.text('CERTIFICACIÓN', 14, y);
+  doc.text('CERTIFICACIÓN OFICIAL', 14, y);
   doc.setTextColor(30, 27, 19);
   y += 8;
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
   const texto = [
-    `Por medio del presente documento se certifica que el/la señor(a) ${nombreCompleto(reserva)}`,
-    `ha cancelado en su TOTALIDAD el valor correspondiente a la reserva de la finca`,
-    `"${reserva.fincas?.nombre || '—'}", correspondiente al período comprendido entre`,
-    `el ${formatFecha(reserva.fecha_inicio)} y el ${formatFecha(reserva.fecha_fin)}.`,
+    `Por medio del presente documento, ${config.nombre_empresa || 'la administración'} certifica que el/la señor(a)`,
+    `${nombreCompleto(reserva)} ha cancelado en su TOTALIDAD el valor correspondiente a la reserva`,
+    `de la finca "${reserva.fincas?.nombre || '—'}", para el período comprendido entre el`,
+    `${formatFecha(reserva.fecha_inicio)} y el ${formatFecha(reserva.fecha_fin)}.`,
     '',
     `Valor total cancelado: ${formatCOP(reserva.valor_total)}`,
     `Saldo pendiente: ${formatCOP(0)}`,
     '',
-    'En consecuencia, se expide el presente paz y salvo a conformidad de las partes.',
+    config.textos_legales || 'En consecuencia, se expide el presente paz y salvo a plena conformidad de las partes.',
   ];
-  for (const linea of texto) {
-    doc.text(linea, 14, y, { maxWidth: 182 });
-    y += linea === '' ? 4 : 7;
+  for (const lineaTexto of texto) {
+    doc.text(lineaTexto, 14, y, { maxWidth: 182 });
+    y += lineaTexto === '' ? 4 : 6.5;
   }
 
-  y += 20;
+  y += 18;
   doc.setFont('helvetica', 'bold');
-  doc.text('Firma del administrador:', 14, y);
+  doc.text('Firma y autorización administrativa:', 14, y);
   y += 14;
   doc.line(14, y, 90, y);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text('Firma y sello', 14, y + 5);
+  doc.text(`Administración • ${config.nombre_empresa}`, 14, y + 5);
 
-  pie(doc);
+  pie(doc, config);
   doc.save(`PazYSalvo_${reserva.id.slice(0, 8)}.pdf`);
 }
 
 // ================================================================
-// 5. PROPUESTA DE ALIMENTACIÓN (FASE 2)
+// 5. PROPUESTA DE ALIMENTACIÓN (FASE 2 & 4)
 // ================================================================
-
-async function urlABase64(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, { mode: 'cors' });
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
-}
-
 export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionDatos): Promise<void> {
   const {
     menu,
@@ -450,17 +512,19 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
     finca,
     personas = 10,
     cantidadServicios = 1,
-    fechaEvento,
     notasEspeciales,
+    config: configParam,
   } = datos;
 
+  const config = configParam || getConfiguracionGlobal();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const ancho = doc.internal.pageSize.getWidth();
-  const num = `PROP-ALIM-${(menu.id || 'MEN').slice(0, 8).toUpperCase()}`;
+  const prefijo = config.prefijo_propuesta_menu || 'PROP-';
+  const num = `${prefijo}${(menu.id || 'MEN').slice(0, 8).toUpperCase()}`;
 
-  encabezado(doc, 'PROPUESTA DE SERVICIO GASTRONÓMICO', num);
+  encabezado(doc, 'PROPUESTA DE SERVICIO GASTRONÓMICO', num, config);
 
-  let y = 46;
+  let y = 48;
 
   // Franja datos cliente y finca
   doc.setFillColor(244, 241, 234);
@@ -482,7 +546,7 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
 
   const contactoCli = cliente?.whatsapp || cliente?.correo || 'Coordinación directa';
   doc.text(`Contacto: ${contactoCli}`, 14, y + 26);
-  doc.text(`Comensales: ${personas} personas · ${cantidadServicios} servicio(s)`, col2, y + 26);
+  doc.text(`Comensales: ${personas} personas • ${cantidadServicios} servicio(s)`, col2, y + 26);
 
   y += 38;
 
@@ -533,7 +597,6 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
         doc.roundedRect(14, y, 75, 45, 2, 2, 'FD');
         doc.addImage(b64, 'JPEG', 15, y + 1, 73, 43);
 
-        // Cuadro lateral de resumen rápido al lado de la foto
         doc.setFillColor(244, 241, 234);
         doc.roundedRect(95, y, ancho - 109, 45, 2, 2, 'F');
         doc.setFont('helvetica', 'bold');
@@ -551,7 +614,7 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
         y += 50;
       }
     } catch {
-      // Si falla la imagen, continuamos limpiamente
+      // Continuar limpiamente si la imagen no responde CORS
     }
   }
 
@@ -603,7 +666,7 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
   doc.setTextColor(30, 27, 19);
   y += 14;
 
-  // CONDICIONES
+  // CONDICIONES (Fase 4)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(26, 107, 94);
@@ -642,12 +705,138 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
   doc.line(col2, y, col2 + 66, y);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  doc.text('Coordinación Gastronómica Fincas', 14, y + 4.5);
+  doc.text(`Coordinación • ${config.nombre_empresa}`, 14, y + 4.5);
   doc.text(nombreCli, col2, y + 4.5);
 
-  pie(doc);
+  pie(doc, config);
 
   const nombreLimpio = menu.nombre.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 25);
   doc.save(`Propuesta_Alimentacion_${nombreLimpio}.pdf`);
 }
 
+// ================================================================
+// 6. PROPUESTA FORMAL DE COTIZACIÓN (FASE 4)
+// ================================================================
+export function generarDocCotizacion(cotizacion: CotizacionDB, configParam?: ConfiguracionGeneral): void {
+  const config = configParam || getConfiguracionGlobal();
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const prefijo = config.prefijo_cotizacion || 'COT-';
+  const num = `${prefijo}${cotizacion.id.slice(0, 8).toUpperCase()}`;
+  const ancho = doc.internal.pageSize.getWidth();
+
+  encabezado(doc, 'COTIZACIÓN FORMAL DE SERVICIOS', num, config);
+
+  let y = 48;
+
+  // Datos cliente y finca
+  doc.setFillColor(244, 241, 234);
+  doc.rect(0, y, ancho, 32, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(26, 107, 94);
+  doc.text('DATOS DE LA COTIZACIÓN', 14, y + 8);
+  doc.setTextColor(30, 27, 19);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  const col2 = ancho / 2 + 4;
+
+  const cliNombre = cotizacion.clientes
+    ? `${cotizacion.clientes.nombre} ${cotizacion.clientes.apellido || ''}`.trim()
+    : 'Cliente Particular';
+  doc.text(`Cliente: ${cliNombre}`, 14, y + 17);
+  doc.text(`Finca: ${cotizacion.fincas?.nombre || 'Finca Campestre'}`, col2, y + 17);
+
+  const waCli = cotizacion.clientes?.whatsapp || 'Coordinación directa';
+  doc.text(`WhatsApp: ${waCli}`, 14, y + 26);
+  doc.text(`Grupo: ${cotizacion.personas} personas`, col2, y + 26);
+
+  y += 38;
+
+  // Detalle de la estadía
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(26, 107, 94);
+  doc.text('DETALLE DE FECHAS Y ALOJAMIENTO', 14, y);
+  doc.setTextColor(30, 27, 19);
+  y += 8;
+
+  y = fila(doc, y, 'Fecha de ingreso:', formatFecha(cotizacion.fecha_inicio));
+  y = fila(doc, y, 'Fecha de salida:', formatFecha(cotizacion.fecha_fin));
+  y = fila(doc, y, 'Total de personas:', `${cotizacion.personas} huéspedes`);
+  if (cotizacion.alimentacion && cotizacion.alimentacion !== 'Sin alimentación') {
+    y = fila(doc, y, 'Servicio gastronómico:', cotizacion.alimentacion);
+  }
+  y += 4;
+  y = linea(doc, y);
+
+  // Liquidación de valores
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(26, 107, 94);
+  doc.text('DESGLOSE ECONÓMICO', 14, y);
+  doc.setTextColor(30, 27, 19);
+  y += 8;
+
+  y = fila(doc, y, 'Subtotal alojamiento:', formatCOP(cotizacion.subtotal_alojamiento));
+  if (cotizacion.costo_alimentacion > 0) {
+    y = fila(doc, y, 'Alimentación seleccionada:', formatCOP(cotizacion.costo_alimentacion));
+  }
+  if (cotizacion.descuento > 0) {
+    y = fila(doc, y, 'Descuento aplicado:', `-${formatCOP(cotizacion.descuento)}`);
+  }
+  if (cotizacion.recargo > 0) {
+    y = fila(doc, y, 'Recargos adicionales:', `+${formatCOP(cotizacion.recargo)}`);
+  }
+
+  y += 2;
+  // Total destacado
+  doc.setFillColor(230, 243, 240);
+  doc.rect(14, y - 4, 182, 10, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(26, 107, 94);
+  doc.text('VALOR TOTAL COTIZADO:', 18, y + 2.5);
+  doc.text(formatCOP(cotizacion.total), 182, y + 2.5, { align: 'right' });
+  doc.setTextColor(30, 27, 19);
+  y += 14;
+
+  // Condiciones y Políticas
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(26, 107, 94);
+  doc.text('TÉRMINOS Y VALIDEZ DE LA COTIZACIÓN', 14, y);
+  doc.setTextColor(30, 27, 19);
+  y += 6;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  const terminos = config.terminos_condiciones || `• Esta cotización tiene una vigencia de 5 días hábiles a partir de su emisión.\n• Para formalizar y bloquear la disponibilidad de las fechas se requiere un anticipo del 50%.\n• Los precios pactados se respetan únicamente con la confirmación oportuna de la reserva.`;
+  const lineas = terminos.split('\n');
+  for (const l of lineas) {
+    if (l.trim()) {
+      const split = doc.splitTextToSize(l.trim(), 182);
+      doc.text(split, 14, y);
+      y += split.length * 4.2;
+    }
+  }
+
+  // Firmas
+  y += 12;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.text('Elaborado por:', 14, y);
+  doc.text('Aceptación de cotización:', col2, y);
+  y += 14;
+  doc.setDrawColor(30, 27, 19);
+  doc.line(14, y, 80, y);
+  doc.line(col2, y, col2 + 66, y);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text(`Asesor Comercial • ${config.nombre_empresa}`, 14, y + 4.5);
+  doc.text(cliNombre, col2, y + 4.5);
+
+  pie(doc, config);
+  doc.save(`Cotizacion_${cotizacion.id.slice(0, 8)}.pdf`);
+}

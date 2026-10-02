@@ -15,6 +15,7 @@ import { useCotizaciones } from './hooks/useCotizaciones';
 import { useReservas } from './hooks/useReservas';
 import { useMenus } from './hooks/useMenus';
 import { useComunicaciones } from './hooks/useComunicaciones';
+import { useConfiguracion } from './hooks/useConfiguracion';
 import { DEFAULT_WA_NUMBER } from './services/supabase';
 import type { ViewType } from './types';
 
@@ -94,6 +95,14 @@ export const App: React.FC = () => {
     registrarComunicacion,
     limpiarHistorial: limpiarHistorialComunicaciones,
   } = useComunicaciones();
+
+  // Fase 4: Hook de configuración general (empresa, documentos, consecutivos)
+  const {
+    config: configuracion,
+    guardando: guardandoConfig,
+    guardarConfiguracion,
+    restablecerPorDefecto: restablecerConfiguracion,
+  } = useConfiguracion();
 
   // Sincronizar tema con el DOM
   useEffect(() => {
@@ -237,6 +246,10 @@ export const App: React.FC = () => {
             comunicaciones={comunicaciones}
             onRegistrarComunicacion={registrarComunicacion}
             onLimpiarHistorialComunicaciones={limpiarHistorialComunicaciones}
+            configuracion={configuracion}
+            guardandoConfig={guardandoConfig}
+            onGuardarConfiguracion={guardarConfiguracion}
+            onRestablecerConfiguracion={restablecerConfiguracion}
             showToast={showToast}
             openConfirm={openConfirm}
           />
