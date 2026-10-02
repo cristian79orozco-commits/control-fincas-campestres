@@ -3,6 +3,22 @@
 -- Migración: tablas clientes, cotizaciones, reservas, pagos
 -- ================================================================
 
+CREATE OR REPLACE FUNCTION public.handle_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = timezone('utc'::text, now());
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ---------------------------------------------------------------
+-- 0. LIMPIEZA PREVIA (Asegurar esquema limpio para Fase 1)
+-- ---------------------------------------------------------------
+DROP TABLE IF EXISTS public.pagos CASCADE;
+DROP TABLE IF EXISTS public.reservas CASCADE;
+DROP TABLE IF EXISTS public.cotizaciones CASCADE;
+DROP TABLE IF EXISTS public.clientes CASCADE;
+
 -- ---------------------------------------------------------------
 -- 1. TABLA: CLIENTES
 -- ---------------------------------------------------------------
@@ -120,24 +136,28 @@ ALTER TABLE public.cotizaciones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reservas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pagos ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admin gestion total clientes" ON public.clientes;
 CREATE POLICY "Admin gestion total clientes"
     ON public.clientes FOR ALL
     TO authenticated
     USING (true)
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Admin gestion total cotizaciones" ON public.cotizaciones;
 CREATE POLICY "Admin gestion total cotizaciones"
     ON public.cotizaciones FOR ALL
     TO authenticated
     USING (true)
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Admin gestion total reservas" ON public.reservas;
 CREATE POLICY "Admin gestion total reservas"
     ON public.reservas FOR ALL
     TO authenticated
     USING (true)
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Admin gestion total pagos" ON public.pagos;
 CREATE POLICY "Admin gestion total pagos"
     ON public.pagos FOR ALL
     TO authenticated
