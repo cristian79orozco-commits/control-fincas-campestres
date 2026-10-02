@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch:
 
+# El token necesita permiso de escritura para publicar en gh-pages
+permissions:
+  contents: write
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
