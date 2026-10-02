@@ -7,6 +7,11 @@ import { AdminDashboard } from './admin/AdminDashboard';
 import { ToastContainer, type ToastMessage } from './components/Toast';
 import { ConfirmModal } from './components/ConfirmModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
+import { BannerPromocional } from './components/BannerPromocional';
+import { BeneficiosSection } from './components/BeneficiosSection';
+import { MenusPublicosSection } from './components/MenusPublicosSection';
+import { FaqSection } from './components/FaqSection';
+import { FooterPublico } from './components/FooterPublico';
 import { useAuth } from './hooks/useAuth';
 import { useFincas } from './hooks/useFincas';
 import { useDisponibilidad } from './hooks/useDisponibilidad';
@@ -16,8 +21,9 @@ import { useReservas } from './hooks/useReservas';
 import { useMenus } from './hooks/useMenus';
 import { useComunicaciones } from './hooks/useComunicaciones';
 import { useConfiguracion } from './hooks/useConfiguracion';
+import { useContenidoSitio } from './hooks/useContenidoSitio';
 import { DEFAULT_WA_NUMBER } from './services/supabase';
-import type { ViewType } from './types';
+import type { ViewType, SeccionClave } from './types';
 
 export const App: React.FC = () => {
   // Estado de vistas y navegación
@@ -63,7 +69,7 @@ export const App: React.FC = () => {
     eliminarBloqueo,
   } = useDisponibilidad(selectedFincaId);
 
-  // Fase 1: hooks nuevos (solo se cargan cuando es admin)
+  // Fase 1: Clientes, Cotizaciones, Reservas y Pagos
   const { clientes, guardar: guardarCliente, desactivar: desactivarCliente } = useClientes();
   const {
     cotizaciones,
@@ -103,6 +109,14 @@ export const App: React.FC = () => {
     guardarConfiguracion,
     restablecerPorDefecto: restablecerConfiguracion,
   } = useConfiguracion();
+
+  // Fase 5: Hook de contenido y personalización del sitio público
+  const {
+    contenido: contenidoSitio,
+    guardando: guardandoContenido,
+    guardarContenido,
+    restablecerPorDefecto: restablecerContenido,
+  } = useContenidoSitio();
 
   // Sincronizar tema con el DOM
   useEffect(() => {
@@ -158,8 +172,103 @@ export const App: React.FC = () => {
 
   const selectedFinca = fincas.find(f => f.id === selectedFincaId);
 
+  // Renderizado dinámico de las secciones públicas según `orden_secciones`
+  const renderSeccionesCliente = () => {
+    let catalogoRendered = false;
+
+    return contenidoSitio.orden_secciones.map((seccion: SeccionClave) => {
+      switch (seccion) {
+        case 'hero':
+          return (
+            <Hero
+              key="hero"
+              totalFincas={metricas.total}
+              disponibles={metricas.disponibles}
+              ocupadas={metricas.ocupadas}
+              porcentajeOcupacion={metricas.porcentajeOcupacion}
+              contenido={contenidoSitio}
+              onExploreClick={() => {
+                const el = document.getElementById('catalogo');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              onMenusClick={() => {
+                const el = document.getElementById('seccion-menus');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+            />
+          );
+
+        case 'destacados':
+          return (
+            <BeneficiosSection
+              key="destacados"
+              visible={contenidoSitio.destacados_visible}
+              titulo={contenidoSitio.destacados_titulo}
+              subtitulo={contenidoSitio.destacados_subtitulo}
+              items={contenidoSitio.destacados_items}
+            />
+          );
+
+        case 'estado':
+        case 'filtros':
+        case 'catalogo':
+          // Renderiza el bloque del catálogo solo una vez al encontrar cualquiera de sus claves
+          if (catalogoRendered) return null;
+          catalogoRendered = true;
+          return (
+            <main key="catalogo-block" className="main-content">
+              <Catalog
+                fincas={fincas}
+                loading={loadingFincas}
+                bloquesAdmin={bloquesAdmin}
+                onSelectFinca={handleSelectFinca}
+                contenido={contenidoSitio}
+              />
+            </main>
+          );
+
+        case 'menus':
+          return (
+            <div key="menus" id="seccion-menus">
+              <MenusPublicosSection
+                visible={contenidoSitio.menus_visible}
+                titulo={contenidoSitio.menus_titulo}
+                subtitulo={contenidoSitio.menus_subtitulo}
+                badgeTexto={contenidoSitio.menus_badge_texto}
+                menus={menus}
+                waNumber={waNumberGlobal}
+              />
+            </div>
+          );
+
+        case 'faq':
+          return (
+            <FaqSection
+              key="faq"
+              visible={contenidoSitio.faq_visible}
+              titulo={contenidoSitio.faq_titulo}
+              subtitulo={contenidoSitio.faq_subtitulo}
+              items={contenidoSitio.faq_items}
+            />
+          );
+
+        default:
+          return null;
+      }
+    });
+  };
+
   return (
     <div className="app-wrapper">
+      {/* Banner de anuncio superior */}
+      <BannerPromocional
+        visible={contenidoSitio.banner_visible}
+        texto={contenidoSitio.banner_texto}
+        linkTexto={contenidoSitio.banner_link_texto}
+        linkUrl={contenidoSitio.banner_link_url}
+        tipo={contenidoSitio.banner_tipo}
+      />
+
       <Navbar
         currentView={view}
         onViewChange={handleViewChange}
@@ -172,25 +281,17 @@ export const App: React.FC = () => {
 
       {view === 'cliente' && (
         <>
-          <Hero
-            totalFincas={metricas.total}
-            disponibles={metricas.disponibles}
-            ocupadas={metricas.ocupadas}
-            porcentajeOcupacion={metricas.porcentajeOcupacion}
-            onExploreClick={() => {
-              const el = document.getElementById('catalogo');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }}
-          />
+          {renderSeccionesCliente()}
 
-          <main className="main-content">
-            <Catalog
-              fincas={fincas}
-              loading={loadingFincas}
-              bloquesAdmin={bloquesAdmin}
-              onSelectFinca={handleSelectFinca}
-            />
-          </main>
+          {/* Pie de página público enriquecido */}
+          <FooterPublico
+            visible={contenidoSitio.footer_visible}
+            titulo={contenidoSitio.footer_titulo}
+            subtitulo={contenidoSitio.footer_subtitulo}
+            whatsappCta={contenidoSitio.footer_whatsapp_cta}
+            configuracion={configuracion}
+            waNumber={waNumberGlobal}
+          />
         </>
       )}
 
@@ -250,6 +351,11 @@ export const App: React.FC = () => {
             guardandoConfig={guardandoConfig}
             onGuardarConfiguracion={guardarConfiguracion}
             onRestablecerConfiguracion={restablecerConfiguracion}
+            contenidoSitio={contenidoSitio}
+            guardandoContenido={guardandoContenido}
+            onGuardarContenido={guardarContenido}
+            onRestablecerContenido={restablecerContenido}
+            onVerSitioPublico={() => handleViewChange('cliente')}
             showToast={showToast}
             openConfirm={openConfirm}
           />

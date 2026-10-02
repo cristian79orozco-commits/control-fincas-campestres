@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import {
   LayoutDashboard, LogOut, Lock, LogIn, ShieldCheck, Database,
   Home, Users, FileText, ClipboardList, Calendar, MessageCircle,
-  Menu, X, TrendingUp, CheckCircle, AlertTriangle, Clock, UtensilsCrossed, Settings
+  Menu, X, TrendingUp, CheckCircle, AlertTriangle, Clock, UtensilsCrossed, Settings,
+  Palette
 } from 'lucide-react';
 import { AdminFincaForm } from './AdminFincaForm';
 import { AdminCalendar } from './AdminCalendar';
@@ -13,10 +14,11 @@ import { AdminCotizaciones } from './AdminCotizaciones';
 import { AdminReservas } from './AdminReservas';
 import { AdminMenus } from './AdminMenus';
 import { AdminConfiguracion } from './AdminConfiguracion';
+import { AdminPersonalizacion } from './AdminPersonalizacion';
 import type {
   Finca, BloqueoDisponibilidad, Cliente, CotizacionDB, CotizacionEstado,
   Reserva, ReservaEstado, PagoTipo, AdminSection, Menu as MenuType, Comunicacion,
-  ConfiguracionGeneral
+  ConfiguracionGeneral, ContenidoSitio
 } from '../types';
 
 interface AdminDashboardProps {
@@ -63,6 +65,12 @@ interface AdminDashboardProps {
   guardandoConfig?: boolean;
   onGuardarConfiguracion?: (datos: Partial<ConfiguracionGeneral>) => Promise<{ success: boolean; error?: string }>;
   onRestablecerConfiguracion?: () => Promise<{ success: boolean; error?: string }>;
+  // Personalización del Sitio (Fase 5)
+  contenidoSitio?: ContenidoSitio;
+  guardandoContenido?: boolean;
+  onGuardarContenido?: (datos: Partial<ContenidoSitio>) => Promise<{ success: boolean; error?: string }>;
+  onRestablecerContenido?: () => Promise<{ success: boolean; error?: string }>;
+  onVerSitioPublico?: () => void;
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   openConfirm: (title: string, message: string, onConfirm: () => void) => void;
 }
@@ -77,6 +85,7 @@ const NAV_ITEMS: { section: AdminSection; label: string; icon: React.ReactNode }
   { section: 'menus',        label: 'Menús',          icon: <UtensilsCrossed size={16} /> },
   { section: 'whatsapp',     label: 'Comunicaciones', icon: <MessageCircle size={16} /> },
   { section: 'configuracion', label: 'Configuración',  icon: <Settings size={16} /> },
+  { section: 'personalizacion', label: 'Personalización del sitio', icon: <Palette size={16} /> },
 ];
 
 function formatCOP(v: number) { return '$' + v.toLocaleString('es-CO'); }
@@ -119,6 +128,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   guardandoConfig = false,
   onGuardarConfiguracion,
   onRestablecerConfiguracion,
+  contenidoSitio,
+  guardandoContenido = false,
+  onGuardarContenido,
+  onRestablecerContenido,
+  onVerSitioPublico,
   showToast,
   openConfirm,
 }) => {
@@ -497,6 +511,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {activeSection === 'configuracion' && !configuracion && (
             <div className="panel" style={{ padding: '3rem', textAlign: 'center' }}>
               <div className="text-muted">Cargando configuración general...</div>
+            </div>
+          )}
+
+          {/* ===== SECCIÓN: PERSONALIZACIÓN DEL SITIO PÚBLICO (FASE 5) ===== */}
+          {activeSection === 'personalizacion' && contenidoSitio && (
+            <AdminPersonalizacion
+              contenido={contenidoSitio}
+              guardando={guardandoContenido}
+              onGuardar={onGuardarContenido || (async () => ({ success: false, error: 'No configurado' }))}
+              onRestablecer={onRestablecerContenido || (async () => ({ success: false, error: 'No configurado' }))}
+              onVerSitioPublico={onVerSitioPublico || (() => {})}
+              showToast={showToast}
+              openConfirm={openConfirm}
+            />
+          )}
+
+          {activeSection === 'personalizacion' && !contenidoSitio && (
+            <div className="panel" style={{ padding: '3rem', textAlign: 'center' }}>
+              <div className="text-muted">Cargando datos de personalización...</div>
             </div>
           )}
         </div>

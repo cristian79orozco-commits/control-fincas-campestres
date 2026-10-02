@@ -227,7 +227,8 @@ export type AdminSection =
   | 'reservas'
   | 'menus'
   | 'whatsapp'
-  | 'configuracion';
+  | 'configuracion'
+  | 'personalizacion';
 
 // ---------------------------------------------------------------
 // FASE 3 — Tipos de Comunicaciones y WhatsApp
@@ -310,4 +311,105 @@ export interface ConfiguracionGeneral {
   updated_at?: string;
 }
 
+// ---------------------------------------------------------------
+// FASE 5 — Control del Contenido del Cliente (Sitio Público)
+// ---------------------------------------------------------------
 
+export interface BeneficioItem {
+  id: string;
+  icono: string;
+  titulo: string;
+  descripcion: string;
+}
+
+export interface FaqItem {
+  id: string;
+  pregunta: string;
+  respuesta: string;
+}
+
+export type SeccionClave =
+  | 'banner'
+  | 'hero'
+  | 'destacados'
+  | 'estado'
+  | 'filtros'
+  | 'catalogo'
+  | 'menus'
+  | 'faq';
+
+export interface ContenidoSitio {
+  id: string; // 'principal'
+
+  // Orden de secciones en la página pública
+  orden_secciones: SeccionClave[];
+
+  // 1. Banner Superior Promocional
+  banner_visible: boolean;
+  banner_texto: string;
+  banner_link_texto: string;
+  banner_link_url: string;
+  banner_tipo: 'promo' | 'info' | 'aviso';
+
+  // 2. Hero Section
+  hero_visible: boolean;
+  hero_eyebrow: string;
+  hero_titulo: string;
+  hero_subtitulo: string;
+  hero_cta_texto: string;
+  hero_cta_secundario_texto: string;
+  hero_mostrar_metricas: boolean;
+  hero_mostrar_pasos: boolean;
+  hero_paso_1: string;
+  hero_paso_2: string;
+  hero_paso_3: string;
+  hero_imagen_url?: string | null;
+  hero_badge_ubicacion?: string | null;
+
+  // 3. Información Destacada / Beneficios
+  destacados_visible: boolean;
+  destacados_titulo: string;
+  destacados_subtitulo: string;
+  destacados_items: BeneficioItem[];
+
+  // 4. Estado Actual (Resumen de fincas)
+  estado_visible: boolean;
+  estado_titulo: string;
+  estado_subtitulo: string;
+  estado_badge_texto: string;
+  estado_ayuda_texto: string;
+
+  // 5. Filtros de Búsqueda
+  filtros_visible: boolean;
+  filtros_titulo: string;
+  filtros_subtitulo: string;
+  filtros_badge_titulo: string;
+  filtros_badge_texto: string;
+
+  // 6. Catálogo de Fincas
+  catalogo_visible: boolean;
+  catalogo_titulo: string;
+  catalogo_subtitulo: string;
+  catalogo_vacio_texto: string;
+
+  // 7. Menús Campestres (Portal Público)
+  menus_visible: boolean;
+  menus_titulo: string;
+  menus_subtitulo: string;
+  menus_badge_texto: string;
+
+  // 8. Preguntas Frecuentes (FAQ)
+  faq_visible: boolean;
+  faq_titulo: string;
+  faq_subtitulo: string;
+  faq_items: FaqItem[];
+
+  // 9. Pie de página (Footer)
+  footer_visible: boolean;
+  footer_titulo: string;
+  footer_subtitulo: string;
+  footer_whatsapp_cta: string;
+
+  created_at?: string;
+  updated_at?: string;
+}
