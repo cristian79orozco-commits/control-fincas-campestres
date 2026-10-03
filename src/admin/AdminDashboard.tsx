@@ -436,6 +436,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {activeSection === 'clientes' && (
             <AdminClientes
               clientes={clientes}
+              reservas={reservas}
+              cotizaciones={cotizaciones}
               onGuardar={onGuardarCliente}
               onDesactivar={onDesactivarCliente}
               showToast={showToast}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
+import { obtenerSiguienteConsecutivo } from '../utils/consecutivos';
 import type { Reserva, ReservaEstado, Pago, PagoTipo, CierreReserva } from '../types';
 
 export function useReservas() {
@@ -93,12 +94,7 @@ export function useReservas() {
         if (datos.consecutivo) {
           payload.consecutivo = datos.consecutivo;
         } else {
-          try {
-            const { data: numRes } = await supabase.rpc('siguiente_consecutivo_reserva');
-            if (numRes) payload.consecutivo = numRes;
-          } catch (eRpc) {
-            console.warn('No se pudo generar consecutivo automático de reserva:', eRpc);
-          }
+          payload.consecutivo = await obtenerSiguienteConsecutivo('reserva');
         }
       } else if (datos.consecutivo) {
         payload.consecutivo = datos.consecutivo;

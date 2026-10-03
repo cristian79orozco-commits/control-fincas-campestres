@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   ClipboardList, Plus, Edit3, Trash2, X, Save, CreditCard,
   Calendar, Users, DollarSign, ChevronDown, ChevronUp, FileCheck, MessageCircle,
-  FileText, CheckCircle, Hash, Copy, Check
+  FileText, CheckCircle, Hash, Copy, Check, Award, AlertTriangle, ArrowRight
 } from 'lucide-react';
 import type { Reserva, ReservaEstado, Cliente, Finca, Pago, PagoTipo, CotizacionDB, CierreReserva, ConfiguracionGeneral } from '../types';
 import { calcularSaldo } from '../types';
@@ -14,8 +14,9 @@ import {
   plantillaRecordatorioPago,
   plantillaBienvenida,
   plantillaSeparacion,
+  plantillaPazYSalvo,
 } from '../services/whatsapp';
-import { generarDocSeparacion } from '../services/documentos';
+import { generarDocSeparacion, generarPazYSalvo } from '../services/documentos';
 import { CurrencyInput } from '../components/CurrencyInput';
 
 interface AdminReservasProps {
@@ -158,11 +159,12 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
     tipo: 'recordatorio_pago',
   });
 
-  // Si llega cotización pre-cargada, abrir formulario con sus datos
+  // Si llega cotización pre-cargada, abrir formulario con sus datos y preservar consecutivo
   React.useEffect(() => {
     if (cotizacionInicial) {
       setForm({
         cotizacion_id: cotizacionInicial.id,
+        consecutivo: cotizacionInicial.consecutivo ? cotizacionInicial.consecutivo.replace(/^COT-/, 'RES-') : undefined,
         cliente_id: cotizacionInicial.cliente_id || '',
         finca_id: cotizacionInicial.finca_id,
         fecha_inicio: cotizacionInicial.fecha_inicio,
@@ -441,11 +443,48 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
             const saldo = calcularSaldo(r);
             const totalPagado = (r.valor_total) - saldo;
             const clienteNombre = r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim() : '—';
+            const clienteTel = r.clientes?.whatsapp || r.clientes?.telefono;
             const fincaNombre = r.fincas?.nombre || '—';
             const expanded = reservaExpandida === r.id;
 
+            const hoy = new Date().toISOString().split('T')[0];
+            const estanciaVencida = r.estado === 'activa' && r.fecha_fin < hoy;
+            const pazYSalvoHabilitado = saldo <= 0 && (r.pagos?.length || 0) > 0;
+
             return (
-              <div key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
+              <div key={r.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+                {/* Alerta de Fecha Cumplida / Estancia Finalizada */}
+                {estanciaVencida && (
+                  <div
+                    style={{
+                      background: 'rgba(245, 158, 11, 0.12)',
+                      borderLeft: '4px solid #f59e0b',
+                      padding: '0.4rem 0.85rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '0.78rem',
+                      color: '#b45309',
+                      fontWeight: 600,
+                      gap: '0.5rem',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <AlertTriangle size={14} /> Estancia finalizada ({formatFecha(r.fecha_fin)}) · Lista para cerrar e ir a Historial
+                    </span>
+                    {onCerrarReserva && (
+                      <button
+                        className="btn btn-sm btn-primary"
+                        style={{ fontSize: '0.72rem', padding: '0.2rem 0.6rem', backgroundColor: '#f59e0b', borderColor: '#f59e0b', color: '#fff' }}
+                        onClick={() => setReservaParaCierre(r)}
+                      >
+                        <CheckCircle size={12} /> Cerrar y Pasar a Historial
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {/* Fila principal */}
                 <div className="avail-row" style={{ borderBottom: 'none', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -458,6 +497,16 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                       <Calendar size={10} style={{ display:'inline', verticalAlign:'-1px' }} /> {formatFecha(r.fecha_inicio)} → {formatFecha(r.fecha_fin)}
                       {' · '}<Users size={10} style={{ display:'inline', verticalAlign:'-1px' }} /> {r.personas} personas
                       {' · '}👤 {clienteNombre}
+                      {clienteTel && (
+                        <a
+                          href={`https://wa.me/${clienteTel.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: '#25d366', textDecoration: 'none', marginLeft: '0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                        >
+                          <MessageCircle size={10} /> {clienteTel}
+                        </a>
+                      )}
                     </div>
                     <div style={{ marginTop: '0.25rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.8rem' }}>
                       <span>Total: <strong>{formatCOP(r.valor_total)}</strong></span>
@@ -537,6 +586,120 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                     >
                       {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                     </button>
+                  </div>
+                </div>
+
+                {/* ENTORNO INTERACTIVO BASADO EN BOTONES: Flujo de Seguimiento de la Reserva */}
+                <div
+                  style={{
+                    margin: '0.4rem 1rem 0.5rem',
+                    padding: '0.5rem 0.75rem',
+                    background: 'var(--surface-sunken)',
+                    borderRadius: 'var(--rad-xs)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.5rem',
+                    flexWrap: 'wrap',
+                    border: '1px solid var(--border-subtle, rgba(0,0,0,0.06))',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                    <span>Flujo de Reserva {r.consecutivo ? `(${r.consecutivo})` : ''}:</span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* 1. Botón Separación */}
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.22rem 0.55rem' }}
+                      title="Emitir documento oficial de separación y enviar por WhatsApp"
+                      onClick={() => {
+                        setModalWaReserva({
+                          abierto: true,
+                          reserva: r,
+                          titulo: `Documento de Separación · ${r.fincas?.nombre || 'Finca'}`,
+                          nombreDoc: 'Documento Oficial de Separación (PDF)',
+                          mensaje: plantillaSeparacion(r),
+                          onGenerarPdf: () => generarDocSeparacion(r),
+                          tipo: 'separacion',
+                        });
+                      }}
+                    >
+                      <FileText size={12} /> 1. Separación
+                    </button>
+
+                    {/* 2. Botón Registrar Abono */}
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.22rem 0.55rem' }}
+                      title="Registrar abono y generar comprobante"
+                      onClick={() => {
+                        setPagoReservaId(r.id);
+                        setPagoForm(PAGO_VACIO);
+                      }}
+                    >
+                      <CreditCard size={12} /> 2. Registrar Abono
+                    </button>
+
+                    {/* 3. Botón Paz y Salvo */}
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      disabled={!pazYSalvoHabilitado}
+                      style={{
+                        fontSize: '0.72rem',
+                        gap: '0.3rem',
+                        padding: '0.22rem 0.55rem',
+                        color: pazYSalvoHabilitado ? 'var(--success)' : 'var(--text-muted)',
+                        borderColor: pazYSalvoHabilitado ? 'var(--success)' : 'var(--border)',
+                        background: pazYSalvoHabilitado ? 'rgba(34,197,94,0.08)' : 'transparent',
+                        opacity: pazYSalvoHabilitado ? 1 : 0.6,
+                        cursor: pazYSalvoHabilitado ? 'pointer' : 'not-allowed',
+                      }}
+                      title={pazYSalvoHabilitado ? "Generar certificado de Paz y Salvo y enviar por WhatsApp" : `Requiere saldo en $0 (saldo pendiente: ${formatCOP(saldo)})`}
+                      onClick={() => {
+                        if (!pazYSalvoHabilitado) return;
+                        setModalWaReserva({
+                          abierto: true,
+                          reserva: r,
+                          titulo: `Certificado de Paz y Salvo · ${r.fincas?.nombre || 'Finca'}`,
+                          nombreDoc: 'Certificado de Paz y Salvo (PDF)',
+                          mensaje: plantillaPazYSalvo(r),
+                          onGenerarPdf: () => generarPazYSalvo(r),
+                          tipo: 'paz_salvo',
+                        });
+                      }}
+                    >
+                      <Award size={12} /> 3. Paz y Salvo {pazYSalvoHabilitado ? '✓' : `($${saldo.toLocaleString('es-CO')})`}
+                    </button>
+
+                    {/* 4. Botón Cerrar y Pasar a Historial */}
+                    {r.estado === 'activa' && onCerrarReserva ? (
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        style={{
+                          fontSize: '0.72rem',
+                          gap: '0.3rem',
+                          padding: '0.22rem 0.55rem',
+                          color: estanciaVencida ? '#fff' : 'var(--primary)',
+                          background: estanciaVencida ? '#f59e0b' : 'transparent',
+                          borderColor: estanciaVencida ? '#f59e0b' : 'var(--primary)',
+                          fontWeight: estanciaVencida ? 700 : 500,
+                        }}
+                        title="Efectuar check-out formal y archivar en historial permanente"
+                        onClick={() => setReservaParaCierre(r)}
+                      >
+                        <CheckCircle size={12} /> 4. Cerrar a Historial
+                      </button>
+                    ) : r.estado === 'completada' ? (
+                      <span style={{ fontSize: '0.72rem', color: 'var(--success)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        ✓ Archivada en Historial
+                      </span>
+                    ) : null}
                   </div>
                 </div>
 

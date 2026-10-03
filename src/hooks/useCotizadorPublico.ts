@@ -12,6 +12,7 @@
  */
 
 import { supabase } from '../services/supabase';
+import { obtenerSiguienteConsecutivo } from '../utils/consecutivos';
 
 // -----------------------------------------------------------------------
 // Tipos públicos
@@ -55,14 +56,17 @@ export function useCotizadorPublico() {
   ): Promise<ResultadoCotizacionPublica> => {
     try {
       // ----------------------------------------------------------------
-      // PASO 1 — Buscar cliente existente por número de celular
+      // PASO 1 — Buscar cliente existente por número de celular (deduplicación inteligente)
       // ----------------------------------------------------------------
-      const telefonoNormalizado = datos.clienteCelular.trim().replace(/\s/g, '');
+      const digitosTel = datos.clienteCelular.replace(/\D/g, '');
+      const digitosTel10 = digitosTel.startsWith('57') && digitosTel.length === 12 ? digitosTel.slice(2) : digitosTel;
+      const digitosTel57 = digitosTel.length === 10 ? `57${digitosTel}` : digitosTel;
 
+      // Buscar si existe por cualquiera de los formatos comunes
       const { data: clientesExistentes, error: errorBusqueda } = await supabase
         .from('clientes')
-        .select('id, nombre')
-        .or(`telefono.eq.${telefonoNormalizado},whatsapp.eq.${telefonoNormalizado}`)
+        .select('id, nombre, apellido, telefono, whatsapp')
+        .or(`telefono.eq.${digitosTel},whatsapp.eq.${digitosTel},telefono.eq.${digitosTel10},whatsapp.eq.${digitosTel10},telefono.eq.${digitosTel57},whatsapp.eq.${digitosTel57}`)
         .limit(1);
 
       if (errorBusqueda) throw errorBusqueda;
@@ -71,21 +75,35 @@ export function useCotizadorPublico() {
 
       if (clientesExistentes && clientesExistentes.length > 0) {
         // ----------------------------------------------------------------
-        // PASO 2a — Reutilizar cliente existente
+        // PASO 2a — Reutilizar cliente existente (no duplicar en la base de datos)
         // ----------------------------------------------------------------
         clienteId = clientesExistentes[0].id;
+
+        // Actualizar datos del cliente si el nombre previo estaba incompleto
+        try {
+          await supabase
+            .from('clientes')
+            .update({
+              nombre: datos.clienteNombre.trim(),
+              whatsapp: datos.clienteWhatsapp.replace(/\D/g, '') || digitosTel57,
+              activo: true,
+            })
+            .eq('id', clienteId);
+        } catch {
+          // Silencioso si falla la actualización menor
+        }
       } else {
         // ----------------------------------------------------------------
         // PASO 2b — Crear nuevo cliente
         // ----------------------------------------------------------------
-        const whatsappNormalizado = datos.clienteWhatsapp.trim().replace(/\s/g, '') || telefonoNormalizado;
+        const whatsappFinal = datos.clienteWhatsapp.replace(/\D/g, '') || digitosTel57;
 
         const { data: nuevoCliente, error: errorCliente } = await supabase
           .from('clientes')
           .insert({
             nombre: datos.clienteNombre.trim(),
-            telefono: telefonoNormalizado,
-            whatsapp: whatsappNormalizado,
+            telefono: digitosTel10 || digitosTel,
+            whatsapp: whatsappFinal,
             activo: true,
           })
           .select('id')
@@ -98,25 +116,9 @@ export function useCotizadorPublico() {
       }
 
       // ----------------------------------------------------------------
-      // PASO 3 — Obtener consecutivo atómico vía RPC
+      // PASO 3 — Obtener consecutivo estrictamente secuencial iniciando en 1001
       // ----------------------------------------------------------------
-      let consecutivo: string | null = null;
-      try {
-        const { data: numCot, error: errorConsecutivo } = await supabase
-          .rpc('siguiente_consecutivo_cotizacion');
-
-        if (!errorConsecutivo && numCot) {
-          consecutivo = numCot as string;
-        }
-      } catch (errRpc) {
-        console.warn('[useCotizadorPublico] Error al obtener consecutivo vía RPC:', errRpc);
-      }
-
-      // Si por alguna razón el RPC no respondió, generar consecutivo de respaldo
-      if (!consecutivo) {
-        const randomNum = Math.floor(1000 + Math.random() * 9000);
-        consecutivo = `COT-${randomNum}`;
-      }
+      const consecutivo = await obtenerSiguienteConsecutivo('cotizacion');
 
       // ----------------------------------------------------------------
       // PASO 4 — Insertar cotización con UUID propio para evitar chequeo SELECT en RLS

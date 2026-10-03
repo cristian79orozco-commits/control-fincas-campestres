@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
+import { obtenerSiguienteConsecutivo } from '../utils/consecutivos';
 import type { CotizacionDB, CotizacionEstado } from '../types';
 
 export function useCotizaciones() {
@@ -53,12 +54,7 @@ export function useCotizaciones() {
       };
       if (datos.id) payload.id = datos.id;
       if (!datos.id && !datos.consecutivo) {
-        try {
-          const { data: numCot } = await supabase.rpc('siguiente_consecutivo_cotizacion');
-          if (numCot) payload.consecutivo = numCot;
-        } catch (eRpc) {
-          console.warn('No se pudo generar consecutivo automático de cotización:', eRpc);
-        }
+        payload.consecutivo = await obtenerSiguienteConsecutivo('cotizacion');
       }
 
       const { data, error } = await supabase

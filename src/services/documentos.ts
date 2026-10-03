@@ -215,7 +215,8 @@ export function generarDocSeparacion(reserva: Reserva, configParam?: Configuraci
   const config = configParam || getConfiguracionGlobal();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const prefijo = config.prefijo_separacion || 'SEP-';
-  const num = `${prefijo}${reserva.id.slice(0, 8).toUpperCase()}`;
+  const consecBase = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8).toUpperCase();
+  const num = reserva.consecutivo || `${prefijo}${consecBase}`;
 
   encabezado(doc, 'DOCUMENTO DE SEPARACIÓN', num, config);
 
@@ -290,7 +291,8 @@ export function generarDocSeparacion(reserva: Reserva, configParam?: Configuraci
   doc.text(config.nombre_empresa || 'Administración', doc.internal.pageSize.getWidth() / 2 + 10, y + 4.5);
 
   pie(doc, config);
-  doc.save(`Separacion_${reserva.id.slice(0, 8)}.pdf`);
+  const nombreArchivo = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8);
+  doc.save(`Separacion_${nombreArchivo}.pdf`);
 }
 
 // ================================================================
@@ -300,7 +302,8 @@ export function generarComprobantePago(reserva: Reserva, pago: Pago, configParam
   const config = configParam || getConfiguracionGlobal();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const prefijo = config.prefijo_abono || 'PAG-';
-  const num = `${prefijo}${pago.id.slice(0, 8).toUpperCase()}`;
+  const consecBase = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8).toUpperCase();
+  const num = `${prefijo}${consecBase}`;
 
   encabezado(doc, 'COMPROBANTE DE ABONO / PAGO', num, config);
 
@@ -350,7 +353,8 @@ export function generarComprobantePago(reserva: Reserva, pago: Pago, configParam
   doc.text(textoLegal, 14, y, { maxWidth: 182 });
 
   pie(doc, config);
-  doc.save(`Abono_${pago.id.slice(0, 8)}.pdf`);
+  const nombreArchivo = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : pago.id.slice(0, 8);
+  doc.save(`Abono_${nombreArchivo}.pdf`);
 }
 
 // ================================================================
@@ -360,7 +364,8 @@ export function generarEstadoCuenta(reserva: Reserva, configParam?: Configuracio
   const config = configParam || getConfiguracionGlobal();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const prefijo = config.prefijo_estado_cuenta || 'EC-';
-  const num = `${prefijo}${reserva.id.slice(0, 8).toUpperCase()}`;
+  const consecBase = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8).toUpperCase();
+  const num = `${prefijo}${consecBase}`;
 
   encabezado(doc, 'ESTADO DE CUENTA', num, config);
 
@@ -432,7 +437,8 @@ export function generarEstadoCuenta(reserva: Reserva, configParam?: Configuracio
   }
 
   pie(doc, config);
-  doc.save(`EstadoCuenta_${reserva.id.slice(0, 8)}.pdf`);
+  const nombreArchivo = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8);
+  doc.save(`EstadoCuenta_${nombreArchivo}.pdf`);
 }
 
 // ================================================================
@@ -448,7 +454,8 @@ export function generarPazYSalvo(reserva: Reserva, configParam?: ConfiguracionGe
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const prefijo = config.prefijo_paz_salvo || 'PS-';
-  const num = `${prefijo}${reserva.id.slice(0, 8).toUpperCase()}`;
+  const consecBase = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8).toUpperCase();
+  const num = `${prefijo}${consecBase}`;
   const ancho = doc.internal.pageSize.getWidth();
 
   encabezado(doc, 'CERTIFICADO DE PAZ Y SALVO', num, config);
@@ -504,7 +511,8 @@ export function generarPazYSalvo(reserva: Reserva, configParam?: ConfiguracionGe
   doc.text(`Administración • ${config.nombre_empresa}`, 14, y + 5);
 
   pie(doc, config);
-  doc.save(`PazYSalvo_${reserva.id.slice(0, 8)}.pdf`);
+  const nombreArchivo = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8);
+  doc.save(`PazYSalvo_${nombreArchivo}.pdf`);
 }
 
 // ================================================================
@@ -726,7 +734,8 @@ export function generarDocCotizacion(cotizacion: CotizacionDB, configParam?: Con
   const config = configParam || getConfiguracionGlobal();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const prefijo = config.prefijo_cotizacion || 'COT-';
-  const num = `${prefijo}${cotizacion.id.slice(0, 8).toUpperCase()}`;
+  const consecBase = cotizacion.consecutivo ? cotizacion.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : cotizacion.id.slice(0, 8).toUpperCase();
+  const num = cotizacion.consecutivo || `${prefijo}${consecBase}`;
   const ancho = doc.internal.pageSize.getWidth();
 
   encabezado(doc, 'COTIZACIÓN FORMAL DE SERVICIOS', num, config);
@@ -843,7 +852,8 @@ export function generarDocCotizacion(cotizacion: CotizacionDB, configParam?: Con
   doc.text(cliNombre, col2, y + 4.5);
 
   pie(doc, config);
-  doc.save(`Cotizacion_${cotizacion.id.slice(0, 8)}.pdf`);
+  const nombreArchivo = cotizacion.consecutivo ? cotizacion.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : cotizacion.id.slice(0, 8);
+  doc.save(`Cotizacion_${nombreArchivo}.pdf`);
 }
 
 // ---------------------------------------------------------------
@@ -864,7 +874,8 @@ export function generarExpedienteCompleto(
   const finNombre = obtenerNombreFincaHistorico(reserva);
   const saldo = calcularSaldo(reserva);
   const totalPagado = reserva.valor_total - saldo;
-  const numExpediente = `EXP-${reserva.id.slice(0, 8).toUpperCase()}`;
+  const consecBase = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8).toUpperCase();
+  const numExpediente = reserva.consecutivo ? `EXP-${consecBase}` : `EXP-${reserva.id.slice(0, 8).toUpperCase()}`;
 
   encabezado(doc, 'EXPEDIENTE HISTÓRICO Y ACTA DE CIERRE', numExpediente, config);
 
@@ -1068,6 +1079,7 @@ export function generarExpedienteCompleto(
   doc.text(`${cliNombre}`, col2, y + 4);
 
   pie(doc, config);
-  doc.save(`Expediente_${reserva.id.slice(0, 8)}.pdf`);
+  const nombreArchivo = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8);
+  doc.save(`Expediente_${nombreArchivo}.pdf`);
 }
 

@@ -558,7 +558,21 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
                   <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
                     <Calendar size={10} style={{ display:'inline', verticalAlign:'-1px' }} /> {formatFecha(c.fecha_inicio)} → {formatFecha(c.fecha_fin)}
                     {' · '}<Users size={10} style={{ display:'inline', verticalAlign:'-1px' }} /> {c.personas} personas
-                    {clienteNombre !== '—' && <> · 👤 {clienteNombre}</>}
+                    {clienteNombre !== '—' && (
+                      <>
+                        {' · '}👤 {clienteNombre}
+                        {c.clientes?.whatsapp && (
+                          <a
+                            href={`https://wa.me/${c.clientes.whatsapp.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: '#25d366', marginLeft: '0.35rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                          >
+                            <MessageCircle size={10} /> {c.clientes.whatsapp}
+                          </a>
+                        )}
+                      </>
+                    )}
                   </div>
                   <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.9rem', marginTop: '0.15rem' }}>
                     {formatCOP(c.total)}
@@ -629,13 +643,19 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
                     <ChevronDown size={11} style={{ position: 'absolute', right: '0.35rem', pointerEvents: 'none' }} />
                   </div>
 
-                  {c.estado === 'confirmada' && onConvertirReserva && (
+                  {onConvertirReserva && c.estado !== 'cancelada' && c.estado !== 'vencida' && (
                     <button
                       className="btn btn-sm btn-primary"
-                      title="Convertir en reserva"
-                      onClick={() => onConvertirReserva(c)}
+                      title="Convertir esta cotización en una Reserva formal"
+                      style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.6rem' }}
+                      onClick={async () => {
+                        if (c.estado !== 'confirmada') {
+                          await onCambiarEstado(c.id, 'confirmada');
+                        }
+                        onConvertirReserva(c);
+                      }}
                     >
-                      <ArrowRight size={13} /> Reservar
+                      <ArrowRight size={13} /> Pasar a Reserva
                     </button>
                   )}
                   <button className="btn btn-sm" onClick={() => abrirEdicion(c)} title="Editar"><Edit3 size={13} /></button>

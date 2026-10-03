@@ -117,7 +117,7 @@ export function plantillaCotizacion(
 ¡Hola, *${cNombre}*! 👋 Con gusto te presentamos los detalles de tu cotización para disfrutar de una experiencia campestre inolvidable.
 
 📍 *Finca solicitada:* ${fNombre}
-📅 *Fecha de llegada:* ${formatFecha(cotizacion.fecha_inicio)}
+${cotizacion.consecutivo ? `🆔 *Consecutivo N°:* ${cotizacion.consecutivo}\n` : ''}📅 *Fecha de llegada:* ${formatFecha(cotizacion.fecha_inicio)}
 📅 *Fecha de salida:* ${formatFecha(cotizacion.fecha_fin)}
 🌙 *Noches de estancia:* ${noches}
 👥 *Capacidad / Personas:* ${cotizacion.personas} personas
@@ -167,7 +167,7 @@ export function plantillaSeparacion(reserva: Reserva): string {
 Hola, *${clienteNombre}* 🙌 Hemos emitido satisfactoriamente tu *Documento Oficial de Separación*.
 
 📍 *Finca reservada:* ${fincaNombre}
-📅 *Llegada (Check-in):* ${formatFecha(reserva.fecha_inicio)}
+${reserva.consecutivo ? `🆔 *Consecutivo de Reserva:* ${reserva.consecutivo}\n` : ''}📅 *Llegada (Check-in):* ${formatFecha(reserva.fecha_inicio)}
 📅 *Salida (Check-out):* ${formatFecha(reserva.fecha_fin)}
 🌙 *Noches:* ${noches} | 👥 *Huéspedes:* ${reserva.personas} personas
 
@@ -201,7 +201,7 @@ export function plantillaComprobantePago(reserva: Reserva, pago: Pago): string {
 *Control de Fincas Campestres*
 
 Hola, *${clienteNombre}* ✅ Confirmamos la recepción de tu pago para la finca *${fincaNombre}*.
-
+${reserva.consecutivo ? `🆔 *Consecutivo de Reserva:* ${reserva.consecutivo}\n` : ''}
 📝 *DETALLE DE LA TRANSACCIÓN:*
 • Concepto: *${etiquetaTipo}*
 • Fecha del pago: ${formatFecha(pago.fecha)}
@@ -243,7 +243,7 @@ export function plantillaEstadoCuenta(reserva: Reserva): string {
 Hola, *${clienteNombre}* 📋 Te compartimos el balance financiero detallado de tu reserva:
 
 📍 *Finca:* ${fincaNombre}
-📅 *Estancia:* ${formatFecha(reserva.fecha_inicio)} al ${formatFecha(reserva.fecha_fin)}
+${reserva.consecutivo ? `🆔 *Consecutivo de Reserva:* ${reserva.consecutivo}\n` : ''}📅 *Estancia:* ${formatFecha(reserva.fecha_inicio)} al ${formatFecha(reserva.fecha_fin)}
 
 💳 *HISTORIAL DE ABONOS REGISTRADOS:*
 ${historialTexto}
@@ -272,7 +272,7 @@ export function plantillaPazYSalvo(reserva: Reserva): string {
 Estimado/a *${clienteNombre}* 🌟
 
 Nos complace certificarte que tu reserva para la finca *${fincaNombre}* se encuentra *100% CANCELADA Y AL DÍA*.
-
+${reserva.consecutivo ? `🆔 *Certificado de Reserva N°:* ${reserva.consecutivo}\n` : ''}
 ✅ *Estado Financiero:* PAZ Y SALVO
 📅 *Fechas de Estadía:* ${formatFecha(reserva.fecha_inicio)} al ${formatFecha(reserva.fecha_fin)}
 👥 *Huéspedes autorizados:* ${reserva.personas} personas
@@ -325,7 +325,7 @@ export function plantillaRecordatorioPago(reserva: Reserva): string {
 
 Hola, *${clienteNombre}* 👋 Esperamos que te encuentres muy bien.
 
-Te recordamos que se acerca la fecha de tu estadía en *${fincaNombre}* (Llegada: ${formatFecha(reserva.fecha_inicio)}).
+Te recordamos que se acerca la fecha de tu estadía en *${fincaNombre}*${reserva.consecutivo ? ` (Reserva N° ${reserva.consecutivo})` : ''} (Llegada: ${formatFecha(reserva.fecha_inicio)}).
 
 📌 Tu saldo pendiente por liquidar es de *${formatCOP(saldo)}*.
 
