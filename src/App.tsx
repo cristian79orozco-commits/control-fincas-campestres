@@ -62,7 +62,16 @@ export const App: React.FC = () => {
 
   // Hooks de datos y servicios
   const { user, isAdminLoggedIn, login, logout } = useAuth();
-  const { fincas, loading: loadingFincas, metricas, guardarFinca, desactivarFinca } = useFincas();
+  const {
+    fincas,
+    todasLasFincas,
+    loading: loadingFincas,
+    metricas,
+    guardarFinca,
+    desactivarFinca,
+    reactivarFinca,
+    recargar: recargarFincas,
+  } = useFincas();
   const {
     bloquesFinca,
     bloquesAdmin,
@@ -96,6 +105,7 @@ export const App: React.FC = () => {
     guardar: guardarMenu,
     cambiarEstado: cambiarEstadoMenu,
     eliminar: eliminarMenu,
+    recargarMenus,
   } = useMenus();
 
   // Fase 3: Hook de comunicaciones y WhatsApp
@@ -174,7 +184,22 @@ export const App: React.FC = () => {
   const handleViewChange = (newView: ViewType) => {
     setView(newView);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Sincronización dinámica: forzar recarga al volver al catálogo de clientes
+    if (newView === 'cliente') {
+      recargarFincas();
+      recargarMenus();
+    }
   };
+
+  // Sincronización automática de datos al enfocar la pestaña del navegador
+  useEffect(() => {
+    const handleFocus = () => {
+      recargarFincas();
+      recargarMenus();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [recargarFincas, recargarMenus]);
 
   const selectedFinca = fincas.find(f => f.id === selectedFincaId);
 
@@ -319,7 +344,7 @@ export const App: React.FC = () => {
           <AdminDashboard
             isAdminLoggedIn={isAdminLoggedIn}
             userEmail={user?.email}
-            fincas={fincas}
+            fincas={todasLasFincas}
             bloquesAdmin={bloquesAdmin}
             currentWaNumber={waNumberGlobal}
             clientes={clientes}

@@ -3,7 +3,7 @@ import { supabase, DEFAULT_WA_NUMBER } from '../services/supabase';
 import type { Finca, FincaImagen } from '../types';
 
 export function useFincas() {
-  const [fincas, setFincas] = useState<Finca[]>([]);
+  const [todasLasFincas, setTodasLasFincas] = useState<Finca[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,14 +18,13 @@ export function useFincas() {
           finca_amenidades(id, finca_id, nombre, icono),
           finca_planes(id, finca_id, nombre)
         `)
-        .eq('activo', true)
         .order('nombre');
 
       if (error) {
         throw error;
       }
 
-      setFincas(data || []);
+      setTodasLasFincas(data || []);
       setError(null);
     } catch (err: any) {
       console.error('Error cargando fincas:', err);
@@ -51,6 +50,9 @@ export function useFincas() {
     };
   }, [cargarFincas]);
 
+  // Fincas activas filtradas para el panel público de clientes y cotizador
+  const fincas = todasLasFincas.filter(f => f.activo !== false);
+
   const guardarFinca = async (fincaData: Partial<Finca>, imagenesUrls?: string[], planesStr?: string) => {
     try {
       const payload: any = {
@@ -61,7 +63,7 @@ export function useFincas() {
         descripcion: fincaData.descripcion || '',
         estado: fincaData.estado || 'disponible',
         whatsapp: (fincaData.whatsapp || DEFAULT_WA_NUMBER).replace(/[^0-9]/g, ''),
-        activo: true,
+        activo: fincaData.activo !== undefined ? fincaData.activo : true,
       };
 
       if (fincaData.id && fincaData.id !== 'new') {
@@ -123,19 +125,36 @@ export function useFincas() {
     }
   };
 
-  // Métricas calculadas en tiempo real
+  const reactivarFinca = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('fincas')
+        .update({ activo: true })
+        .eq('id', id);
+
+      if (error) throw error;
+      await cargarFincas();
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Métricas calculadas en tiempo real (sobre fincas activas)
   const total = fincas.length;
   const disponibles = fincas.filter(f => f.estado === 'disponible').length;
   const ocupadas = fincas.filter(f => f.estado === 'no_disponible' || f.estado === 'alta_demanda').length;
   const porcentajeOcupacion = total > 0 ? Math.round((ocupadas / total) * 100) : 0;
 
   return {
-    fincas,
+    fincas, // Solo activas para el catálogo de clientes
+    todasLasFincas, // Todas las fincas (incluyendo inactivas) para administración
     loading,
     error,
     recargar: cargarFincas,
     guardarFinca,
     desactivarFinca,
+    reactivarFinca,
     metricas: {
       total,
       disponibles,

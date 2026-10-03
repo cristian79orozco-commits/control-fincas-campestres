@@ -27,6 +27,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
   const [descripcion, setDescripcion] = useState('');
   const [planes, setPlanes] = useState('Sin alimentación, Desayuno, Todo incluido');
   const [waNumber, setWaNumber] = useState(DEFAULT_WA_NUMBER);
+  const [activo, setActivo] = useState(true);
 
   // Imágenes
   const [imagenes, setImagenes] = useState<string[]>([]);
@@ -44,6 +45,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
       setDescripcion('');
       setPlanes('Sin alimentación, Desayuno, Todo incluido');
       setWaNumber(DEFAULT_WA_NUMBER);
+      setActivo(true);
       setImagenes([]);
       setSelectedThumbs(new Set());
     } else {
@@ -56,6 +58,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
         setDescripcion(f.descripcion || '');
         setPlanes((f.finca_planes || []).map(p => p.nombre).join(', '));
         setWaNumber(f.whatsapp || DEFAULT_WA_NUMBER);
+        setActivo(f.activo !== false);
 
         const imgs = [...(f.finca_imagenes || [])].sort((a, b) => a.orden - b.orden).map(i => i.url);
         setImagenes(imgs);
@@ -180,6 +183,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
       descripcion: descripcion.trim(),
       estado,
       whatsapp: waNumber.replace(/[^0-9]/g, ''),
+      activo,
     };
 
     if (selectedFincaId !== 'new') {
@@ -228,7 +232,9 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
           >
             <option value="new">+ Nueva finca</option>
             {fincas.map(f => (
-              <option key={f.id} value={f.id}>{f.nombre}</option>
+              <option key={f.id} value={f.id}>
+                {f.nombre}{f.activo === false ? ' 🚫 (Inactiva)' : ''}
+              </option>
             ))}
           </select>
           <button className="btn btn-sm" onClick={() => setSelectedFincaId('new')}>
@@ -246,6 +252,41 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
             value={nombre}
             onChange={e => setNombre(e.target.value)}
           />
+        </div>
+
+        {/* Selector de estado activo/inactivo */}
+        <div className="field col-span-full" style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'var(--surface-sunken)',
+          padding: '0.65rem 0.9rem',
+          borderRadius: 'var(--rad-xs)',
+          border: '1px solid var(--border)',
+        }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', cursor: 'pointer', margin: 0, userSelect: 'none' }}>
+            <input
+              type="checkbox"
+              checked={activo}
+              onChange={e => setActivo(e.target.checked)}
+              style={{ width: '16px', height: '16px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+              Finca activa (visible en el catálogo público y cotizador)
+            </span>
+          </label>
+          <span
+            style={{
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              padding: '0.15rem 0.55rem',
+              borderRadius: '999px',
+              color: activo ? 'var(--success)' : '#ef4444',
+              background: activo ? 'color-mix(in srgb, var(--success) 12%, transparent)' : 'rgba(239,68,68,0.1)',
+            }}
+          >
+            {activo ? 'Activa ✓' : 'Inactiva 🚫'}
+          </span>
         </div>
 
         <div className="field">
