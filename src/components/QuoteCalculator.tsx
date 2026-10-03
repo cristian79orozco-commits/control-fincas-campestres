@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import {
-  MessageCircle, Calculator, Calendar, Users, Utensils, Info,
+  MessageCircle, Calculator, Calendar, Users, Utensils,
   Check, User, Phone, Loader2, BadgeCheck,
 } from 'lucide-react';
 import type { Finca, Cotizacion, Menu } from '../types';
 import type { DatosCotizacionPublica, ResultadoCotizacionPublica } from '../hooks/useCotizadorPublico';
+import { MenuSelectorCards } from './MenuSelectorCards';
 
 interface QuoteCalculatorProps {
   finca: Finca;
@@ -41,7 +42,6 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
   onGuardarCotizacion,
 }) => {
   const [cantidadServicios, setCantidadServicios] = useState<number>(1);
-  const [verDetalleMenu, setVerDetalleMenu] = useState(false);
 
   // --- Campos de cliente (Etapa 2) ---
   const [clienteNombre, setClienteNombre] = useState('');
@@ -131,7 +131,6 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
 
   const handlePlanSelect = (val: string) => {
     onPlanChange(val);
-    setVerDetalleMenu(false);
   };
 
   // --- Acción principal: Generar cotización y guardar en Supabase ---
@@ -225,73 +224,41 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
             ))}
           </select>
         </div>
-
-        <div className="field">
-          <label><Utensils size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> Plan de alimentación</label>
-          <select
-            value={plan}
-            onChange={e => handlePlanSelect(e.target.value)}
-          >
-            <option value="Sin alimentación">Sin alimentación (+$0)</option>
-            {menusActivos.map(m => (
-              <option key={m.id} value={m.nombre}>
-                [{m.categoria}] {m.nombre} — {formatCOP(m.precio_pp)}/pp
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
-      {/* Servicios / Días de alimentación y botón ver detalle */}
+      {/* Selector visual de planes de alimentación — Fase 2 */}
+      <MenuSelectorCards
+        menus={menus}
+        planSeleccionado={plan}
+        onSelect={handlePlanSelect}
+      />
+
+
+      {/* Campo de días/servicios cuando hay menú seleccionado */}
       {menuSeleccionado && (
-        <div style={{ background: 'var(--surface-sunken)', padding: '0.75rem 1rem', borderRadius: 'var(--rad-xs)', display: 'grid', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Utensils size={13} /> {menuSeleccionado.nombre} ({formatCOP(menuSeleccionado.precio_pp)}/pp)
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Días/servicios:</label>
-              <input
-                type="number"
-                min={1}
-                max={30}
-                value={cantidadServicios}
-                onChange={e => setCantidadServicios(Math.max(1, +e.target.value))}
-                style={{ width: '56px', padding: '0.2rem 0.4rem', height: '28px', fontSize: '0.8rem', textAlign: 'center' }}
-              />
-              <button
-                type="button"
-                className="btn btn-sm"
-                style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
-                onClick={() => setVerDetalleMenu(v => !v)}
-              >
-                <Info size={11} /> {verDetalleMenu ? 'Ocultar' : 'Ver qué incluye'}
-              </button>
-            </div>
+        <div style={{
+          background: 'var(--surface-sunken)',
+          padding: '0.65rem 1rem',
+          borderRadius: 'var(--rad-xs)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
+        }}>
+          <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.35rem', flexGrow: 1 }}>
+            <Utensils size={13} /> {menuSeleccionado.nombre} — {(menuSeleccionado.precio_pp || 0).toLocaleString('es-CO')} COP/pp
           </div>
-
-          {/* Detalle desplegable del menú */}
-          {verDetalleMenu && (
-            <div style={{ paddingTop: '0.5rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-              {menuSeleccionado.imagen_url && (
-                <img
-                  src={menuSeleccionado.imagen_url}
-                  alt={menuSeleccionado.nombre}
-                  style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: 'var(--rad-xs)', flexShrink: 0 }}
-                />
-              )}
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{menuSeleccionado.categoria}</div>
-                <div>{menuSeleccionado.descripcion}</div>
-                {menuSeleccionado.condiciones && (
-                  <div style={{ fontSize: '0.72rem', fontStyle: 'italic', marginTop: '0.25rem' }}>
-                    ℹ️ {menuSeleccionado.condiciones}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Nº de servicios:</label>
+            <input
+              type="number"
+              min={1}
+              max={30}
+              value={cantidadServicios}
+              onChange={e => setCantidadServicios(Math.max(1, +e.target.value))}
+              style={{ width: '56px', padding: '0.2rem 0.4rem', height: '28px', fontSize: '0.8rem', textAlign: 'center' }}
+            />
+          </div>
         </div>
       )}
 
