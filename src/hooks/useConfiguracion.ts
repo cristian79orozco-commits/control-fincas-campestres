@@ -87,10 +87,31 @@ export function useConfiguracion() {
     }
   };
 
-  // Obtener y avanzar el número consecutivo de un tipo de documento
+  // Obtener y avanzar el número consecutivo de un tipo de documento.
+  // Para 'cotizacion' y 'reserva' usa la función SQL atómica (FOR UPDATE) en Supabase
+  // para evitar duplicados en solicitudes simultáneas.
+  // Para el resto de tipos mantiene el comportamiento previo (lectura + incremento local).
   const obtenerSiguienteNumero = async (
     tipo: 'cotizacion' | 'separacion' | 'abono' | 'estado_cuenta' | 'paz_salvo' | 'propuesta_menu'
   ): Promise<string> => {
+    // ── Consecutivos atómicos via RPC ──────────────────────────────────────
+    if (tipo === 'cotizacion') {
+      const { data, error } = await supabase.rpc('siguiente_consecutivo_cotizacion');
+      if (error) {
+        console.warn('RPC siguiente_consecutivo_cotizacion falló, usando fallback local:', error.message);
+        // fallback local
+      } else {
+        return data as string;
+      }
+    }
+
+    if (tipo === 'separacion') {
+      // separacion se reutiliza como contador de RES- según la migración etapa2
+      // Si se prefiere mantener el prefijo de separación original, usar la lógica local:
+      // No usamos RPC de reserva aquí para no mezclarlo con el consecutivo RES-
+    }
+
+    // ── Consecutivos locales (resto de tipos) ──────────────────────────────
     let prefijo = 'DOC-';
     let consecutivo = 1001;
     const campoConsecutivo: keyof ConfiguracionGeneral =
@@ -119,6 +140,17 @@ export function useConfiguracion() {
     return formatted;
   };
 
+  // Consecutivo atómico de reservas (RES-XXXXXX) — usado por useReservas al crear
+  const obtenerConsecutivoReserva = async (): Promise<string | null> => {
+    const { data, error } = await supabase.rpc('siguiente_consecutivo_reserva');
+    if (error) {
+      console.warn('RPC siguiente_consecutivo_reserva falló:', error.message);
+      return null;
+    }
+    return data as string;
+  };
+
+
   // Restablecer valores de fábrica
   const restablecerPorDefecto = async (): Promise<{ success: boolean; error?: string }> => {
     return await guardarConfiguracion(CONFIGURACION_DEFAULT);
@@ -131,6 +163,7 @@ export function useConfiguracion() {
     cargarConfiguracion,
     guardarConfiguracion,
     obtenerSiguienteNumero,
+    obtenerConsecutivoReserva,
     restablecerPorDefecto,
   };
 }

@@ -89,6 +89,20 @@ export function useReservas() {
         observaciones: datos.observaciones || null,
       };
       if (datos.id) payload.id = datos.id;
+      if (!datos.id) {
+        if (datos.consecutivo) {
+          payload.consecutivo = datos.consecutivo;
+        } else {
+          try {
+            const { data: numRes } = await supabase.rpc('siguiente_consecutivo_reserva');
+            if (numRes) payload.consecutivo = numRes;
+          } catch (eRpc) {
+            console.warn('No se pudo generar consecutivo automático de reserva:', eRpc);
+          }
+        }
+      } else if (datos.consecutivo) {
+        payload.consecutivo = datos.consecutivo;
+      }
       if (datos.cliente_snapshot) payload.cliente_snapshot = datos.cliente_snapshot;
       if (datos.finca_snapshot) payload.finca_snapshot = datos.finca_snapshot;
       if (datos.cotizacion_snapshot) payload.cotizacion_snapshot = datos.cotizacion_snapshot;

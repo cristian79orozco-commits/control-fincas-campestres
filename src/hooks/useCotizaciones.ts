@@ -52,6 +52,14 @@ export function useCotizaciones() {
         notas: datos.notas || null,
       };
       if (datos.id) payload.id = datos.id;
+      if (!datos.id && !datos.consecutivo) {
+        try {
+          const { data: numCot } = await supabase.rpc('siguiente_consecutivo_cotizacion');
+          if (numCot) payload.consecutivo = numCot;
+        } catch (eRpc) {
+          console.warn('No se pudo generar consecutivo automático de cotización:', eRpc);
+        }
+      }
 
       const { data, error } = await supabase
         .from('cotizaciones')

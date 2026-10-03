@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   FileText, Plus, Edit3, Trash2, X, Save, ChevronDown, ArrowRight,
-  Calendar, Users, Utensils, DollarSign, Tag, MessageCircle, Download
+  Calendar, Users, Utensils, DollarSign, Tag, MessageCircle, Download, Hash, Copy, Check
 } from 'lucide-react';
 import type { CotizacionDB, CotizacionEstado, Cliente, Finca, Menu } from '../types';
 import { generarPropuestaAlimentacion, generarDocCotizacion } from '../services/documentos';
@@ -73,6 +73,39 @@ function formatFecha(f?: string) {
   const [y, m, d] = f.split('-');
   return `${d}/${m}/${y}`;
 }
+
+// ─── Badge de consecutivo copiable ────────────────────────────────────────────
+const ConsecutivoBadge: React.FC<{ consecutivo: string }> = ({ consecutivo }) => {
+  const [copiado, setCopiado] = useState(false);
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(consecutivo);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 1800);
+    } catch { /* silent */ }
+  };
+  return (
+    <button
+      type="button"
+      title="Clic para copiar"
+      onClick={copiar}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+        fontFamily: 'monospace', fontSize: '0.7rem', fontWeight: 700,
+        color: copiado ? '#16a34a' : 'var(--primary)',
+        background: copiado ? 'rgba(34,197,94,0.10)' : 'color-mix(in srgb, var(--primary) 10%, transparent)',
+        border: `1px solid ${copiado ? 'rgba(34,197,94,0.3)' : 'color-mix(in srgb, var(--primary) 25%, transparent)'}`,
+        borderRadius: '6px', padding: '0.1rem 0.45rem',
+        cursor: 'pointer', transition: 'all 0.2s ease',
+        letterSpacing: '0.03em',
+      }}
+    >
+      {copiado ? <Check size={10} /> : <Hash size={10} />}
+      {consecutivo}
+      {!copiado && <Copy size={9} style={{ opacity: 0.5 }} />}
+    </button>
+  );
+};
 
 export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
   cotizaciones,
@@ -481,6 +514,10 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
                   <div style={{ fontWeight: 600, display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <Tag size={12} /> {fincaNombre}
                     <span className={`status-badge ${ESTADO_COLORS[c.estado]}`} style={{ fontSize: '0.68rem' }}>{c.estado}</span>
+                    {/* Badge consecutivo copiable */}
+                    {c.consecutivo && (
+                      <ConsecutivoBadge consecutivo={c.consecutivo} />
+                    )}
                     {tieneAlimentacion && (
                       <span className="status-badge s-avail" style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                         <Utensils size={10} /> {c.alimentacion || 'Con alimentación'}
