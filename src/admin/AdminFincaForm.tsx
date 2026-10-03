@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Trash2, Plus, Upload, Link as LinkIcon, Loader, Image as ImageIcon } from 'lucide-react';
 import { supabase, DEFAULT_WA_NUMBER } from '../services/supabase';
+import { optimizarImagen, formatearBytes } from '../utils/imageOptimizer';
 import type { Finca } from '../types';
 
 interface AdminFincaFormProps {
@@ -80,34 +81,37 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
 
     setUploading(true);
     let subidasOk = 0;
+    let totalBytesOriginales = 0;
+    let totalBytesOptimizados = 0;
     const nuevasUrls: string[] = [];
 
-    const mimeToExt: Record<string, string> = {
-      'image/jpeg': 'jpg', 'image/jpg': 'jpg',
-      'image/png': 'png', 'image/webp': 'webp',
-      'image/heic': 'heic', 'image/heif': 'heif',
-      'image/gif': 'gif',
-    };
-
     for (let i = 0; i < toUpload.length; i++) {
-      const file = toUpload[i];
-      setUploadLabel(`Subiendo ${i + 1} de ${toUpload.length}: ${file.name}`);
+      const rawFile = toUpload[i];
+      setUploadLabel(`Optimizando imagen ${i + 1} de ${toUpload.length}: ${rawFile.name}…`);
 
-      const mimeType = file.type || 'image/jpeg';
-      const extFromMime = mimeToExt[mimeType.toLowerCase()];
-      const extFromName = file.name.split('.').pop()?.toLowerCase();
-      const ext = extFromMime || extFromName || 'jpg';
-      const contentType = mimeType || 'image/jpeg';
+      // Optimización automática en cliente (Fase 5)
+      const opt = await optimizarImagen(rawFile);
+      const fileToUpload = opt.file;
+      totalBytesOriginales += opt.originalSize;
+      totalBytesOptimizados += opt.optimizedSize;
 
+      if (opt.reductionPct > 0) {
+        setUploadLabel(`Subiendo ${i + 1} de ${toUpload.length} (reducida ${opt.reductionPct}% a WebP: ${formatearBytes(opt.originalSize)} → ${formatearBytes(opt.optimizedSize)})…`);
+      } else {
+        setUploadLabel(`Subiendo ${i + 1} de ${toUpload.length}: ${fileToUpload.name}…`);
+      }
+
+      const mimeType = fileToUpload.type || 'image/webp';
+      const ext = mimeType.includes('webp') ? 'webp' : (fileToUpload.name.split('.').pop()?.toLowerCase() || 'jpg');
       const path = `fincas/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
 
       const { error } = await supabase.storage
         .from('finca-imagenes')
-        .upload(path, file, { upsert: false, contentType });
+        .upload(path, fileToUpload, { upsert: false, contentType: mimeType });
 
       if (error) {
         console.error('Error subiendo imagen:', error);
-        showToast(`Error subiendo ${file.name}: ${error.message}`, 'error');
+        showToast(`Error subiendo ${rawFile.name}: ${error.message}`, 'error');
         continue;
       }
 
@@ -123,7 +127,9 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
 
     if (nuevasUrls.length > 0) {
       setImagenes(prev => [...prev, ...nuevasUrls]);
-      showToast(`${subidasOk} imagen(es) subida(s) correctamente a Supabase Storage ✅`, 'success');
+      const ahorro = totalBytesOriginales - totalBytesOptimizados;
+      const ahorroTexto = ahorro > 0 ? ` (ahorro de peso: ${formatearBytes(ahorro)})` : '';
+      showToast(`${subidasOk} imagen(es) optimizada(s) a WebP y subida(s) con éxito ✅${ahorroTexto}`, 'success');
     }
   };
 

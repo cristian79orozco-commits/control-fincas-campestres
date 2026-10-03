@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { generarPropuestaAlimentacion } from '../services/documentos';
+import { optimizarImagen, formatearBytes } from '../utils/imageOptimizer';
 import type { Menu, MenuCategoria, Cliente, Finca } from '../types';
 
 interface AdminMenusProps {
@@ -120,19 +121,28 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
 
     setSubiendoImg(true);
     let subidasOk = 0;
+    let totalOriginales = 0;
+    let totalOptimizados = 0;
     const nuevas: string[] = [];
 
-    for (const file of files) {
-      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    for (const rawFile of files) {
+      // Optimización automática en cliente (Fase 5)
+      const opt = await optimizarImagen(rawFile);
+      const fileToUpload = opt.file;
+      totalOriginales += opt.originalSize;
+      totalOptimizados += opt.optimizedSize;
+
+      const mimeType = fileToUpload.type || 'image/webp';
+      const ext = mimeType.includes('webp') ? 'webp' : (fileToUpload.name.split('.').pop()?.toLowerCase() || 'jpg');
       const path = `menus/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
 
       const { error } = await supabase.storage
         .from('finca-imagenes')
-        .upload(path, file, { upsert: false, contentType: file.type || 'image/jpeg' });
+        .upload(path, fileToUpload, { upsert: false, contentType: mimeType });
 
       if (error) {
         console.error('Error subiendo imagen de menú:', error);
-        showToast(`Error: ${error.message}`, 'error');
+        showToast(`Error subiendo ${rawFile.name}: ${error.message}`, 'error');
         continue;
       }
 
@@ -151,7 +161,9 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
       if (!form.imagen_url) {
         setForm(prev => ({ ...prev, imagen_url: nuevas[0] }));
       }
-      showToast(`${subidasOk} foto(s) subida(s) con éxito ✅`, 'success');
+      const ahorro = totalOriginales - totalOptimizados;
+      const ahorroTxt = ahorro > 0 ? ` (ahorro de peso: ${formatearBytes(ahorro)})` : '';
+      showToast(`${subidasOk} foto(s) de menú optimizada(s) a WebP y subida(s) ✅${ahorroTxt}`, 'success');
     }
   };
 
