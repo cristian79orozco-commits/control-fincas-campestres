@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard, LogOut, Lock, LogIn, ShieldCheck, Database,
   Home, Users, FileText, ClipboardList, Calendar, MessageCircle,
   Menu, X, TrendingUp, CheckCircle, AlertTriangle, Clock, UtensilsCrossed, Settings,
-  Palette, History
+  Palette, History, Globe
 } from 'lucide-react';
 import { AdminFincaForm } from './AdminFincaForm';
 import { AdminCalendar } from './AdminCalendar';
@@ -16,6 +16,7 @@ import { AdminMenus } from './AdminMenus';
 import { AdminHistorial } from './AdminHistorial';
 import { AdminConfiguracion } from './AdminConfiguracion';
 import { AdminPersonalizacion } from './AdminPersonalizacion';
+import { useApp } from '../context/AppContext';
 import type {
   Finca, BloqueoDisponibilidad, Cliente, CotizacionDB, CotizacionEstado,
   Reserva, ReservaEstado, PagoTipo, AdminSection, Menu as MenuType, Comunicacion,
@@ -147,13 +148,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   showToast,
   openConfirm,
 }) => {
+  const { adminActiveSection, setAdminActiveSection, navegarACliente } = useApp();
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
-  const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
+  const [activeSection, setActiveSection] = useState<AdminSection>(adminActiveSection || 'dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Para "convertir cotización en reserva"
   const [cotizacionParaReserva, setCotizacionParaReserva] = useState<CotizacionDB | null>(null);
+
+  // Sincronizar sección si cambia externamente desde la barra flotante u otra vista
+  useEffect(() => {
+    if (adminActiveSection) {
+      setActiveSection(adminActiveSection);
+    }
+  }, [adminActiveSection]);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,6 +218,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const navigateTo = (section: AdminSection) => {
     setActiveSection(section);
+    setAdminActiveSection(section);
     setSidebarOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -242,7 +252,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn btn-sm"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                background: 'var(--primary-bg)',
+                color: 'var(--primary)',
+                borderColor: 'var(--primary)',
+                fontWeight: 600,
+              }}
+              onClick={onVerSitioPublico || (() => navegarACliente())}
+              title="Ver cómo lo ve el cliente en vivo"
+            >
+              <Globe size={14} /> Explorar como cliente
+            </button>
             <span className="status-badge s-avail">
               <Database size={12} style={{ display: 'inline' }} /> Supabase conectado
             </span>

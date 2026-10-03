@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Trash2, Plus, Upload, Link as LinkIcon, Loader, Image as ImageIcon } from 'lucide-react';
+import { Save, Trash2, Plus, Upload, Link as LinkIcon, Loader, Image as ImageIcon, Eye } from 'lucide-react';
 import { supabase, DEFAULT_WA_NUMBER } from '../services/supabase';
 import { optimizarImagen, formatearBytes } from '../utils/imageOptimizer';
 import type { Finca } from '../types';
 import { CurrencyInput } from '../components/CurrencyInput';
+import { useApp } from '../context/AppContext';
 
 interface AdminFincaFormProps {
   fincas: Finca[];
@@ -20,7 +21,17 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
   showToast,
   openConfirm,
 }) => {
+  const { previsualizarFinca, fincaParaEditarId, setFincaParaEditarId } = useApp();
   const [selectedFincaId, setSelectedFincaId] = useState<string>('new');
+
+  // Si se solicita editar una finca específica desde el panel cliente
+  useEffect(() => {
+    if (fincaParaEditarId) {
+      setSelectedFincaId(fincaParaEditarId);
+      setFincaParaEditarId(null);
+    }
+  }, [fincaParaEditarId, setFincaParaEditarId]);
+
   const [nombre, setNombre] = useState('');
   const [capacidad, setCapacidad] = useState<number>(10);
   const [precio, setPrecio] = useState<number>(85000);
@@ -238,6 +249,17 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
               </option>
             ))}
           </select>
+          {selectedFincaId !== 'new' && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => previsualizarFinca(selectedFincaId)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'var(--surface-2)' }}
+              title="Ver cómo lo ve el cliente en el catálogo y cotizador"
+            >
+              <Eye size={14} /> Ver en cliente
+            </button>
+          )}
           <button className="btn btn-sm" onClick={() => setSelectedFincaId('new')}>
             <Plus size={14} /> Nueva
           </button>

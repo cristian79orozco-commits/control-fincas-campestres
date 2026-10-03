@@ -1,8 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../services/supabase';
-import type { Menu, MenuImagen } from '../types';
+import { useApp } from '../context/AppContext';
+import type { Menu } from '../types';
 
-// Datos semilla de respaldo si Supabase aún no tiene la tabla migrada o está vacía
 export const MENUS_DEFAULT: Menu[] = [
   {
     id: 'menu-1',
@@ -48,222 +46,41 @@ export const MENUS_DEFAULT: Menu[] = [
     id: 'menu-5',
     nombre: 'Refrigerio Valluno con Empanadas Crocantes',
     categoria: 'Refrigerio',
-    precio_pp: 12000,
-    descripcion: 'Dúo de empanadas artesanales crocantes de carne y papa con ají casero pique suave y limón, acompañado de champús valluno frío o maracuyada refrescante.',
-    condiciones: 'Ideal para la media tarde o receso de actividades. Mínimo 6 personas.',
-    imagen_url: 'https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=800&q=80',
+    precio_pp: 14000,
+    descripcion: 'Trilogía de empanadas vallunas crocantes de carne y papa con ají pique casero y guacamole suave, acompañadas de vaso frío de lulada tradicional con leche condensada.',
+    condiciones: 'Mínimo 6 personas. Ideal para media tarde o pausas en reuniones familiares.',
+    imagen_url: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=800&q=80',
     activo: true,
   },
   {
     id: 'menu-6',
-    nombre: 'Costillas BBQ Ahumadas en Madera Frutal',
-    categoria: 'Menú especial',
-    precio_pp: 42000,
-    descripcion: 'Costillar tierno de cerdo glaseado lentamente en salsa barbacoa artesanal de panela y especias, papas rústicas al romero y mazorquitas asadas a la mantequilla.',
-    condiciones: 'Tiempo de preparación en sitio: 4 horas. Solicitar con 48h de anticipación.',
-    imagen_url: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80',
-    activo: true,
-  },
-  {
-    id: 'menu-7',
-    nombre: 'Paquete Pensión Completa Campestre',
+    nombre: 'Paquete Campestre Día Completo (3 Tiempos)',
     categoria: 'Paquetes',
-    precio_pp: 75000,
-    descripcion: 'Plan todo incluido de alimentación por persona y día: Desayuno típico campesino + Almuerzo a elección (Sancocho o Parrillada) + Refrigerio de la tarde + Cena completa.',
-    condiciones: 'Tarifa por persona y por día completo. Aplica para toda la estancia de los huéspedes registrados.',
+    precio_pp: 68000,
+    descripcion: 'Solución gastronómica completa: Desayuno Campestre Típico + Sancocho Tradicional de Gallina en Leña para almuerzo + Refrigerio Valluno de la tarde. La mejor opción para disfrutar sin preocuparse por la cocina.',
+    condiciones: 'Mínimo 8 personas. Ahorro del 10% frente al valor individual de los servicios.',
     imagen_url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80',
     activo: true,
   },
 ];
 
 export function useMenus() {
-  const [menus, setMenus] = useState<Menu[]>(MENUS_DEFAULT);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchMenus = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data, error: err } = await supabase
-        .from('menus')
-        .select(`
-          *,
-          menu_imagenes (
-            id,
-            menu_id,
-            url,
-            alt,
-            orden,
-            es_principal
-          )
-        `)
-        .order('categoria', { ascending: true })
-        .order('nombre', { ascending: true });
-
-      if (err) {
-        // Si la tabla no existe aún en Supabase, usamos el fallback local
-        console.warn('Supabase: tabla menus no encontrada o no migrada aún, usando fallback:', err.message);
-        // Intentar leer de localStorage si el usuario creó menús locales
-        const cached = localStorage.getItem('fc_menus_cache');
-        if (cached) {
-          try {
-            setMenus(JSON.parse(cached));
-          } catch {
-            setMenus(MENUS_DEFAULT);
-          }
-        } else {
-          setMenus(MENUS_DEFAULT);
-        }
-      } else if (data && data.length > 0) {
-        setMenus(data as Menu[]);
-        localStorage.setItem('fc_menus_cache', JSON.stringify(data));
-      } else {
-        // Si la tabla existe pero está vacía, usar defaults
-        setMenus(MENUS_DEFAULT);
-      }
-    } catch (ex: any) {
-      console.error('Error fetching menus:', ex);
-      setError(ex.message || 'Error cargando menús');
-      const cached = localStorage.getItem('fc_menus_cache');
-      if (cached) {
-        try { setMenus(JSON.parse(cached)); } catch { setMenus(MENUS_DEFAULT); }
-      } else {
-        setMenus(MENUS_DEFAULT);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchMenus();
-  }, [fetchMenus]);
-
-  // Guardar (crear o editar)
-  const guardar = async (
-    menuData: Partial<Menu>,
-    imagenesUrls: string[] = []
-  ): Promise<{ success: boolean; id?: string; error?: string }> => {
-    try {
-      const payload = {
-        nombre: menuData.nombre?.trim() || 'Nuevo Menú',
-        descripcion: menuData.descripcion?.trim() || null,
-        categoria: menuData.categoria || 'Almuerzo',
-        precio_pp: Number(menuData.precio_pp) || 0,
-        condiciones: menuData.condiciones?.trim() || null,
-        imagen_url: imagenesUrls[0] || menuData.imagen_url || null,
-        activo: menuData.activo ?? true,
-      };
-
-      let menuId = menuData.id;
-
-      // Intentar en Supabase
-      const { data, error: err } = menuId && !menuId.startsWith('menu-')
-        ? await supabase.from('menus').update(payload).eq('id', menuId).select().single()
-        : await supabase.from('menus').insert(payload).select().single();
-
-      if (err) {
-        console.warn('Guardando en almacenamiento local por error Supabase:', err.message);
-        // Fallback local
-        const idLocal = menuId || `menu-${Date.now()}`;
-        const nuevoMenu: Menu = {
-          id: idLocal,
-          ...payload,
-          menu_imagenes: imagenesUrls.map((url, i) => ({
-            menu_id: idLocal,
-            url,
-            orden: i,
-            es_principal: i === 0,
-          })),
-        };
-
-        setMenus(prev => {
-          const index = prev.findIndex(m => m.id === idLocal);
-          const updated = index >= 0
-            ? prev.map(m => (m.id === idLocal ? nuevoMenu : m))
-            : [nuevoMenu, ...prev];
-          localStorage.setItem('fc_menus_cache', JSON.stringify(updated));
-          return updated;
-        });
-
-        return { success: true, id: idLocal };
-      }
-
-      menuId = data.id;
-
-      // Gestionar imágenes si hay URLs nuevas
-      if (imagenesUrls.length > 0 && menuId) {
-        try {
-          // Eliminar imágenes anteriores y reinsertar
-          await supabase.from('menu_imagenes').delete().eq('menu_id', menuId);
-          const imagenesRows = imagenesUrls.map((url, idx) => ({
-            menu_id: menuId,
-            url,
-            orden: idx,
-            es_principal: idx === 0,
-          }));
-          await supabase.from('menu_imagenes').insert(imagenesRows);
-        } catch (imgErr) {
-          console.warn('Error sincronizando imagenes de menú en Supabase:', imgErr);
-        }
-      }
-
-      await fetchMenus();
-      return { success: true, id: menuId };
-    } catch (e: any) {
-      console.error('Error guardando menú:', e);
-      return { success: false, error: e.message || 'Error desconocido' };
-    }
-  };
-
-  // Cambiar estado activo/inactivo
-  const cambiarEstado = async (id: string, activo: boolean): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const { error: err } = await supabase.from('menus').update({ activo }).eq('id', id);
-      if (err) {
-        // Fallback local
-        setMenus(prev => {
-          const updated = prev.map(m => m.id === id ? { ...m, activo } : m);
-          localStorage.setItem('fc_menus_cache', JSON.stringify(updated));
-          return updated;
-        });
-        return { success: true };
-      }
-      await fetchMenus();
-      return { success: true };
-    } catch (e: any) {
-      return { success: false, error: e.message };
-    }
-  };
-
-  // Eliminar
-  const eliminar = async (id: string): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const { error: err } = await supabase.from('menus').delete().eq('id', id);
-      if (err) {
-        // Fallback local
-        setMenus(prev => {
-          const updated = prev.filter(m => m.id !== id);
-          localStorage.setItem('fc_menus_cache', JSON.stringify(updated));
-          return updated;
-        });
-        return { success: true };
-      }
-      await fetchMenus();
-      return { success: true };
-    } catch (e: any) {
-      return { success: false, error: e.message };
-    }
-  };
+  const {
+    menus,
+    loading,
+    recargarTodo,
+    guardarMenu,
+    cambiarEstadoMenu,
+    eliminarMenu,
+  } = useApp();
 
   return {
     menus,
     loading,
-    error,
-    recargarMenus: fetchMenus,
-    guardar,
-    cambiarEstado,
-    eliminar,
+    error: null,
+    recargarMenus: recargarTodo,
+    guardar: guardarMenu,
+    cambiarEstado: cambiarEstadoMenu,
+    eliminar: eliminarMenu,
   };
 }

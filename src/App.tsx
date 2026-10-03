@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { Catalog } from './components/Catalog';
 import { FincaDetail } from './components/FincaDetail';
 import { AdminDashboard } from './admin/AdminDashboard';
-import { ToastContainer, type ToastMessage } from './components/Toast';
+import { ToastContainer } from './components/Toast';
 import { ConfirmModal } from './components/ConfirmModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
+import { AdminFloatingBar } from './components/AdminFloatingBar';
 import { BannerPromocional } from './components/BannerPromocional';
 import { BeneficiosSection } from './components/BeneficiosSection';
 import { MenusPublicosSection } from './components/MenusPublicosSection';
@@ -18,42 +19,24 @@ import { DEFAULT_WA_NUMBER } from './services/supabase';
 import type { ViewType, SeccionClave } from './types';
 
 export const App: React.FC = () => {
-  // Estado de vistas y navegación
-  const [view, setView] = useState<ViewType>('cliente');
-  const [selectedFincaId, setSelectedFincaId] = useState<string | null>(null);
-
-  // Tema claro/oscuro
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    return (localStorage.getItem('fc_theme') as 'light' | 'dark') || 'light';
-  });
-
-  // Número de WhatsApp global (sincronizado desde Supabase via configuracion_general)
-  const [waNumberGlobal, setWaNumberGlobal] = useState<string>(DEFAULT_WA_NUMBER);
-
-  // Notificaciones Toast
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-
-  // Modal de confirmación
-  const [confirmModalState, setConfirmModalState] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-  }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    onConfirm: () => {},
-  });
-
-  // Modal de login rápido (acceso secreto)
-  const [adminLoginModalOpen, setAdminLoginModalOpen] = useState(false);
-
   // Autenticación administrativa
   const { user, isAdminLoggedIn, login, logout } = useAuth();
 
   // ESTADO Y ACCIONES CENTRALIZADAS EN TIEMPO REAL (Única fuente de la verdad para toda la app)
   const {
+    view,
+    setView,
+    selectedFincaId,
+    setSelectedFincaId,
+    navegarACliente,
+    navegarAAdmin,
+    previsualizarFinca,
+    toasts,
+    showToast,
+    dismissToast,
+    confirmModalState,
+    openConfirm,
+    closeConfirm,
     fincas,
     todasLasFincas,
     bloquesAdmin,
@@ -79,6 +62,7 @@ export const App: React.FC = () => {
     guardarCotizacion,
     cambiarEstadoCotizacion,
     eliminarCotizacion,
+    convertirCotizacionAReserva,
     guardarReserva,
     cambiarEstadoReserva,
     cerrarReserva,
@@ -98,6 +82,17 @@ export const App: React.FC = () => {
     guardarContenido,
     restablecerContenido,
   } = useApp();
+
+  // Tema claro/oscuro
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return (localStorage.getItem('fc_theme') as 'light' | 'dark') || 'light';
+  });
+
+  // Número de WhatsApp global (sincronizado desde Supabase via configuracion_general)
+  const [waNumberGlobal, setWaNumberGlobal] = useState<string>(DEFAULT_WA_NUMBER);
+
+  // Modal de login rápido (acceso secreto)
+  const [adminLoginModalOpen, setAdminLoginModalOpen] = useState(false);
 
   // Bloques de fechas para la finca seleccionada (computado reactivamente desde el estado central)
   const bloquesFinca = useMemo(() => {
@@ -122,50 +117,24 @@ export const App: React.FC = () => {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  // Toast helper
-  const showToast = useCallback((text: string, type: 'success' | 'error' | 'info' = 'info') => {
-    const id = Date.now().toString() + Math.random().toString(36).slice(2);
-    setToasts(prev => [...prev, { id, text, type }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 3500);
-  }, []);
-
-  const dismissToast = (id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  };
-
-  // Confirm modal helper
-  const openConfirm = (title: string, message: string, onConfirm: () => void) => {
-    setConfirmModalState({
-      isOpen: true,
-      title,
-      message,
-      onConfirm: () => {
-        setConfirmModalState(prev => ({ ...prev, isOpen: false }));
-        onConfirm();
-      },
-    });
-  };
-
   const handleSelectFinca = (id: string) => {
-    setSelectedFincaId(id);
-    setView('detalle');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    previsualizarFinca(id);
   };
 
   const handleSaveWaNumber = (num: string) => {
     setWaNumberGlobal(num);
-    // Persistir en Supabase via configuracion_general para que otros dispositivos lo vean
     guardarConfiguracion({ whatsapp: num });
   };
 
   const handleViewChange = (newView: ViewType) => {
-    setView(newView);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    // Sincronización dinámica: forzar recarga al volver al catálogo de clientes
     if (newView === 'cliente') {
+      navegarACliente();
       recargarTodo();
+    } else if (newView === 'admin') {
+      navegarAAdmin();
+    } else {
+      setView(newView);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -373,6 +342,12 @@ export const App: React.FC = () => {
         </main>
       )}
 
+      {/* Barra de control flotante del Administrador cuando navega en portal cliente */}
+      <AdminFloatingBar
+        isAdminLoggedIn={isAdminLoggedIn}
+        onVolverAdmin={() => handleViewChange('admin')}
+      />
+
       {/* Notificaciones Toast flotantes */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
@@ -382,7 +357,7 @@ export const App: React.FC = () => {
         title={confirmModalState.title}
         message={confirmModalState.message}
         onConfirm={confirmModalState.onConfirm}
-        onCancel={() => setConfirmModalState(prev => ({ ...prev, isOpen: false }))}
+        onCancel={closeConfirm}
       />
 
       {/* Modal de Login Secreto (3 clics en logo) */}

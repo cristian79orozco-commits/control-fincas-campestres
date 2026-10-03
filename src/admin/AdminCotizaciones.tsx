@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   FileText, Plus, Edit3, Trash2, X, Save, ChevronDown, ArrowRight,
-  Calendar, Users, Utensils, DollarSign, Tag, MessageCircle, Download, Hash, Copy, Check
+  Calendar, Users, Utensils, DollarSign, Tag, MessageCircle, Download, Hash, Copy, Check, Eye
 } from 'lucide-react';
 import type { CotizacionDB, CotizacionEstado, Cliente, Finca, Menu } from '../types';
 import { generarPropuestaAlimentacion, generarDocCotizacion } from '../services/documentos';
@@ -9,6 +9,7 @@ import { WhatsAppModal } from '../components/WhatsAppModal';
 import { plantillaCotizacion, plantillaPropuestaAlimentacion } from '../services/whatsapp';
 import { calcularCotizacion } from '../utils/calcularCotizacion';
 import { CurrencyInput } from '../components/CurrencyInput';
+import { useApp } from '../context/AppContext';
 
 interface AdminCotizacionesProps {
   cotizaciones: CotizacionDB[];
@@ -122,6 +123,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
   showToast,
   openConfirm,
 }) => {
+  const { previsualizarFinca } = useApp();
   const [form, setForm] = useState<Partial<CotizacionDB>>(VACIO);
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -658,6 +660,15 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
                       <ArrowRight size={13} /> Pasar a Reserva
                     </button>
                   )}
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.55rem' }}
+                    title="Ver finca cotizada en vista de cliente"
+                    onClick={() => previsualizarFinca(c.finca_id)}
+                  >
+                    <Eye size={12} /> Ver Finca
+                  </button>
                   <button className="btn btn-sm" onClick={() => abrirEdicion(c)} title="Editar"><Edit3 size={13} /></button>
                   <button className="btn btn-sm btn-danger" onClick={() => handleEliminar(c)} title="Eliminar"><Trash2 size={13} /></button>
                 </div>

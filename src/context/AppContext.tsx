@@ -4,8 +4,9 @@ import type {
   Finca, Cliente, CotizacionDB, Reserva, Pago, PagoTipo,
   ReservaEstado, CotizacionEstado, BloqueoDisponibilidad,
   Menu as MenuType, Comunicacion, ConfiguracionGeneral,
-  ContenidoSitio, CierreReserva
+  ContenidoSitio, CierreReserva, ViewType, AdminSection
 } from '../types';
+import type { ToastMessage } from '../components/Toast';
 import { calcularSaldo } from '../types';
 import { obtenerSiguienteConsecutivo } from '../utils/consecutivos';
 import { CONFIGURACION_DEFAULT, setConfiguracionGlobal } from '../services/configuracion';
@@ -29,6 +30,32 @@ interface AppContextValue {
   configuracion: ConfiguracionGeneral;
   contenidoSitio: ContenidoSitio;
   loading: boolean;
+
+  // Navegación centralizada e interacción cruzada Admin <-> Cliente
+  view: ViewType;
+  selectedFincaId: string | null;
+  adminActiveSection: AdminSection;
+  fincaParaEditarId: string | null;
+  setView: (view: ViewType) => void;
+  setSelectedFincaId: (id: string | null) => void;
+  setAdminActiveSection: (section: AdminSection) => void;
+  setFincaParaEditarId: (id: string | null) => void;
+  navegarACliente: (fincaId?: string) => void;
+  navegarAAdmin: (seccion?: AdminSection, fincaIdParaEditar?: string) => void;
+  previsualizarFinca: (fincaId: string) => void;
+
+  // Notificaciones Toast y Confirmaciones Globales
+  toasts: ToastMessage[];
+  showToast: (text: string, type?: 'success' | 'error' | 'info') => void;
+  dismissToast: (id: string) => void;
+  confirmModalState: {
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  };
+  openConfirm: (title: string, message: string, onConfirm: () => void) => void;
+  closeConfirm: () => void;
 
   // Métricas reactivas globales
   metricasFincas: {
@@ -119,6 +146,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [loading, setLoading] = useState(true);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [guardandoContenido, setGuardandoContenido] = useState(false);
+
+  // Navegación centralizada e interacción cruzada Admin <-> Cliente
+  const [view, setView] = useState<ViewType>('cliente');
+  const [selectedFincaId, setSelectedFincaId] = useState<string | null>(null);
+  const [adminActiveSection, setAdminActiveSection] = useState<AdminSection>('dashboard');
+  const [fincaParaEditarId, setFincaParaEditarId] = useState<string | null>(null);
+
+  // Notificaciones Toast centralizadas
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const showToast = useCallback((text: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Date.now().toString() + Math.random().toString(36).slice(2);
+    setToasts(prev => [...prev, { id, text, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  // Modal de confirmación centralizado
+  const [confirmModalState, setConfirmModalState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
+  const openConfirm = useCallback((title: string, message: string, onConfirm: () => void) => {
+    setConfirmModalState({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        setConfirmModalState(prev => ({ ...prev, isOpen: false }));
+        onConfirm();
+      },
+    });
+  }, []);
+
+  const closeConfirm = useCallback(() => {
+    setConfirmModalState(prev => ({ ...prev, isOpen: false }));
+  }, []);
+
+  // Métodos de navegación unificada
+  const navegarACliente = useCallback((fincaId?: string) => {
+    if (fincaId) {
+      setSelectedFincaId(fincaId);
+      setView('detalle');
+    } else {
+      setView('cliente');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const navegarAAdmin = useCallback((seccion?: AdminSection, fincaIdParaEditar?: string) => {
+    setView('admin');
+    if (seccion) setAdminActiveSection(seccion);
+    if (fincaIdParaEditar) setFincaParaEditarId(fincaIdParaEditar);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const previsualizarFinca = useCallback((fincaId: string) => {
+    setSelectedFincaId(fincaId);
+    setView('detalle');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   // ---------------------------------------------------------------------------
   // CARGA DE DATOS CENTRALIZADA
@@ -323,11 +424,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Sincronización en tiempo real con Supabase
     const channel = supabase
       .channel('app-global-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, (payload) => {
         cargarCotizaciones();
+        if (payload.eventType === 'INSERT') {
+          const nueva = payload.new as any;
+          const consecutivo = nueva?.consecutivo ? `[${nueva.consecutivo}] ` : '';
+          showToast(`🔔 ¡Nueva cotización web recibida! ${consecutivo}Disponible en el panel admin.`, 'info');
+        }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas' }, () => {
         cargarReservas();
+        cargarDisponibilidad();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pagos' }, () => {
         cargarReservas();
@@ -361,6 +468,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     cargarMenus,
     cargarConfiguracion,
     cargarContenidoSitio,
+    showToast,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -500,6 +608,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (errorCot) {
         console.warn('[AppContext] Aviso insertando cotización en Supabase:', errorCot);
       }
+
+      showToast(`✓ Cotización ${consecutivo} registrada con éxito`, 'success');
 
       return {
         success: true,
@@ -1388,6 +1498,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     configuracion,
     contenidoSitio,
     loading,
+
+    // Navegación centralizada e interacción cruzada Admin <-> Cliente
+    view,
+    selectedFincaId,
+    adminActiveSection,
+    fincaParaEditarId,
+    setView,
+    setSelectedFincaId,
+    setAdminActiveSection,
+    setFincaParaEditarId,
+    navegarACliente,
+    navegarAAdmin,
+    previsualizarFinca,
+
+    // Notificaciones Toast y Confirmaciones Globales
+    toasts,
+    showToast,
+    dismissToast,
+    confirmModalState,
+    openConfirm,
+    closeConfirm,
+
     metricasFincas,
     metricasReservas,
     recargarTodo,
@@ -1433,6 +1565,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     configuracion,
     contenidoSitio,
     loading,
+    view,
+    selectedFincaId,
+    adminActiveSection,
+    fincaParaEditarId,
+    navegarACliente,
+    navegarAAdmin,
+    previsualizarFinca,
+    toasts,
+    showToast,
+    dismissToast,
+    confirmModalState,
+    openConfirm,
+    closeConfirm,
     metricasFincas,
     metricasReservas,
     recargarTodo,
