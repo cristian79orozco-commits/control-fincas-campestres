@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { Catalog } from './components/Catalog';
@@ -13,16 +13,7 @@ import { MenusPublicosSection } from './components/MenusPublicosSection';
 import { FaqSection } from './components/FaqSection';
 import { FooterPublico } from './components/FooterPublico';
 import { useAuth } from './hooks/useAuth';
-import { useFincas } from './hooks/useFincas';
-import { useDisponibilidad } from './hooks/useDisponibilidad';
-import { useClientes } from './hooks/useClientes';
-import { useCotizaciones } from './hooks/useCotizaciones';
-import { useReservas } from './hooks/useReservas';
-import { useMenus } from './hooks/useMenus';
-import { useComunicaciones } from './hooks/useComunicaciones';
-import { useConfiguracion } from './hooks/useConfiguracion';
-import { useContenidoSitio } from './hooks/useContenidoSitio';
-import { useCotizadorPublico } from './hooks/useCotizadorPublico';
+import { useApp } from './context/AppContext';
 import { DEFAULT_WA_NUMBER } from './services/supabase';
 import type { ViewType, SeccionClave } from './types';
 
@@ -58,81 +49,61 @@ export const App: React.FC = () => {
   // Modal de login rápido (acceso secreto)
   const [adminLoginModalOpen, setAdminLoginModalOpen] = useState(false);
 
-  // Hooks de datos y servicios
+  // Autenticación administrativa
   const { user, isAdminLoggedIn, login, logout } = useAuth();
+
+  // ESTADO Y ACCIONES CENTRALIZADAS EN TIEMPO REAL (Única fuente de la verdad para toda la app)
   const {
     fincas,
     todasLasFincas,
+    bloquesAdmin,
+    clientes,
+    cotizaciones,
+    reservas,
+    menus,
+    comunicaciones,
+    configuracion,
+    contenidoSitio,
     loading: loadingFincas,
-    metricas,
+    metricasFincas: metricas,
+    metricasReservas,
+    recargarTodo,
+    guardarCotizacionPublica,
     guardarFinca,
     desactivarFinca,
     reactivarFinca,
-    recargar: recargarFincas,
-  } = useFincas();
-  const {
-    bloquesFinca,
-    bloquesAdmin,
     marcarDiasAdmin,
     eliminarBloqueo,
-  } = useDisponibilidad(selectedFincaId);
-
-  // Fase 1: Clientes, Cotizaciones, Reservas y Pagos
-  const { clientes, guardar: guardarCliente, desactivar: desactivarCliente } = useClientes();
-  const {
-    cotizaciones,
-    guardar: guardarCotizacion,
-    cambiarEstado: cambiarEstadoCotizacion,
-    eliminar: eliminarCotizacion,
-  } = useCotizaciones();
-  const {
-    reservas,
-    guardar: guardarReserva,
-    cambiarEstado: cambiarEstadoReserva,
+    guardarCliente,
+    desactivarCliente,
+    guardarCotizacion,
+    cambiarEstadoCotizacion,
+    eliminarCotizacion,
+    guardarReserva,
+    cambiarEstadoReserva,
     cerrarReserva,
     reabrirReserva,
-    eliminar: eliminarReserva,
+    eliminarReserva,
     registrarPago,
     eliminarPago,
-    metricas: metricasReservas,
-  } = useReservas();
-
-  // Fase 2: Hook de menús y alimentación
-  const {
-    menus,
-    guardar: guardarMenu,
-    cambiarEstado: cambiarEstadoMenu,
-    eliminar: eliminarMenu,
-    recargarMenus,
-  } = useMenus();
-
-  // Fase 3: Hook de comunicaciones y WhatsApp
-  const {
-    comunicaciones,
+    guardarMenu,
+    cambiarEstadoMenu,
+    eliminarMenu,
     registrarComunicacion,
-    limpiarHistorial: limpiarHistorialComunicaciones,
-  } = useComunicaciones();
-
-  // Fase 4: Hook de configuración general (empresa, documentos, consecutivos)
-  const {
-    config: configuracion,
-    guardando: guardandoConfig,
-    cargarConfiguracion,
+    limpiarHistorialComunicaciones,
+    guardandoConfig,
     guardarConfiguracion,
-    restablecerPorDefecto: restablecerConfiguracion,
-  } = useConfiguracion();
-
-  // Fase 5: Hook de contenido y personalización del sitio público
-  const {
-    contenido: contenidoSitio,
-    guardando: guardandoContenido,
-    cargarContenido,
+    restablecerConfiguracion,
+    guardandoContenido,
     guardarContenido,
-    restablecerPorDefecto: restablecerContenido,
-  } = useContenidoSitio();
+    restablecerContenido,
+  } = useApp();
 
-  // Etapa 2: Hook del cotizador público (flujo cliente → Supabase)
-  const { guardarCotizacionPublica } = useCotizadorPublico();
+  // Bloques de fechas para la finca seleccionada (computado reactivamente desde el estado central)
+  const bloquesFinca = useMemo(() => {
+    if (!selectedFincaId) return [];
+    return bloquesAdmin.filter(b => b.finca_id === selectedFincaId);
+  }, [bloquesAdmin, selectedFincaId]);
 
   // Sincronizar WhatsApp global desde configuración de Supabase
   useEffect(() => {
@@ -194,23 +165,18 @@ export const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     // Sincronización dinámica: forzar recarga al volver al catálogo de clientes
     if (newView === 'cliente') {
-      recargarFincas();
-      recargarMenus();
+      recargarTodo();
     }
   };
 
   // Sincronización automática de datos al enfocar la pestaña del navegador
-  // Recarga fincas, menús, configuración y contenido del sitio desde Supabase
   useEffect(() => {
     const handleFocus = () => {
-      recargarFincas();
-      recargarMenus();
-      cargarConfiguracion();
-      cargarContenido();
+      recargarTodo();
     };
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, [recargarFincas, recargarMenus, cargarConfiguracion, cargarContenido]);
+  }, [recargarTodo]);
 
   const selectedFinca = fincas.find(f => f.id === selectedFincaId);
 
