@@ -9,6 +9,7 @@ import {
   obtenerNombreClienteHistorico,
   obtenerNombreFincaHistorico,
 } from '../types';
+import { CurrencyInput } from '../components/CurrencyInput';
 
 interface AdminCierreModalProps {
   isOpen: boolean;
@@ -274,11 +275,9 @@ export const AdminCierreModal: React.FC<AdminCierreModalProps> = ({
 
             <div className="field">
               <label>Monto depósito devuelto (COP)</label>
-              <input
-                type="number"
-                min={0}
+              <CurrencyInput
                 value={valorDeposito}
-                onChange={e => setValorDeposito(+e.target.value)}
+                onChange={val => setValorDeposito(val)}
                 placeholder="0"
               />
             </div>

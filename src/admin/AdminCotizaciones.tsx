@@ -8,6 +8,7 @@ import { generarPropuestaAlimentacion, generarDocCotizacion } from '../services/
 import { WhatsAppModal } from '../components/WhatsAppModal';
 import { plantillaCotizacion, plantillaPropuestaAlimentacion } from '../services/whatsapp';
 import { calcularCotizacion } from '../utils/calcularCotizacion';
+import { CurrencyInput } from '../components/CurrencyInput';
 
 interface AdminCotizacionesProps {
   cotizaciones: CotizacionDB[];
@@ -458,19 +459,35 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
                 {/* Valores */}
                 <div className="field">
                   <label><DollarSign size={11} style={{ display:'inline', verticalAlign:'-1px' }} /> Precio base /pp/noche</label>
-                  <input type="number" min={0} value={form.precio_base_pp || 0} onChange={e => updateField('precio_base_pp', +e.target.value)} />
+                  <CurrencyInput
+                    value={form.precio_base_pp}
+                    onChange={val => updateField('precio_base_pp', val)}
+                    placeholder="0"
+                  />
                 </div>
                 <div className="field">
                   <label>Costo alimentación total</label>
-                  <input type="number" min={0} value={form.costo_alimentacion || 0} onChange={e => updateField('costo_alimentacion', +e.target.value)} />
+                  <CurrencyInput
+                    value={form.costo_alimentacion}
+                    onChange={val => updateField('costo_alimentacion', val)}
+                    placeholder="0"
+                  />
                 </div>
                 <div className="field">
                   <label>Descuento</label>
-                  <input type="number" min={0} value={form.descuento || 0} onChange={e => updateField('descuento', +e.target.value)} />
+                  <CurrencyInput
+                    value={form.descuento}
+                    onChange={val => updateField('descuento', val)}
+                    placeholder="0"
+                  />
                 </div>
                 <div className="field">
                   <label>Recargo</label>
-                  <input type="number" min={0} value={form.recargo || 0} onChange={e => updateField('recargo', +e.target.value)} />
+                  <CurrencyInput
+                    value={form.recargo}
+                    onChange={val => updateField('recargo', val)}
+                    placeholder="0"
+                  />
                 </div>
 
                 <div className="field">

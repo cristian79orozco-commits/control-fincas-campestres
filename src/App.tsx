@@ -36,10 +36,8 @@ export const App: React.FC = () => {
     return (localStorage.getItem('fc_theme') as 'light' | 'dark') || 'light';
   });
 
-  // Número de WhatsApp global
-  const [waNumberGlobal, setWaNumberGlobal] = useState<string>(() => {
-    return localStorage.getItem('fc_global_wa') || DEFAULT_WA_NUMBER;
-  });
+  // Número de WhatsApp global (sincronizado desde Supabase via configuracion_general)
+  const [waNumberGlobal, setWaNumberGlobal] = useState<string>(DEFAULT_WA_NUMBER);
 
   // Notificaciones Toast
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -119,6 +117,7 @@ export const App: React.FC = () => {
   const {
     config: configuracion,
     guardando: guardandoConfig,
+    cargarConfiguracion,
     guardarConfiguracion,
     restablecerPorDefecto: restablecerConfiguracion,
   } = useConfiguracion();
@@ -127,12 +126,20 @@ export const App: React.FC = () => {
   const {
     contenido: contenidoSitio,
     guardando: guardandoContenido,
+    cargarContenido,
     guardarContenido,
     restablecerPorDefecto: restablecerContenido,
   } = useContenidoSitio();
 
   // Etapa 2: Hook del cotizador público (flujo cliente → Supabase)
   const { guardarCotizacionPublica } = useCotizadorPublico();
+
+  // Sincronizar WhatsApp global desde configuración de Supabase
+  useEffect(() => {
+    if (configuracion.whatsapp) {
+      setWaNumberGlobal(configuracion.whatsapp);
+    }
+  }, [configuracion.whatsapp]);
 
   // Sincronizar tema con el DOM
   useEffect(() => {
@@ -178,7 +185,8 @@ export const App: React.FC = () => {
 
   const handleSaveWaNumber = (num: string) => {
     setWaNumberGlobal(num);
-    localStorage.setItem('fc_global_wa', num);
+    // Persistir en Supabase via configuracion_general para que otros dispositivos lo vean
+    guardarConfiguracion({ whatsapp: num });
   };
 
   const handleViewChange = (newView: ViewType) => {
@@ -192,14 +200,17 @@ export const App: React.FC = () => {
   };
 
   // Sincronización automática de datos al enfocar la pestaña del navegador
+  // Recarga fincas, menús, configuración y contenido del sitio desde Supabase
   useEffect(() => {
     const handleFocus = () => {
       recargarFincas();
       recargarMenus();
+      cargarConfiguracion();
+      cargarContenido();
     };
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, [recargarFincas, recargarMenus]);
+  }, [recargarFincas, recargarMenus, cargarConfiguracion, cargarContenido]);
 
   const selectedFinca = fincas.find(f => f.id === selectedFincaId);
 

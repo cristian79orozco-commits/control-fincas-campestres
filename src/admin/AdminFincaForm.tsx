@@ -3,6 +3,7 @@ import { Save, Trash2, Plus, Upload, Link as LinkIcon, Loader, Image as ImageIco
 import { supabase, DEFAULT_WA_NUMBER } from '../services/supabase';
 import { optimizarImagen, formatearBytes } from '../utils/imageOptimizer';
 import type { Finca } from '../types';
+import { CurrencyInput } from '../components/CurrencyInput';
 
 interface AdminFincaFormProps {
   fincas: Finca[];
@@ -312,11 +313,10 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
 
         <div className="field">
           <label>Precio por persona / noche (COP)</label>
-          <input
-            type="number"
-            step="5000"
+          <CurrencyInput
             value={precio}
-            onChange={e => setPrecio(Number(e.target.value))}
+            onChange={val => setPrecio(val)}
+            placeholder="0"
           />
         </div>
 

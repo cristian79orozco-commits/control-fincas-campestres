@@ -7,6 +7,7 @@ import type { Finca, Cotizacion, Menu } from '../types';
 import type { DatosCotizacionPublica, ResultadoCotizacionPublica } from '../hooks/useCotizadorPublico';
 import { MenuSelectorCards } from './MenuSelectorCards';
 import { calcularCotizacion } from '../utils/calcularCotizacion';
+import { NumericStepper } from './NumericStepper';
 
 interface QuoteCalculatorProps {
   finca: Finca;
@@ -96,10 +97,28 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
 
     const waNum = (finca.whatsapp || waNumberGlobal || '573176827093').replace(/[^0-9]/g, '');
 
-    const consecutivoLinea = cotGuardada ? `\n🆔 *Cotización:* ${cotGuardada.consecutivo}` : '';
+    const consecutivoLinea = cotGuardada
+      ? `🆔 *Cotización N°:* ${cotGuardada.consecutivo}`
+      : '';
+
+    const clienteLinea = clienteNombre.trim()
+      ? `👤 *Cliente:* ${clienteNombre.trim()}`
+      : '';
+
+    const telefonoLinea = clienteCelular.trim()
+      ? `📞 *Teléfono de contacto:* ${clienteCelular.trim()}`
+      : '';
+
+    const waAlternativoLinea = (!mismoWa && clienteWa.trim())
+      ? `📱 *WhatsApp:* ${clienteWa.trim()}`
+      : '';
 
     const partes = [
       `¡Hola! 👋 Me gustaría reservar en *${finca.nombre}*.`,
+      consecutivoLinea,
+      clienteLinea,
+      telefonoLinea,
+      waAlternativoLinea,
       fechaInicio && fechaFin
         ? `📅 *Fechas:* del *${fechaInicio}* al *${fechaFin}* (${noches} noche${noches !== 1 ? 's' : ''})`
         : '',
@@ -108,8 +127,7 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
         ? `🍽️ *Plan de alimentación:* ${menuSeleccionado.nombre} (${menuSeleccionado.categoria}) — ${personas} pers. × ${cantidadServicios} servicio(s): $${costoPlanTotal.toLocaleString('es-CO')} COP`
         : (plan && plan !== 'Sin alimentación' ? `🍽️ *Plan de alimentación:* ${plan}` : ''),
       totalEstimado > 0 ? `💰 *Cotización estimada total:* $${totalEstimado.toLocaleString('es-CO')} COP` : '',
-      consecutivoLinea,
-      `\n¿Tienen disponibilidad confirmada para estas fechas? Quedo atento/a para coordinar los detalles. ¡Muchas gracias! 🙏`,
+      `\n📌 *Interés en reserva:* Tengo total interés en reservar esta finca para estas fechas. Por favor confírmenme disponibilidad y los pasos para consignar el anticipo de reserva con este código. ¡Muchas gracias! 🙏`,
     ].filter(Boolean).join('\n');
 
     const waUrl = `https://wa.me/${waNum}?text=${encodeURIComponent(partes)}`;
@@ -128,7 +146,7 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
       waMensaje: partes,
       waUrl,
     };
-  }, [finca, fechaInicio, fechaFin, personas, plan, waNumberGlobal, menuSeleccionado, cantidadServicios, cotGuardada]);
+  }, [finca, fechaInicio, fechaFin, personas, plan, waNumberGlobal, menuSeleccionado, cantidadServicios, cotGuardada, clienteNombre, clienteCelular, clienteWa, mismoWa]);
 
   const handlePlanSelect = (val: string) => {
     onPlanChange(val);
@@ -180,6 +198,32 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
 
       if (resultado.success && resultado.consecutivo && resultado.cotizacionId) {
         setCotGuardada({ consecutivo: resultado.consecutivo, id: resultado.cotizacionId });
+
+        // Intentar abrir WhatsApp en pestaña nueva automáticamente
+        const waNum = (finca.whatsapp || waNumberGlobal || '573176827093').replace(/[^0-9]/g, '');
+        const partesExito = [
+          `¡Hola! 👋 Me gustaría reservar en *${finca.nombre}*.`,
+          `🆔 *Cotización N°:* ${resultado.consecutivo}`,
+          `👤 *Cliente:* ${clienteNombre.trim()}`,
+          `📞 *Teléfono de contacto:* ${clienteCelular.trim()}`,
+          (!mismoWa && clienteWa.trim()) ? `📱 *WhatsApp:* ${clienteWa.trim()}` : '',
+          cotizacion.fechaInicio && cotizacion.fechaFin
+            ? `📅 *Fechas:* del *${cotizacion.fechaInicio}* al *${cotizacion.fechaFin}* (${cotizacion.noches} noche${cotizacion.noches !== 1 ? 's' : ''})`
+            : '',
+          `👥 *Cantidad de personas:* ${cotizacion.personas}`,
+          menuSeleccionado
+            ? `🍽️ *Plan de alimentación:* ${menuSeleccionado.nombre} (${menuSeleccionado.categoria}) — ${cotizacion.personas} pers. × ${cantidadServicios} servicio(s): $${cotizacion.costoPlanTotal.toLocaleString('es-CO')} COP`
+            : (plan && plan !== 'Sin alimentación' ? `🍽️ *Plan de alimentación:* ${plan}` : ''),
+          cotizacion.totalEstimado > 0 ? `💰 *Cotización estimada total:* $${cotizacion.totalEstimado.toLocaleString('es-CO')} COP` : '',
+          `\n📌 *Interés en reserva:* Tengo total interés en reservar esta finca para estas fechas. Por favor confírmenme disponibilidad y los pasos para consignar el anticipo de reserva con este código. ¡Muchas gracias! 🙏`,
+        ].filter(Boolean).join('\n');
+
+        const directoWaUrl = `https://wa.me/${waNum}?text=${encodeURIComponent(partesExito)}`;
+        try {
+          window.open(directoWaUrl, '_blank', 'noopener,noreferrer');
+        } catch {
+          // Si el navegador bloquea la apertura automática, el botón verde queda listo
+        }
       } else {
         // Guardado falló pero no bloqueamos el flujo de WhatsApp
         setErrorGuardado(resultado.error || 'No se pudo registrar la cotización, pero puedes contactarnos por WhatsApp.');
@@ -251,13 +295,12 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Servicios:</label>
-            <input
-              type="number"
+            <NumericStepper
+              size="sm"
               min={1}
               max={30}
               value={cantidadServicios}
-              onChange={e => setCantidadServicios(Math.max(1, +e.target.value))}
-              style={{ width: '56px', padding: '0.2rem 0.4rem', height: '28px', fontSize: '0.8rem', textAlign: 'center' }}
+              onChange={setCantidadServicios}
             />
           </div>
         </div>

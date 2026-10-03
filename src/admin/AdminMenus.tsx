@@ -8,6 +8,7 @@ import { supabase } from '../services/supabase';
 import { generarPropuestaAlimentacion } from '../services/documentos';
 import { optimizarImagen, formatearBytes } from '../utils/imageOptimizer';
 import type { Menu, MenuCategoria, Cliente, Finca } from '../types';
+import { CurrencyInput } from '../components/CurrencyInput';
 
 interface AdminMenusProps {
   menus: Menu[];
@@ -590,18 +591,12 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
                   <label>
                     <DollarSign size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> Precio por persona (COP) *
                   </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={1000}
+                  <CurrencyInput
+                    value={form.precio_pp}
+                    onChange={val => setForm(f => ({ ...f, precio_pp: val }))}
+                    placeholder="0"
                     required
-                    placeholder="25000"
-                    value={form.precio_pp || 0}
-                    onChange={e => setForm(f => ({ ...f, precio_pp: +e.target.value }))}
                   />
-                  <span className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
-                    {formatCOP(form.precio_pp || 0)}
-                  </span>
                 </div>
 
                 <div className="field" style={{ justifyContent: 'center' }}>

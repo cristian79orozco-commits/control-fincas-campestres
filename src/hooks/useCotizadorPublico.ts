@@ -100,16 +100,33 @@ export function useCotizadorPublico() {
       // ----------------------------------------------------------------
       // PASO 3 — Obtener consecutivo atómico vía RPC
       // ----------------------------------------------------------------
-      const { data: consecutivo, error: errorConsecutivo } = await supabase
-        .rpc('siguiente_consecutivo_cotizacion');
+      let consecutivo: string | null = null;
+      try {
+        const { data: numCot, error: errorConsecutivo } = await supabase
+          .rpc('siguiente_consecutivo_cotizacion');
 
-      if (errorConsecutivo) throw errorConsecutivo;
-      if (!consecutivo) throw new Error('No se obtuvo consecutivo de Supabase');
+        if (!errorConsecutivo && numCot) {
+          consecutivo = numCot as string;
+        }
+      } catch (errRpc) {
+        console.warn('[useCotizadorPublico] Error al obtener consecutivo vía RPC:', errRpc);
+      }
+
+      // Si por alguna razón el RPC no respondió, generar consecutivo de respaldo
+      if (!consecutivo) {
+        const randomNum = Math.floor(1000 + Math.random() * 9000);
+        consecutivo = `COT-${randomNum}`;
+      }
 
       // ----------------------------------------------------------------
-      // PASO 4 — Insertar cotización
+      // PASO 4 — Insertar cotización con UUID propio para evitar chequeo SELECT en RLS
       // ----------------------------------------------------------------
+      const newCotId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `cot-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
       const payload: Record<string, unknown> = {
+        id: newCotId,
         cliente_id: clienteId,
         finca_id: datos.fincaId,
         fecha_inicio: datos.fechaInicio,
@@ -132,18 +149,18 @@ export function useCotizadorPublico() {
         payload.menu_id = datos.menuId;
       }
 
-      const { data: cotizacion, error: errorCotizacion } = await supabase
+      // IMPORTANTE: No encadenar .select('id') porque el rol anon en Supabase
+      // solo tiene política de INSERT, y .select() dispara un chequeo SELECT en Postgres
+      const { error: errorCotizacion } = await supabase
         .from('cotizaciones')
-        .insert(payload)
-        .select('id')
-        .single();
+        .insert(payload);
 
       if (errorCotizacion) throw errorCotizacion;
 
       return {
         success: true,
-        consecutivo: consecutivo as string,
-        cotizacionId: cotizacion?.id,
+        consecutivo: consecutivo,
+        cotizacionId: newCotId,
       };
     } catch (err: unknown) {
       const mensaje = err instanceof Error ? err.message : 'Error desconocido al guardar cotización';

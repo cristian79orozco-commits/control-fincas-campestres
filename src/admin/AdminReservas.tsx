@@ -16,6 +16,7 @@ import {
   plantillaSeparacion,
 } from '../services/whatsapp';
 import { generarDocSeparacion } from '../services/documentos';
+import { CurrencyInput } from '../components/CurrencyInput';
 
 interface AdminReservasProps {
   reservas: Reserva[];
@@ -328,11 +329,19 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
 
                 <div className="field">
                   <label><DollarSign size={11} style={{ display:'inline', verticalAlign:'-1px' }} /> Valor total</label>
-                  <input type="number" min={0} value={form.valor_total || 0} onChange={e => setForm(p => ({ ...p, valor_total: +e.target.value }))} />
+                  <CurrencyInput
+                    value={form.valor_total}
+                    onChange={val => setForm(p => ({ ...p, valor_total: val }))}
+                    placeholder="0"
+                  />
                 </div>
                 <div className="field">
                   <label>Separación / Anticipo</label>
-                  <input type="number" min={0} max={form.valor_total || undefined} value={form.separacion || 0} onChange={e => setForm(p => ({ ...p, separacion: +e.target.value }))} />
+                  <CurrencyInput
+                    value={form.separacion}
+                    onChange={val => setForm(p => ({ ...p, separacion: val }))}
+                    placeholder="0"
+                  />
                 </div>
 
                 <div className="field" style={{ gridColumn: '1 / -1' }}>
@@ -399,8 +408,12 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                 <input type="date" value={pagoForm.fecha} onChange={e => setPagoForm(p => ({ ...p, fecha: e.target.value }))} />
               </div>
               <div className="field">
-                <label>Valor</label>
-                <input type="number" min={1} value={pagoForm.valor} onChange={e => setPagoForm(p => ({ ...p, valor: +e.target.value }))} />
+                <label>Valor (COP)</label>
+                <CurrencyInput
+                  value={pagoForm.valor}
+                  onChange={val => setPagoForm(p => ({ ...p, valor: val }))}
+                  placeholder="0"
+                />
               </div>
               <div className="field">
                 <label>Observación</label>
