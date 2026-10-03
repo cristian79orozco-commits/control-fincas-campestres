@@ -249,7 +249,7 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
             <Utensils size={13} /> {menuSeleccionado.nombre} — {(menuSeleccionado.precio_pp || 0).toLocaleString('es-CO')} COP/pp
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Nº de servicios:</label>
+            <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Servicios:</label>
             <input
               type="number"
               min={1}
@@ -401,12 +401,21 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
       )}
 
       {/* Vista previa del mensaje de WhatsApp */}
-      <div>
-        <div className="wa-label">
-          <MessageCircle size={14} style={{ color: '#25d366' }} /> Mensaje de WhatsApp:
+      {!cotGuardada ? (
+        <div>
+          <div className="wa-label">
+            <MessageCircle size={14} style={{ color: '#25d366' }} /> Mensaje de WhatsApp:
+          </div>
+          <div className="wa-bubble">{cotizacion.waMensaje}</div>
         </div>
-        <div className="wa-bubble">{cotizacion.waMensaje}</div>
-      </div>
+      ) : (
+        <details style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+          <summary style={{ cursor: 'pointer', userSelect: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.2rem 0' }}>
+            <MessageCircle size={12} style={{ color: '#25d366' }} /> Ver detalle del mensaje para WhatsApp
+          </summary>
+          <div className="wa-bubble" style={{ marginTop: '0.45rem', opacity: 0.9 }}>{cotizacion.waMensaje}</div>
+        </details>
+      )}
 
       {/* Botón principal: Generar Cotización */}
       {!cotGuardada && (

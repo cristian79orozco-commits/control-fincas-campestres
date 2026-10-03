@@ -12,7 +12,25 @@ interface MenuSelectorCardsProps {
   menus: Menu[];
   planSeleccionado: string; // nombre del plan o 'Sin alimentación'
   onSelect: (nombrePlan: string) => void;
+  loading?: boolean;
 }
+
+// ─── Skeleton Card para menús ─────────────────────────────────────────────────
+const SkeletonMenuCard: React.FC = () => (
+  <div style={{
+    border: '1px solid var(--border-subtle)',
+    borderRadius: 'var(--rad-sm, 10px)',
+    overflow: 'hidden',
+    background: 'var(--surface)',
+  }}>
+    <div className="skeleton-box" style={{ width: '100%', height: '110px', borderRadius: 0 }} />
+    <div style={{ padding: '0.75rem', display: 'grid', gap: '0.45rem' }}>
+      <div className="skeleton-box" style={{ height: '14px', width: '40%' }} />
+      <div className="skeleton-box" style={{ height: '16px', width: '70%' }} />
+      <div className="skeleton-box" style={{ height: '18px', width: '50%' }} />
+    </div>
+  </div>
+);
 
 function formatCOP(v: number) {
   return '$' + (v || 0).toLocaleString('es-CO');
@@ -323,6 +341,7 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
   menus,
   planSeleccionado,
   onSelect,
+  loading = false,
 }) => {
   const [expandido, setExpandido] = useState(true);
 
@@ -404,21 +423,31 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
           gap: '0.75rem',
           animation: 'fadeInDown 0.18s ease',
         }}>
-          {/* Tarjeta: Sin alimentación */}
-          <SinAlimentacionCard
-            isSelected={sinAlimentacionSeleccionado}
-            onSelect={() => onSelect('Sin alimentación')}
-          />
+          {loading ? (
+            <>
+              {[1, 2, 3].map(n => (
+                <SkeletonMenuCard key={n} />
+              ))}
+            </>
+          ) : (
+            <>
+              {/* Tarjeta: Sin alimentación */}
+              <SinAlimentacionCard
+                isSelected={sinAlimentacionSeleccionado}
+                onSelect={() => onSelect('Sin alimentación')}
+              />
 
-          {/* Tarjetas de menús activos */}
-          {menusActivos.map(menu => (
-            <MenuCard
-              key={menu.id}
-              menu={menu}
-              isSelected={planSeleccionado === menu.nombre}
-              onSelect={() => onSelect(menu.nombre)}
-            />
-          ))}
+              {/* Tarjetas de menús activos */}
+              {menusActivos.map(menu => (
+                <MenuCard
+                  key={menu.id}
+                  menu={menu}
+                  isSelected={planSeleccionado === menu.nombre}
+                  onSelect={() => onSelect(menu.nombre)}
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
 

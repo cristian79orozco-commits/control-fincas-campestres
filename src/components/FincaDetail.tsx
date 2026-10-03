@@ -3,6 +3,7 @@ import { ArrowLeft, MapPin, Users, Check, Sparkles, Image as ImageIcon } from 'l
 import { CalendarPicker } from './CalendarPicker';
 import { QuoteCalculator } from './QuoteCalculator';
 import { GalleryLightbox } from './GalleryLightbox';
+import { CollapsibleSection } from './CollapsibleSection';
 import type { Finca, BloqueoDisponibilidad, Menu } from '../types';
 import type { DatosCotizacionPublica, ResultadoCotizacionPublica } from '../hooks/useCotizadorPublico';
 
@@ -126,33 +127,81 @@ export const FincaDetail: React.FC<FincaDetailProps> = ({
         {/* Amenidades y Servicios */}
         {finca.finca_amenidades && finca.finca_amenidades.length > 0 && (
           <div style={{ marginTop: '1.25rem' }}>
-            <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 600, marginBottom: '0.5rem' }}>
-              Comodidades y servicios
-            </h3>
-            <div className="amenities-grid">
-              {finca.finca_amenidades.map((amenidad, idx) => (
-                <span key={idx} className="amenity">
-                  <Check size={13} style={{ color: 'var(--primary)' }} /> {amenidad.nombre}
-                </span>
-              ))}
-            </div>
+            <CollapsibleSection
+              title="Comodidades y servicios"
+              badge={finca.finca_amenidades.length}
+              defaultOpen={true}
+              icon={<Check size={16} />}
+            >
+              <div className="amenities-grid" style={{ paddingTop: '0.75rem' }}>
+                {finca.finca_amenidades.map((amenidad, idx) => (
+                  <span key={idx} className="amenity">
+                    <Check size={13} style={{ color: 'var(--primary)' }} /> {amenidad.nombre}
+                  </span>
+                ))}
+              </div>
+            </CollapsibleSection>
           </div>
         )}
 
-        {/* Planes de alimentación */}
+        {/* Planes de estadía */}
         {finca.finca_planes && finca.finca_planes.length > 0 && (
-          <div style={{ marginTop: '1.25rem' }}>
-            <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 600, marginBottom: '0.5rem' }}>
-              Planes de estadía disponibles
-            </h3>
-            <div className="plans-row">
-              {finca.finca_planes.map((p, idx) => (
-                <span key={idx} className="plan-tag">
-                  <Sparkles size={11} style={{ display: 'inline', verticalAlign: '-1px', marginRight: '3px' }} />
-                  {p.nombre}
-                </span>
-              ))}
-            </div>
+          <div style={{ marginTop: '1rem' }}>
+            <CollapsibleSection
+              title="Planes de estadía disponibles"
+              badge={finca.finca_planes.length}
+              defaultOpen={true}
+              icon={<Sparkles size={16} />}
+            >
+              <div className="plans-row" style={{ paddingTop: '0.75rem' }}>
+                {finca.finca_planes.map((p, idx) => (
+                  <span key={idx} className="plan-tag">
+                    <Sparkles size={11} style={{ display: 'inline', verticalAlign: '-1px', marginRight: '3px' }} />
+                    {p.nombre}
+                  </span>
+                ))}
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {/* Galería completa si tiene más de 5 fotos */}
+        {imagesList.length > 5 && (
+          <div style={{ marginTop: '1rem' }}>
+            <CollapsibleSection
+              title="Galería completa de fotos"
+              badge={`${imagesList.length} fotos`}
+              defaultOpen={false}
+              icon={<ImageIcon size={16} />}
+            >
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+                gap: '0.5rem',
+                paddingTop: '0.75rem',
+              }}>
+                {imagesList.map((url, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => openLightbox(idx)}
+                    style={{
+                      borderRadius: 'var(--rad-xs, 6px)',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      height: '75px',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <img
+                      src={url}
+                      alt={`${finca.nombre} foto ${idx + 1}`}
+                      loading="lazy"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
           </div>
         )}
       </div>

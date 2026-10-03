@@ -11,6 +11,28 @@ interface CatalogProps {
   contenido?: ContenidoSitio;
 }
 
+// ─── Skeleton Card para carga del catálogo ────────────────────────────────────
+const SkeletonFincaCard: React.FC = () => (
+  <div className="skeleton-finca-card">
+    <div className="skeleton-box" style={{ height: '210px', width: '100%', borderRadius: 0 }} />
+    <div style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="skeleton-box" style={{ height: '18px', width: '60%' }} />
+        <div className="skeleton-box" style={{ height: '16px', width: '25%' }} />
+      </div>
+      <div className="skeleton-box" style={{ height: '14px', width: '40%' }} />
+      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem' }}>
+        <div className="skeleton-box" style={{ height: '22px', width: '30%', borderRadius: '999px' }} />
+        <div className="skeleton-box" style={{ height: '22px', width: '30%', borderRadius: '999px' }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', paddingTop: '0.65rem', borderTop: '1px solid var(--border)' }}>
+        <div className="skeleton-box" style={{ height: '20px', width: '45%' }} />
+        <div className="skeleton-box" style={{ height: '32px', width: '35%', borderRadius: '6px' }} />
+      </div>
+    </div>
+  </div>
+);
+
 export const Catalog: React.FC<CatalogProps> = ({
   fincas,
   loading,
@@ -222,9 +244,10 @@ export const Catalog: React.FC<CatalogProps> = ({
           </div>
 
           {loading ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              <Loader size={24} style={{ animation: 'spin 1s linear infinite', marginBottom: '0.5rem' }} />
-              <div>Cargando fincas desde Supabase…</div>
+            <div className="catalog-grid">
+              {[1, 2, 3, 4].map(n => (
+                <SkeletonFincaCard key={n} />
+              ))}
             </div>
           ) : fincasFiltradas.length === 0 ? (
             <div className="panel" style={{ textAlign: 'center', padding: '2.5rem' }}>

@@ -1562,4 +1562,41 @@ textarea:focus {
   text-transform: capitalize;
 }
 
+/* ================================================================
+   FASE 4: Skeletons & Optimizaciones UI
+   ================================================================ */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-box {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--border) 40%, transparent) 25%,
+    color-mix(in srgb, var(--border) 80%, transparent) 50%,
+    color-mix(in srgb, var(--border) 40%, transparent) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+  border-radius: var(--rad-xs, 6px);
+}
+
+.skeleton-finca-card {
+  border: 1px solid var(--border);
+  border-radius: var(--rad-sm, 14px);
+  background: var(--surface);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.collapsible-section:hover {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+}
+
 
