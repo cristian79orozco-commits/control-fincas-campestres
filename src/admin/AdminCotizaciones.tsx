@@ -7,6 +7,7 @@ import type { CotizacionDB, CotizacionEstado, Cliente, Finca, Menu } from '../ty
 import { generarPropuestaAlimentacion, generarDocCotizacion } from '../services/documentos';
 import { WhatsAppModal } from '../components/WhatsAppModal';
 import { plantillaCotizacion, plantillaPropuestaAlimentacion } from '../services/whatsapp';
+import { calcularCotizacion } from '../utils/calcularCotizacion';
 
 interface AdminCotizacionesProps {
   cotizaciones: CotizacionDB[];
@@ -152,23 +153,36 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
   };
   const cerrar = () => { setForm(VACIO); setEditando(false); };
 
-  // Recalcular subtotal cuando cambian fechas, personas, precio
+  // Recalcular subtotal usando la función compartida calcularCotizacion (fuente única de verdad)
   const recalcular = (f: Partial<CotizacionDB>): Partial<CotizacionDB> => {
     const n = noches(f.fecha_inicio || '', f.fecha_fin || '');
-    const subtotal = n * (f.personas || 1) * (f.precio_base_pp || 0);
-
-    // Si tiene menú vinculado, recalcular costo de alimentación automáticamente
-    let costoAlim = f.costo_alimentacion ?? 0;
+    let menuPrecioPp = 0;
     if (f.menu_id && !modoAlimentacionPersonalizada) {
       const m = menus.find(x => x.id === f.menu_id);
       if (m) {
-        const cant = f.cantidad_alimentacion || n;
-        costoAlim = (m.precio_pp || 0) * (f.personas || 1) * cant;
+        menuPrecioPp = m.precio_pp || 0;
       }
     }
 
-    const total = subtotal + costoAlim - (f.descuento || 0) + (f.recargo || 0);
-    return { ...f, subtotal_alojamiento: subtotal, costo_alimentacion: costoAlim, total };
+    const { subtotalAlojamiento, costoAlimentacion, total } = calcularCotizacion({
+      noches: n,
+      personas: f.personas || 1,
+      precioPp: f.precio_base_pp || 0,
+      menuPrecioPp,
+      cantidadServicios: f.cantidad_alimentacion || n,
+      descuento: f.descuento || 0,
+      recargo: f.recargo || 0,
+    });
+
+    const costoFinalAlim = (f.menu_id && !modoAlimentacionPersonalizada)
+      ? costoAlimentacion
+      : (f.costo_alimentacion ?? 0);
+
+    const totalFinal = (f.menu_id && !modoAlimentacionPersonalizada)
+      ? total
+      : Math.max(0, subtotalAlojamiento + costoFinalAlim - (f.descuento || 0) + (f.recargo || 0));
+
+    return { ...f, subtotal_alojamiento: subtotalAlojamiento, costo_alimentacion: costoFinalAlim, total: totalFinal };
   };
 
   const updateField = (campo: keyof CotizacionDB, valor: any) => {

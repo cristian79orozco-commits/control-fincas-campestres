@@ -6,6 +6,7 @@ import {
 import type { Finca, Cotizacion, Menu } from '../types';
 import type { DatosCotizacionPublica, ResultadoCotizacionPublica } from '../hooks/useCotizadorPublico';
 import { MenuSelectorCards } from './MenuSelectorCards';
+import { calcularCotizacion } from '../utils/calcularCotizacion';
 
 interface QuoteCalculatorProps {
   finca: Finca;
@@ -78,20 +79,20 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
     }
 
     const precioBasePorPersona = Number(finca.precio_pp) || 0;
-    const subtotalAlojamiento = noches * personas * precioBasePorPersona;
-
-    let costoPlanTotal = 0;
-    if (menuSeleccionado) {
-      const cant = cantidadServicios || noches || 1;
-      costoPlanTotal = (menuSeleccionado.precio_pp || 0) * personas * cant;
-    } else if (plan && !plan.toLowerCase().includes('sin alimentación')) {
-      let costoPorPp = 0;
-      if (plan.toLowerCase().includes('desayuno')) costoPorPp = 18000;
-      else if (plan.toLowerCase().includes('todo incluido') || plan.toLowerCase().includes('completa')) costoPorPp = 75000;
-      costoPlanTotal = noches * personas * costoPorPp;
+    let menuPrecioPp = menuSeleccionado ? (menuSeleccionado.precio_pp || 0) : 0;
+    if (!menuSeleccionado && plan && !plan.toLowerCase().includes('sin alimentación')) {
+      if (plan.toLowerCase().includes('desayuno')) menuPrecioPp = 18000;
+      else if (plan.toLowerCase().includes('todo incluido') || plan.toLowerCase().includes('completa')) menuPrecioPp = 75000;
     }
 
-    const totalEstimado = subtotalAlojamiento + costoPlanTotal;
+    // Fuente única de verdad compartida con el panel de administración
+    const { subtotalAlojamiento, costoAlimentacion: costoPlanTotal, total: totalEstimado } = calcularCotizacion({
+      noches,
+      personas,
+      precioPp: precioBasePorPersona,
+      menuPrecioPp,
+      cantidadServicios: cantidadServicios || noches || 1,
+    });
 
     const waNum = (finca.whatsapp || waNumberGlobal || '573176827093').replace(/[^0-9]/g, '');
 

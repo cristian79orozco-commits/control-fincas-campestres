@@ -129,6 +129,22 @@ export function useReservas() {
         });
       }
 
+      // Si la reserva es nueva y está activa, registrar automáticamente el bloqueo de disponibilidad
+      if (!datos.id && datos.finca_id && datos.fecha_inicio && datos.fecha_fin && (!datos.estado || datos.estado === 'activa')) {
+        try {
+          await supabase.from('disponibilidad').insert({
+            finca_id: datos.finca_id,
+            fecha_inicio: datos.fecha_inicio,
+            fecha_fin: datos.fecha_fin,
+            estado: 'ocupado',
+            personas: datos.personas || 1,
+            notas: `Reserva ${payload.consecutivo || data.id}`,
+          });
+        } catch (eDisp) {
+          console.warn('Aviso: no se pudo sincronizar bloqueo de disponibilidad automático:', eDisp);
+        }
+      }
+
       await cargar();
       return { success: true, id: data?.id };
     } catch (err: any) {
