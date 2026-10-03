@@ -152,6 +152,58 @@ ${cotizacion.consecutivo ? `🆔 *Consecutivo N°:* ${cotizacion.consecutivo}\n`
 }
 
 /**
+ * 1.1 Plantilla Oficial: Solicitud de Abono para Bloqueo de Fechas
+ */
+export function plantillaPedirAbonoCotizacion(
+  cotizacion: CotizacionDB,
+  finca?: { nombre?: string } | null,
+  cliente?: { nombre?: string; apellido?: string | null; whatsapp?: string | null } | null,
+  bancosInfo?: { banco?: string; tipoCuenta?: string; cuenta?: string; titular?: string; nit?: string } | null,
+  porcentaje: number = 50
+): string {
+  const cNombre = cliente ? `${cliente.nombre || ''} ${cliente.apellido || ''}`.trim() : (cotizacion.clientes ? `${cotizacion.clientes.nombre} ${cotizacion.clientes.apellido || ''}`.trim() : 'Estimado/a cliente');
+  const fNombre = finca?.nombre || cotizacion.fincas?.nombre || 'Finca Campestre';
+  const noches = calcularNoches(cotizacion.fecha_inicio, cotizacion.fecha_fin);
+  const total = cotizacion.total || 0;
+  const abonoSugerido = Math.round(total * (porcentaje / 100));
+
+  let msg = `🌿 *SOLICITUD OFICIAL DE ABONO Y BLOQUEO DE FECHAS*
+*Control de Fincas Campestres*
+
+Hola, *${cNombre}* 👋
+Adjuntamos la propuesta oficial de cotización para tu estadía en *${fNombre}*.
+
+📅 *Fechas solicitadas:* ${formatFecha(cotizacion.fecha_inicio)} al ${formatFecha(cotizacion.fecha_fin)} (${noches} noche${noches > 1 ? 's' : ''})
+👥 *Huéspedes:* ${cotizacion.personas} personas
+${cotizacion.consecutivo ? `🆔 *Cotización N°:* ${cotizacion.consecutivo}\n` : ''}💰 *Valor Total:* *${formatCOP(total)}*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔒 *ABONO REQUERIDO (${porcentaje}%):* *${formatCOP(abonoSugerido)}*
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+_Con este abono garantizamos tu cupo y bloqueamos de inmediato la disponibilidad de la finca en el calendario oficial._
+
+💳 *DATOS DE CONSIGNACIÓN / TRANSFERENCIA:*`;
+
+  if (bancosInfo && bancosInfo.cuenta) {
+    msg += `
+• *Banco:* ${bancosInfo.banco || 'Bancolombia'}
+• *Tipo de Cuenta:* ${bancosInfo.tipoCuenta || 'Ahorros'}
+• *Número de Cuenta:* ${bancosInfo.cuenta}
+• *Titular:* ${bancosInfo.titular || 'Administración de Fincas'}
+${bancosInfo.nit ? `• *Identificación:* ${bancosInfo.nit}` : ''}`;
+  } else {
+    msg += `
+• Por favor consúltanos los datos de transferencia directa (Bancolombia, Nequi o Daviplata).`;
+  }
+
+  msg += `
+
+📲 *Siguiente paso:* Una vez realices la transferencia, por favor compártenos el comprobante por este medio para emitir tu *Documento Oficial de Reserva* y bloquear formalmente tus fechas. ¡Quedamos muy atentos! ✨`;
+
+  return msg;
+}
+
+/**
  * 2. Plantilla: Documento de Separación / Reserva Confirmada
  */
 export function plantillaSeparacion(reserva: Reserva): string {

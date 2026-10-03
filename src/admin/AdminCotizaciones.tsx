@@ -6,7 +6,7 @@ import {
 import type { CotizacionDB, CotizacionEstado, Cliente, Finca, Menu } from '../types';
 import { generarPropuestaAlimentacion, generarDocCotizacion } from '../services/documentos';
 import { WhatsAppModal } from '../components/WhatsAppModal';
-import { plantillaCotizacion, plantillaPropuestaAlimentacion } from '../services/whatsapp';
+import { plantillaCotizacion, plantillaPedirAbonoCotizacion, plantillaPropuestaAlimentacion } from '../services/whatsapp';
 import { calcularCotizacion } from '../utils/calcularCotizacion';
 import { CurrencyInput } from '../components/CurrencyInput';
 import { useApp } from '../context/AppContext';
@@ -124,7 +124,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
   showToast,
   openConfirm,
 }) => {
-  const { previsualizarFinca } = useApp();
+  const { previsualizarFinca, configuracion } = useApp();
   const [form, setForm] = useState<Partial<CotizacionDB>>(VACIO);
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -259,6 +259,25 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
     }
   };
 
+  const handleAbrirPedirAbono = (c: CotizacionDB) => {
+    const bancosInfo = {
+      banco: configuracion?.banco_nombre || 'Bancolombia',
+      tipoCuenta: configuracion?.banco_tipo_cuenta || 'Ahorros',
+      cuenta: configuracion?.banco_cuenta || '',
+      titular: configuracion?.banco_titular || configuracion?.nombre_empresa,
+      nit: configuracion?.nit || undefined,
+    };
+    setModalWaCotiz({
+      abierto: true,
+      cotizacion: c,
+      titulo: `Documento Oficial y Solicitud de Abono · ${c.fincas?.nombre || 'Finca'}`,
+      mensaje: plantillaPedirAbonoCotizacion(c, c.fincas, c.clientes, bancosInfo, 50),
+      nombreDoc: 'Cotización Oficial y Solicitud de Abono (PDF)',
+      onGenerarPdf: () => generarDocCotizacion(c, configuracion),
+      tipo: 'cotizacion',
+    });
+  };
+
   const handleAbrirWaCotizacion = (c: CotizacionDB) => {
     setModalWaCotiz({
       abierto: true,
@@ -266,7 +285,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
       titulo: `Cotización Oficial · ${c.fincas?.nombre || 'Finca'}`,
       mensaje: plantillaCotizacion(c, c.fincas, c.clientes),
       nombreDoc: 'Cotización Oficial (PDF)',
-      onGenerarPdf: () => generarDocCotizacion(c),
+      onGenerarPdf: () => generarDocCotizacion(c, configuracion),
       tipo: 'cotizacion',
     });
   };
@@ -587,53 +606,44 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                  {/* Botón Descargar PDF Cotización */}
-                  <button
-                    className="btn btn-sm btn-secondary"
-                    style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.55rem' }}
-                    title="Descargar Cotización Formal en PDF"
-                    onClick={() => {
-                      generarDocCotizacion(c);
-                      showToast('Cotización descargada en PDF ✅', 'success');
-                    }}
-                  >
-                    <Download size={12} /> PDF Cotización
-                  </button>
-
-                  {/* Botón WhatsApp Cotización */}
+                {/* BARRA DE ACCIONES SIMPLIFICADA Y UNIFICADA */}
+                <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* 1. ACCIÓN PRIMARIA: Pedir Abono / Enviar propuesta oficial */}
                   <button
                     className="btn btn-sm"
-                    style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.55rem', color: '#25d366', borderColor: '#25d366' }}
-                    title="Enviar cotización por WhatsApp al cliente"
-                    onClick={() => handleAbrirWaCotizacion(c)}
+                    style={{
+                      fontSize: '0.74rem',
+                      fontWeight: 600,
+                      gap: '0.35rem',
+                      padding: '0.28rem 0.65rem',
+                      color: '#15803d',
+                      background: 'rgba(34, 197, 94, 0.12)',
+                      borderColor: 'rgba(34, 197, 94, 0.35)',
+                    }}
+                    title="Enviar cotización oficial y solicitar abono del 50% por WhatsApp"
+                    onClick={() => handleAbrirPedirAbono(c)}
                   >
-                    <MessageCircle size={12} /> WhatsApp
+                    <MessageCircle size={13} /> Pedir Abono
                   </button>
 
-                  {/* Botón generar propuesta PDF de alimentación */}
-                  {tieneAlimentacion && (
-                    <>
-                      <button
-                        className="btn btn-sm btn-primary"
-                        style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.55rem' }}
-                        title="Descargar Propuesta de Alimentación en PDF"
-                        onClick={() => handleDescargarPdfAlimentacion(c)}
-                      >
-                        <Utensils size={12} /> PDF Menú
-                      </button>
-                      <button
-                        className="btn btn-sm"
-                        style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.55rem', color: '#25d366', borderColor: '#25d366' }}
-                        title="Enviar Propuesta de Menú por WhatsApp"
-                        onClick={() => handleAbrirWaMenu(c)}
-                      >
-                        <Utensils size={12} /> WA Menú
-                      </button>
-                    </>
+                  {/* 2. ACCIÓN DE CONVERSIÓN: Pasar a Reserva con bloqueo automático */}
+                  {onConvertirReserva && c.estado !== 'cancelada' && c.estado !== 'vencida' && (
+                    <button
+                      className="btn btn-sm btn-primary"
+                      title="Convertir esta cotización en Reserva formal (bloquea disponibilidad de la finca)"
+                      style={{ fontSize: '0.74rem', fontWeight: 600, gap: '0.35rem', padding: '0.28rem 0.65rem' }}
+                      onClick={async () => {
+                        if (c.estado !== 'confirmada') {
+                          await onCambiarEstado(c.id, 'confirmada');
+                        }
+                        onConvertirReserva(c);
+                      }}
+                    >
+                      <ArrowRight size={13} /> Pasar a Reserva
+                    </button>
                   )}
 
-                  {/* Cambio rápido de estado */}
+                  {/* 3. Selector Rápido de Estado */}
                   <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                     <select
                       value={c.estado}
@@ -646,32 +656,47 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
                     <ChevronDown size={11} style={{ position: 'absolute', right: '0.35rem', pointerEvents: 'none' }} />
                   </div>
 
-                  {onConvertirReserva && c.estado !== 'cancelada' && c.estado !== 'vencida' && (
+                  {/* 4. Documento PDF */}
+                  <button
+                    className="btn btn-sm"
+                    style={{ fontSize: '0.72rem', gap: '0.25rem', padding: '0.25rem 0.5rem' }}
+                    title="Descargar Cotización Formal en PDF"
+                    onClick={() => {
+                      generarDocCotizacion(c, configuracion);
+                      showToast('Cotización descargada en PDF ✅', 'success');
+                    }}
+                  >
+                    <Download size={12} /> PDF
+                  </button>
+
+                  {/* Menú de Alimentación si aplica */}
+                  {tieneAlimentacion && (
                     <button
-                      className="btn btn-sm btn-primary"
-                      title="Convertir esta cotización en una Reserva formal"
-                      style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.6rem' }}
-                      onClick={async () => {
-                        if (c.estado !== 'confirmada') {
-                          await onCambiarEstado(c.id, 'confirmada');
-                        }
-                        onConvertirReserva(c);
-                      }}
+                      className="btn btn-sm"
+                      style={{ fontSize: '0.72rem', gap: '0.25rem', padding: '0.25rem 0.5rem' }}
+                      title="Descargar Propuesta de Alimentación en PDF"
+                      onClick={() => handleDescargarPdfAlimentacion(c)}
                     >
-                      <ArrowRight size={13} /> Pasar a Reserva
+                      <Utensils size={12} /> Menú
                     </button>
                   )}
+
+                  {/* 5. Vista de Finca */}
                   <button
                     type="button"
                     className="btn btn-sm"
-                    style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.55rem' }}
-                    title="Ver finca cotizada en vista de cliente"
+                    style={{ fontSize: '0.72rem', gap: '0.25rem', padding: '0.25rem 0.5rem' }}
+                    title="Ver finca cotizada en portal público"
                     onClick={() => previsualizarFinca(c.finca_id)}
                   >
-                    <Eye size={12} /> Ver Finca
+                    <Eye size={12} /> Finca
                   </button>
+
+                  {/* 6. Editar */}
                   <button className="btn btn-sm" onClick={() => abrirEdicion(c)} title="Editar"><Edit3 size={13} /></button>
-                  <button className="btn btn-sm btn-danger" onClick={() => handleEliminar(c)} title="Eliminar"><Trash2 size={13} /></button>
+
+                  {/* 7. Eliminar definitivamente */}
+                  <button className="btn btn-sm btn-danger" onClick={() => handleEliminar(c)} title="Eliminar definitivamente"><Trash2 size={13} /></button>
                 </div>
               </div>
             );
@@ -691,7 +716,10 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
           nombreDocumento={modalWaCotiz.nombreDoc}
           onGenerarPdf={modalWaCotiz.onGenerarPdf}
           onDespuesDeEnviar={(tel, msg) => {
-            showToast('Cotización enviada por WhatsApp al cliente ✅', 'success');
+            showToast('Documento y propuesta enviada por WhatsApp al cliente ✅', 'success');
+            if (modalWaCotiz.cotizacion && (modalWaCotiz.cotizacion.estado === 'borrador' || modalWaCotiz.cotizacion.estado === 'cotizada')) {
+              handleEstado(modalWaCotiz.cotizacion.id, 'enviada');
+            }
             onRegistrarComunicacion?.({
               cliente_id: modalWaCotiz.cotizacion?.cliente_id || null,
               cotizacion_id: modalWaCotiz.cotizacion?.id || null,

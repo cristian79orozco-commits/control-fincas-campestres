@@ -43,6 +43,7 @@ interface AdminDashboardProps {
   // Clientes
   onGuardarCliente: (datos: Partial<Cliente>) => Promise<{ success: boolean; id?: string; error?: string }>;
   onDesactivarCliente: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onEliminarCliente?: (id: string) => Promise<{ success: boolean; error?: string }>;
   // Cotizaciones
   onGuardarCotizacion: (datos: Partial<CotizacionDB>) => Promise<{ success: boolean; id?: string; error?: string }>;
   onCambiarEstadoCotizacion: (id: string, estado: CotizacionEstado) => Promise<{ success: boolean; error?: string }>;
@@ -120,6 +121,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onSaveWaNumber,
   onGuardarCliente,
   onDesactivarCliente,
+  onEliminarCliente,
   onGuardarCotizacion,
   onCambiarEstadoCotizacion,
   onEliminarCotizacion,
@@ -468,6 +470,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               fincas={fincas}
               onGuardar={onGuardarCliente}
               onDesactivar={onDesactivarCliente}
+              onEliminar={onEliminarCliente}
               showToast={showToast}
               openConfirm={openConfirm}
             />

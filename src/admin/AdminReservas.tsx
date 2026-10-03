@@ -15,8 +15,9 @@ import {
   plantillaBienvenida,
   plantillaSeparacion,
   plantillaPazYSalvo,
+  plantillaEstadoCuenta,
 } from '../services/whatsapp';
-import { generarDocSeparacion, generarPazYSalvo } from '../services/documentos';
+import { generarDocSeparacion, generarPazYSalvo, generarEstadoCuenta } from '../services/documentos';
 import { CurrencyInput } from '../components/CurrencyInput';
 
 interface AdminReservasProps {
@@ -174,7 +175,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
         fecha_fin: cotizacionInicial.fecha_fin,
         personas: cotizacionInicial.personas,
         valor_total: cotizacionInicial.total,
-        separacion: 0,
+        separacion: Math.round((cotizacionInicial.total || 0) * 0.5),
         menu_id: cotizacionInicial.menu_id || null,
         alimentacion: cotizacionInicial.alimentacion || null,
         costo_alimentacion: cotizacionInicial.costo_alimentacion || 0,
@@ -532,6 +533,79 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                       <ChevronDown size={11} style={{ position: 'absolute', right: '0.35rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                     </div>
 
+                    {/* ACCIONES UNIFICADAS DE LA RESERVA */}
+                    {/* 1. Registrar Abono / Pago (Acción Primaria) */}
+                    <button
+                      className="btn btn-sm btn-primary"
+                      title="Registrar un abono o amortización de pago"
+                      style={{ fontSize: '0.74rem', fontWeight: 600, gap: '0.35rem', padding: '0.28rem 0.65rem' }}
+                      onClick={() => { setPagoReservaId(r.id); setPagoForm(PAGO_VACIO); }}
+                    >
+                      <CreditCard size={13} /> Registrar Abono
+                    </button>
+
+                    {/* 2. Menú de Documentos Oficiales Unificado */}
+                    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                      <select
+                        defaultValue=""
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          e.target.value = '';
+                          if (val === 'separacion') {
+                            setModalWaReserva({
+                              abierto: true,
+                              reserva: r,
+                              titulo: `Documento de Separación · ${r.fincas?.nombre || 'Finca'}`,
+                              nombreDoc: 'Documento Oficial de Separación (PDF)',
+                              mensaje: plantillaSeparacion(r),
+                              onGenerarPdf: () => generarDocSeparacion(r),
+                              tipo: 'separacion',
+                            });
+                          } else if (val === 'estado_cuenta') {
+                            setModalWaReserva({
+                              abierto: true,
+                              reserva: r,
+                              titulo: `Estado de Cuenta · ${r.fincas?.nombre || 'Finca'}`,
+                              nombreDoc: 'Estado de Cuenta (PDF)',
+                              mensaje: plantillaEstadoCuenta(r),
+                              onGenerarPdf: () => generarEstadoCuenta(r),
+                              tipo: 'estado_cuenta',
+                            });
+                          } else if (val === 'paz_salvo') {
+                            if (!pazYSalvoHabilitado) {
+                              showToast(`Requiere saldo en $0 para emitir Paz y Salvo (saldo actual: ${formatCOP(saldo)})`, 'info');
+                              return;
+                            }
+                            setModalWaReserva({
+                              abierto: true,
+                              reserva: r,
+                              titulo: `Certificado de Paz y Salvo · ${r.fincas?.nombre || 'Finca'}`,
+                              nombreDoc: 'Certificado de Paz y Salvo (PDF)',
+                              mensaje: plantillaPazYSalvo(r),
+                              onGenerarPdf: () => generarPazYSalvo(r),
+                              tipo: 'paz_salvo',
+                            });
+                          } else if (val === 'cierre') {
+                            setReservaParaCierre(r);
+                          }
+                        }}
+                        className="btn btn-sm"
+                        style={{ appearance: 'none', paddingRight: '1.4rem', cursor: 'pointer', fontSize: '0.72rem' }}
+                      >
+                        <option value="" disabled>📑 Documentos ▾</option>
+                        <option value="separacion">📄 Documento de Separación</option>
+                        <option value="estado_cuenta">📊 Estado de Cuenta</option>
+                        <option value="paz_salvo" disabled={!pazYSalvoHabilitado}>
+                          🏆 Paz y Salvo {pazYSalvoHabilitado ? '✓' : `(Saldo: ${formatCOP(saldo)})`}
+                        </option>
+                        {r.estado === 'activa' && onCerrarReserva && (
+                          <option value="cierre">🏁 Check-out y Cierre</option>
+                        )}
+                      </select>
+                      <ChevronDown size={11} style={{ position: 'absolute', right: '0.35rem', pointerEvents: 'none' }} />
+                    </div>
+
+                    {/* 3. Mensaje WhatsApp Directo */}
                     <button
                       className="btn btn-sm"
                       style={{ color: '#25d366', borderColor: '#25d366' }}
@@ -558,21 +632,8 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                     >
                       <MessageCircle size={13} />
                     </button>
-                    <button className="btn btn-sm btn-primary" title="Registrar pago" onClick={() => { setPagoReservaId(r.id); setPagoForm(PAGO_VACIO); }}>
-                      <CreditCard size={13} />
-                    </button>
-                    {/* Botón rápido para Cierre formal si está activa */}
-                    {r.estado === 'activa' && onCerrarReserva && (
-                      <button
-                        className="btn btn-sm"
-                        style={{ color: 'var(--success)', borderColor: 'var(--success)' }}
-                        title="Realizar Cierre de Reserva y Check-out"
-                        onClick={() => setReservaParaCierre(r)}
-                      >
-                        <CheckCircle size={13} />
-                      </button>
-                    )}
-                    {/* Botón Ver Expediente Completo */}
+
+                    {/* 4. Expediente Histórico */}
                     <button
                       className="btn btn-sm"
                       title="Ver Expediente Histórico Completo"
@@ -580,129 +641,21 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                     >
                       <FileText size={13} />
                     </button>
+
+                    {/* 5. Editar */}
                     <button className="btn btn-sm" onClick={() => abrirEdicion(r)} title="Editar"><Edit3 size={13} /></button>
-                    <button className="btn btn-sm btn-danger" onClick={() => handleEliminar(r)} title="Eliminar"><Trash2 size={13} /></button>
+
+                    {/* 6. Eliminar (libera calendario automáticamente) */}
+                    <button className="btn btn-sm btn-danger" onClick={() => handleEliminar(r)} title="Eliminar reserva y liberar calendario"><Trash2 size={13} /></button>
+
+                    {/* 7. Desplegar pagos */}
                     <button
                       className="btn btn-sm"
                       onClick={() => setReservaExpandida(expanded ? null : r.id)}
-                      title={expanded ? 'Cerrar detalle' : 'Ver pagos y documentos'}
+                      title={expanded ? 'Cerrar detalle' : 'Ver historial de pagos'}
                     >
                       {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                     </button>
-                  </div>
-                </div>
-
-                {/* ENTORNO INTERACTIVO BASADO EN BOTONES: Flujo de Seguimiento de la Reserva */}
-                <div
-                  style={{
-                    margin: '0.4rem 1rem 0.5rem',
-                    padding: '0.5rem 0.75rem',
-                    background: 'var(--surface-sunken)',
-                    borderRadius: 'var(--rad-xs)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '0.5rem',
-                    flexWrap: 'wrap',
-                    border: '1px solid var(--border-subtle, rgba(0,0,0,0.06))',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                    <span>Flujo de Reserva {r.consecutivo ? `(${r.consecutivo})` : ''}:</span>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {/* 1. Botón Separación */}
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.22rem 0.55rem' }}
-                      title="Emitir documento oficial de separación y enviar por WhatsApp"
-                      onClick={() => {
-                        setModalWaReserva({
-                          abierto: true,
-                          reserva: r,
-                          titulo: `Documento de Separación · ${r.fincas?.nombre || 'Finca'}`,
-                          nombreDoc: 'Documento Oficial de Separación (PDF)',
-                          mensaje: plantillaSeparacion(r),
-                          onGenerarPdf: () => generarDocSeparacion(r),
-                          tipo: 'separacion',
-                        });
-                      }}
-                    >
-                      <FileText size={12} /> 1. Separación
-                    </button>
-
-                    {/* 2. Botón Registrar Abono */}
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-primary"
-                      style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.22rem 0.55rem' }}
-                      title="Registrar abono y generar comprobante"
-                      onClick={() => {
-                        setPagoReservaId(r.id);
-                        setPagoForm(PAGO_VACIO);
-                      }}
-                    >
-                      <CreditCard size={12} /> 2. Registrar Abono
-                    </button>
-
-                    {/* 3. Botón Paz y Salvo */}
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      disabled={!pazYSalvoHabilitado}
-                      style={{
-                        fontSize: '0.72rem',
-                        gap: '0.3rem',
-                        padding: '0.22rem 0.55rem',
-                        color: pazYSalvoHabilitado ? 'var(--success)' : 'var(--text-muted)',
-                        borderColor: pazYSalvoHabilitado ? 'var(--success)' : 'var(--border)',
-                        background: pazYSalvoHabilitado ? 'rgba(34,197,94,0.08)' : 'transparent',
-                        opacity: pazYSalvoHabilitado ? 1 : 0.6,
-                        cursor: pazYSalvoHabilitado ? 'pointer' : 'not-allowed',
-                      }}
-                      title={pazYSalvoHabilitado ? "Generar certificado de Paz y Salvo y enviar por WhatsApp" : `Requiere saldo en $0 (saldo pendiente: ${formatCOP(saldo)})`}
-                      onClick={() => {
-                        if (!pazYSalvoHabilitado) return;
-                        setModalWaReserva({
-                          abierto: true,
-                          reserva: r,
-                          titulo: `Certificado de Paz y Salvo · ${r.fincas?.nombre || 'Finca'}`,
-                          nombreDoc: 'Certificado de Paz y Salvo (PDF)',
-                          mensaje: plantillaPazYSalvo(r),
-                          onGenerarPdf: () => generarPazYSalvo(r),
-                          tipo: 'paz_salvo',
-                        });
-                      }}
-                    >
-                      <Award size={12} /> 3. Paz y Salvo {pazYSalvoHabilitado ? '✓' : `($${saldo.toLocaleString('es-CO')})`}
-                    </button>
-
-                    {/* 4. Botón Cerrar y Pasar a Historial */}
-                    {r.estado === 'activa' && onCerrarReserva ? (
-                      <button
-                        type="button"
-                        className="btn btn-sm"
-                        style={{
-                          fontSize: '0.72rem',
-                          gap: '0.3rem',
-                          padding: '0.22rem 0.55rem',
-                          color: estanciaVencida ? '#fff' : 'var(--primary)',
-                          background: estanciaVencida ? '#f59e0b' : 'transparent',
-                          borderColor: estanciaVencida ? '#f59e0b' : 'var(--primary)',
-                          fontWeight: estanciaVencida ? 700 : 500,
-                        }}
-                        title="Efectuar check-out formal y archivar en historial permanente"
-                        onClick={() => setReservaParaCierre(r)}
-                      >
-                        <CheckCircle size={12} /> 4. Cerrar a Historial
-                      </button>
-                    ) : r.estado === 'completada' ? (
-                      <span style={{ fontSize: '0.72rem', color: 'var(--success)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                        ✓ Archivada en Historial
-                      </span>
-                    ) : null}
                   </div>
                 </div>
 

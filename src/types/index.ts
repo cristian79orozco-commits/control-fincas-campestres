@@ -331,6 +331,12 @@ export interface ConfiguracionGeneral {
   prefijo_propuesta_menu: string;
   siguiente_propuesta_menu: number;
 
+  // 4. Datos Bancarios para Abonos y Pagos
+  banco_nombre?: string | null;
+  banco_tipo_cuenta?: string | null;
+  banco_cuenta?: string | null;
+  banco_titular?: string | null;
+
   created_at?: string;
   updated_at?: string;
 }

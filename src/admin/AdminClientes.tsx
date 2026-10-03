@@ -13,6 +13,7 @@ interface AdminClientesProps {
   fincas?: Finca[];
   onGuardar: (datos: Partial<Cliente>) => Promise<{ success: boolean; id?: string; error?: string }>;
   onDesactivar: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onEliminar?: (id: string) => Promise<{ success: boolean; error?: string }>;
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   openConfirm: (title: string, message: string, onConfirm: () => void) => void;
 }
@@ -45,6 +46,7 @@ export const AdminClientes: React.FC<AdminClientesProps> = ({
   fincas = [],
   onGuardar,
   onDesactivar,
+  onEliminar,
   showToast,
   openConfirm,
 }) => {
@@ -100,12 +102,18 @@ export const AdminClientes: React.FC<AdminClientesProps> = ({
 
   const handleEliminar = (c: Cliente) => {
     openConfirm(
-      '¿Desactivar cliente?',
-      `El cliente "${c.nombre} ${c.apellido || ''}" quedará inactivo. Sus reservas e historial permanecerán íntegros en la base de datos.`,
+      '¿Eliminar cliente definitivamente?',
+      `El cliente "${c.nombre} ${c.apellido || ''}" será eliminado de la base de datos y de la caché local. Esta acción es permanente.`,
       async () => {
-        const res = await onDesactivar(c.id);
-        if (res.success) showToast('Cliente desactivado', 'info');
-        else showToast(`Error: ${res.error}`, 'error');
+        if (onEliminar) {
+          const res = await onEliminar(c.id);
+          if (res.success) showToast('Cliente eliminado definitivamente ✅', 'success');
+          else showToast(`Error: ${res.error}`, 'error');
+        } else {
+          const res = await onDesactivar(c.id);
+          if (res.success) showToast('Cliente desactivado', 'info');
+          else showToast(`Error: ${res.error}`, 'error');
+        }
       }
     );
   };
@@ -430,21 +438,33 @@ export const AdminClientes: React.FC<AdminClientesProps> = ({
                     </td>
 
                     {/* COLUMNA 5: ACCIONES */}
-                    <td style={{ padding: '0.75rem 1rem', verticalAlign: 'top', textAlign: 'right' }}>
+                    <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle', textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                        {(c.whatsapp || c.telefono) && (
+                          <a
+                            href={`https://wa.me/${(c.whatsapp || c.telefono || '').replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-sm"
+                            title="Abrir chat de WhatsApp"
+                            style={{ padding: '0.3rem 0.5rem', color: '#16a34a', borderColor: '#bbf7d0', background: '#f0fdf4' }}
+                          >
+                            <MessageCircle size={13} />
+                          </a>
+                        )}
                         <button
                           className="btn btn-sm"
                           onClick={() => setClienteDetalleId(c.id)}
                           title="Ver expediente e historial completo"
-                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', gap: '0.25rem' }}
+                          style={{ fontSize: '0.75rem', padding: '0.3rem 0.55rem', gap: '0.25rem', fontWeight: 500 }}
                         >
-                          <History size={11} /> Expediente
+                          <History size={12} /> Expediente
                         </button>
-                        <button className="btn btn-sm" onClick={() => abrirEdicion(c)} title="Editar datos">
-                          <Edit3 size={12} />
+                        <button className="btn btn-sm" onClick={() => abrirEdicion(c)} title="Editar cliente" style={{ padding: '0.3rem 0.5rem' }}>
+                          <Edit3 size={13} />
                         </button>
-                        <button className="btn btn-sm btn-danger" onClick={() => handleEliminar(c)} title="Desactivar">
-                          <Trash2 size={12} />
+                        <button className="btn btn-sm btn-danger" onClick={() => handleEliminar(c)} title="Eliminar cliente definitivamente" style={{ padding: '0.3rem 0.5rem' }}>
+                          <Trash2 size={13} />
                         </button>
                       </div>
                     </td>

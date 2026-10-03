@@ -45,6 +45,12 @@ export const CONFIGURACION_DEFAULT: ConfiguracionGeneral = {
   siguiente_paz_salvo: 1001,
   prefijo_propuesta_menu: '',
   siguiente_propuesta_menu: 1001,
+
+  // 4. Datos Bancarios
+  banco_nombre: 'Bancolombia',
+  banco_tipo_cuenta: 'Ahorros',
+  banco_cuenta: '',
+  banco_titular: 'Control de Fincas Campestres',
 };
 
 // Variable en memoria global para sincronización inmediata

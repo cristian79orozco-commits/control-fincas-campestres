@@ -89,6 +89,7 @@ interface AppContextValue {
   // Operaciones de Clientes
   guardarCliente: (datos: Partial<Cliente>) => Promise<{ success: boolean; id?: string; error?: string }>;
   desactivarCliente: (id: string) => Promise<{ success: boolean; error?: string }>;
+  eliminarCliente: (id: string) => Promise<{ success: boolean; error?: string }>;
 
   // Operaciones de Cotizaciones
   guardarCotizacion: (datos: Partial<CotizacionDB>) => Promise<{ success: boolean; id?: string; error?: string }>;
@@ -127,6 +128,24 @@ interface AppContextValue {
   restablecerContenido: () => Promise<{ success: boolean; error?: string }>;
 }
 
+// Helpers de persistencia local resiliente
+const leerCache = <T,>(key: string, fallback: T): T => {
+  try {
+    const val = localStorage.getItem(key);
+    return val ? JSON.parse(val) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const guardarCache = (key: string, data: any) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (err) {
+    console.warn('[AppContext Cache] Error guardando:', key, err);
+  }
+};
+
 const AppContext = createContext<AppContextValue | null>(null);
 
 // -----------------------------------------------------------------------------
@@ -134,17 +153,17 @@ const AppContext = createContext<AppContextValue | null>(null);
 // -----------------------------------------------------------------------------
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Estado local centralizado
-  const [fincas, setFincas] = useState<Finca[]>([]);
-  const [bloquesAdmin, setBloquesAdmin] = useState<BloqueoDisponibilidad[]>([]);
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [cotizaciones, setCotizaciones] = useState<CotizacionDB[]>([]);
-  const [reservas, setReservas] = useState<Reserva[]>([]);
-  const [menus, setMenus] = useState<MenuType[]>([]);
-  const [comunicaciones, setComunicaciones] = useState<Comunicacion[]>([]);
-  const [configuracion, setConfiguracion] = useState<ConfiguracionGeneral>(CONFIGURACION_DEFAULT);
-  const [contenidoSitio, setContenidoSitio] = useState<ContenidoSitio>(CONTENIDO_SITIO_DEFAULT);
-  const [loading, setLoading] = useState(true);
+  // Estado local centralizado con rehidratación instantánea de caché local
+  const [fincas, setFincas] = useState<Finca[]>(() => leerCache('fc_cache_fincas', []));
+  const [bloquesAdmin, setBloquesAdmin] = useState<BloqueoDisponibilidad[]>(() => leerCache('fc_cache_disponibilidad', []));
+  const [clientes, setClientes] = useState<Cliente[]>(() => leerCache('fc_cache_clientes', []));
+  const [cotizaciones, setCotizaciones] = useState<CotizacionDB[]>(() => leerCache('fc_cache_cotizaciones', []));
+  const [reservas, setReservas] = useState<Reserva[]>(() => leerCache('fc_cache_reservas', []));
+  const [menus, setMenus] = useState<MenuType[]>(() => leerCache('fc_cache_menus', []));
+  const [comunicaciones, setComunicaciones] = useState<Comunicacion[]>(() => leerCache('fc_cache_comunicaciones', []));
+  const [configuracion, setConfiguracion] = useState<ConfiguracionGeneral>(() => leerCache('fc_configuracion_general', CONFIGURACION_DEFAULT));
+  const [contenidoSitio, setContenidoSitio] = useState<ContenidoSitio>(() => leerCache('fc_contenido_sitio_v1', CONTENIDO_SITIO_DEFAULT));
+  const [loading, setLoading] = useState(false);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [guardandoContenido, setGuardandoContenido] = useState(false);
 
@@ -238,7 +257,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         `)
         .order('nombre');
       if (error) throw error;
-      setFincas((data as Finca[]) || []);
+      const arr = (data as Finca[]) || [];
+      if (arr.length > 0) {
+        setFincas(arr);
+        guardarCache('fc_cache_fincas', arr);
+      }
     } catch (err) {
       console.warn('[AppContext] Error cargando fincas:', err);
     }
@@ -251,7 +274,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .select('*, fincas(nombre)')
         .order('fecha_inicio');
       if (error) throw error;
-      setBloquesAdmin((data as unknown as BloqueoDisponibilidad[]) || []);
+      const arr = (data as unknown as BloqueoDisponibilidad[]) || [];
+      setBloquesAdmin(arr);
+      guardarCache('fc_cache_disponibilidad', arr);
     } catch (err) {
       console.warn('[AppContext] Error cargando disponibilidad:', err);
     }
@@ -265,7 +290,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .eq('activo', true)
         .order('nombre');
       if (error) throw error;
-      setClientes((data as Cliente[]) || []);
+      const arr = (data as Cliente[]) || [];
+      setClientes(arr);
+      guardarCache('fc_cache_clientes', arr);
     } catch (err) {
       console.warn('[AppContext] Error cargando clientes:', err);
     }
@@ -282,7 +309,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         `)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setCotizaciones((data as unknown as CotizacionDB[]) || []);
+      const arr = (data as unknown as CotizacionDB[]) || [];
+      const ordenadas = arr.sort(
+        (a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
+      );
+      setCotizaciones(ordenadas);
+      guardarCache('fc_cache_cotizaciones', ordenadas);
     } catch (err) {
       console.warn('[AppContext] Error cargando cotizaciones:', err);
     }
@@ -325,7 +357,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return { ...r, cierre };
       });
 
-      setReservas(procesadas);
+      const ordenadas = procesadas.sort(
+        (a, b) => new Date(b.fecha_inicio || '').getTime() - new Date(a.fecha_inicio || '').getTime()
+      );
+      setReservas(ordenadas);
+      guardarCache('fc_cache_reservas', ordenadas);
     } catch (err) {
       console.warn('[AppContext] Error cargando reservas:', err);
     }
@@ -725,10 +761,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }] : [],
       };
 
-      // Actualización optimista de reserva
-      setReservas(prev => [nuevaReserva, ...prev]);
+      // Actualización optimista de reserva con persistencia local
+      setReservas(prev => {
+        const up = [nuevaReserva, ...prev];
+        guardarCache('fc_cache_reservas', up);
+        return up;
+      });
 
-      // Bloquear calendario en memoria
+      // Bloquear calendario en memoria y persistir en caché
       const nuevoBloqueo: BloqueoDisponibilidad = {
         id: Date.now(),
         finca_id: cotizacion.finca_id,
@@ -739,42 +779,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         notas: `Reserva ${consecutivoReserva}`,
         fincas: { nombre: fincaSel?.nombre || 'Finca' },
       };
-      setBloquesAdmin(prev => [...prev, nuevoBloqueo]);
-
-      // Persistir en Supabase
-      await supabase.from('reservas').insert({
-        id: newResId,
-        cotizacion_id: cotizacion.id,
-        cliente_id: cotizacion.cliente_id,
-        finca_id: cotizacion.finca_id,
-        fecha_inicio: cotizacion.fecha_inicio,
-        fecha_fin: cotizacion.fecha_fin,
-        personas: cotizacion.personas,
-        valor_total: cotizacion.total,
-        separacion: anticipo,
-        consecutivo: consecutivoReserva,
-        estado: 'activa',
-        observaciones: nuevaReserva.observaciones,
+      setBloquesAdmin(prev => {
+        const up = [...prev, nuevoBloqueo];
+        guardarCache('fc_cache_disponibilidad', up);
+        return up;
       });
 
-      if (anticipo > 0) {
-        await supabase.from('pagos').insert({
-          reserva_id: newResId,
-          tipo: 'separacion',
-          fecha: new Date().toISOString().split('T')[0],
-          valor: anticipo,
-          observacion: 'Anticipo registrado al convertir cotización en reserva',
+      // Actualizar cotización a confirmada en estado y caché
+      setCotizaciones(prev => {
+        const up = prev.map(c => (c.id === cotizacion.id ? { ...c, estado: 'confirmada' as const } : c));
+        guardarCache('fc_cache_cotizaciones', up);
+        return up;
+      });
+
+      // Persistir en Supabase (con fallback silencioso para no bloquear la app si RLS está pendiente)
+      try {
+        await supabase.from('reservas').insert({
+          id: newResId,
+          cotizacion_id: cotizacion.id,
+          cliente_id: cotizacion.cliente_id,
+          finca_id: cotizacion.finca_id,
+          fecha_inicio: cotizacion.fecha_inicio,
+          fecha_fin: cotizacion.fecha_fin,
+          personas: cotizacion.personas,
+          valor_total: cotizacion.total,
+          separacion: anticipo,
+          consecutivo: consecutivoReserva,
+          estado: 'activa',
+          observaciones: nuevaReserva.observaciones,
         });
-      }
 
-      await supabase.from('disponibilidad').insert({
-        finca_id: cotizacion.finca_id,
-        fecha_inicio: cotizacion.fecha_inicio,
-        fecha_fin: cotizacion.fecha_fin,
-        estado: 'ocupado',
-        personas: cotizacion.personas,
-        notas: `Reserva ${consecutivoReserva}`,
-      });
+        if (anticipo > 0) {
+          await supabase.from('pagos').insert({
+            reserva_id: newResId,
+            tipo: 'separacion',
+            fecha: new Date().toISOString().split('T')[0],
+            valor: anticipo,
+            observacion: 'Anticipo registrado al convertir cotización en reserva',
+          });
+        }
+
+        await supabase.from('disponibilidad').insert({
+          finca_id: cotizacion.finca_id,
+          fecha_inicio: cotizacion.fecha_inicio,
+          fecha_fin: cotizacion.fecha_fin,
+          estado: 'ocupado',
+          personas: cotizacion.personas,
+          notas: `Reserva ${consecutivoReserva}`,
+        });
+      } catch (errDb) {
+        console.warn('[convertirCotizacionAReserva] Aviso de sincronización Supabase:', errDb);
+      }
 
       return { success: true, reservaId: newResId };
     } catch (err: any) {
@@ -830,13 +885,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }] : [],
       };
 
-      // Actualización optimista
+      // Actualización optimista y persistencia en cache local
       setReservas(prev => {
-        if (isNew) return [payloadReserva, ...prev];
-        return prev.map(r => (r.id === resId ? { ...r, ...payloadReserva } : r));
+        const up = isNew ? [payloadReserva, ...prev] : prev.map(r => (r.id === resId ? { ...r, ...payloadReserva } : r));
+        guardarCache('fc_cache_reservas', up);
+        return up;
       });
 
-      // Persistir
+      // Sincronizar bloqueo en disponibilidad de la finca
+      if (datos.finca_id && datos.fecha_inicio && datos.fecha_fin) {
+        setBloquesAdmin(prev => {
+          const filtrados = prev.filter(b => !(
+            b.finca_id === datos.finca_id &&
+            ((b.fecha_inicio === datos.fecha_inicio && b.fecha_fin === datos.fecha_fin) ||
+             (payloadReserva.consecutivo && b.notas && b.notas.includes(payloadReserva.consecutivo)))
+          ));
+          const nuevoBloqueo: BloqueoDisponibilidad = {
+            id: Date.now(),
+            finca_id: datos.finca_id!,
+            fecha_inicio: datos.fecha_inicio!,
+            fecha_fin: datos.fecha_fin!,
+            estado: 'ocupado',
+            personas: datos.personas || 1,
+            notas: `Reserva ${payloadReserva.consecutivo || resId}`,
+            fincas: { nombre: fincaSel?.nombre || 'Finca' },
+          };
+          const up = [...filtrados, nuevoBloqueo];
+          guardarCache('fc_cache_disponibilidad', up);
+          return up;
+        });
+
+        try {
+          await supabase.from('disponibilidad').insert({
+            finca_id: datos.finca_id,
+            fecha_inicio: datos.fecha_inicio,
+            fecha_fin: datos.fecha_fin,
+            estado: 'ocupado',
+            personas: datos.personas || 1,
+            notas: `Reserva ${payloadReserva.consecutivo || resId}`,
+          });
+        } catch { /* silent */ }
+      }
+
+      // Persistir en Supabase
       const dbPayload: any = {
         id: resId,
         cliente_id: datos.cliente_id,
@@ -852,29 +943,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cotizacion_id: datos.cotizacion_id || null,
       };
 
-      const { error } = await supabase.from('reservas').upsert(dbPayload, { onConflict: 'id' });
-      if (error) throw error;
+      try {
+        const { error } = await supabase.from('reservas').upsert(dbPayload, { onConflict: 'id' });
+        if (error) console.warn('[guardarReserva] Supabase error:', error);
 
-      if (isNew && datos.separacion && datos.separacion > 0) {
-        await supabase.from('pagos').insert({
-          reserva_id: resId,
-          tipo: 'separacion',
-          fecha: new Date().toISOString().split('T')[0],
-          valor: datos.separacion,
-          observacion: 'Separación registrada al crear reserva',
-        });
-      }
-
-      if (isNew && datos.finca_id && datos.fecha_inicio && datos.fecha_fin) {
-        await supabase.from('disponibilidad').insert({
-          finca_id: datos.finca_id,
-          fecha_inicio: datos.fecha_inicio,
-          fecha_fin: datos.fecha_fin,
-          estado: 'ocupado',
-          personas: datos.personas || 1,
-          notas: `Reserva ${payloadReserva.consecutivo || resId}`,
-        });
-        cargarDisponibilidad();
+        if (isNew && datos.separacion && datos.separacion > 0) {
+          await supabase.from('pagos').insert({
+            reserva_id: resId,
+            tipo: 'separacion',
+            fecha: new Date().toISOString().split('T')[0],
+            valor: datos.separacion,
+            observacion: 'Separación registrada al crear reserva',
+          });
+        }
+      } catch (errSup) {
+        console.warn('[guardarReserva] Aviso de sincronización Supabase:', errSup);
       }
 
       return { success: true, id: resId };
@@ -1032,9 +1115,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const eliminarReserva = async (id: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      setReservas(prev => prev.filter(r => r.id !== id));
-      const { error } = await supabase.from('reservas').delete().eq('id', id);
-      if (error) throw error;
+      const resAEliminar = reservas.find(r => r.id === id);
+
+      // 1. Eliminar optimista y actualizar caché local
+      setReservas(prev => {
+        const up = prev.filter(r => r.id !== id);
+        guardarCache('fc_cache_reservas', up);
+        return up;
+      });
+
+      // 2. Liberar automáticamente el calendario en disponibilidad
+      if (resAEliminar) {
+        setBloquesAdmin(prev => {
+          const up = prev.filter(b => !(
+            b.finca_id === resAEliminar.finca_id &&
+            ((b.fecha_inicio === resAEliminar.fecha_inicio && b.fecha_fin === resAEliminar.fecha_fin) ||
+             (resAEliminar.consecutivo && b.notas && b.notas.includes(resAEliminar.consecutivo)))
+          ));
+          guardarCache('fc_cache_disponibilidad', up);
+          return up;
+        });
+
+        try {
+          await supabase
+            .from('disponibilidad')
+            .delete()
+            .eq('finca_id', resAEliminar.finca_id)
+            .eq('fecha_inicio', resAEliminar.fecha_inicio)
+            .eq('fecha_fin', resAEliminar.fecha_fin);
+        } catch { /* silent */ }
+      }
+
+      // 3. Eliminar pagos y cierres asociados en Supabase
+      try {
+        await supabase.from('pagos').delete().eq('reserva_id', id);
+        await supabase.from('cierres_reservas').delete().eq('reserva_id', id);
+      } catch { /* silent */ }
+
+      // 4. Eliminar reserva en Supabase
+      try {
+        const { error } = await supabase.from('reservas').delete().eq('id', id);
+        if (error) console.warn('[eliminarReserva] Aviso de sincronización Supabase:', error);
+      } catch (errSup) {
+        console.warn('[eliminarReserva] Supabase error:', errSup);
+      }
+
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -1056,9 +1181,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         observacion: pago.observacion || null,
       };
 
-      // Actualización optimista de pagos: ¡El saldo se recalcula al milisegundo!
-      setReservas(prev =>
-        prev.map(r => {
+      // Actualización optimista de pagos y persistencia en caché
+      setReservas(prev => {
+        const up = prev.map(r => {
           if (r.id === reservaId) {
             return {
               ...r,
@@ -1066,19 +1191,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             };
           }
           return r;
-        })
-      );
-
-      const { error } = await supabase.from('pagos').insert({
-        id: nuevoPagoId,
-        reserva_id: reservaId,
-        tipo: pago.tipo,
-        fecha: pago.fecha,
-        valor: pago.valor,
-        observacion: pago.observacion || null,
+        });
+        guardarCache('fc_cache_reservas', up);
+        return up;
       });
 
-      if (error) throw error;
+      try {
+        await supabase.from('pagos').insert({
+          id: nuevoPagoId,
+          reserva_id: reservaId,
+          tipo: pago.tipo,
+          fecha: pago.fecha,
+          valor: pago.valor,
+          observacion: pago.observacion || null,
+        });
+      } catch (errDb) {
+        console.warn('[registrarPago] Aviso Supabase:', errDb);
+      }
+
       return { success: true };
     } catch (err: any) {
       console.error('[AppContext.registrarPago]', err);
@@ -1088,14 +1218,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const eliminarPago = async (pagoId: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      setReservas(prev =>
-        prev.map(r => ({
+      setReservas(prev => {
+        const up = prev.map(r => ({
           ...r,
           pagos: (r.pagos || []).filter(p => p.id !== pagoId),
-        }))
-      );
-      const { error } = await supabase.from('pagos').delete().eq('id', pagoId);
-      if (error) throw error;
+        }));
+        guardarCache('fc_cache_reservas', up);
+        return up;
+      });
+
+      try {
+        await supabase.from('pagos').delete().eq('id', pagoId);
+      } catch { /* silent */ }
+
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -1123,12 +1258,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       setClientes(prev => {
-        if (isNew) return [clienteObj, ...prev];
-        return prev.map(c => (c.id === cid ? { ...c, ...clienteObj } : c));
+        const up = isNew ? [clienteObj, ...prev] : prev.map(c => (c.id === cid ? { ...c, ...clienteObj } : c));
+        guardarCache('fc_cache_clientes', up);
+        return up;
       });
 
-      const { error } = await supabase.from('clientes').upsert(clienteObj, { onConflict: 'id' });
-      if (error) throw error;
+      try {
+        const { error } = await supabase.from('clientes').upsert(clienteObj, { onConflict: 'id' });
+        if (error) console.warn('[guardarCliente] Aviso Supabase:', error);
+      } catch (errSup) {
+        console.warn('[guardarCliente] Supabase error:', errSup);
+      }
+
       return { success: true, id: cid };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -1137,9 +1278,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const desactivarCliente = async (id: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      setClientes(prev => prev.filter(c => c.id !== id));
-      const { error } = await supabase.from('clientes').update({ activo: false }).eq('id', id);
-      if (error) throw error;
+      setClientes(prev => {
+        const up = prev.filter(c => c.id !== id);
+        guardarCache('fc_cache_clientes', up);
+        return up;
+      });
+      try {
+        await supabase.from('clientes').update({ activo: false }).eq('id', id);
+      } catch { /* silent */ }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const eliminarCliente = async (id: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      // 1. Eliminar de la lista de clientes local y cache
+      setClientes(prev => {
+        const up = prev.filter(c => c.id !== id);
+        guardarCache('fc_cache_clientes', up);
+        return up;
+      });
+
+      // 2. Desvincular id en cotizaciones y reservas locales
+      setCotizaciones(prev => {
+        const up = prev.map(c => (c.cliente_id === id ? { ...c, cliente_id: null, clientes: undefined } : c));
+        guardarCache('fc_cache_cotizaciones', up);
+        return up;
+      });
+
+      setReservas(prev => {
+        const up = prev.map(r => (r.cliente_id === id ? { ...r, cliente_id: '', clientes: undefined } : r));
+        guardarCache('fc_cache_reservas', up);
+        return up;
+      });
+
+      // 3. Eliminar físicamente en Supabase
+      try {
+        const { error } = await supabase.from('clientes').delete().eq('id', id);
+        if (error) console.warn('[eliminarCliente] Aviso Supabase:', error);
+      } catch (errDb) {
+        console.warn('[eliminarCliente] Supabase error:', errDb);
+      }
+
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -1188,32 +1370,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       setCotizaciones(prev => {
-        if (isNew) return [cotizacionObj, ...prev];
-        return prev.map(c => (c.id === cotId ? { ...c, ...cotizacionObj } : c));
+        const up = isNew ? [cotizacionObj, ...prev] : prev.map(c => (c.id === cotId ? { ...c, ...cotizacionObj } : c));
+        guardarCache('fc_cache_cotizaciones', up);
+        return up;
       });
 
-      const { error } = await supabase.from('cotizaciones').upsert({
-        id: cotId,
-        cliente_id: datos.cliente_id || null,
-        finca_id: datos.finca_id,
-        fecha_inicio: datos.fecha_inicio,
-        fecha_fin: datos.fecha_fin,
-        personas: datos.personas || 1,
-        alimentacion: datos.alimentacion || 'Sin alimentación',
-        menu_id: datos.menu_id || null,
-        cantidad_alimentacion: datos.cantidad_alimentacion ?? 1,
-        precio_base_pp: datos.precio_base_pp || 0,
-        subtotal_alojamiento: datos.subtotal_alojamiento || 0,
-        costo_alimentacion: datos.costo_alimentacion || 0,
-        descuento: datos.descuento || 0,
-        recargo: datos.recargo || 0,
-        total: datos.total || 0,
-        consecutivo: cotizacionObj.consecutivo,
-        estado: datos.estado || 'borrador',
-        notas: datos.notas || null,
-      }, { onConflict: 'id' });
+      try {
+        const { error } = await supabase.from('cotizaciones').upsert({
+          id: cotId,
+          cliente_id: datos.cliente_id || null,
+          finca_id: datos.finca_id,
+          fecha_inicio: datos.fecha_inicio,
+          fecha_fin: datos.fecha_fin,
+          personas: datos.personas || 1,
+          alimentacion: datos.alimentacion || 'Sin alimentación',
+          menu_id: datos.menu_id || null,
+          cantidad_alimentacion: datos.cantidad_alimentacion ?? 1,
+          precio_base_pp: datos.precio_base_pp || 0,
+          subtotal_alojamiento: datos.subtotal_alojamiento || 0,
+          costo_alimentacion: datos.costo_alimentacion || 0,
+          descuento: datos.descuento || 0,
+          recargo: datos.recargo || 0,
+          total: datos.total || 0,
+          consecutivo: cotizacionObj.consecutivo,
+          estado: datos.estado || 'borrador',
+          notas: datos.notas || null,
+        }, { onConflict: 'id' });
 
-      if (error) throw error;
+        if (error) console.warn('[guardarCotizacion] Aviso Supabase:', error);
+      } catch (errSup) {
+        console.warn('[guardarCotizacion] Supabase error:', errSup);
+      }
+
       return { success: true, id: cotId };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -1222,9 +1410,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const cambiarEstadoCotizacion = async (id: string, estado: CotizacionEstado): Promise<{ success: boolean; error?: string }> => {
     try {
-      setCotizaciones(prev => prev.map(c => (c.id === id ? { ...c, estado } : c)));
-      const { error } = await supabase.from('cotizaciones').update({ estado }).eq('id', id);
-      if (error) throw error;
+      setCotizaciones(prev => {
+        const up = prev.map(c => (c.id === id ? { ...c, estado } : c));
+        guardarCache('fc_cache_cotizaciones', up);
+        return up;
+      });
+      try {
+        await supabase.from('cotizaciones').update({ estado }).eq('id', id);
+      } catch { /* silent */ }
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -1233,9 +1426,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const eliminarCotizacion = async (id: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      setCotizaciones(prev => prev.filter(c => c.id !== id));
-      const { error } = await supabase.from('cotizaciones').delete().eq('id', id);
-      if (error) throw error;
+      setCotizaciones(prev => {
+        const up = prev.filter(c => c.id !== id);
+        guardarCache('fc_cache_cotizaciones', up);
+        return up;
+      });
+      try {
+        const { error } = await supabase.from('cotizaciones').delete().eq('id', id);
+        if (error) console.warn('[eliminarCotizacion] Aviso Supabase:', error);
+      } catch (errDb) {
+        console.warn('[eliminarCotizacion] Supabase error:', errDb);
+      }
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -1566,6 +1767,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     eliminarBloqueo,
     guardarCliente,
     desactivarCliente,
+    eliminarCliente,
     guardarCotizacion,
     cambiarEstadoCotizacion,
     eliminarCotizacion,

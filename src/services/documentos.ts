@@ -816,6 +816,19 @@ export function generarDocCotizacion(cotizacion: CotizacionDB, configParam?: Con
   doc.text('VALOR TOTAL COTIZADO:', 18, y + 2.5);
   doc.text(formatCOP(cotizacion.total), 182, y + 2.5, { align: 'right' });
   doc.setTextColor(30, 27, 19);
+  y += 10;
+
+  // Abono requerido (50%) para formalizar y bloquear disponibilidad
+  const abono50 = Math.round(cotizacion.total * 0.5);
+  doc.setFillColor(254, 249, 195);
+  doc.setDrawColor(202, 138, 4);
+  doc.roundedRect(14, y, 182, 8.5, 1.5, 1.5, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(161, 98, 7);
+  doc.text('ABONO REQUERIDO (50% PARA BLOQUEAR DISPONIBILIDAD):', 18, y + 5.5);
+  doc.text(formatCOP(abono50), 182, y + 5.5, { align: 'right' });
+  doc.setTextColor(30, 27, 19);
   y += 14;
 
   // Condiciones y Políticas

@@ -59,6 +59,7 @@ export const App: React.FC = () => {
     eliminarBloqueo,
     guardarCliente,
     desactivarCliente,
+    eliminarCliente,
     guardarCotizacion,
     cambiarEstadoCotizacion,
     eliminarCotizacion,
@@ -310,6 +311,7 @@ export const App: React.FC = () => {
             onSaveWaNumber={handleSaveWaNumber}
             onGuardarCliente={guardarCliente}
             onDesactivarCliente={desactivarCliente}
+            onEliminarCliente={eliminarCliente}
             onGuardarCotizacion={guardarCotizacion}
             onCambiarEstadoCotizacion={cambiarEstadoCotizacion}
             onEliminarCotizacion={eliminarCotizacion}
