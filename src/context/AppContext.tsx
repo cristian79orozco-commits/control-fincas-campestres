@@ -83,6 +83,7 @@ interface AppContextValue {
   guardarFinca: (fincaData: Partial<Finca>, imagenesUrls: string[], planesStr: string) => Promise<{ success: boolean; id?: string; error?: string }>;
   desactivarFinca: (id: string) => Promise<{ success: boolean; error?: string }>;
   reactivarFinca: (id: string) => Promise<{ success: boolean; error?: string }>;
+  eliminarFinca: (id: string) => Promise<{ success: boolean; error?: string }>;
   marcarDiasAdmin: (fincaId: string, fechas: string[], estado: 'ocupado' | 'libre', nombreCliente?: string) => Promise<{ success: boolean; error?: string }>;
   eliminarBloqueo: (id: number | string) => Promise<{ success: boolean; error?: string }>;
 
@@ -469,6 +470,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           showToast(`🔔 ¡Nueva cotización web recibida! ${consecutivo}Disponible en el panel admin.`, 'info');
         }
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fincas' }, () => {
+        cargarFincas();
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas' }, () => {
         cargarReservas();
         cargarDisponibilidad();
@@ -485,6 +489,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'menus' }, () => {
         cargarMenus();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'comunicaciones' }, () => {
+        cargarComunicaciones();
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'configuracion_general' }, () => {
         cargarConfiguracion();
       })
@@ -498,11 +505,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [
     recargarTodo,
+    cargarFincas,
     cargarCotizaciones,
     cargarReservas,
     cargarClientes,
     cargarDisponibilidad,
     cargarMenus,
+    cargarComunicaciones,
     cargarConfiguracion,
     cargarContenidoSitio,
     showToast,
@@ -1519,6 +1528,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const eliminarFinca = async (id: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      // 1. Limpieza en cascada en tablas dependientes
+      await Promise.allSettled([
+        supabase.from('finca_imagenes').delete().eq('finca_id', id),
+        supabase.from('finca_planes').delete().eq('finca_id', id),
+        supabase.from('finca_amenidades').delete().eq('finca_id', id),
+        supabase.from('disponibilidad').delete().eq('finca_id', id),
+      ]);
+
+      // 2. Eliminar la finca de la base de datos
+      const { error } = await supabase.from('fincas').delete().eq('id', id);
+      if (error) throw error;
+
+      // 3. Actualización de estado local optimista
+      setFincas(prev => prev.filter(f => f.id !== id));
+
+      await Promise.all([cargarFincas(), cargarDisponibilidad()]);
+      return { success: true };
+    } catch (err: any) {
+      console.error('[AppContext] Error al eliminar finca:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
   const marcarDiasAdmin = async (
     fincaId: string,
     fechas: string[],
@@ -1763,6 +1797,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     guardarFinca,
     desactivarFinca,
     reactivarFinca,
+    eliminarFinca,
     marcarDiasAdmin,
     eliminarBloqueo,
     guardarCliente,

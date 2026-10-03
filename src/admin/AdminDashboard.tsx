@@ -560,6 +560,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               comunicaciones={comunicaciones}
               onRegistrarComunicacion={onRegistrarComunicacion || (async () => {})}
               onLimpiarHistorial={onLimpiarHistorialComunicaciones}
+              configuracion={configuracion}
+              onGuardarConfiguracion={onGuardarConfiguracion}
               showToast={showToast}
             />
           )}

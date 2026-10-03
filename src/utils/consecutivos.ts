@@ -86,3 +86,55 @@ export function formatearConsecutivoSimple(consecutivo?: string | null): string 
   }
   return String(consecutivo).replace(/^[A-Za-z\-]+/, '') || '1001';
 }
+
+export type TipoDocumentoPrefijo =
+  | 'cotizacion'
+  | 'separacion'
+  | 'abono'
+  | 'estado_cuenta'
+  | 'paz_salvo'
+  | 'menu';
+
+export const PREFIJOS_DOCUMENTOS_DEFECTO: Record<TipoDocumentoPrefijo, string> = {
+  cotizacion: 'COT-',
+  separacion: 'SEP-',
+  abono: 'ABO-',
+  estado_cuenta: 'SAL-',
+  paz_salvo: 'PAZ-',
+  menu: 'MEN-',
+};
+
+/**
+ * Formatea un consecutivo vinculando el número base de la cotización/reserva
+ * con las letras iniciales (prefijo) correspondientes al tipo de documento a emitir.
+ * Ejemplos:
+ *  - Base '1001' + 'cotizacion' -> 'COT-1001'
+ *  - Base '1001' + 'separacion' -> 'SEP-1001'
+ *  - Base '1001' + 'abono' -> 'ABO-1001' (o 'ABO-1001-2' para segundo abono)
+ *  - Base '1001' + 'estado_cuenta' -> 'SAL-1001'
+ *  - Base '1001' + 'paz_salvo' -> 'PAZ-1001'
+ *  - Base '1001' + 'menu' -> 'MEN-1001'
+ */
+export function formatearConsecutivoConPrefijo(
+  consecutivoBase: string | number | undefined | null,
+  tipo: TipoDocumentoPrefijo,
+  subIndice?: number,
+  prefijosPersonalizados?: Partial<Record<TipoDocumentoPrefijo, string>>
+): string {
+  const numBase = formatearConsecutivoSimple(consecutivoBase ? String(consecutivoBase) : '1001');
+  const prefijoConfig = prefijosPersonalizados?.[tipo];
+  
+  let prefijoFinal: string;
+  if (prefijoConfig !== undefined && prefijoConfig !== null) {
+    // Si viene configurado (ej: 'COT-' o 'COT'), asegurar formato limpio
+    prefijoFinal = prefijoConfig.trim();
+    if (prefijoFinal && !prefijoFinal.endsWith('-')) {
+      prefijoFinal += '-';
+    }
+  } else {
+    prefijoFinal = PREFIJOS_DOCUMENTOS_DEFECTO[tipo] || '';
+  }
+
+  const sufijo = subIndice !== undefined && subIndice > 1 ? `-${subIndice}` : '';
+  return `${prefijoFinal}${numBase}${sufijo}`;
+}

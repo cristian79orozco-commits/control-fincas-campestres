@@ -26,6 +26,34 @@ import {
   obtenerContactoClienteHistorico,
 } from '../types';
 import { getConfiguracionGlobal } from './configuracion';
+import { formatearConsecutivoConPrefijo } from '../utils/consecutivos';
+
+export interface ResultadoDocumentoPdf {
+  doc: jsPDF;
+  num: string;
+  blob: Blob;
+  nombreArchivo: string;
+}
+
+export async function subirDocumentoStorage(blob: Blob, nombreArchivo: string): Promise<string | null> {
+  try {
+    const { supabase } = await import('./supabase');
+    const path = `documentos/${Date.now()}_${nombreArchivo}`;
+    const { error } = await supabase.storage.from('finca-imagenes').upload(path, blob, {
+      contentType: 'application/pdf',
+      upsert: true,
+    });
+    if (error) {
+      console.warn('[documentos] Aviso al subir a storage:', error.message);
+      return null;
+    }
+    const { data } = supabase.storage.from('finca-imagenes').getPublicUrl(path);
+    return data?.publicUrl || null;
+  } catch (err) {
+    console.warn('[documentos] Excepción al subir documento:', err);
+    return null;
+  }
+}
 
 export interface PropuestaAlimentacionDatos {
   menu: Menu;
@@ -209,15 +237,18 @@ function pie(doc: jsPDF, configParam?: ConfiguracionGeneral) {
 }
 
 // ================================================================
+// ================================================================
 // 1. DOCUMENTO DE SEPARACIÓN
 // ================================================================
-export function generarDocSeparacion(reserva: Reserva, configParam?: ConfiguracionGeneral): void {
+export function generarDocSeparacion(reserva: Reserva, configParam?: ConfiguracionGeneral): ResultadoDocumentoPdf {
   const config = configParam || getConfiguracionGlobal();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const prefijo = config.prefijo_cotizacion || '';
-  const num = reserva.consecutivo
-    ? (reserva.consecutivo.match(/\d+/g)?.join('') || reserva.consecutivo.replace(/^[A-Za-z\-]+/, ''))
-    : (prefijo ? `${prefijo}${reserva.id.slice(0, 8).toUpperCase()}` : reserva.id.slice(0, 8).toUpperCase());
+  const num = formatearConsecutivoConPrefijo(
+    reserva.consecutivo,
+    'separacion',
+    undefined,
+    { separacion: config.prefijo_separacion }
+  );
 
   encabezado(doc, 'DOCUMENTO DE SEPARACIÓN', num, config);
 
@@ -292,19 +323,26 @@ export function generarDocSeparacion(reserva: Reserva, configParam?: Configuraci
   doc.text(config.nombre_empresa || 'Administración', doc.internal.pageSize.getWidth() / 2 + 10, y + 4.5);
 
   pie(doc, config);
-  const nombreArchivo = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8);
-  doc.save(`Separacion_${nombreArchivo}.pdf`);
+  const nombreArchivo = `Separacion_${num}.pdf`;
+  doc.save(nombreArchivo);
+  const blob = doc.output('blob');
+  return { doc, num, blob, nombreArchivo };
 }
 
 // ================================================================
 // 2. COMPROBANTE DE ABONO
 // ================================================================
-export function generarComprobantePago(reserva: Reserva, pago: Pago, configParam?: ConfiguracionGeneral): void {
+export function generarComprobantePago(reserva: Reserva, pago: Pago, configParam?: ConfiguracionGeneral): ResultadoDocumentoPdf {
   const config = configParam || getConfiguracionGlobal();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const prefijo = config.prefijo_abono || 'PAG-';
-  const consecBase = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8).toUpperCase();
-  const num = `${prefijo}${consecBase}`;
+  const indexPago = (reserva.pagos || []).findIndex(p => p.id === pago.id);
+  const sub = indexPago > 0 ? indexPago + 1 : undefined;
+  const num = formatearConsecutivoConPrefijo(
+    reserva.consecutivo,
+    'abono',
+    sub,
+    { abono: config.prefijo_abono }
+  );
 
   encabezado(doc, 'COMPROBANTE DE ABONO / PAGO', num, config);
 
@@ -354,19 +392,24 @@ export function generarComprobantePago(reserva: Reserva, pago: Pago, configParam
   doc.text(textoLegal, 14, y, { maxWidth: 182 });
 
   pie(doc, config);
-  const nombreArchivo = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : pago.id.slice(0, 8);
-  doc.save(`Abono_${nombreArchivo}.pdf`);
+  const nombreArchivo = `Abono_${num}.pdf`;
+  doc.save(nombreArchivo);
+  const blob = doc.output('blob');
+  return { doc, num, blob, nombreArchivo };
 }
 
 // ================================================================
 // 3. ESTADO DE CUENTA
 // ================================================================
-export function generarEstadoCuenta(reserva: Reserva, configParam?: ConfiguracionGeneral): void {
+export function generarEstadoCuenta(reserva: Reserva, configParam?: ConfiguracionGeneral): ResultadoDocumentoPdf {
   const config = configParam || getConfiguracionGlobal();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const prefijo = config.prefijo_estado_cuenta || 'EC-';
-  const consecBase = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8).toUpperCase();
-  const num = `${prefijo}${consecBase}`;
+  const num = formatearConsecutivoConPrefijo(
+    reserva.consecutivo,
+    'estado_cuenta',
+    undefined,
+    { estado_cuenta: config.prefijo_estado_cuenta }
+  );
 
   encabezado(doc, 'ESTADO DE CUENTA', num, config);
 
@@ -438,25 +481,30 @@ export function generarEstadoCuenta(reserva: Reserva, configParam?: Configuracio
   }
 
   pie(doc, config);
-  const nombreArchivo = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8);
-  doc.save(`EstadoCuenta_${nombreArchivo}.pdf`);
+  const nombreArchivo = `EstadoCuenta_${num}.pdf`;
+  doc.save(nombreArchivo);
+  const blob = doc.output('blob');
+  return { doc, num, blob, nombreArchivo };
 }
 
 // ================================================================
 // 4. PAZ Y SALVO
 // ================================================================
-export function generarPazYSalvo(reserva: Reserva, configParam?: ConfiguracionGeneral): void {
+export function generarPazYSalvo(reserva: Reserva, configParam?: ConfiguracionGeneral): ResultadoDocumentoPdf | null {
   const config = configParam || getConfiguracionGlobal();
   const saldo = calcularSaldo(reserva);
   if (saldo > 0) {
     alert('No es posible generar el Paz y Salvo: la reserva tiene saldo pendiente.');
-    return;
+    return null;
   }
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const prefijo = config.prefijo_paz_salvo || 'PS-';
-  const consecBase = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8).toUpperCase();
-  const num = `${prefijo}${consecBase}`;
+  const num = formatearConsecutivoConPrefijo(
+    reserva.consecutivo,
+    'paz_salvo',
+    undefined,
+    { paz_salvo: config.prefijo_paz_salvo }
+  );
   const ancho = doc.internal.pageSize.getWidth();
 
   encabezado(doc, 'CERTIFICADO DE PAZ Y SALVO', num, config);
@@ -504,6 +552,7 @@ export function generarPazYSalvo(reserva: Reserva, configParam?: ConfiguracionGe
 
   y += 18;
   doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
   doc.text('Firma y autorización administrativa:', 14, y);
   y += 14;
   doc.line(14, y, 90, y);
@@ -512,14 +561,16 @@ export function generarPazYSalvo(reserva: Reserva, configParam?: ConfiguracionGe
   doc.text(`Administración • ${config.nombre_empresa}`, 14, y + 5);
 
   pie(doc, config);
-  const nombreArchivo = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8);
-  doc.save(`PazYSalvo_${nombreArchivo}.pdf`);
+  const nombreArchivo = `PazYSalvo_${num}.pdf`;
+  doc.save(nombreArchivo);
+  const blob = doc.output('blob');
+  return { doc, num, blob, nombreArchivo };
 }
 
 // ================================================================
 // 5. PROPUESTA DE ALIMENTACIÓN (FASE 2 & 4)
 // ================================================================
-export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionDatos): Promise<void> {
+export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionDatos): Promise<ResultadoDocumentoPdf> {
   const {
     menu,
     cliente,
@@ -533,8 +584,12 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
   const config = configParam || getConfiguracionGlobal();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const ancho = doc.internal.pageSize.getWidth();
-  const prefijo = config.prefijo_propuesta_menu || 'PROP-';
-  const num = `${prefijo}${(menu.id || 'MEN').slice(0, 8).toUpperCase()}`;
+  const num = formatearConsecutivoConPrefijo(
+    menu.id || '1001',
+    'menu',
+    undefined,
+    { menu: config.prefijo_propuesta_menu }
+  );
 
   encabezado(doc, 'PROPUESTA DE SERVICIO GASTRONÓMICO', num, config);
 
@@ -724,20 +779,24 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
 
   pie(doc, config);
 
-  const nombreLimpio = menu.nombre.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 25);
-  doc.save(`Propuesta_Alimentacion_${nombreLimpio}.pdf`);
+  const nombreArchivo = `Propuesta_Menu_${num}.pdf`;
+  doc.save(nombreArchivo);
+  const blob = doc.output('blob');
+  return { doc, num, blob, nombreArchivo };
 }
 
 // ================================================================
 // 6. PROPUESTA FORMAL DE COTIZACIÓN (FASE 4)
 // ================================================================
-export function generarDocCotizacion(cotizacion: CotizacionDB, configParam?: ConfiguracionGeneral): void {
+export function generarDocCotizacion(cotizacion: CotizacionDB, configParam?: ConfiguracionGeneral): ResultadoDocumentoPdf {
   const config = configParam || getConfiguracionGlobal();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const prefijo = config.prefijo_cotizacion || '';
-  const num = cotizacion.consecutivo
-    ? (cotizacion.consecutivo.match(/\d+/g)?.join('') || cotizacion.consecutivo.replace(/^[A-Za-z\-]+/, ''))
-    : (prefijo ? `${prefijo}${cotizacion.id.slice(0, 8).toUpperCase()}` : cotizacion.id.slice(0, 8).toUpperCase());
+  const num = formatearConsecutivoConPrefijo(
+    cotizacion.consecutivo,
+    'cotizacion',
+    undefined,
+    { cotizacion: config.prefijo_cotizacion }
+  );
   const ancho = doc.internal.pageSize.getWidth();
 
   encabezado(doc, 'COTIZACIÓN FORMAL DE SERVICIOS', num, config);
@@ -867,8 +926,10 @@ export function generarDocCotizacion(cotizacion: CotizacionDB, configParam?: Con
   doc.text(cliNombre, col2, y + 4.5);
 
   pie(doc, config);
-  const nombreArchivo = cotizacion.consecutivo ? cotizacion.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : cotizacion.id.slice(0, 8);
-  doc.save(`Cotizacion_${nombreArchivo}.pdf`);
+  const nombreArchivo = `Cotizacion_${num}.pdf`;
+  doc.save(nombreArchivo);
+  const blob = doc.output('blob');
+  return { doc, num, blob, nombreArchivo };
 }
 
 // ---------------------------------------------------------------

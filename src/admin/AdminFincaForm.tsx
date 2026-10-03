@@ -21,7 +21,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
   showToast,
   openConfirm,
 }) => {
-  const { previsualizarFinca, fincaParaEditarId, setFincaParaEditarId } = useApp();
+  const { previsualizarFinca, fincaParaEditarId, setFincaParaEditarId, eliminarFinca, desactivarFinca, reactivarFinca } = useApp();
   const [selectedFincaId, setSelectedFincaId] = useState<string>('new');
 
   // Si se solicita editar una finca específica desde el panel cliente
@@ -211,18 +211,38 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
     }
   };
 
-  const handleEliminarFinca = () => {
+  const handleDesactivarFinca = () => {
     if (selectedFincaId === 'new') return;
+    const esActivo = activo;
     openConfirm(
-      `¿Desactivar "${nombre}"?`,
-      'La finca dejará de estar visible en el catálogo de clientes.',
+      esActivo ? `¿Desactivar "${nombre}"?` : `¿Reactivar "${nombre}"?`,
+      esActivo
+        ? 'La finca dejará de estar visible en el catálogo de clientes, pero se conservará en el sistema.'
+        : 'La finca volverá a estar disponible en el catálogo público de clientes.',
       async () => {
-        const res = await onDelete(selectedFincaId);
+        const res = esActivo ? await desactivarFinca(selectedFincaId) : await reactivarFinca(selectedFincaId);
         if (res.success) {
-          showToast('Finca desactivada exitosamente ✅', 'success');
-          setSelectedFincaId('new');
+          showToast(esActivo ? 'Finca desactivada exitosamente ✅' : 'Finca reactivada exitosamente ✅', 'success');
+          setActivo(!esActivo);
         } else {
           showToast(`Error: ${res.error}`, 'error');
+        }
+      }
+    );
+  };
+
+  const handleEliminarDefinitivo = () => {
+    if (selectedFincaId === 'new') return;
+    openConfirm(
+      `¿ELIMINAR DEFINITIVAMENTE "${nombre}"?`,
+      '⚠️ Esta acción borrará la finca, sus imágenes y su disponibilidad permanentemente de la base de datos.',
+      async () => {
+        const res = await eliminarFinca(selectedFincaId);
+        if (res.success) {
+          showToast('Finca eliminada definitivamente de la base de datos ✅', 'success');
+          setSelectedFincaId('new');
+        } else {
+          showToast(`Error al eliminar: ${res.error}`, 'error');
         }
       }
     );
@@ -454,14 +474,27 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
         </div>
       )}
 
-      <div className="form-actions" style={{ marginTop: '1.25rem' }}>
+      <div className="form-actions" style={{ marginTop: '1.25rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
         <button className="btn btn-primary" onClick={handleGuardar}>
           <Save size={15} /> Guardar en Supabase
         </button>
         {selectedFincaId !== 'new' && (
-          <button className="btn btn-danger" onClick={handleEliminarFinca}>
-            <Trash2 size={15} /> Desactivar finca
-          </button>
+          <>
+            <button
+              className="btn btn-secondary"
+              onClick={handleDesactivarFinca}
+              title={activo ? 'Ocultar finca del catálogo público' : 'Mostrar finca en el catálogo público'}
+            >
+              {activo ? 'Desactivar finca' : 'Reactivar finca'}
+            </button>
+            <button
+              className="btn btn-danger"
+              onClick={handleEliminarDefinitivo}
+              title="Borrar permanentemente de la base de datos"
+            >
+              <Trash2 size={15} /> Eliminar definitivamente
+            </button>
+          </>
         )}
       </div>
     </div>

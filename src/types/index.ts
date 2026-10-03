@@ -337,6 +337,9 @@ export interface ConfiguracionGeneral {
   banco_cuenta?: string | null;
   banco_titular?: string | null;
 
+  // 5. Plantillas de Mensajes de Comunicación Editables
+  plantillas_comunicacion?: Record<string, string>;
+
   created_at?: string;
   updated_at?: string;
 }

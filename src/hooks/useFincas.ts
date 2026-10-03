@@ -9,6 +9,7 @@ export function useFincas() {
     guardarFinca,
     desactivarFinca,
     reactivarFinca,
+    eliminarFinca,
     recargarTodo,
   } = useApp();
 
@@ -20,6 +21,7 @@ export function useFincas() {
     guardarFinca,
     desactivarFinca,
     reactivarFinca,
+    eliminarFinca,
     recargarFincas: recargarTodo,
   };
 }

@@ -72,7 +72,7 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
       titulo: 'Enviar Separación por WhatsApp',
       nombreDoc: 'Documento Oficial de Separación (PDF)',
       mensaje: plantillaSeparacion(reserva),
-      onGenerarPdf: () => generarDocSeparacion(reserva),
+      onGenerarPdf: () => { generarDocSeparacion(reserva); },
       tipoComunicacion: 'separacion',
     });
   };
@@ -83,7 +83,7 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
       titulo: 'Enviar Estado de Cuenta por WhatsApp',
       nombreDoc: 'Estado de Cuenta Consolidado (PDF)',
       mensaje: plantillaEstadoCuenta(reserva),
-      onGenerarPdf: () => generarEstadoCuenta(reserva),
+      onGenerarPdf: () => { generarEstadoCuenta(reserva); },
       tipoComunicacion: 'estado_cuenta',
     });
   };
@@ -94,7 +94,7 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
       titulo: 'Enviar Paz y Salvo por WhatsApp',
       nombreDoc: 'Certificado de Paz y Salvo (PDF)',
       mensaje: plantillaPazYSalvo(reserva),
-      onGenerarPdf: () => generarPazYSalvo(reserva),
+      onGenerarPdf: () => { generarPazYSalvo(reserva); },
       tipoComunicacion: 'paz_salvo',
     });
   };
@@ -112,7 +112,7 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
       titulo: 'Enviar Comprobante de Abono por WhatsApp',
       nombreDoc: `Comprobante de Pago (${pago.tipo})`,
       mensaje: plantillaComprobantePago(reserva, pago),
-      onGenerarPdf: () => generarComprobantePago(reserva, pago),
+      onGenerarPdf: () => { generarComprobantePago(reserva, pago); },
       tipoComunicacion: 'abono',
     });
   };

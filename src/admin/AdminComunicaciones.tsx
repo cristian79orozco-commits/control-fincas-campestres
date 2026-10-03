@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   MessageCircle, Send, FileText, CheckCircle, Clock, Copy, Check,
-  Download, Users, ClipboardList, Utensils, RefreshCw, Trash2, Settings,
-  AlertTriangle, Phone, ExternalLink, BookOpen, CreditCard
+  Download, Users, Trash2, Settings, Phone, BookOpen,
+  Search, RotateCcw, Save, Sparkles, Tag, ExternalLink
 } from 'lucide-react';
 import type {
-  Cliente, Finca, Reserva, CotizacionDB, Menu, Pago, TipoComunicacion, Comunicacion
+  Cliente, Finca, Reserva, CotizacionDB, Menu, Pago, TipoComunicacion, Comunicacion, ConfiguracionGeneral
 } from '../types';
 import { calcularSaldo } from '../types';
 import {
@@ -22,6 +22,9 @@ import {
   formatearTelefonoWhatsApp,
   formatCOP,
   formatFecha,
+  renderizarPlantillaPersonalizada,
+  PLANTILLAS_PREDETERMINADAS,
+  obtenerTokensParaMensaje,
 } from '../services/whatsapp';
 import {
   generarDocSeparacion,
@@ -29,7 +32,14 @@ import {
   generarEstadoCuenta,
   generarPazYSalvo,
   generarPropuestaAlimentacion,
+  generarDocCotizacion,
+  subirDocumentoStorage,
 } from '../services/documentos';
+import {
+  formatearConsecutivoSimple,
+  formatearConsecutivoConPrefijo,
+  type TipoDocumentoPrefijo
+} from '../utils/consecutivos';
 
 interface AdminComunicacionesProps {
   currentWaNumber: string;
@@ -42,6 +52,8 @@ interface AdminComunicacionesProps {
   comunicaciones: Comunicacion[];
   onRegistrarComunicacion: (com: Omit<Comunicacion, 'id' | 'created_at'>) => Promise<any>;
   onLimpiarHistorial?: () => void;
+  configuracion?: ConfiguracionGeneral;
+  onGuardarConfiguracion?: (datos: Partial<ConfiguracionGeneral>) => Promise<{ success: boolean; error?: string }>;
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
@@ -58,6 +70,8 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
   comunicaciones,
   onRegistrarComunicacion,
   onLimpiarHistorial,
+  configuracion,
+  onGuardarConfiguracion,
   showToast,
 }) => {
   const [tabActiva, setTabActiva] = useState<TabComunicaciones>('envio');
@@ -75,102 +89,149 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
   const [copiado, setCopiado] = useState<boolean>(false);
   const [procesando, setProcesando] = useState<boolean>(false);
 
+  // Consecutivo Lookup
+  const [inputBusquedaConsecutivo, setInputBusquedaConsecutivo] = useState<string>('');
+  const [consecutivoBaseActivo, setConsecutivoBaseActivo] = useState<string>('');
+
+  // Editor de Plantillas
+  const [plantillaSeleccionada, setPlantillaSeleccionada] = useState<string>('cotizacion');
+  const [textoEditorPlantilla, setTextoEditorPlantilla] = useState<string>('');
+  const [guardandoPlantilla, setGuardandoPlantilla] = useState<boolean>(false);
+
   // Configuración de número global
   const [waGlobalInput, setWaGlobalInput] = useState<string>(currentWaNumber);
 
   // Filtro historial
   const [filtroTipoHistorial, setFiltroTipoHistorial] = useState<string>('todos');
 
-  // Al cambiar el tipo de plantilla o la selección, regenerar mensaje
-  const actualizarPlantilla = (
+  // -------------------------------------------------------------
+  // Inicialización del editor de plantillas
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const custom = configuracion?.plantillas_comunicacion?.[plantillaSeleccionada];
+    setTextoEditorPlantilla(custom || PLANTILLAS_PREDETERMINADAS[plantillaSeleccionada] || '');
+  }, [plantillaSeleccionada, configuracion]);
+
+  // -------------------------------------------------------------
+  // Generador de Mensaje dinámico con soporte de Plantillas Personalizadas
+  // -------------------------------------------------------------
+  const generarTextoMensaje = (
     nuevoTipo: TipoComunicacion,
     resId = reservaId,
     cotId = cotizacionId,
     cliId = clienteId,
-    pId = pagoId
-  ) => {
+    pId = pagoId,
+    consecBase = consecutivoBaseActivo
+  ): { msg: string; tel: string; nom: string } => {
     let msg = '';
     let tel = telefonoInput;
     let nom = destinatarioNombre;
 
+    const r = reservas.find(x => x.id === resId);
+    const c = cotizaciones.find(x => x.id === cotId);
+    const cli = clientes.find(x => x.id === cliId) || r?.clientes || c?.clientes;
+    const f = fincas.find(x => x.id === (r?.finca_id || c?.finca_id)) || r?.fincas || c?.fincas;
+    const p = r?.pagos?.find(x => x.id === pId) || r?.pagos?.[0];
+
+    // Verificar si el usuario tiene una plantilla personalizada en Supabase
+    const plantillaCustom = configuracion?.plantillas_comunicacion?.[nuevoTipo];
+
+    if (plantillaCustom) {
+      const tokens = obtenerTokensParaMensaje({
+        tipo: nuevoTipo,
+        cotizacion: c,
+        reserva: r,
+        cliente: cli,
+        finca: f,
+        pago: p,
+        consecutivoBase: consecBase,
+      });
+      msg = renderizarPlantillaPersonalizada(plantillaCustom, tokens);
+
+      if (cli) {
+        tel = cli.whatsapp || (cli as any)?.telefono || tel;
+        nom = `${cli.nombre} ${cli.apellido || ''}`.trim();
+      }
+      return { msg, tel, nom };
+    }
+
+    // Si no hay plantilla personalizada, usar la plantilla oficial por defecto
     if (nuevoTipo === 'cotizacion') {
-      const c = cotizaciones.find(x => x.id === cotId) || cotizaciones[0];
-      if (c) {
-        msg = plantillaCotizacion(c, c.fincas, c.clientes);
-        tel = c.clientes?.whatsapp || tel;
-        nom = c.clientes ? `${c.clientes.nombre} ${c.clientes.apellido || ''}`.trim() : nom;
+      const cotTarget = c || cotizaciones[0];
+      if (cotTarget) {
+        msg = plantillaCotizacion(cotTarget, cotTarget.fincas, cotTarget.clientes);
+        tel = cotTarget.clientes?.whatsapp || (cotTarget.clientes as any)?.telefono || tel;
+        nom = cotTarget.clientes ? `${cotTarget.clientes.nombre} ${cotTarget.clientes.apellido || ''}`.trim() : nom;
       }
     } else if (nuevoTipo === 'separacion') {
-      const r = reservas.find(x => x.id === resId) || reservas[0];
-      if (r) {
-        msg = plantillaSeparacion(r);
-        tel = r.clientes?.whatsapp || r.clientes?.telefono || tel;
-        nom = r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim() : nom;
+      const resTarget = r || reservas[0];
+      if (resTarget) {
+        msg = plantillaSeparacion(resTarget);
+        tel = resTarget.clientes?.whatsapp || (resTarget.clientes as any)?.telefono || tel;
+        nom = resTarget.clientes ? `${resTarget.clientes.nombre} ${resTarget.clientes.apellido || ''}`.trim() : nom;
       }
     } else if (nuevoTipo === 'abono') {
-      const r = reservas.find(x => x.id === resId) || reservas[0];
-      if (r) {
-        const pagos = r.pagos || [];
-        const p = pagos.find(x => x.id === pId) || pagos[0] || {
+      const resTarget = r || reservas[0];
+      if (resTarget) {
+        const pagoTarget = p || {
           id: 'pago-temp',
-          reserva_id: r.id,
+          reserva_id: resTarget.id,
           tipo: 'abono',
           fecha: new Date().toISOString().split('T')[0],
-          valor: r.separacion || 0,
+          valor: resTarget.separacion || 0,
         } as Pago;
-        msg = plantillaComprobantePago(r, p);
-        tel = r.clientes?.whatsapp || r.clientes?.telefono || tel;
-        nom = r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim() : nom;
+        msg = plantillaComprobantePago(resTarget, pagoTarget);
+        tel = resTarget.clientes?.whatsapp || (resTarget.clientes as any)?.telefono || tel;
+        nom = resTarget.clientes ? `${resTarget.clientes.nombre} ${resTarget.clientes.apellido || ''}`.trim() : nom;
       }
     } else if (nuevoTipo === 'estado_cuenta') {
-      const r = reservas.find(x => x.id === resId) || reservas[0];
-      if (r) {
-        msg = plantillaEstadoCuenta(r);
-        tel = r.clientes?.whatsapp || r.clientes?.telefono || tel;
-        nom = r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim() : nom;
+      const resTarget = r || reservas[0];
+      if (resTarget) {
+        msg = plantillaEstadoCuenta(resTarget);
+        tel = resTarget.clientes?.whatsapp || (resTarget.clientes as any)?.telefono || tel;
+        nom = resTarget.clientes ? `${resTarget.clientes.nombre} ${resTarget.clientes.apellido || ''}`.trim() : nom;
       }
     } else if (nuevoTipo === 'paz_salvo') {
-      const r = reservas.find(x => x.id === resId) || reservas[0];
-      if (r) {
-        msg = plantillaPazYSalvo(r);
-        tel = r.clientes?.whatsapp || r.clientes?.telefono || tel;
-        nom = r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim() : nom;
+      const resTarget = r || reservas[0];
+      if (resTarget) {
+        msg = plantillaPazYSalvo(resTarget);
+        tel = resTarget.clientes?.whatsapp || (resTarget.clientes as any)?.telefono || tel;
+        nom = resTarget.clientes ? `${resTarget.clientes.nombre} ${resTarget.clientes.apellido || ''}`.trim() : nom;
       }
     } else if (nuevoTipo === 'menu') {
-      const c = cotizaciones.find(x => x.id === cotId) || cotizaciones[0];
-      const m = (c && menus.find(x => x.id === c.menu_id)) || menus[0];
+      const cotTarget = c || cotizaciones[0];
+      const m = (cotTarget && menus.find(x => x.id === cotTarget.menu_id)) || menus[0];
       if (m) {
         msg = plantillaPropuestaAlimentacion({
           menu: m,
-          cliente: c?.clientes,
-          finca: c?.fincas,
-          personas: c?.personas || 4,
-          cantidadServicios: c?.cantidad_alimentacion || 1,
+          cliente: cotTarget?.clientes,
+          finca: cotTarget?.fincas,
+          personas: cotTarget?.personas || 4,
+          cantidadServicios: cotTarget?.cantidad_alimentacion || 1,
         });
-        if (c?.clientes) {
-          tel = c.clientes.whatsapp || tel;
-          nom = `${c.clientes.nombre} ${c.clientes.apellido || ''}`.trim();
+        if (cotTarget?.clientes) {
+          tel = cotTarget.clientes.whatsapp || (cotTarget.clientes as any)?.telefono || tel;
+          nom = `${cotTarget.clientes.nombre} ${cotTarget.clientes.apellido || ''}`.trim();
         }
       }
     } else if (nuevoTipo === 'recordatorio_pago') {
-      const r = reservas.find(x => x.id === resId) || reservas[0];
-      if (r) {
-        msg = plantillaRecordatorioPago(r);
-        tel = r.clientes?.whatsapp || r.clientes?.telefono || tel;
-        nom = r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim() : nom;
+      const resTarget = r || reservas[0];
+      if (resTarget) {
+        msg = plantillaRecordatorioPago(resTarget);
+        tel = resTarget.clientes?.whatsapp || (resTarget.clientes as any)?.telefono || tel;
+        nom = resTarget.clientes ? `${resTarget.clientes.nombre} ${resTarget.clientes.apellido || ''}`.trim() : nom;
       }
     } else if (nuevoTipo === 'bienvenida') {
-      const r = reservas.find(x => x.id === resId) || reservas[0];
-      if (r) {
-        msg = plantillaBienvenida(r);
-        tel = r.clientes?.whatsapp || r.clientes?.telefono || tel;
-        nom = r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim() : nom;
+      const resTarget = r || reservas[0];
+      if (resTarget) {
+        msg = plantillaBienvenida(resTarget);
+        tel = resTarget.clientes?.whatsapp || (resTarget.clientes as any)?.telefono || tel;
+        nom = resTarget.clientes ? `${resTarget.clientes.nombre} ${resTarget.clientes.apellido || ''}`.trim() : nom;
       }
     } else {
-      // personalizado
-      const cli = clientes.find(x => x.id === cliId);
+      // Personalizado
       if (cli) {
-        tel = cli.whatsapp || cli.telefono || tel;
+        tel = cli.whatsapp || (cli as any)?.telefono || tel;
         nom = `${cli.nombre} ${cli.apellido || ''}`.trim();
         msg = `Hola, *${nom}* 👋\n\nTe escribimos de *Control de Fincas Campestres*.`;
       } else {
@@ -178,15 +239,90 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
       }
     }
 
+    return { msg, tel, nom };
+  };
+
+  const actualizarPlantilla = (
+    nuevoTipo: TipoComunicacion,
+    resId = reservaId,
+    cotId = cotizacionId,
+    cliId = clienteId,
+    pId = pagoId,
+    consecBase = consecutivoBaseActivo
+  ) => {
+    const { msg, tel, nom } = generarTextoMensaje(nuevoTipo, resId, cotId, cliId, pId, consecBase);
     setMensajeTexto(msg);
     if (tel) setTelefonoInput(formatearTelefonoWhatsApp(tel));
     if (nom) setDestinatarioNombre(nom);
   };
 
   // Inicializar al cargar
-  React.useEffect(() => {
+  useEffect(() => {
     actualizarPlantilla('cotizacion');
   }, []);
+
+  // -------------------------------------------------------------
+  // Consecutivo Lookup
+  // -------------------------------------------------------------
+  const ejecutarBusquedaConsecutivo = (valorBuscar?: string) => {
+    const query = valorBuscar !== undefined ? valorBuscar : inputBusquedaConsecutivo;
+    const numLimpio = formatearConsecutivoSimple(query);
+    if (!numLimpio || numLimpio === '1001' && !query.includes('1001')) {
+      showToast('Ingresa un número de consecutivo válido (ej: 1001)', 'info');
+      return;
+    }
+
+    // Buscar coincidencia en reservas
+    const rMatch = reservas.find(r =>
+      formatearConsecutivoSimple(r.consecutivo) === numLimpio ||
+      (r.cotizacion_id && cotizaciones.some(c => c.id === r.cotizacion_id && formatearConsecutivoSimple(c.consecutivo) === numLimpio))
+    );
+
+    // Buscar coincidencia en cotizaciones
+    const cMatch = cotizaciones.find(c =>
+      formatearConsecutivoSimple(c.consecutivo) === numLimpio
+    );
+
+    if (!rMatch && !cMatch) {
+      showToast(`No se encontró ninguna reserva o cotización con el consecutivo #${numLimpio}`, 'error');
+      return;
+    }
+
+    setConsecutivoBaseActivo(numLimpio);
+
+    if (rMatch) {
+      setReservaId(rMatch.id);
+      if (rMatch.cotizacion_id) setCotizacionId(rMatch.cotizacion_id);
+      if (rMatch.cliente_id) setClienteId(rMatch.cliente_id);
+      const cliNom = rMatch.clientes ? `${rMatch.clientes.nombre} ${rMatch.clientes.apellido || ''}`.trim() : '';
+      const cliTel = rMatch.clientes?.whatsapp || (rMatch.clientes as any)?.telefono || '';
+      if (cliNom) setDestinatarioNombre(cliNom);
+      if (cliTel) setTelefonoInput(formatearTelefonoWhatsApp(cliTel));
+
+      // Determinar tipo sugerido
+      const saldo = calcularSaldo(rMatch);
+      const tipoSugerido: TipoComunicacion = saldo <= 0 ? 'paz_salvo' : (rMatch.pagos && rMatch.pagos.length > 1 ? 'abono' : 'separacion');
+      setTipoSeleccionado(tipoSugerido);
+      actualizarPlantilla(tipoSugerido, rMatch.id, rMatch.cotizacion_id || '', rMatch.cliente_id || '', '', numLimpio);
+      showToast(`¡Consecutivo #${numLimpio} cargado! Reserva de ${rMatch.fincas?.nombre || 'Finca'} (${cliNom})`, 'success');
+    } else if (cMatch) {
+      setCotizacionId(cMatch.id);
+      if (cMatch.cliente_id) setClienteId(cMatch.cliente_id);
+      const cliNom = cMatch.clientes ? `${cMatch.clientes.nombre} ${cMatch.clientes.apellido || ''}`.trim() : '';
+      const cliTel = cMatch.clientes?.whatsapp || (cMatch.clientes as any)?.telefono || '';
+      if (cliNom) setDestinatarioNombre(cliNom);
+      if (cliTel) setTelefonoInput(formatearTelefonoWhatsApp(cliTel));
+
+      setTipoSeleccionado('cotizacion');
+      actualizarPlantilla('cotizacion', '', cMatch.id, cMatch.cliente_id || '', '', numLimpio);
+      showToast(`¡Consecutivo #${numLimpio} cargado! Cotización para ${cMatch.fincas?.nombre || 'Finca'} (${cliNom})`, 'success');
+    }
+  };
+
+  const seleccionarTipoRapido = (tipo: TipoComunicacion) => {
+    setTipoSeleccionado(tipo);
+    actualizarPlantilla(tipo, reservaId, cotizacionId, clienteId, pagoId, consecutivoBaseActivo);
+  };
 
   const handleTipoChange = (nuevo: TipoComunicacion) => {
     setTipoSeleccionado(nuevo);
@@ -195,12 +331,15 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
 
   const handleCotizacionChange = (id: string) => {
     setCotizacionId(id);
+    const c = cotizaciones.find(x => x.id === id);
+    if (c?.consecutivo) setConsecutivoBaseActivo(formatearConsecutivoSimple(c.consecutivo));
     actualizarPlantilla(tipoSeleccionado, reservaId, id, clienteId, pagoId);
   };
 
   const handleReservaChange = (id: string) => {
     setReservaId(id);
     const r = reservas.find(x => x.id === id);
+    if (r?.consecutivo) setConsecutivoBaseActivo(formatearConsecutivoSimple(r.consecutivo));
     const primerPago = r?.pagos?.[0]?.id || '';
     setPagoId(primerPago);
     actualizarPlantilla(tipoSeleccionado, id, cotizacionId, clienteId, primerPago);
@@ -222,59 +361,96 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
     }
   };
 
-  // Determinar si el tipo actual requiere documento PDF
+  // Determinar si el tipo actual requiere o admite documento PDF
   const tieneDocumentoPdf = [
-    'separacion', 'abono', 'estado_cuenta', 'paz_salvo', 'menu'
+    'cotizacion', 'separacion', 'abono', 'estado_cuenta', 'paz_salvo', 'menu'
   ].includes(tipoSeleccionado);
 
   const nombreDocumento =
+    tipoSeleccionado === 'cotizacion' ? 'Cotización Formal de Servicios (PDF)' :
     tipoSeleccionado === 'separacion' ? 'Documento Oficial de Separación (PDF)' :
     tipoSeleccionado === 'abono' ? 'Comprobante de Abono / Pago (PDF)' :
     tipoSeleccionado === 'estado_cuenta' ? 'Estado de Cuenta Consolidado (PDF)' :
     tipoSeleccionado === 'paz_salvo' ? 'Certificado de Paz y Salvo (PDF)' :
     tipoSeleccionado === 'menu' ? 'Propuesta Gastronómica de Menú (PDF)' : '';
 
-  const ejecutarDescargaPdf = async () => {
+  // -------------------------------------------------------------
+  // Ejecución y generación de PDF
+  // -------------------------------------------------------------
+  const ejecutarGeneracionYDescargaPdf = async (): Promise<{ blob: Blob; nombreArchivo: string } | null> => {
     const r = reservas.find(x => x.id === reservaId) || reservas[0];
     const c = cotizaciones.find(x => x.id === cotizacionId) || cotizaciones[0];
 
-    switch (tipoSeleccionado) {
-      case 'separacion':
-        if (r) generarDocSeparacion(r);
-        break;
-      case 'abono':
-        if (r) {
-          const p = r.pagos?.find(x => x.id === pagoId) || r.pagos?.[0];
-          if (p) generarComprobantePago(r, p);
-          else showToast('Selecciona o registra un pago primero', 'error');
-        }
-        break;
-      case 'estado_cuenta':
-        if (r) generarEstadoCuenta(r);
-        break;
-      case 'paz_salvo':
-        if (r) {
-          if (calcularSaldo(r) > 0) {
-            showToast('El saldo debe ser $0 para generar Paz y Salvo', 'error');
-            return false;
+    try {
+      switch (tipoSeleccionado) {
+        case 'cotizacion':
+          if (c) {
+            const res = generarDocCotizacion(c, configuracion);
+            return { blob: res.blob, nombreArchivo: res.nombreArchivo };
           }
-          generarPazYSalvo(r);
+          break;
+        case 'separacion':
+          if (r) {
+            const res = generarDocSeparacion(r, configuracion);
+            return { blob: res.blob, nombreArchivo: res.nombreArchivo };
+          }
+          break;
+        case 'abono':
+          if (r) {
+            const p = r.pagos?.find(x => x.id === pagoId) || r.pagos?.[0] || {
+              id: 'pago-temp',
+              reserva_id: r.id,
+              tipo: 'abono',
+              fecha: new Date().toISOString().split('T')[0],
+              valor: r.separacion || 0,
+            } as Pago;
+            const res = generarComprobantePago(r, p, configuracion);
+            return { blob: res.blob, nombreArchivo: res.nombreArchivo };
+          }
+          break;
+        case 'estado_cuenta':
+          if (r) {
+            const res = generarEstadoCuenta(r, configuracion);
+            return { blob: res.blob, nombreArchivo: res.nombreArchivo };
+          }
+          break;
+        case 'paz_salvo':
+          if (r) {
+            if (calcularSaldo(r) > 0) {
+              showToast('El saldo debe ser $0 COP para emitir el Paz y Salvo', 'error');
+              return null;
+            }
+            const res = generarPazYSalvo(r, configuracion);
+            if (res) {
+              return { blob: res.blob, nombreArchivo: res.nombreArchivo };
+            }
+            return null;
+          }
+          break;
+        case 'menu': {
+          const m = (c && menus.find(x => x.id === c.menu_id)) || menus[0];
+          if (m) {
+            const res = await generarPropuestaAlimentacion({
+              menu: m,
+              cliente: c?.clientes,
+              finca: c?.fincas,
+              personas: c?.personas || 4,
+              cantidadServicios: c?.cantidad_alimentacion || 1,
+              config: configuracion,
+            });
+            if (res) {
+              return { blob: res.blob, nombreArchivo: res.nombreArchivo };
+            }
+            return null;
+          }
+          break;
         }
-        break;
-      case 'menu':
-        const m = (c && menus.find(x => x.id === c.menu_id)) || menus[0];
-        if (m) {
-          await generarPropuestaAlimentacion({
-            menu: m,
-            cliente: c?.clientes,
-            finca: c?.fincas,
-            personas: c?.personas || 4,
-            cantidadServicios: c?.cantidad_alimentacion || 1,
-          });
-        }
-        break;
+      }
+      return null;
+    } catch (err: any) {
+      showToast(`Error al generar documento PDF: ${err.message}`, 'error');
+      return null;
     }
-    return true;
   };
 
   const handleCopiar = async () => {
@@ -286,6 +462,9 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
     }
   };
 
+  // -------------------------------------------------------------
+  // Envío por WhatsApp con integración Storage
+  // -------------------------------------------------------------
   const handleEnviar = async () => {
     const telLimpio = formatearTelefonoWhatsApp(telefonoInput);
     if (!telLimpio) {
@@ -298,18 +477,28 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
     }
 
     setProcesando(true);
+    let textoFinalParaEnviar = mensajeTexto;
+
     try {
-      // 1. Si está activo descargar PDF y aplica, generarlo primero (Regla obligatoria)
+      // 1. Si está activo descargar PDF y aplica, generarlo y subirlo a Storage
       if (tieneDocumentoPdf && descargarPdf) {
-        const okPdf = await ejecutarDescargaPdf();
-        if (okPdf === false) {
-          setProcesando(false);
-          return;
+        showToast('Generando documento PDF y preparando enlace seguro…', 'info');
+        const resultadoPdf = await ejecutarGeneracionYDescargaPdf();
+        if (resultadoPdf) {
+          const enlacePublico = await subirDocumentoStorage(resultadoPdf.blob, resultadoPdf.nombreArchivo);
+          if (enlacePublico) {
+            if (textoFinalParaEnviar.includes('{{enlace_pdf}}')) {
+              textoFinalParaEnviar = textoFinalParaEnviar.replace(/\{\{enlace_pdf\}\}/gi, `📎 *Documento oficial adjunto (PDF):*\n${enlacePublico}`);
+            } else if (!textoFinalParaEnviar.includes(enlacePublico)) {
+              textoFinalParaEnviar += `\n\n📎 *Documento oficial adjunto (PDF):*\n${enlacePublico}`;
+            }
+            setMensajeTexto(textoFinalParaEnviar);
+          }
         }
       }
 
       // 2. Abrir WhatsApp
-      abrirWhatsApp(telLimpio, mensajeTexto);
+      abrirWhatsApp(telLimpio, textoFinalParaEnviar);
 
       // 3. Registrar en historial de auditoría
       const r = reservas.find(x => x.id === reservaId);
@@ -321,16 +510,66 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
         tipo: tipoSeleccionado,
         destinatario: destinatarioNombre || 'Cliente',
         telefono: telLimpio,
-        mensaje: mensajeTexto,
+        mensaje: textoFinalParaEnviar,
         estado: 'enviado',
       });
 
-      showToast('WhatsApp abierto y comunicación registrada ✅', 'success');
+      showToast('WhatsApp abierto y comunicación registrada con éxito ✅', 'success');
     } catch (err: any) {
       showToast(`Error al procesar comunicación: ${err.message}`, 'error');
     } finally {
       setProcesando(false);
     }
+  };
+
+  // -------------------------------------------------------------
+  // Gestión de Plantillas Personalizadas en Supabase
+  // -------------------------------------------------------------
+  const handleGuardarPlantilla = async () => {
+    if (!onGuardarConfiguracion) {
+      showToast('No se dispone de permisos para guardar la configuración', 'error');
+      return;
+    }
+    setGuardandoPlantilla(true);
+    const plantillasActuales = { ...(configuracion?.plantillas_comunicacion || {}) };
+    plantillasActuales[plantillaSeleccionada] = textoEditorPlantilla;
+
+    const res = await onGuardarConfiguracion({
+      plantillas_comunicacion: plantillasActuales,
+    });
+    setGuardandoPlantilla(false);
+
+    if (res.success) {
+      showToast(`Plantilla de ${plantillaSeleccionada} guardada en Supabase ✅`, 'success');
+    } else {
+      showToast(`Error al guardar plantilla: ${res.error}`, 'error');
+    }
+  };
+
+  const handleRestablecerPlantilla = async () => {
+    if (!onGuardarConfiguracion) return;
+    const def = PLANTILLAS_PREDETERMINADAS[plantillaSeleccionada] || '';
+    setTextoEditorPlantilla(def);
+
+    const plantillasActuales = { ...(configuracion?.plantillas_comunicacion || {}) };
+    delete plantillasActuales[plantillaSeleccionada];
+
+    setGuardandoPlantilla(true);
+    const res = await onGuardarConfiguracion({
+      plantillas_comunicacion: plantillasActuales,
+    });
+    setGuardandoPlantilla(false);
+
+    if (res.success) {
+      showToast(`Plantilla de ${plantillaSeleccionada} restablecida a la versión oficial predeterminada 🔄`, 'info');
+    } else {
+      showToast(`Error: ${res.error}`, 'error');
+    }
+  };
+
+  const insertarEtiquetaEnEditor = (etiqueta: string) => {
+    setTextoEditorPlantilla(prev => `${prev} {{${etiqueta}}}`);
+    showToast(`Etiqueta {{${etiqueta}}} insertada`, 'info');
   };
 
   const handleGuardarWaGlobal = () => {
@@ -348,6 +587,8 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
   );
 
   const reservaActual = reservas.find(x => x.id === reservaId);
+  const cotizacionActual = cotizaciones.find(x => x.id === cotizacionId);
+  const baseNum = consecutivoBaseActivo || (reservaActual?.consecutivo ? formatearConsecutivoSimple(reservaActual.consecutivo) : (cotizacionActual?.consecutivo ? formatearConsecutivoSimple(cotizacionActual.consecutivo) : '1001'));
 
   return (
     <div className="panel">
@@ -356,14 +597,14 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
         <div>
           <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#25d366' }}>
             <MessageCircle size={20} />
-            <span>Comunicaciones y WhatsApp</span>
+            <span>Comunicaciones, Consecutivos y WhatsApp</span>
           </div>
           <div className="text-xs text-muted mt-1">
-            Gestión integral de mensajería con clientes, envío de cotizaciones, documentos PDF y recordatorios.
+            Sinergia completa con Cotizaciones y Reservas: gestión de consecutivos dinámicos, documentos PDF, almacenamiento y plantillas personalizadas.
           </div>
         </div>
 
-        {/* Pestañas */}
+        {/* Pestañas de navegación */}
         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
           <button
             className={`btn btn-sm${tabActiva === 'envio' ? ' btn-primary' : ''}`}
@@ -373,18 +614,18 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
             <Send size={13} /> Enviar Mensaje
           </button>
           <button
+            className={`btn btn-sm${tabActiva === 'plantillas' ? ' btn-primary' : ''}`}
+            onClick={() => setTabActiva('plantillas')}
+            style={{ fontSize: '0.76rem', gap: '0.35rem' }}
+          >
+            <BookOpen size={13} /> Editor de Plantillas
+          </button>
+          <button
             className={`btn btn-sm${tabActiva === 'historial' ? ' btn-primary' : ''}`}
             onClick={() => setTabActiva('historial')}
             style={{ fontSize: '0.76rem', gap: '0.35rem' }}
           >
             <Clock size={13} /> Historial ({comunicaciones.length})
-          </button>
-          <button
-            className={`btn btn-sm${tabActiva === 'plantillas' ? ' btn-primary' : ''}`}
-            onClick={() => setTabActiva('plantillas')}
-            style={{ fontSize: '0.76rem', gap: '0.35rem' }}
-          >
-            <BookOpen size={13} /> Plantillas
           </button>
           <button
             className={`btn btn-sm${tabActiva === 'config' ? ' btn-primary' : ''}`}
@@ -397,276 +638,564 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
       </div>
 
       {/* ========================================================
-          PESTAÑA 1: CENTRO DE ENVÍOS RÁPIDOS
+          PESTAÑA 1: CENTRO DE ENVÍOS RÁPIDOS & CONSECUTIVOS
           ======================================================== */}
       {tabActiva === 'envio' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem', paddingTop: '0.5rem' }}>
-          {/* Columna Izquierda: Configuración del Mensaje */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-            {/* 1. Selector de Plantilla */}
-            <div className="field">
-              <label style={{ fontWeight: 600, fontSize: '0.8rem' }}>1. Tipo de Comunicación / Documento</label>
-              <select
-                value={tipoSeleccionado}
-                onChange={e => handleTipoChange(e.target.value as TipoComunicacion)}
-                style={{ fontSize: '0.85rem', fontWeight: 500 }}
-              >
-                <option value="cotizacion">📄 Cotización Oficial</option>
-                <option value="separacion">🎉 Documento de Separación (PDF)</option>
-                <option value="abono">💳 Comprobante de Abono / Pago (PDF)</option>
-                <option value="estado_cuenta">📊 Estado de Cuenta Consolidado (PDF)</option>
-                <option value="paz_salvo">🏅 Certificado de Paz y Salvo (PDF)</option>
-                <option value="menu">🍽️ Propuesta de Menú / Alimentación (PDF)</option>
-                <option value="recordatorio_pago">⏰ Recordatorio Amistoso de Saldo</option>
-                <option value="bienvenida">👋 Bienvenida e Instrucciones de Llegada</option>
-                <option value="personalizado">💬 Mensaje Personalizado Libre</option>
-              </select>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingTop: '0.5rem' }}>
+          
+          {/* BARRA SUPERIOR: LOOKUP RÁPIDO POR CONSECUTIVO */}
+          <div
+            style={{
+              background: 'linear-gradient(135deg, rgba(26, 107, 94, 0.08) 0%, rgba(37, 211, 102, 0.06) 100%)',
+              border: '1px solid rgba(26, 107, 94, 0.25)',
+              borderRadius: 'var(--rad-sm)',
+              padding: '0.85rem 1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.65rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.84rem', color: 'var(--primary)' }}>
+                <Search size={16} />
+                <span>Cargar por N° Consecutivo de Cotización o Reserva:</span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  placeholder="Ej: 1001 o COT-1001"
+                  value={inputBusquedaConsecutivo}
+                  onChange={e => setInputBusquedaConsecutivo(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') ejecutarBusquedaConsecutivo(); }}
+                  style={{
+                    fontSize: '0.82rem',
+                    padding: '0.35rem 0.65rem',
+                    width: '160px',
+                    fontWeight: 600,
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  onClick={() => ejecutarBusquedaConsecutivo()}
+                  style={{ fontSize: '0.76rem', padding: '0.35rem 0.75rem' }}
+                >
+                  Cargar
+                </button>
+              </div>
             </div>
 
-            {/* 2. Selectores dependientes */}
-            {tipoSeleccionado === 'cotizacion' && (
-              <div className="field">
-                <label style={{ fontSize: '0.78rem' }}>Seleccionar Cotización</label>
-                <select
-                  value={cotizacionId}
-                  onChange={e => handleCotizacionChange(e.target.value)}
-                  style={{ fontSize: '0.82rem' }}
+            {/* Ficha de Consecutivo Activo y Selector Dinámico de Documentos */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.6rem',
+                paddingTop: '0.4rem',
+                borderTop: '1px solid rgba(26, 107, 94, 0.15)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', fontSize: '0.78rem' }}>
+                <span style={{ background: 'var(--primary)', color: '#fff', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 700 }}>
+                  N° Base: #{baseNum}
+                </span>
+                {destinatarioNombre && (
+                  <span><strong>Cliente:</strong> {destinatarioNombre}</span>
+                )}
+                {reservaActual && (
+                  <span><strong>Finca:</strong> {reservaActual.fincas?.nombre || 'Finca'}</span>
+                )}
+                {reservaActual && (
+                  <span><strong>Saldo:</strong> {formatCOP(calcularSaldo(reservaActual))}</span>
+                )}
+              </div>
+
+              {/* Botones rápidos de Documentos con Prefijo Dinámico sobre el mismo Consecutivo */}
+              <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm${tipoSeleccionado === 'cotizacion' ? ' btn-primary' : ''}`}
+                  onClick={() => seleccionarTipoRapido('cotizacion')}
+                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
+                  title="Cotización oficial"
                 >
-                  <option value="">— Seleccionar cotización —</option>
-                  {cotizaciones.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.fincas?.nombre} · {c.clientes ? `${c.clientes.nombre} ${c.clientes.apellido || ''}` : 'Sin cliente'} · {formatCOP(c.total)}
-                    </option>
-                  ))}
+                  COT-{baseNum}
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm${tipoSeleccionado === 'separacion' ? ' btn-primary' : ''}`}
+                  onClick={() => seleccionarTipoRapido('separacion')}
+                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
+                  title="Documento de separación"
+                >
+                  SEP-{baseNum}
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm${tipoSeleccionado === 'abono' ? ' btn-primary' : ''}`}
+                  onClick={() => seleccionarTipoRapido('abono')}
+                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
+                  title="Comprobante de abono"
+                >
+                  ABO-{baseNum}
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm${tipoSeleccionado === 'estado_cuenta' ? ' btn-primary' : ''}`}
+                  onClick={() => seleccionarTipoRapido('estado_cuenta')}
+                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
+                  title="Estado de cuenta consolidado"
+                >
+                  SAL-{baseNum}
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm${tipoSeleccionado === 'paz_salvo' ? ' btn-primary' : ''}`}
+                  onClick={() => seleccionarTipoRapido('paz_salvo')}
+                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
+                  title="Certificado de paz y salvo"
+                >
+                  PAZ-{baseNum}
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm${tipoSeleccionado === 'menu' ? ' btn-primary' : ''}`}
+                  onClick={() => seleccionarTipoRapido('menu')}
+                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
+                  title="Propuesta de menú gastronómico"
+                >
+                  MEN-{baseNum}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* CUERPO PRINCIPAL DEL FORMULARIO DE ENVÍO */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+            {/* Columna Izquierda: Parámetros del Documento y Destinatario */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              {/* 1. Selector de Plantilla */}
+              <div className="field">
+                <label style={{ fontWeight: 600, fontSize: '0.8rem' }}>1. Tipo de Comunicación / Documento</label>
+                <select
+                  value={tipoSeleccionado}
+                  onChange={e => handleTipoChange(e.target.value as TipoComunicacion)}
+                  style={{ fontSize: '0.85rem', fontWeight: 500 }}
+                >
+                  <option value="cotizacion">📄 Cotización Oficial ({formatearConsecutivoConPrefijo(baseNum, 'cotizacion')})</option>
+                  <option value="separacion">🎉 Documento de Separación ({formatearConsecutivoConPrefijo(baseNum, 'separacion')})</option>
+                  <option value="abono">💳 Comprobante de Abono / Pago ({formatearConsecutivoConPrefijo(baseNum, 'abono')})</option>
+                  <option value="estado_cuenta">📊 Estado de Cuenta ({formatearConsecutivoConPrefijo(baseNum, 'estado_cuenta')})</option>
+                  <option value="paz_salvo">🏅 Certificado de Paz y Salvo ({formatearConsecutivoConPrefijo(baseNum, 'paz_salvo')})</option>
+                  <option value="menu">🍽️ Propuesta de Menú ({formatearConsecutivoConPrefijo(baseNum, 'menu')})</option>
+                  <option value="recordatorio_pago">⏰ Recordatorio Amistoso de Saldo</option>
+                  <option value="bienvenida">👋 Bienvenida e Instrucciones de Llegada</option>
+                  <option value="personalizado">💬 Mensaje Personalizado Libre</option>
                 </select>
               </div>
-            )}
 
-            {['separacion', 'estado_cuenta', 'paz_salvo', 'recordatorio_pago', 'bienvenida'].includes(tipoSeleccionado) && (
-              <div className="field">
-                <label style={{ fontSize: '0.78rem' }}>Seleccionar Reserva</label>
-                <select
-                  value={reservaId}
-                  onChange={e => handleReservaChange(e.target.value)}
-                  style={{ fontSize: '0.82rem' }}
-                >
-                  <option value="">— Seleccionar reserva registrada —</option>
-                  {reservas.map(r => (
-                    <option key={r.id} value={r.id}>
-                      {r.fincas?.nombre} · {r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}` : 'Cliente'} ({formatFecha(r.fecha_inicio)})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {tipoSeleccionado === 'abono' && (
-              <>
+              {/* 2. Selectores dependientes */}
+              {tipoSeleccionado === 'cotizacion' && (
                 <div className="field">
-                  <label style={{ fontSize: '0.78rem' }}>Seleccionar Reserva</label>
+                  <label style={{ fontSize: '0.78rem' }}>Seleccionar Cotización Registrada</label>
+                  <select
+                    value={cotizacionId}
+                    onChange={e => handleCotizacionChange(e.target.value)}
+                    style={{ fontSize: '0.82rem' }}
+                  >
+                    <option value="">— Seleccionar cotización —</option>
+                    {cotizaciones.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.consecutivo ? `[#${formatearConsecutivoSimple(c.consecutivo)}] ` : ''}{c.fincas?.nombre} · {c.clientes ? `${c.clientes.nombre} ${c.clientes.apellido || ''}` : 'Sin cliente'} · {formatCOP(c.total)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {['separacion', 'estado_cuenta', 'paz_salvo', 'recordatorio_pago', 'bienvenida'].includes(tipoSeleccionado) && (
+                <div className="field">
+                  <label style={{ fontSize: '0.78rem' }}>Seleccionar Reserva Registrada</label>
                   <select
                     value={reservaId}
                     onChange={e => handleReservaChange(e.target.value)}
                     style={{ fontSize: '0.82rem' }}
                   >
-                    <option value="">— Seleccionar reserva —</option>
+                    <option value="">— Seleccionar reserva registrada —</option>
                     {reservas.map(r => (
                       <option key={r.id} value={r.id}>
-                        {r.fincas?.nombre} · {r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}` : 'Cliente'}
+                        {r.consecutivo ? `[#${formatearConsecutivoSimple(r.consecutivo)}] ` : ''}{r.fincas?.nombre} · {r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}` : 'Cliente'} ({formatFecha(r.fecha_inicio)})
                       </option>
                     ))}
                   </select>
                 </div>
+              )}
 
-                {reservaActual && (reservaActual.pagos || []).length > 0 && (
+              {tipoSeleccionado === 'abono' && (
+                <>
                   <div className="field">
-                    <label style={{ fontSize: '0.78rem' }}>Seleccionar Pago a Certificar</label>
+                    <label style={{ fontSize: '0.78rem' }}>Seleccionar Reserva</label>
                     <select
-                      value={pagoId}
-                      onChange={e => handlePagoChange(e.target.value)}
+                      value={reservaId}
+                      onChange={e => handleReservaChange(e.target.value)}
                       style={{ fontSize: '0.82rem' }}
                     >
-                      {(reservaActual.pagos || []).map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.tipo} · {formatFecha(p.fecha)} · {formatCOP(p.valor)}
+                      <option value="">— Seleccionar reserva —</option>
+                      {reservas.map(r => (
+                        <option key={r.id} value={r.id}>
+                          {r.consecutivo ? `[#${formatearConsecutivoSimple(r.consecutivo)}] ` : ''}{r.fincas?.nombre} · {r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}` : 'Cliente'}
                         </option>
                       ))}
                     </select>
                   </div>
-                )}
-              </>
-            )}
 
-            {tipoSeleccionado === 'menu' && (
-              <div className="field">
-                <label style={{ fontSize: '0.78rem' }}>Cotización con menú asociado</label>
-                <select
-                  value={cotizacionId}
-                  onChange={e => handleCotizacionChange(e.target.value)}
-                  style={{ fontSize: '0.82rem' }}
+                  {reservaActual && (reservaActual.pagos || []).length > 0 && (
+                    <div className="field">
+                      <label style={{ fontSize: '0.78rem' }}>Seleccionar Pago a Certificar</label>
+                      <select
+                        value={pagoId}
+                        onChange={e => handlePagoChange(e.target.value)}
+                        style={{ fontSize: '0.82rem' }}
+                      >
+                        {(reservaActual.pagos || []).map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.tipo} · {formatFecha(p.fecha)} · {formatCOP(p.valor)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {tipoSeleccionado === 'menu' && (
+                <div className="field">
+                  <label style={{ fontSize: '0.78rem' }}>Cotización con menú asociado</label>
+                  <select
+                    value={cotizacionId}
+                    onChange={e => handleCotizacionChange(e.target.value)}
+                    style={{ fontSize: '0.82rem' }}
+                  >
+                    <option value="">— Seleccionar cotización —</option>
+                    {cotizaciones.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.consecutivo ? `[#${formatearConsecutivoSimple(c.consecutivo)}] ` : ''}{c.fincas?.nombre} · {c.alimentacion || 'Menú'} · {c.clientes?.nombre || 'Cliente'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {tipoSeleccionado === 'personalizado' && (
+                <div className="field">
+                  <label style={{ fontSize: '0.78rem' }}>Vincular a cliente registrado (opcional)</label>
+                  <select
+                    value={clienteId}
+                    onChange={e => handleClienteChange(e.target.value)}
+                    style={{ fontSize: '0.82rem' }}
+                  >
+                    <option value="">— Ninguno / Ingreso manual —</option>
+                    {clientes.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre} {c.apellido || ''} {c.whatsapp ? `(${c.whatsapp})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* 3. Datos del Destinatario */}
+              <div style={{ background: 'var(--surface-alt, #f7f9f8)', padding: '0.85rem', borderRadius: 'var(--rad-sm)', border: '1px solid var(--border)' }}>
+                <div className="field" style={{ marginBottom: '0.6rem' }}>
+                  <label style={{ fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <Users size={12} /> Nombre del Destinatario:
+                  </label>
+                  <input
+                    type="text"
+                    value={destinatarioNombre}
+                    onChange={e => setDestinatarioNombre(e.target.value)}
+                    placeholder="Ej. Juan Pérez"
+                    style={{ fontSize: '0.82rem' }}
+                  />
+                </div>
+
+                <div className="field" style={{ margin: 0 }}>
+                  <label style={{ fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <Phone size={12} /> WhatsApp (indicativo + celular):
+                  </label>
+                  <input
+                    type="tel"
+                    value={telefonoInput}
+                    onChange={e => setTelefonoInput(e.target.value)}
+                    placeholder="Ej. 573176827093"
+                    style={{ fontSize: '0.85rem', fontWeight: 600 }}
+                  />
+                </div>
+              </div>
+
+              {/* 4. Banner de Documento PDF */}
+              {tieneDocumentoPdf && (
+                <div
+                  style={{
+                    background: 'rgba(26, 107, 94, 0.08)',
+                    border: '1px solid rgba(26, 107, 94, 0.25)',
+                    padding: '0.75rem',
+                    borderRadius: 'var(--rad-sm)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem',
+                    fontSize: '0.78rem',
+                  }}
                 >
-                  <option value="">— Seleccionar cotización —</option>
-                  {cotizaciones.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.fincas?.nombre} · {c.alimentacion || 'Menú'} · {c.clientes?.nombre || 'Cliente'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {tipoSeleccionado === 'personalizado' && (
-              <div className="field">
-                <label style={{ fontSize: '0.78rem' }}>Vincular a cliente registrado (opcional)</label>
-                <select
-                  value={clienteId}
-                  onChange={e => handleClienteChange(e.target.value)}
-                  style={{ fontSize: '0.82rem' }}
-                >
-                  <option value="">— Ninguno / Ingreso manual —</option>
-                  {clientes.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre} {c.apellido || ''} {c.whatsapp ? `(${c.whatsapp})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* 3. Datos del Destinatario */}
-            <div style={{ background: 'var(--surface-alt, #f7f9f8)', padding: '0.85rem', borderRadius: 'var(--rad-sm)', border: '1px solid var(--border)' }}>
-              <div className="field" style={{ marginBottom: '0.6rem' }}>
-                <label style={{ fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <Users size={12} /> Nombre del Destinatario:
-                </label>
-                <input
-                  type="text"
-                  value={destinatarioNombre}
-                  onChange={e => setDestinatarioNombre(e.target.value)}
-                  placeholder="Ej. Juan Pérez"
-                  style={{ fontSize: '0.82rem' }}
-                />
-              </div>
-
-              <div className="field" style={{ margin: 0 }}>
-                <label style={{ fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <Phone size={12} /> WhatsApp (indicativo + celular):
-                </label>
-                <input
-                  type="tel"
-                  value={telefonoInput}
-                  onChange={e => setTelefonoInput(e.target.value)}
-                  placeholder="Ej. 573176827093"
-                  style={{ fontSize: '0.85rem', fontWeight: 600 }}
-                />
-              </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: 'var(--primary)', fontWeight: 600 }}>
+                    <Download size={15} /> {nombreDocumento}
+                  </div>
+                  <div className="text-muted" style={{ fontSize: '0.74rem' }}>
+                    El PDF se generará con el código <strong>{formatearConsecutivoConPrefijo(baseNum, tipoSeleccionado as TipoDocumentoPrefijo)}</strong>, se guardará en tu equipo y se subirá automáticamente a la nube para adjuntar el enlace directo en WhatsApp.
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.2rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={ejecutarGeneracionYDescargaPdf}
+                      style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
+                    >
+                      <Download size={11} /> Descargar PDF ahora
+                    </button>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.74rem', margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={descargarPdf}
+                        onChange={e => setDescargarPdf(e.target.checked)}
+                      />
+                      <span>Generar y subir al enviar</span>
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* 4. Banner de Documento PDF */}
-            {tieneDocumentoPdf && (
-              <div
-                style={{
-                  background: 'rgba(26, 107, 94, 0.08)',
-                  border: '1px solid rgba(26, 107, 94, 0.25)',
-                  padding: '0.75rem',
-                  borderRadius: 'var(--rad-sm)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                  fontSize: '0.78rem',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: 'var(--primary)', fontWeight: 600 }}>
-                  <Download size={15} /> {nombreDocumento}
-                </div>
-                <div className="text-muted" style={{ fontSize: '0.74rem' }}>
-                  Siguiendo las reglas del Plan Maestro, el documento PDF se genera primero para que puedas adjuntarlo en la conversación de WhatsApp.
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.2rem' }}>
+            {/* Columna Derecha: Vista previa y acción de envío */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label style={{ fontWeight: 600, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <MessageCircle size={14} style={{ color: '#25d366' }} /> Mensaje a enviar por WhatsApp (editable)
+                </label>
+                <div style={{ display: 'flex', gap: '0.35rem' }}>
                   <button
                     type="button"
                     className="btn btn-sm"
-                    onClick={ejecutarDescargaPdf}
+                    onClick={() => actualizarPlantilla(tipoSeleccionado)}
+                    title="Regenerar texto con plantilla actual"
+                    style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
+                  >
+                    <RotateCcw size={11} /> Regenerar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={handleCopiar}
                     style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
                   >
-                    <Download size={11} /> Descargar PDF ahora
+                    {copiado ? <><Check size={11} style={{ color: 'var(--success)' }} /> Copiado</> : <><Copy size={11} /> Copiar</>}
                   </button>
-                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.74rem', margin: 0 }}>
-                    <input
-                      type="checkbox"
-                      checked={descargarPdf}
-                      onChange={e => setDescargarPdf(e.target.checked)}
-                    />
-                    <span>Descargar al enviar</span>
-                  </label>
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Columna Derecha: Vista previa y acción de envío */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label style={{ fontWeight: 600, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <MessageCircle size={14} style={{ color: '#25d366' }} /> Vista previa del mensaje (editable)
-              </label>
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={handleCopiar}
-                style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
-              >
-                {copiado ? <><Check size={11} style={{ color: 'var(--success)' }} /> Copiado</> : <><Copy size={11} /> Copiar texto</>}
-              </button>
-            </div>
-
-            <textarea
-              rows={15}
-              value={mensajeTexto}
-              onChange={e => setMensajeTexto(e.target.value)}
-              placeholder="Escribe o previsualiza aquí el mensaje que recibirá el cliente…"
-              style={{
-                fontFamily: 'inherit',
-                fontSize: '0.82rem',
-                lineHeight: '1.45',
-                padding: '0.85rem',
-                borderRadius: 'var(--rad-sm)',
-                whiteSpace: 'pre-wrap',
-                flex: 1,
-                minHeight: '260px',
-              }}
-            />
-
-            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.4rem' }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleEnviar}
-                disabled={procesando || !telefonoInput.trim()}
+              <textarea
+                rows={16}
+                value={mensajeTexto}
+                onChange={e => setMensajeTexto(e.target.value)}
+                placeholder="Escribe o previsualiza aquí el mensaje que recibirá el cliente…"
                 style={{
+                  fontFamily: 'inherit',
+                  fontSize: '0.82rem',
+                  lineHeight: '1.45',
+                  padding: '0.85rem',
+                  borderRadius: 'var(--rad-sm)',
+                  whiteSpace: 'pre-wrap',
                   flex: 1,
-                  backgroundColor: '#25d366',
-                  borderColor: '#25d366',
-                  color: '#ffffff',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
-                  gap: '0.45rem',
-                  justifyContent: 'center',
-                  padding: '0.65rem 1rem',
+                  minHeight: '280px',
                 }}
-              >
-                <Send size={16} />
-                {procesando
-                  ? 'Generando y enviando…'
-                  : (tieneDocumentoPdf && descargarPdf ? 'Descargar PDF y Enviar por WhatsApp' : 'Abrir chat de WhatsApp')}
-              </button>
+              />
+
+              <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.4rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleEnviar}
+                  disabled={procesando || !telefonoInput.trim()}
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#25d366',
+                    borderColor: '#25d366',
+                    color: '#ffffff',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    gap: '0.45rem',
+                    justifyContent: 'center',
+                    padding: '0.65rem 1rem',
+                  }}
+                >
+                  <Send size={16} />
+                  {procesando
+                    ? 'Generando PDF y abriendo WhatsApp…'
+                    : (tieneDocumentoPdf && descargarPdf ? 'Descargar PDF y Enviar por WhatsApp' : 'Abrir chat de WhatsApp')}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* ========================================================
-          PESTAÑA 2: HISTORIAL DE COMUNICACIONES
+          PESTAÑA 2: EDITOR DE PLANTILLAS EN SUPABASE
+          ======================================================== */}
+      {tabActiva === 'plantillas' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingTop: '0.5rem' }}>
+          <div
+            style={{
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--rad-sm)',
+              padding: '1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+            }}
+          >
+            {/* Selector de plantilla a editar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <BookOpen size={16} style={{ color: 'var(--primary)' }} />
+                <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>Seleccionar Plantilla a Personalizar:</span>
+              </div>
+              <select
+                value={plantillaSeleccionada}
+                onChange={e => setPlantillaSeleccionada(e.target.value)}
+                style={{ fontSize: '0.82rem', padding: '0.3rem 0.6rem', minWidth: '240px' }}
+              >
+                <option value="cotizacion">📄 Cotización Oficial</option>
+                <option value="separacion">🎉 Documento de Separación</option>
+                <option value="abono">💳 Comprobante de Abono / Pago</option>
+                <option value="estado_cuenta">📊 Estado de Cuenta Consolidado</option>
+                <option value="paz_salvo">🏅 Certificado de Paz y Salvo</option>
+                <option value="menu">🍽️ Propuesta de Menú / Alimentación</option>
+                <option value="recordatorio_pago">⏰ Recordatorio Amistoso de Saldo</option>
+                <option value="bienvenida">👋 Bienvenida e Instrucciones de Llegada</option>
+              </select>
+            </div>
+
+            {/* Estado actual de la plantilla */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem' }}>
+              <span className="text-muted">Estado actual:</span>
+              {configuracion?.plantillas_comunicacion?.[plantillaSeleccionada] ? (
+                <span className="status-badge s-avail" style={{ fontSize: '0.7rem' }}>
+                  ✓ Plantilla personalizada activa en Supabase
+                </span>
+              ) : (
+                <span className="status-badge" style={{ fontSize: '0.7rem', background: 'rgba(0,0,0,0.06)' }}>
+                  Predeterminada del sistema
+                </span>
+              )}
+            </div>
+
+            {/* Inserción rápida de etiquetas / tokens */}
+            <div>
+              <div style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <Tag size={12} /> Haz clic en cualquier etiqueta para insertarla en el texto del mensaje:
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                {[
+                  { tag: 'cliente', desc: 'Nombre del cliente' },
+                  { tag: 'finca', desc: 'Nombre de la finca' },
+                  { tag: 'consecutivo', desc: 'N° con prefijo (COT-, SEP-...)' },
+                  { tag: 'fechas', desc: 'Rango de fechas' },
+                  { tag: 'fecha_llegada', desc: 'Día de llegada' },
+                  { tag: 'fecha_salida', desc: 'Día de salida' },
+                  { tag: 'noches', desc: 'Noches de estancia' },
+                  { tag: 'personas', desc: 'N° comensales / huéspedes' },
+                  { tag: 'total', desc: 'Valor total' },
+                  { tag: 'anticipo', desc: 'Valor anticipo / separación' },
+                  { tag: 'saldo', desc: 'Saldo pendiente' },
+                  { tag: 'pago_valor', desc: 'Monto del pago' },
+                  { tag: 'enlace_pdf', desc: 'Enlace público del PDF' },
+                ].map(item => (
+                  <button
+                    key={item.tag}
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => insertarEtiquetaEnEditor(item.tag)}
+                    style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', background: 'rgba(26, 107, 94, 0.06)', borderColor: 'rgba(26, 107, 94, 0.2)' }}
+                    title={item.desc}
+                  >
+                    + {`{{${item.tag}}}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Textarea de edición */}
+            <div className="field">
+              <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Cuerpo de la Plantilla:</label>
+              <textarea
+                rows={12}
+                value={textoEditorPlantilla}
+                onChange={e => setTextoEditorPlantilla(e.target.value)}
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: '0.82rem',
+                  lineHeight: '1.45',
+                  padding: '0.75rem',
+                  borderRadius: 'var(--rad-sm)',
+                }}
+              />
+            </div>
+
+            {/* Acciones de guardado */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={handleRestablecerPlantilla}
+                disabled={guardandoPlantilla}
+                style={{ fontSize: '0.76rem', color: '#c0392b' }}
+              >
+                <RotateCcw size={12} /> Restablecer a plantilla oficial
+              </button>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => {
+                    setTipoSeleccionado(plantillaSeleccionada as TipoComunicacion);
+                    setTabActiva('envio');
+                    actualizarPlantilla(plantillaSeleccionada as TipoComunicacion);
+                  }}
+                  style={{ fontSize: '0.76rem' }}
+                >
+                  <Send size={12} /> Usar en Enviar Mensaje
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  onClick={handleGuardarPlantilla}
+                  disabled={guardandoPlantilla}
+                  style={{ fontSize: '0.76rem', gap: '0.35rem' }}
+                >
+                  <Save size={13} /> {guardandoPlantilla ? 'Guardando en Supabase…' : 'Guardar en Supabase'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          PESTAÑA 3: HISTORIAL DE COMUNICACIONES
           ======================================================== */}
       {tabActiva === 'historial' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', paddingTop: '0.5rem' }}>
@@ -766,99 +1295,6 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
       )}
 
       {/* ========================================================
-          PESTAÑA 3: CATÁLOGO DE PLANTILLAS
-          ======================================================== */}
-      {tabActiva === 'plantillas' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', paddingTop: '0.5rem' }}>
-          {[
-            {
-              titulo: '📄 Cotización Oficial',
-              desc: 'Desglose económico completo con fechas, noches, personas, desglose de alojamiento y alimentación seleccionada.',
-              tipo: 'cotizacion' as TipoComunicacion,
-              badge: 'Automática',
-            },
-            {
-              titulo: '🎉 Documento de Separación',
-              desc: 'Confirmación formal de reserva con anticipo recibido, saldo pendiente, fechas y aviso de PDF de separación adjunto.',
-              tipo: 'separacion' as TipoComunicacion,
-              badge: 'PDF Vinculado',
-            },
-            {
-              titulo: '💳 Comprobante de Abono / Pago',
-              desc: 'Recibo oficial del pago con fecha, tipo (abono/separación), monto cancelado y nuevo saldo restante de la finca.',
-              tipo: 'abono' as TipoComunicacion,
-              badge: 'PDF Vinculado',
-            },
-            {
-              titulo: '📊 Estado de Cuenta',
-              desc: 'Historial completo de pagos recibidos, balance general y aviso de documento PDF de estado de cuenta adjunto.',
-              tipo: 'estado_cuenta' as TipoComunicacion,
-              badge: 'PDF Vinculado',
-            },
-            {
-              titulo: '🏅 Certificado de Paz y Salvo',
-              desc: 'Certificación 100% de saldo $0 COP al día, habilitado únicamente cuando la reserva está totalmente pagada.',
-              tipo: 'paz_salvo' as TipoComunicacion,
-              badge: 'PDF Vinculado',
-            },
-            {
-              titulo: '🍽️ Propuesta de Menú / Alimentación',
-              desc: 'Presentación gastronómica con detalle de platos, precio por comensal, valor total y propuesta formal en PDF.',
-              tipo: 'menu' as TipoComunicacion,
-              badge: 'PDF Vinculado',
-            },
-            {
-              titulo: '⏰ Recordatorio Amistoso de Saldo',
-              desc: 'Notificación amable para que el cliente recuerde cancelar el saldo de su estancia antes de la llegada.',
-              tipo: 'recordatorio_pago' as TipoComunicacion,
-              badge: 'Operativo',
-            },
-            {
-              titulo: '👋 Bienvenida e Instrucciones de Llegada',
-              desc: 'Mensaje de recepción con recomendaciones de viaje, contacto del anfitrión / mayordomo y coordenadas.',
-              tipo: 'bienvenida' as TipoComunicacion,
-              badge: 'Huéspedes',
-            },
-          ].map(p => (
-            <div
-              key={p.tipo}
-              style={{
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--rad-sm)',
-                padding: '1rem',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: '0.65rem',
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <strong style={{ fontSize: '0.85rem' }}>{p.titulo}</strong>
-                  <span className="status-badge s-avail" style={{ fontSize: '0.65rem' }}>{p.badge}</span>
-                </div>
-                <p className="text-xs text-muted" style={{ marginTop: '0.4rem', lineHeight: '1.4' }}>
-                  {p.desc}
-                </p>
-              </div>
-
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={() => {
-                  setTabActiva('envio');
-                  handleTipoChange(p.tipo);
-                }}
-                style={{ fontSize: '0.72rem', alignSelf: 'flex-start' }}
-              >
-                Usar plantilla
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ========================================================
           PESTAÑA 4: CONFIGURACIÓN DE WHATSAPP GLOBAL
           ======================================================== */}
       {tabActiva === 'config' && (
@@ -883,11 +1319,11 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
           </div>
 
           <div style={{ background: 'var(--surface-alt, #fafafa)', padding: '0.85rem', borderRadius: 'var(--rad-sm)', border: '1px solid var(--border)', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            <strong>Nota de configuración:</strong>
+            <strong>Reglas de envío y consecutivos:</strong>
             <ul style={{ margin: '0.4rem 0 0 1rem', padding: 0, lineHeight: '1.5' }}>
-              <li>Este es el número al que se redirigen las consultas de cotización desde la página pública del cliente.</li>
-              <li>Cada finca puede tener opcionalmente su propio número de WhatsApp asignado en su formulario de edición individual.</li>
-              <li>Al enviar documentos a clientes desde el módulo de reservas o cotizaciones, el sistema utiliza el WhatsApp registrado directamente en el perfil del cliente.</li>
+              <li>El número secuencial inicial lo otorga la cotización (ej: <code>1001</code>).</li>
+              <li>A partir de ahí, todos los documentos vinculados (Separación, Abono, Estado de Cuenta, Paz y Salvo, Menú) conservan exactamente el mismo número base, modificando dinámicamente el prefijo (<code>COT-1001</code>, <code>SEP-1001</code>, <code>ABO-1001</code>, etc.).</li>
+              <li>Al hacer clic en "Descargar PDF y Enviar por WhatsApp", el documento se compila en tu equipo y se genera un enlace público directo que se inserta en el chat.</li>
             </ul>
           </div>
         </div>
