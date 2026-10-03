@@ -1,6 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { MessageCircle, Calculator, Calendar, Users, Utensils, Info, Check } from 'lucide-react';
+import {
+  MessageCircle, Calculator, Calendar, Users, Utensils, Info,
+  Check, User, Phone, Loader2, BadgeCheck,
+} from 'lucide-react';
 import type { Finca, Cotizacion, Menu } from '../types';
+import type { DatosCotizacionPublica, ResultadoCotizacionPublica } from '../hooks/useCotizadorPublico';
 
 interface QuoteCalculatorProps {
   finca: Finca;
@@ -14,6 +18,8 @@ interface QuoteCalculatorProps {
   onFechaFinChange: (val: string) => void;
   onPersonasChange: (val: number) => void;
   onPlanChange: (val: string) => void;
+  /** Prop de Etapa 2: conecta el guardado a Supabase vía useCotizadorPublico */
+  onGuardarCotizacion?: (datos: DatosCotizacionPublica) => Promise<ResultadoCotizacionPublica>;
 }
 
 function formatCOP(v: number) {
@@ -32,9 +38,19 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
   onFechaFinChange,
   onPersonasChange,
   onPlanChange,
+  onGuardarCotizacion,
 }) => {
   const [cantidadServicios, setCantidadServicios] = useState<number>(1);
   const [verDetalleMenu, setVerDetalleMenu] = useState(false);
+
+  // --- Campos de cliente (Etapa 2) ---
+  const [clienteNombre, setClienteNombre] = useState('');
+  const [clienteCelular, setClienteCelular] = useState('');
+  const [mismoWa, setMismoWa] = useState(true);
+  const [clienteWa, setClienteWa] = useState('');
+  const [guardandoCot, setGuardandoCot] = useState(false);
+  const [cotGuardada, setCotGuardada] = useState<{ consecutivo: string; id: string } | null>(null);
+  const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
 
   // Menús activos disponibles
   const menusActivos = useMemo(() => {
@@ -44,7 +60,10 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
   // Identificar el menú seleccionado actualmente
   const menuSeleccionado = useMemo(() => {
     if (!plan || plan.toLowerCase().includes('sin alimentación')) return null;
-    return menusActivos.find(m => m.nombre.toLowerCase() === plan.toLowerCase() || `${m.categoria}: ${m.nombre}`.toLowerCase() === plan.toLowerCase());
+    return menusActivos.find(
+      m => m.nombre.toLowerCase() === plan.toLowerCase()
+        || `${m.categoria}: ${m.nombre}`.toLowerCase() === plan.toLowerCase()
+    );
   }, [plan, menusActivos]);
 
   // Cotización calculada en tiempo real
@@ -61,13 +80,11 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
     const precioBasePorPersona = Number(finca.precio_pp) || 0;
     const subtotalAlojamiento = noches * personas * precioBasePorPersona;
 
-    // Cálculo automático de alimentación: Precio × Personas × Cantidad
     let costoPlanTotal = 0;
     if (menuSeleccionado) {
       const cant = cantidadServicios || noches || 1;
       costoPlanTotal = (menuSeleccionado.precio_pp || 0) * personas * cant;
     } else if (plan && !plan.toLowerCase().includes('sin alimentación')) {
-      // Fallback si es un texto antiguo de plan
       let costoPorPp = 0;
       if (plan.toLowerCase().includes('desayuno')) costoPorPp = 18000;
       else if (plan.toLowerCase().includes('todo incluido') || plan.toLowerCase().includes('completa')) costoPorPp = 75000;
@@ -76,17 +93,21 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
 
     const totalEstimado = subtotalAlojamiento + costoPlanTotal;
 
-    // Construcción del mensaje formateado para WhatsApp
     const waNum = (finca.whatsapp || waNumberGlobal || '573176827093').replace(/[^0-9]/g, '');
+
+    const consecutivoLinea = cotGuardada ? `\n🆔 *Cotización:* ${cotGuardada.consecutivo}` : '';
 
     const partes = [
       `¡Hola! 👋 Me gustaría reservar en *${finca.nombre}*.`,
-      fechaInicio && fechaFin ? `📅 *Fechas:* del *${fechaInicio}* al *${fechaFin}* (${noches} noche${noches !== 1 ? 's' : ''})` : '',
+      fechaInicio && fechaFin
+        ? `📅 *Fechas:* del *${fechaInicio}* al *${fechaFin}* (${noches} noche${noches !== 1 ? 's' : ''})`
+        : '',
       `👥 *Cantidad de personas:* ${personas}`,
       menuSeleccionado
         ? `🍽️ *Plan de alimentación:* ${menuSeleccionado.nombre} (${menuSeleccionado.categoria}) — ${personas} pers. × ${cantidadServicios} servicio(s): $${costoPlanTotal.toLocaleString('es-CO')} COP`
         : (plan && plan !== 'Sin alimentación' ? `🍽️ *Plan de alimentación:* ${plan}` : ''),
       totalEstimado > 0 ? `💰 *Cotización estimada total:* $${totalEstimado.toLocaleString('es-CO')} COP` : '',
+      consecutivoLinea,
       `\n¿Tienen disponibilidad confirmada para estas fechas? Quedo atento/a para coordinar los detalles. ¡Muchas gracias! 🙏`,
     ].filter(Boolean).join('\n');
 
@@ -106,11 +127,66 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
       waMensaje: partes,
       waUrl,
     };
-  }, [finca, fechaInicio, fechaFin, personas, plan, waNumberGlobal, menuSeleccionado, cantidadServicios]);
+  }, [finca, fechaInicio, fechaFin, personas, plan, waNumberGlobal, menuSeleccionado, cantidadServicios, cotGuardada]);
 
   const handlePlanSelect = (val: string) => {
     onPlanChange(val);
     setVerDetalleMenu(false);
+  };
+
+  // --- Acción principal: Generar cotización y guardar en Supabase ---
+  const handleGenerarCotizacion = async () => {
+    // Siempre limpiar error previo
+    setErrorGuardado(null);
+
+    // Validar campos requeridos
+    if (!clienteNombre.trim()) {
+      setErrorGuardado('Por favor ingresa tu nombre.');
+      return;
+    }
+    if (!clienteCelular.trim()) {
+      setErrorGuardado('Por favor ingresa tu número de celular.');
+      return;
+    }
+
+    // Si no hay integración con Supabase (prop opcional no provista), abrir WhatsApp directo
+    if (!onGuardarCotizacion) {
+      window.open(cotizacion.waUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    setGuardandoCot(true);
+    try {
+      const whatsappFinal = mismoWa ? clienteCelular.trim() : clienteWa.trim();
+
+      const datos: DatosCotizacionPublica = {
+        clienteNombre: clienteNombre.trim(),
+        clienteCelular: clienteCelular.trim(),
+        clienteWhatsapp: whatsappFinal || clienteCelular.trim(),
+        fincaId: finca.id,
+        fechaInicio: cotizacion.fechaInicio,
+        fechaFin: cotizacion.fechaFin,
+        personas: cotizacion.personas,
+        alimentacion: plan || 'Sin alimentación',
+        menuId: menuSeleccionado?.id,
+        cantidadServicios,
+        precioBasePp: cotizacion.precioBasePorPersona,
+        subtotalAlojamiento: cotizacion.subtotalAlojamiento,
+        costoAlimentacion: cotizacion.costoPlanTotal,
+        total: cotizacion.totalEstimado,
+      };
+
+      const resultado = await onGuardarCotizacion(datos);
+
+      if (resultado.success && resultado.consecutivo && resultado.cotizacionId) {
+        setCotGuardada({ consecutivo: resultado.consecutivo, id: resultado.cotizacionId });
+      } else {
+        // Guardado falló pero no bloqueamos el flujo de WhatsApp
+        setErrorGuardado(resultado.error || 'No se pudo registrar la cotización, pero puedes contactarnos por WhatsApp.');
+      }
+    } finally {
+      setGuardandoCot(false);
+    }
   };
 
   return (
@@ -252,27 +328,157 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
         </div>
       </div>
 
+      {/* ------------------------------------------------------------------ */}
+      {/* CAMPOS DE CLIENTE — Etapa 2                                         */}
+      {/* ------------------------------------------------------------------ */}
+      <div style={{
+        background: 'var(--surface-sunken)',
+        borderRadius: 'var(--rad-xs)',
+        padding: '1rem',
+        display: 'grid',
+        gap: '0.85rem',
+        border: '1px solid var(--border-subtle)',
+      }}>
+        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <User size={14} style={{ color: 'var(--primary)' }} /> Tus datos de contacto
+        </div>
+
+        <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div className="field" style={{ margin: 0 }}>
+            <label style={{ fontSize: '0.75rem' }}><User size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> Nombre *</label>
+            <input
+              id="cotizador-nombre"
+              type="text"
+              placeholder="Tu nombre completo"
+              value={clienteNombre}
+              onChange={e => setClienteNombre(e.target.value)}
+              autoComplete="name"
+            />
+          </div>
+
+          <div className="field" style={{ margin: 0 }}>
+            <label style={{ fontSize: '0.75rem' }}><Phone size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> Celular *</label>
+            <input
+              id="cotizador-celular"
+              type="tel"
+              placeholder="Ej: 3001234567"
+              value={clienteCelular}
+              onChange={e => setClienteCelular(e.target.value)}
+              autoComplete="tel"
+            />
+          </div>
+        </div>
+
+        {/* Checkbox: ¿Mismo número WhatsApp? */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', userSelect: 'none' }}>
+          <input
+            id="cotizador-mismo-wa"
+            type="checkbox"
+            checked={mismoWa}
+            onChange={e => setMismoWa(e.target.checked)}
+            style={{ width: '15px', height: '15px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+          />
+          <span style={{ color: 'var(--text-muted)' }}>El celular también es mi número de WhatsApp</span>
+        </label>
+
+        {/* Campo WhatsApp alternativo */}
+        {!mismoWa && (
+          <div className="field" style={{ margin: 0 }}>
+            <label style={{ fontSize: '0.75rem' }}><MessageCircle size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> WhatsApp (diferente al celular)</label>
+            <input
+              id="cotizador-whatsapp"
+              type="tel"
+              placeholder="Ej: 3009876543"
+              value={clienteWa}
+              onChange={e => setClienteWa(e.target.value)}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Mensaje de error no bloqueante */}
+      {errorGuardado && (
+        <div style={{
+          padding: '0.6rem 0.9rem',
+          borderRadius: 'var(--rad-xs)',
+          background: 'rgba(239,68,68,0.08)',
+          border: '1px solid rgba(239,68,68,0.3)',
+          fontSize: '0.78rem',
+          color: '#ef4444',
+        }}>
+          ⚠️ {errorGuardado}
+        </div>
+      )}
+
+      {/* Badge de éxito: cotización registrada con consecutivo */}
+      {cotGuardada && (
+        <div style={{
+          padding: '0.85rem 1rem',
+          borderRadius: 'var(--rad-xs)',
+          background: 'rgba(34,197,94,0.08)',
+          border: '1px solid rgba(34,197,94,0.35)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+        }}>
+          <BadgeCheck size={22} style={{ color: '#22c55e', flexShrink: 0 }} />
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#16a34a' }}>
+              ✓ Cotización registrada
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+              Código: <strong style={{ fontFamily: 'monospace', color: 'var(--text-main)' }}>{cotGuardada.consecutivo}</strong> — Ahora puedes contactarnos por WhatsApp con este código.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Vista previa del mensaje de WhatsApp */}
       <div>
         <div className="wa-label">
-          <MessageCircle size={14} style={{ color: '#25d366' }} /> Mensaje que se enviará automáticamente por WhatsApp:
+          <MessageCircle size={14} style={{ color: '#25d366' }} /> Mensaje de WhatsApp:
         </div>
         <div className="wa-bubble">{cotizacion.waMensaje}</div>
       </div>
 
-      {/* Botón directo de reserva */}
-      <a
-        href={cotizacion.waUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="btn wa-btn"
-        style={{ width: '100%', marginTop: '0.5rem' }}
-      >
-        <span className="wa-pulse" />
-        <MessageCircle size={18} />
-        Reservar {finca.nombre} por WhatsApp
-      </a>
+      {/* Botón principal: Generar Cotización */}
+      {!cotGuardada && (
+        <button
+          id="cotizador-btn-generar"
+          type="button"
+          className="btn wa-btn"
+          style={{ width: '100%', marginTop: '0.25rem', opacity: guardandoCot ? 0.75 : 1 }}
+          disabled={guardandoCot}
+          onClick={handleGenerarCotizacion}
+        >
+          {guardandoCot ? (
+            <>
+              <Loader2 size={18} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
+              Registrando cotización...
+            </>
+          ) : (
+            <>
+              <Check size={18} />
+              Generar cotización
+            </>
+          )}
+        </button>
+      )}
+
+      {/* Botón de WhatsApp (siempre disponible una vez cotización generada o si ya hay consecutivo) */}
+      {cotGuardada && (
+        <a
+          href={cotizacion.waUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn wa-btn"
+          style={{ width: '100%', marginTop: '0.25rem' }}
+        >
+          <span className="wa-pulse" />
+          <MessageCircle size={18} />
+          Contactar por WhatsApp con código {cotGuardada.consecutivo}
+        </a>
+      )}
     </div>
   );
 };

@@ -22,6 +22,7 @@ import { useMenus } from './hooks/useMenus';
 import { useComunicaciones } from './hooks/useComunicaciones';
 import { useConfiguracion } from './hooks/useConfiguracion';
 import { useContenidoSitio } from './hooks/useContenidoSitio';
+import { useCotizadorPublico } from './hooks/useCotizadorPublico';
 import { DEFAULT_WA_NUMBER } from './services/supabase';
 import type { ViewType, SeccionClave } from './types';
 
@@ -119,6 +120,9 @@ export const App: React.FC = () => {
     guardarContenido,
     restablecerPorDefecto: restablecerContenido,
   } = useContenidoSitio();
+
+  // Etapa 2: Hook del cotizador público (flujo cliente → Supabase)
+  const { guardarCotizacionPublica } = useCotizadorPublico();
 
   // Sincronizar tema con el DOM
   useEffect(() => {
@@ -305,6 +309,7 @@ export const App: React.FC = () => {
             waNumberGlobal={waNumberGlobal}
             menus={menus}
             onBackToCatalog={() => handleViewChange('cliente')}
+            onGuardarCotizacion={guardarCotizacionPublica}
           />
         </main>
       )}

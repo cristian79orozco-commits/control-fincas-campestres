@@ -122,6 +122,7 @@ export interface CotizacionDB {
   descuento: number;
   recargo: number;
   total: number;
+  consecutivo?: string | null;  // Etapa 2 — formato COT-XXXXXX
   estado: CotizacionEstado;
   notas?: string | null;
   created_at?: string;
@@ -146,6 +147,7 @@ export interface Reserva {
   menu_id?: string | null;
   alimentacion?: string | null;
   costo_alimentacion?: number;
+  consecutivo?: string | null;  // Etapa 2 — formato RES-XXXXXX
   estado: ReservaEstado;
   observaciones?: string | null;
   created_at?: string;

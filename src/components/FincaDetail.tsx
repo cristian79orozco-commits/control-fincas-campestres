@@ -4,6 +4,7 @@ import { CalendarPicker } from './CalendarPicker';
 import { QuoteCalculator } from './QuoteCalculator';
 import { GalleryLightbox } from './GalleryLightbox';
 import type { Finca, BloqueoDisponibilidad, Menu } from '../types';
+import type { DatosCotizacionPublica, ResultadoCotizacionPublica } from '../hooks/useCotizadorPublico';
 
 interface FincaDetailProps {
   finca: Finca;
@@ -11,6 +12,8 @@ interface FincaDetailProps {
   waNumberGlobal: string;
   menus?: Menu[];
   onBackToCatalog: () => void;
+  /** Etapa 2: conecta el cotizador público con Supabase */
+  onGuardarCotizacion?: (datos: DatosCotizacionPublica) => Promise<ResultadoCotizacionPublica>;
 }
 
 const estadoMap: Record<string, { cls: string; lbl: string }> = {
@@ -34,6 +37,7 @@ export const FincaDetail: React.FC<FincaDetailProps> = ({
   waNumberGlobal,
   menus = [],
   onBackToCatalog,
+  onGuardarCotizacion,
 }) => {
 
   const [fechaInicio, setFechaInicio] = useState('');
@@ -184,6 +188,7 @@ export const FincaDetail: React.FC<FincaDetailProps> = ({
           onFechaFinChange={setFechaFin}
           onPersonasChange={setPersonas}
           onPlanChange={setPlan}
+          onGuardarCotizacion={onGuardarCotizacion}
         />
 
       </div>
