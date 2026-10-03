@@ -1,24 +1,20 @@
--- =============================================================================
--- ETAPA 2 — MIGRACIÓN SQL
+ï»¿-- =============================================================================
+-- ETAPA 2 - MIGRACION SQL
 -- Control de Fincas Campestres
--- Aplicar en Supabase SQL Editor (Dashboard > SQL Editor > New query)
+-- Estado: APLICADA en Supabase
 -- =============================================================================
 
 -- 1. Columnas nuevas en tabla cotizaciones
-ALTER TABLE public.cotizaciones
-  ADD COLUMN IF NOT EXISTS consecutivo TEXT UNIQUE;
-
-ALTER TABLE public.cotizaciones
-  ADD COLUMN IF NOT EXISTS menu_id UUID REFERENCES public.menus(id) ON DELETE SET NULL;
-
-ALTER TABLE public.cotizaciones
-  ADD COLUMN IF NOT EXISTS cantidad_alimentacion INTEGER DEFAULT 1;
+--    menu_id sin FK directa (tabla menus puede no existir segun orden de migraciones)
+ALTER TABLE public.cotizaciones ADD COLUMN IF NOT EXISTS consecutivo TEXT UNIQUE;
+ALTER TABLE public.cotizaciones ADD COLUMN IF NOT EXISTS menu_id UUID;
+ALTER TABLE public.cotizaciones ADD COLUMN IF NOT EXISTS cantidad_alimentacion INTEGER DEFAULT 1;
 
 -- 2. Columna consecutivo en tabla reservas
-ALTER TABLE public.reservas
-  ADD COLUMN IF NOT EXISTS consecutivo TEXT UNIQUE;
+ALTER TABLE public.reservas ADD COLUMN IF NOT EXISTS consecutivo TEXT UNIQUE;
 
--- 3. Función SQL atómica para consecutivo de cotizaciones
+-- 3. Funcion SQL atomica para consecutivo de cotizaciones
+--    Usa FOR UPDATE para bloquear la fila y evitar duplicados en concurrencia
 CREATE OR REPLACE FUNCTION public.siguiente_consecutivo_cotizacion()
 RETURNS TEXT AS $$
 DECLARE
@@ -39,7 +35,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 4. Función SQL atómica para consecutivo de reservas
+-- 4. Funcion SQL atomica para consecutivo de reservas
 CREATE OR REPLACE FUNCTION public.siguiente_consecutivo_reserva()
 RETURNS TEXT AS $$
 DECLARE
@@ -59,27 +55,27 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 5a. Los clientes anónimos pueden insertar cotizaciones
+-- 5a. Insercion publica de cotizaciones (usuarios anonimos)
 DROP POLICY IF EXISTS "Insercion publica cotizaciones" ON public.cotizaciones;
 CREATE POLICY "Insercion publica cotizaciones"
   ON public.cotizaciones FOR INSERT
   TO anon
   WITH CHECK (true);
 
--- 5b. Los clientes anónimos pueden insertar nuevos clientes
+-- 5b. Insercion publica de clientes (usuarios anonimos)
 DROP POLICY IF EXISTS "Insercion publica clientes" ON public.clientes;
 CREATE POLICY "Insercion publica clientes"
   ON public.clientes FOR INSERT
   TO anon
   WITH CHECK (true);
 
--- 5c. Los clientes anónimos pueden leer clientes (para evitar duplicados por teléfono)
+-- 5c. Lectura publica de clientes (para deduplicar por telefono)
 DROP POLICY IF EXISTS "Lectura publica clientes por telefono" ON public.clientes;
 CREATE POLICY "Lectura publica clientes por telefono"
   ON public.clientes FOR SELECT
   TO anon
   USING (true);
 
--- 5d. GRANT EXECUTE para usuarios anónimos en funciones de consecutivo
+-- 5d. GRANT EXECUTE para usuarios anonimos
 GRANT EXECUTE ON FUNCTION public.siguiente_consecutivo_cotizacion() TO anon;
 GRANT EXECUTE ON FUNCTION public.siguiente_consecutivo_reserva() TO anon;
