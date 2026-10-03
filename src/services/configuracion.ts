@@ -32,18 +32,18 @@ export const CONFIGURACION_DEFAULT: ConfiguracionGeneral = {
   textos_legales: 'Documento expedido de conformidad con las disposiciones turísticas y comerciales colombianas vigentes. Válido como soporte contractual de reserva de finca campestre y servicios complementarios.',
   politicas_cancelacion: 'Cancelaciones con más de 15 días calendario de anticipación permiten reprogramación sujeta a disponibilidad dentro del mismo año. Cancelaciones posteriores conllevan la pérdida de la suma de separación pactada.',
 
-  // 3. Consecutivos y Prefijos
-  prefijo_cotizacion: 'COT-',
+  // 3. Consecutivos (Inicio en 1001 sin letras)
+  prefijo_cotizacion: '',
   siguiente_cotizacion: 1001,
-  prefijo_separacion: 'SEP-',
+  prefijo_separacion: '',
   siguiente_separacion: 1001,
-  prefijo_abono: 'PAG-',
+  prefijo_abono: '',
   siguiente_abono: 1001,
-  prefijo_estado_cuenta: 'EC-',
+  prefijo_estado_cuenta: '',
   siguiente_estado_cuenta: 1001,
-  prefijo_paz_salvo: 'PS-',
+  prefijo_paz_salvo: '',
   siguiente_paz_salvo: 1001,
-  prefijo_propuesta_menu: 'PROP-',
+  prefijo_propuesta_menu: '',
   siguiente_propuesta_menu: 1001,
 };
 

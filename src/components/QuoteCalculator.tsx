@@ -166,6 +166,10 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
       setErrorGuardado('Por favor ingresa tu número de celular.');
       return;
     }
+    if (!cotizacion.fechaInicio || !cotizacion.fechaFin) {
+      setErrorGuardado('Por favor selecciona las fechas de llegada y salida en el calendario.');
+      return;
+    }
 
     // Si no hay integración con Supabase (prop opcional no provista), abrir WhatsApp directo
     if (!onGuardarCotizacion) {
@@ -478,8 +482,8 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
             </>
           ) : (
             <>
-              <Check size={18} />
-              Generar cotización
+              <MessageCircle size={18} />
+              Solicitar cotización por WhatsApp
             </>
           )}
         </button>
@@ -496,7 +500,7 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
         >
           <span className="wa-pulse" />
           <MessageCircle size={18} />
-          Contactar por WhatsApp con código {cotGuardada.consecutivo}
+          Abrir WhatsApp con código {cotGuardada.consecutivo}
         </a>
       )}
     </div>

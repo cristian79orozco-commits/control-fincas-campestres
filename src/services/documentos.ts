@@ -214,9 +214,10 @@ function pie(doc: jsPDF, configParam?: ConfiguracionGeneral) {
 export function generarDocSeparacion(reserva: Reserva, configParam?: ConfiguracionGeneral): void {
   const config = configParam || getConfiguracionGlobal();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const prefijo = config.prefijo_separacion || 'SEP-';
-  const consecBase = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8).toUpperCase();
-  const num = reserva.consecutivo || `${prefijo}${consecBase}`;
+  const prefijo = config.prefijo_cotizacion || '';
+  const num = reserva.consecutivo
+    ? (reserva.consecutivo.match(/\d+/g)?.join('') || reserva.consecutivo.replace(/^[A-Za-z\-]+/, ''))
+    : (prefijo ? `${prefijo}${reserva.id.slice(0, 8).toUpperCase()}` : reserva.id.slice(0, 8).toUpperCase());
 
   encabezado(doc, 'DOCUMENTO DE SEPARACIÓN', num, config);
 
@@ -733,9 +734,10 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
 export function generarDocCotizacion(cotizacion: CotizacionDB, configParam?: ConfiguracionGeneral): void {
   const config = configParam || getConfiguracionGlobal();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const prefijo = config.prefijo_cotizacion || 'COT-';
-  const consecBase = cotizacion.consecutivo ? cotizacion.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : cotizacion.id.slice(0, 8).toUpperCase();
-  const num = cotizacion.consecutivo || `${prefijo}${consecBase}`;
+  const prefijo = config.prefijo_cotizacion || '';
+  const num = cotizacion.consecutivo
+    ? (cotizacion.consecutivo.match(/\d+/g)?.join('') || cotizacion.consecutivo.replace(/^[A-Za-z\-]+/, ''))
+    : (prefijo ? `${prefijo}${cotizacion.id.slice(0, 8).toUpperCase()}` : cotizacion.id.slice(0, 8).toUpperCase());
   const ancho = doc.internal.pageSize.getWidth();
 
   encabezado(doc, 'COTIZACIÓN FORMAL DE SERVICIOS', num, config);

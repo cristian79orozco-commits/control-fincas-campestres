@@ -702,26 +702,26 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                   <div className="field">
-                    <label>Prefijo</label>
+                    <label>Prefijo (Opcional)</label>
                     <input
                       type="text"
                       value={formData.prefijo_cotizacion}
                       onChange={e => handleChange('prefijo_cotizacion', e.target.value)}
-                      placeholder="COT-"
+                      placeholder="Sin letras (ej: 1001)"
                     />
                   </div>
                   <div className="field">
                     <label>Siguiente #</label>
                     <input
                       type="number"
-                      min={1}
+                      min={1001}
                       value={formData.siguiente_cotizacion}
-                      onChange={e => handleChange('siguiente_cotizacion', parseInt(e.target.value) || 1)}
+                      onChange={e => handleChange('siguiente_cotizacion', parseInt(e.target.value) || 1001)}
                     />
                   </div>
                 </div>
                 <div className="text-xs text-muted mt-1">
-                  Muestra: <strong>{formData.prefijo_cotizacion}{formData.siguiente_cotizacion}</strong>
+                  Muestra: <strong>{formData.prefijo_cotizacion ? `${formData.prefijo_cotizacion}${formData.siguiente_cotizacion}` : formData.siguiente_cotizacion}</strong>
                 </div>
               </div>
 
@@ -732,26 +732,26 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                   <div className="field">
-                    <label>Prefijo</label>
+                    <label>Prefijo (Opcional)</label>
                     <input
                       type="text"
                       value={formData.prefijo_separacion}
                       onChange={e => handleChange('prefijo_separacion', e.target.value)}
-                      placeholder="SEP-"
+                      placeholder="Sin letras (ej: 1001)"
                     />
                   </div>
                   <div className="field">
                     <label>Siguiente #</label>
                     <input
                       type="number"
-                      min={1}
+                      min={1001}
                       value={formData.siguiente_separacion}
-                      onChange={e => handleChange('siguiente_separacion', parseInt(e.target.value) || 1)}
+                      onChange={e => handleChange('siguiente_separacion', parseInt(e.target.value) || 1001)}
                     />
                   </div>
                 </div>
                 <div className="text-xs text-muted mt-1">
-                  Muestra: <strong>{formData.prefijo_separacion}{formData.siguiente_separacion}</strong>
+                  Muestra: <strong>{formData.prefijo_separacion ? `${formData.prefijo_separacion}${formData.siguiente_separacion}` : formData.siguiente_separacion}</strong>
                 </div>
               </div>
 

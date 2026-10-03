@@ -13,6 +13,7 @@
 
 import { supabase } from '../services/supabase';
 import { obtenerSiguienteConsecutivo } from '../utils/consecutivos';
+import { generarUUID } from '../utils/uuid';
 
 // -----------------------------------------------------------------------
 // Tipos públicos
@@ -123,9 +124,7 @@ export function useCotizadorPublico() {
       // ----------------------------------------------------------------
       // PASO 4 — Insertar cotización con UUID propio para evitar chequeo SELECT en RLS
       // ----------------------------------------------------------------
-      const newCotId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : `cot-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      const newCotId = generarUUID();
 
       const payload: Record<string, unknown> = {
         id: newCotId,

@@ -80,9 +80,10 @@ function formatFecha(f?: string) {
 // ─── Badge de consecutivo copiable ────────────────────────────────────────────
 const ConsecutivoBadge: React.FC<{ consecutivo: string }> = ({ consecutivo }) => {
   const [copiado, setCopiado] = useState(false);
+  const consecutivoNum = consecutivo.match(/\d+/g)?.join('') || consecutivo.replace(/^[A-Za-z\-]+/, '');
   const copiar = async () => {
     try {
-      await navigator.clipboard.writeText(consecutivo);
+      await navigator.clipboard.writeText(consecutivoNum);
       setCopiado(true);
       setTimeout(() => setCopiado(false), 1800);
     } catch { /* silent */ }
@@ -90,7 +91,7 @@ const ConsecutivoBadge: React.FC<{ consecutivo: string }> = ({ consecutivo }) =>
   return (
     <button
       type="button"
-      title="Clic para copiar"
+      title="Clic para copiar código de seguimiento"
       onClick={copiar}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
@@ -104,7 +105,7 @@ const ConsecutivoBadge: React.FC<{ consecutivo: string }> = ({ consecutivo }) =>
       }}
     >
       {copiado ? <Check size={10} /> : <Hash size={10} />}
-      {consecutivo}
+      {consecutivoNum}
       {!copiado && <Copy size={9} style={{ opacity: 0.5 }} />}
     </button>
   );

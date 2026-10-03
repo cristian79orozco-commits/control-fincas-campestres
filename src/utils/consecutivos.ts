@@ -1,46 +1,43 @@
 import { supabase } from '../services/supabase';
 
 /**
- * Utilidad unificada de Consecutivos Ordenados (iniciando en 1001).
- * Garantiza que nunca se generen números aleatorios y que siempre
- * se mantenga una secuencia estricta y sincronizada.
+ * Utilidad unificada de Consecutivos Numéricos Ordenados (iniciando en 1001).
+ * Garantiza formato puramente numérico (ej: 1001, 1002...) sin letras al inicio,
+ * facilitando el seguimiento y unificando el flujo entre clientes y administración.
  */
 
 export async function obtenerSiguienteConsecutivo(tipo: 'cotizacion' | 'reserva'): Promise<string> {
   const rpcNombre = tipo === 'cotizacion' ? 'siguiente_consecutivo_cotizacion' : 'siguiente_consecutivo_reserva';
-  const prefijoDefecto = tipo === 'cotizacion' ? 'COT-' : 'RES-';
 
-  // 1. Intentar vía RPC en Supabase (función atómica segura contra concurrencia)
+  // 1. Intentar vía RPC en Supabase (función atómica concurrente)
   try {
     const { data: numRpc, error: errorRpc } = await supabase.rpc(rpcNombre);
-    if (!errorRpc && numRpc && typeof numRpc === 'string') {
-      // Normalizar: si viene con 6 ceros como COT-001001, convertir a COT-1001
-      const match = numRpc.match(/^([A-Za-z]+-?)0*([1-9]\d*)$/);
+    if (!errorRpc && numRpc !== null && numRpc !== undefined) {
+      // Extraer únicamente los dígitos numéricos para garantizar formato '1001' sin letras iniciales
+      const match = String(numRpc).match(/\d+/g);
       if (match) {
-        const pref = match[1];
-        const num = match[2];
-        const numVal = parseInt(num, 10);
-        return `${pref}${Math.max(1001, numVal)}`;
+        const numVal = parseInt(match.join(''), 10);
+        return String(Math.max(1001, numVal));
       }
-      return numRpc;
+      const limp = String(numRpc).replace(/^[A-Za-z\-]+/, '').trim();
+      if (limp) return limp;
     }
   } catch (errRpc) {
     console.warn(`[consecutivos] Aviso al invocar RPC ${rpcNombre}:`, errRpc);
   }
 
   // 2. Fallback resiliente: consultar último consecutivo en la base de datos
+  // Se evalúan ambas tablas para mantener sincronía sin duplicar códigos de seguimiento
   try {
-    const tabla = tipo === 'cotizacion' ? 'cotizaciones' : 'reservas';
-    const { data: filas, error: errorSelect } = await supabase
-      .from(tabla)
-      .select('consecutivo')
-      .not('consecutivo', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(50);
+    const [respCots, respRes] = await Promise.all([
+      supabase.from('cotizaciones').select('consecutivo').not('consecutivo', 'is', null).limit(100),
+      supabase.from('reservas').select('consecutivo').not('consecutivo', 'is', null).limit(100),
+    ]);
 
     let maxNumero = 1000;
 
-    if (!errorSelect && filas && filas.length > 0) {
+    const procesarFilas = (filas: Array<{ consecutivo?: string | null }> | null) => {
+      if (!filas) return;
       for (const f of filas) {
         if (f.consecutivo) {
           const match = String(f.consecutivo).match(/\d+/g);
@@ -52,7 +49,10 @@ export async function obtenerSiguienteConsecutivo(tipo: 'cotizacion' | 'reserva'
           }
         }
       }
-    }
+    };
+
+    procesarFilas(respCots.data);
+    procesarFilas(respRes.data);
 
     const siguienteNum = Math.max(1001, maxNumero + 1);
 
@@ -64,25 +64,25 @@ export async function obtenerSiguienteConsecutivo(tipo: 'cotizacion' | 'reserva'
         .update({ [campoConfig]: siguienteNum + 1 })
         .eq('id', 'general');
     } catch {
-      // Silencioso si falla la actualización de configuración
+      // Silencioso si falla la sincronización en configuracion_general
     }
 
-    return `${prefijoDefecto}${siguienteNum}`;
+    return String(siguienteNum);
   } catch (errFallback) {
     console.error(`[consecutivos] Error en fallback de consecutivo para ${tipo}:`, errFallback);
-    return `${prefijoDefecto}1001`;
+    return '1001';
   }
 }
 
 /**
- * Formatea un consecutivo para visualización limpia en insignias y mensajes
- * Ej: 'COT-1001' -> '#1001', 'RES-1002' -> '#1002'
+ * Formatea un consecutivo para visualización limpia
+ * Devuelve el número secuencial limpio sin letras al inicio (ej: 'COT-1001' -> '1001', '1001' -> '1001')
  */
 export function formatearConsecutivoSimple(consecutivo?: string | null): string {
-  if (!consecutivo) return '#1001';
-  const match = consecutivo.match(/\d+/);
+  if (!consecutivo) return '1001';
+  const match = String(consecutivo).match(/\d+/g);
   if (match) {
-    return `#${match[0]}`;
+    return match.join('');
   }
-  return consecutivo.startsWith('#') ? consecutivo : `#${consecutivo}`;
+  return String(consecutivo).replace(/^[A-Za-z\-]+/, '') || '1001';
 }

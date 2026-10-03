@@ -9,6 +9,7 @@ import type {
 import type { ToastMessage } from '../components/Toast';
 import { calcularSaldo } from '../types';
 import { obtenerSiguienteConsecutivo } from '../utils/consecutivos';
+import { generarUUID, esUUID } from '../utils/uuid';
 import { CONFIGURACION_DEFAULT, setConfiguracionGlobal } from '../services/configuracion';
 import { CONTENIDO_SITIO_DEFAULT, setContenidoSitioGlobal } from '../services/contenidoSitio';
 import type { DatosCotizacionPublica, ResultadoCotizacionPublica } from '../hooks/useCotizadorPublico';
@@ -484,37 +485,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const digitosTel10 = digitosTel.startsWith('57') && digitosTel.length === 12 ? digitosTel.slice(2) : digitosTel;
       const digitosTel57 = digitosTel.length === 10 ? `57${digitosTel}` : digitosTel;
 
-      const { data: existentes } = await supabase
-        .from('clientes')
-        .select('id, nombre, apellido, telefono, whatsapp')
-        .or(`telefono.eq.${digitosTel},whatsapp.eq.${digitosTel},telefono.eq.${digitosTel10},whatsapp.eq.${digitosTel10},telefono.eq.${digitosTel57},whatsapp.eq.${digitosTel57}`)
-        .limit(1);
+      let clienteId: string = '';
+      let clienteObj: Cliente | null = null;
 
-      let clienteId: string;
-      let clienteObj: Cliente;
+      // Buscar si el cliente ya existe en la base de datos por teléfono
+      if (digitosTel.length >= 7) {
+        const filtrosOr = Array.from(new Set([digitosTel, digitosTel10, digitosTel57].filter(Boolean)))
+          .flatMap(tel => [`telefono.eq.${tel}`, `whatsapp.eq.${tel}`])
+          .join(',');
 
-      if (existentes && existentes.length > 0) {
-        clienteId = existentes[0].id;
-        clienteObj = {
-          ...existentes[0],
-          nombre: datos.clienteNombre.trim(),
-          whatsapp: datos.clienteWhatsapp.replace(/\D/g, '') || digitosTel57,
-          activo: true,
-        };
-
-        // Actualizar en memoria y BD
-        setClientes(prev => prev.map(c => (c.id === clienteId ? clienteObj : c)));
         try {
-          await supabase.from('clientes').update({
-            nombre: datos.clienteNombre.trim(),
-            whatsapp: clienteObj.whatsapp,
-          }).eq('id', clienteId);
-        } catch { /* silent */ }
-      } else {
-        const nuevoClienteId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-          ? crypto.randomUUID()
-          : `cli-${Date.now()}`;
+          const { data: existentes, error: errBusq } = await supabase
+            .from('clientes')
+            .select('id, nombre, apellido, telefono, whatsapp')
+            .or(filtrosOr)
+            .limit(1);
 
+          if (!errBusq && existentes && existentes.length > 0) {
+            clienteId = existentes[0].id;
+            clienteObj = {
+              ...existentes[0],
+              nombre: datos.clienteNombre.trim(),
+              whatsapp: datos.clienteWhatsapp.replace(/\D/g, '') || digitosTel57,
+              activo: true,
+            };
+          }
+        } catch (errBusq) {
+          console.warn('[AppContext] Aviso en búsqueda de cliente existente:', errBusq);
+        }
+      }
+
+      if (clienteId && clienteObj) {
+        // Actualizar en memoria local
+        const objActualizado = clienteObj;
+        setClientes(prev => prev.map(c => (c.id === clienteId ? objActualizado : c)));
+
+        // Persistir actualización en Supabase
+        const { error: errUpd } = await supabase.from('clientes').update({
+          nombre: datos.clienteNombre.trim(),
+          whatsapp: clienteObj.whatsapp,
+        }).eq('id', clienteId);
+
+        if (errUpd) {
+          console.warn('[AppContext] Aviso al actualizar cliente en Supabase:', errUpd);
+        }
+      } else {
+        // Generar UUID v4 estándar válido para Postgres
+        const nuevoClienteId = generarUUID();
         clienteId = nuevoClienteId;
         clienteObj = {
           id: nuevoClienteId,
@@ -527,36 +544,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           activo: true,
         };
 
-        // Actualización optimista inmediata
-        setClientes(prev => [clienteObj, ...prev]);
+        // Actualización optimista inmediata en memoria
+        setClientes(prev => [clienteObj!, ...prev]);
 
-        try {
-          await supabase.from('clientes').insert(clienteObj);
-        } catch (errInsCli) {
-          console.warn('[AppContext] Aviso insertando cliente:', errInsCli);
+        // Insertar cliente en Supabase
+        const { error: errInsCli } = await supabase.from('clientes').insert({
+          id: nuevoClienteId,
+          nombre: clienteObj.nombre,
+          apellido: null,
+          telefono: clienteObj.telefono,
+          whatsapp: clienteObj.whatsapp,
+          correo: null,
+          observaciones: clienteObj.observaciones,
+          activo: true,
+        });
+
+        if (errInsCli) {
+          console.error('[AppContext] Error al insertar cliente en Supabase:', errInsCli);
         }
       }
 
-      // 2. Consecutivo estricto iniciando en 1001
+      // 2. Consecutivo estricto iniciando en 1001 (sin letras al inicio)
       const consecutivo = await obtenerSiguienteConsecutivo('cotizacion');
 
-      // 3. Crear cotización con ID propio
-      const newCotId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : `cot-${Date.now()}`;
-
+      // 3. Crear cotización con UUID propio de Postgres
+      const newCotId = generarUUID();
       const fincaSel = fincas.find(f => f.id === datos.fincaId);
+
+      // Normalizar y blindar fechas de estancia para cumplir CHECK (fecha_fin > fecha_inicio)
+      const hoy = new Date().toISOString().split('T')[0];
+      const manana = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+      const fInicio = (datos.fechaInicio && datos.fechaInicio.length === 10) ? datos.fechaInicio : hoy;
+      let fFin = (datos.fechaFin && datos.fechaFin.length === 10) ? datos.fechaFin : manana;
+      if (fFin <= fInicio) {
+        const dFin = new Date(new Date(fInicio).getTime() + 86400000);
+        fFin = dFin.toISOString().split('T')[0];
+      }
 
       const nuevaCotizacion: CotizacionDB = {
         id: newCotId,
         cliente_id: clienteId,
         finca_id: datos.fincaId,
-        fecha_inicio: datos.fechaInicio,
-        fecha_fin: datos.fechaFin,
-        personas: datos.personas,
+        fecha_inicio: fInicio,
+        fecha_fin: fFin,
+        personas: datos.personas || 1,
         alimentacion: datos.alimentacion,
-        menu_id: datos.menuId || null,
-        cantidad_alimentacion: datos.cantidadServicios,
+        menu_id: (datos.menuId && esUUID(datos.menuId)) ? datos.menuId : null,
+        cantidad_alimentacion: datos.cantidadServicios || 1,
         precio_base_pp: datos.precioBasePp,
         subtotal_alojamiento: datos.subtotalAlojamiento,
         costo_alimentacion: datos.costoAlimentacion,
@@ -582,19 +616,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Actualización optimista inmediata en memoria: ¡El Panel Admin la ve EN TIEMPO REAL!
       setCotizaciones(prev => [nuevaCotizacion, ...prev]);
 
-      // Persistir en Supabase
-      const payloadBD: any = {
+      // Persistir cotización en Supabase
+      const payloadBD: Record<string, unknown> = {
         id: newCotId,
         cliente_id: clienteId,
         finca_id: datos.fincaId,
-        fecha_inicio: datos.fechaInicio,
-        fecha_fin: datos.fechaFin,
-        personas: datos.personas,
+        fecha_inicio: fInicio,
+        fecha_fin: fFin,
+        personas: datos.personas || 1,
         alimentacion: datos.alimentacion,
         precio_base_pp: datos.precioBasePp,
         subtotal_alojamiento: datos.subtotalAlojamiento,
         costo_alimentacion: datos.costoAlimentacion,
-        cantidad_alimentacion: datos.cantidadServicios,
+        cantidad_alimentacion: datos.cantidadServicios || 1,
         descuento: 0,
         recargo: 0,
         total: datos.total,
@@ -602,11 +636,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         estado: 'cotizada',
         notas: nuevaCotizacion.notas,
       };
-      if (datos.menuId) payloadBD.menu_id = datos.menuId;
+      if (datos.menuId && esUUID(datos.menuId)) {
+        payloadBD.menu_id = datos.menuId;
+      }
 
       const { error: errorCot } = await supabase.from('cotizaciones').insert(payloadBD);
       if (errorCot) {
-        console.warn('[AppContext] Aviso insertando cotización en Supabase:', errorCot);
+        console.error('[AppContext] Error al insertar cotización en Supabase:', errorCot);
       }
 
       showToast(`✓ Cotización ${consecutivo} registrada con éxito`, 'success');
@@ -640,17 +676,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await supabase.from('cotizaciones').update({ estado: 'confirmada' }).eq('id', cotizacion.id);
       } catch { /* silent */ }
 
-      // 2. Generar consecutivo para la reserva (preservando número si es posible)
+      // 2. Generar consecutivo para la reserva (preservando el número de seguimiento sin letras)
       let consecutivoReserva: string;
       if (cotizacion.consecutivo) {
-        consecutivoReserva = cotizacion.consecutivo.replace(/^COT-/, 'RES-');
+        const match = cotizacion.consecutivo.match(/\d+/g);
+        consecutivoReserva = match ? match.join('') : cotizacion.consecutivo.replace(/^[A-Za-z\-]+/, '');
       } else {
         consecutivoReserva = await obtenerSiguienteConsecutivo('reserva');
       }
 
-      const newResId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : `res-${Date.now()}`;
+      const newResId = generarUUID();
 
       const fincaSel = fincas.find(f => f.id === cotizacion.finca_id);
       const clienteSel = clientes.find(c => c.id === cotizacion.cliente_id);
@@ -755,7 +790,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const guardarReserva = async (datos: Partial<Reserva>): Promise<{ success: boolean; id?: string; error?: string }> => {
     try {
       const isNew = !datos.id;
-      const resId = datos.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `res-${Date.now()}`);
+      const resId = datos.id || generarUUID();
       const consecutivo = datos.consecutivo || (isNew ? await obtenerSiguienteConsecutivo('reserva') : undefined);
 
       const fincaSel = fincas.find(f => f.id === datos.finca_id);
@@ -1011,7 +1046,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     pago: { tipo: PagoTipo; fecha: string; valor: number; observacion?: string }
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const nuevoPagoId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `pago-${Date.now()}`;
+      const nuevoPagoId = generarUUID();
       const objPago: Pago = {
         id: nuevoPagoId,
         reserva_id: reservaId,
@@ -1074,7 +1109,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const guardarCliente = async (datos: Partial<Cliente>): Promise<{ success: boolean; id?: string; error?: string }> => {
     try {
       const isNew = !datos.id;
-      const cid = datos.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `cli-${Date.now()}`);
+      const cid = datos.id || generarUUID();
 
       const clienteObj: Cliente = {
         id: cid,
@@ -1114,7 +1149,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const guardarCotizacion = async (datos: Partial<CotizacionDB>): Promise<{ success: boolean; id?: string; error?: string }> => {
     try {
       const isNew = !datos.id;
-      const cotId = datos.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `cot-${Date.now()}`);
+      const cotId = datos.id || generarUUID();
       const consecutivo = datos.consecutivo || (isNew ? await obtenerSiguienteConsecutivo('cotizacion') : undefined);
 
       const fincaSel = fincas.find(f => f.id === datos.finca_id);

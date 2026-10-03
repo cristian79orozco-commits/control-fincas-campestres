@@ -465,6 +465,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               clientes={clientes}
               reservas={reservas}
               cotizaciones={cotizaciones}
+              fincas={fincas}
               onGuardar={onGuardarCliente}
               onDesactivar={onDesactivarCliente}
               showToast={showToast}
