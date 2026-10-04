@@ -168,11 +168,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [guardandoContenido, setGuardandoContenido] = useState(false);
 
-  // Navegación centralizada e interacción cruzada Admin <-> Cliente
-  const [view, setView] = useState<ViewType>('cliente');
-  const [selectedFincaId, setSelectedFincaId] = useState<string | null>(null);
-  const [adminActiveSection, setAdminActiveSection] = useState<AdminSection>('dashboard');
+  // Helpers para persistencia de navegación
+  const getInitialView = (): ViewType => {
+    try {
+      const saved = localStorage.getItem('fc_app_view') as ViewType;
+      if (saved === 'admin') {
+        const authRaw = localStorage.getItem('fc_admin_auth_session');
+        if (authRaw) {
+          const auth = JSON.parse(authRaw);
+          if (auth?.isLoggedIn) return 'admin';
+        }
+        return 'cliente';
+      }
+      if (saved === 'detalle') {
+        const fId = localStorage.getItem('fc_selected_finca_id');
+        if (fId) return 'detalle';
+      }
+      if (saved === 'cliente') return 'cliente';
+    } catch {}
+    return 'cliente';
+  };
+
+  const getInitialAdminSection = (): AdminSection => {
+    try {
+      const saved = localStorage.getItem('fc_admin_section') as AdminSection;
+      if (saved) return saved;
+    } catch {}
+    return 'dashboard';
+  };
+
+  // Navegación centralizada e interacción cruzada Admin <-> Cliente persistida
+  const [view, setView] = useState<ViewType>(getInitialView);
+  const [selectedFincaId, setSelectedFincaId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('fc_selected_finca_id') || null;
+    } catch {
+      return null;
+    }
+  });
+  const [adminActiveSection, setAdminActiveSection] = useState<AdminSection>(getInitialAdminSection);
   const [fincaParaEditarId, setFincaParaEditarId] = useState<string | null>(null);
+
+  // Sincronizar navegación con localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('fc_app_view', view);
+    } catch {}
+  }, [view]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('fc_admin_section', adminActiveSection);
+    } catch {}
+  }, [adminActiveSection]);
+
+  useEffect(() => {
+    try {
+      if (selectedFincaId) {
+        localStorage.setItem('fc_selected_finca_id', selectedFincaId);
+      } else {
+        localStorage.removeItem('fc_selected_finca_id');
+      }
+    } catch {}
+  }, [selectedFincaId]);
 
   // Notificaciones Toast centralizadas
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -218,20 +276,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setConfirmModalState(prev => ({ ...prev, isOpen: false }));
   }, []);
 
-  // Métodos de navegación unificada
+  // Métodos de navegación unificada con persistencia inmediata
   const navegarACliente = useCallback((fincaId?: string) => {
     if (fincaId) {
       setSelectedFincaId(fincaId);
       setView('detalle');
+      try {
+        localStorage.setItem('fc_app_view', 'detalle');
+        localStorage.setItem('fc_selected_finca_id', fincaId);
+      } catch {}
     } else {
       setView('cliente');
+      try {
+        localStorage.setItem('fc_app_view', 'cliente');
+      } catch {}
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   const navegarAAdmin = useCallback((seccion?: AdminSection, fincaIdParaEditar?: string) => {
     setView('admin');
-    if (seccion) setAdminActiveSection(seccion);
+    try {
+      localStorage.setItem('fc_app_view', 'admin');
+    } catch {}
+    if (seccion) {
+      setAdminActiveSection(seccion);
+      try {
+        localStorage.setItem('fc_admin_section', seccion);
+      } catch {}
+    }
     if (fincaIdParaEditar) setFincaParaEditarId(fincaIdParaEditar);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
@@ -239,6 +312,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const previsualizarFinca = useCallback((fincaId: string) => {
     setSelectedFincaId(fincaId);
     setView('detalle');
+    try {
+      localStorage.setItem('fc_app_view', 'detalle');
+      localStorage.setItem('fc_selected_finca_id', fincaId);
+    } catch {}
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
@@ -299,7 +376,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  const cargarCotizaciones = useCallback(async () => {
+  const cargarCotizaciones = useCallback(async (silencioso: boolean = false) => {
     try {
       const { data, error } = await supabase
         .from('cotizaciones')
@@ -314,12 +391,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const ordenadas = arr.sort(
         (a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
       );
-      setCotizaciones(ordenadas);
+      setCotizaciones(prev => {
+        if (!silencioso && prev.length > 0 && ordenadas.length > prev.length) {
+          const prevIds = new Set(prev.map(c => c.id));
+          const nuevas = ordenadas.filter(c => !prevIds.has(c.id));
+          if (nuevas.length > 0) {
+            const masReciente = nuevas[0];
+            const num = masReciente.consecutivo ? `[#${masReciente.consecutivo}]` : '';
+            const nom = masReciente.clientes?.nombre ? ` de ${masReciente.clientes.nombre}` : '';
+            showToast(`🔔 ¡Nueva cotización web recibida! ${num}${nom}`, 'info');
+          }
+        }
+        return ordenadas;
+      });
       guardarCache('fc_cache_cotizaciones', ordenadas);
     } catch (err) {
       console.warn('[AppContext] Error cargando cotizaciones:', err);
     }
-  }, []);
+  }, [showToast]);
 
   const cargarReservas = useCallback(async () => {
     try {
@@ -455,11 +544,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     cargarContenidoSitio,
   ]);
 
-  // Carga inicial y Suscripción Realtime multi-tabla
+  // Carga inicial y Suscripción Realtime multi-capa (Supabase + BroadcastChannel + Smart Polling)
   useEffect(() => {
     recargarTodo();
 
-    // Sincronización en tiempo real con Supabase
+    // 1. Sincronización en tiempo real oficial con Supabase
     const channel = supabase
       .channel('app-global-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, (payload) => {
@@ -500,8 +589,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
       .subscribe();
 
+    // 2. Sincronización instantánea cross-tab en el mismo navegador (BroadcastChannel)
+    let bc: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('fc_realtime_sync_channel');
+        bc.onmessage = (event) => {
+          if (event.data?.type === 'NUEVA_COTIZACION') {
+            cargarCotizaciones();
+            cargarClientes();
+          }
+        };
+      }
+    } catch (e) {
+      console.warn('[AppContext] BroadcastChannel no soportado o fallido:', e);
+    }
+
+    // 3. Respaldo multi-pestaña mediante eventos de Storage
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'fc_sync_tick') {
+        cargarCotizaciones();
+        cargarClientes();
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    // 4. Polling inteligente suave (cada 10 segundos) cuando la pestaña está activa
+    const intervalId = setInterval(() => {
+      if (!document.hidden) {
+        cargarCotizaciones(true);
+      }
+    }, 10000);
+
+    // 5. Refresco inmediato cuando el usuario vuelve a enfocar la pestaña
+    const handleReenfoque = () => {
+      if (!document.hidden) {
+        cargarCotizaciones(true);
+        cargarReservas();
+      }
+    };
+    document.addEventListener('visibilitychange', handleReenfoque);
+    window.addEventListener('focus', handleReenfoque);
+
     return () => {
       supabase.removeChannel(channel);
+      if (bc) {
+        try {
+          bc.close();
+        } catch {}
+      }
+      window.removeEventListener('storage', handleStorage);
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleReenfoque);
+      window.removeEventListener('focus', handleReenfoque);
     };
   }, [
     recargarTodo,
@@ -689,6 +829,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (errorCot) {
         console.error('[AppContext] Error al insertar cotización en Supabase:', errorCot);
       }
+
+      // Sincronización instantánea cross-tab para reflejo inmediato en Panel Admin
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('fc_realtime_sync_channel');
+          bc.postMessage({
+            type: 'NUEVA_COTIZACION',
+            payload: nuevaCotizacion,
+            cliente: clienteObj,
+          });
+          bc.close();
+        }
+      } catch (e) {
+        console.warn('[AppContext] Error notificando BroadcastChannel:', e);
+      }
+
+      try {
+        localStorage.setItem('fc_sync_tick', Date.now().toString());
+      } catch {}
 
       showToast(`✓ Cotización ${consecutivo} registrada con éxito`, 'success');
 

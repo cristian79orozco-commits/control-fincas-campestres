@@ -119,3 +119,24 @@ CREATE POLICY "Lectura publica cotizaciones"
   ON public.cotizaciones FOR SELECT
   TO anon, authenticated
   USING (true);
+
+-- 8. Asegurar que las tablas emitan eventos a través de Supabase Realtime
+DO $$
+BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.cotizaciones;
+  EXCEPTION WHEN duplicate_object THEN
+    NULL;
+  END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.clientes;
+  EXCEPTION WHEN duplicate_object THEN
+    NULL;
+  END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.reservas;
+  EXCEPTION WHEN duplicate_object THEN
+    NULL;
+  END;
+END $$;
+
