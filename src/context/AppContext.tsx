@@ -1649,6 +1649,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         checkin_hora: fincaData.checkin_hora || '15:00',
         checkout_hora: fincaData.checkout_hora || '13:00',
         politica_mascotas: fincaData.politica_mascotas || 'permitido',
+        valor_mascota: fincaData.valor_mascota !== undefined ? fincaData.valor_mascota : 0,
         politica_musica: fincaData.politica_musica || 'moderada',
         precio_finca_completa: fincaData.precio_finca_completa || 0,
         deposito_garantia: fincaData.deposito_garantia || 0,

@@ -11,6 +11,7 @@ ALTER TABLE public.fincas
   ADD COLUMN IF NOT EXISTS checkin_hora TEXT DEFAULT '15:00',
   ADD COLUMN IF NOT EXISTS checkout_hora TEXT DEFAULT '13:00',
   ADD COLUMN IF NOT EXISTS politica_mascotas TEXT DEFAULT 'permitido',
+  ADD COLUMN IF NOT EXISTS valor_mascota NUMERIC(12,2) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS politica_musica TEXT DEFAULT 'moderada',
   ADD COLUMN IF NOT EXISTS precio_finca_completa NUMERIC(12,2) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS deposito_garantia NUMERIC(12,2) DEFAULT 0,

@@ -128,9 +128,16 @@ export const FincaDetail: React.FC<FincaDetailProps> = ({
           <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 600, marginBottom: '0.4rem' }}>
             Sobre esta finca campestre
           </h3>
-          <p className="detail-desc">
+          <div
+            className="detail-desc"
+            style={{
+              whiteSpace: 'pre-line',
+              wordBreak: 'break-word',
+              lineHeight: '1.7',
+            }}
+          >
             {finca.descripcion || 'Disfruta de una estancia inolvidable en medio de la naturaleza, con amplias zonas verdes, total privacidad y todas las comodidades para tu grupo o familia.'}
-          </p>
+          </div>
         </div>
 
         {/* Amenidades y Servicios */}
@@ -207,7 +214,13 @@ export const FincaDetail: React.FC<FincaDetailProps> = ({
                     <Dog size={13} style={{ color: 'var(--primary)' }} /> Mascotas
                   </div>
                   <div style={{ fontWeight: 600, fontSize: '0.85rem', marginTop: '0.15rem' }}>
-                    {finca.politica_mascotas === 'permitido' ? 'Bienvenidas' : finca.politica_mascotas === 'consulta_previa' ? 'Previa consulta' : 'No permitidas'}
+                    {finca.politica_mascotas === 'permitido'
+                      ? 'Bienvenidas sin costo'
+                      : finca.politica_mascotas === 'con_costo'
+                      ? `Se aceptan ($${Number(finca.valor_mascota || 0).toLocaleString('es-CO')} c/u)`
+                      : finca.politica_mascotas === 'consulta_previa'
+                      ? 'Previa consulta / razas pequeñas'
+                      : 'No permitidas'}
                   </div>
                 </div>
               )}

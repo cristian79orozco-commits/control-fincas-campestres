@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Save, Trash2, Plus, Upload, Link as LinkIcon, Loader, Image as ImageIcon,
   Eye, ChevronDown, ChevronUp, Search, Check, Sparkles, MapPin, Users,
@@ -94,9 +94,13 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
   const [checkinHora, setCheckinHora] = useState('15:00');
   const [checkoutHora, setCheckoutHora] = useState('13:00');
   const [politicaMascotas, setPoliticaMascotas] = useState('permitido');
+  const [valorMascota, setValorMascota] = useState<number>(0);
   const [politicaMusica, setPoliticaMusica] = useState('moderada');
   const [normas, setNormas] = useState('');
   const [waNumber, setWaNumber] = useState(DEFAULT_WA_NUMBER);
+
+  // Referencia para evitar sobreescribir las ediciones del usuario al cambiar de pestañas
+  const lastLoadedFincaIdRef = useRef<string | null>(null);
 
   // Amenidades y Planes
   const [amenidades, setAmenidades] = useState<{ nombre: string; icono?: string }[]>([]);
@@ -131,6 +135,10 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
 
   // Cargar datos de la finca seleccionada o resetear a nuevo
   useEffect(() => {
+    // Si ya cargamos esta finca específica, no sobreescribir las ediciones del usuario mientras navega entre pestañas
+    if (lastLoadedFincaIdRef.current === selectedFincaId) return;
+    lastLoadedFincaIdRef.current = selectedFincaId;
+
     if (selectedFincaId === 'new') {
       setNombre('');
       setZona('Santa Elena, Valle');
@@ -148,6 +156,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
       setCheckinHora('15:00');
       setCheckoutHora('13:00');
       setPoliticaMascotas('permitido');
+      setValorMascota(0);
       setPoliticaMusica('moderada');
       setNormas('Cuidar las instalaciones y la naturaleza. Respetar horarios de silencio. Dejar la finca en las condiciones recibidas.');
       setWaNumber(DEFAULT_WA_NUMBER);
@@ -181,6 +190,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
         setCheckinHora(f.checkin_hora || '15:00');
         setCheckoutHora(f.checkout_hora || '13:00');
         setPoliticaMascotas(f.politica_mascotas || 'permitido');
+        setValorMascota(Number(f.valor_mascota) || 0);
         setPoliticaMusica(f.politica_musica || 'moderada');
         setNormas(f.normas || '');
         setWaNumber(f.whatsapp || DEFAULT_WA_NUMBER);
@@ -395,6 +405,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
       checkin_hora: checkinHora,
       checkout_hora: checkoutHora,
       politica_mascotas: politicaMascotas,
+      valor_mascota: politicaMascotas === 'con_costo' ? Number(valorMascota) || 0 : 0,
       politica_musica: politicaMusica,
       normas: normas.trim(),
       whatsapp: waNumber.replace(/[^0-9]/g, ''),
@@ -415,7 +426,10 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
           : 'Finca actualizada exitosamente en Supabase ✅',
         'success'
       );
-      if (res.id) setSelectedFincaId(res.id);
+      if (res.id) {
+        lastLoadedFincaIdRef.current = res.id;
+        setSelectedFincaId(res.id);
+      }
     } else {
       showToast(`Error al guardar: ${res.error}`, 'error');
     }
@@ -508,7 +522,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                 color: selectedFincaId === 'new' ? '#fff' : 'var(--primary)',
               }}
             >
-              <Plus size={15} /> + Nueva finca
+              <Plus size={15} /> Nueva finca
             </button>
           </div>
         </div>
@@ -717,7 +731,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                   <Plus size={18} />
                 </div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--primary)' }}>+ Nueva Finca</div>
+                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--primary)' }}>Nueva Finca</div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Crear propiedad desde cero</div>
                 </div>
               </div>
@@ -974,11 +988,20 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
               <span className="text-xs text-muted">{descripcion.length} caracteres</span>
             </label>
             <textarea
-              rows={4}
-              placeholder="Describe el ambiente, la vista, privacidad, zonas verdes, si el clima es cálido o templado, y las características que enamoran a los huéspedes…"
+              rows={6}
+              placeholder="Describe el ambiente, la vista, privacidad, zonas verdes, si el clima es cálido o templado, y las características que enamoran a los huéspedes…&#10;&#10;Ejemplo:&#10;• Casa principal con amplios ventanales&#10;• Kiosko y asador al lado de la piscina&#10;• Clima cálido con brisa fresca en la tarde"
               value={descripcion}
               onChange={e => setDescripcion(e.target.value)}
+              style={{
+                whiteSpace: 'pre-wrap',
+                lineHeight: '1.6',
+                minHeight: '130px',
+                fontSize: '0.9rem',
+              }}
             />
+            <span className="text-xs text-muted" style={{ marginTop: '0.35rem', display: 'block' }}>
+              💡 <strong>Visualización exacta:</strong> Los párrafos (Enter), viñetas y espaciados que introduzcas se mantendrán exactamente igual al mostrarse al cliente en el catálogo.
+            </span>
           </div>
 
           <div className="field col-span-full">
@@ -1231,11 +1254,29 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
               <span>Política de mascotas (Pet-friendly)</span>
             </label>
             <select value={politicaMascotas} onChange={e => setPoliticaMascotas(e.target.value)}>
-              <option value="permitido">🐶 Mascotas bienvenidas sin costo</option>
-              <option value="consulta_previa">🐾 Permitido con consulta previa / razas pequeñas</option>
+              <option value="permitido">🐶 Mascotas bienvenidas sin costo adicional</option>
+              <option value="con_costo">🐾 Se aceptan mascotas con tarifa / costo adicional</option>
+              <option value="consulta_previa">⚠️ Permitido con consulta previa / solo razas pequeñas</option>
               <option value="no_permitido">🚫 No se permiten mascotas</option>
             </select>
           </div>
+
+          {politicaMascotas === 'con_costo' && (
+            <div className="field">
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Dog size={14} style={{ color: 'var(--accent)' }} />
+                <span>Valor adicional por mascota (COP) *</span>
+              </label>
+              <CurrencyInput
+                value={valorMascota}
+                onChange={val => setValorMascota(val)}
+                placeholder="25.000"
+              />
+              <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
+                Tarifa cobrada por mascota para esta propiedad
+              </span>
+            </div>
+          )}
 
           <div className="field">
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>

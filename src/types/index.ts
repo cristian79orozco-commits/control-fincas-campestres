@@ -40,6 +40,7 @@ export interface Finca {
   checkin_hora?: string | null;
   checkout_hora?: string | null;
   politica_mascotas?: string | null;
+  valor_mascota?: number | null;
   politica_musica?: string | null;
   precio_finca_completa?: number | null;
   deposito_garantia?: number | null;
