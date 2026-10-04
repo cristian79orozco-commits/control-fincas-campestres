@@ -455,8 +455,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <AdminCalendar
                 fincas={fincas}
                 bloquesAdmin={bloquesAdmin}
+                reservas={reservas}
+                clientes={clientes}
+                cotizaciones={cotizaciones}
+                menus={menus}
+                configuracion={configuracion}
+                userEmail={userEmail}
                 onMarcarDias={onMarcarDiasAdmin}
+                onEliminarBloqueo={onEliminarBloqueo}
+                onGuardarReserva={onGuardarReserva}
+                onCambiarEstadoReserva={onCambiarEstadoReserva}
+                onRegistrarPago={onRegistrarPago}
+                onEliminarPago={onEliminarPago}
+                onCerrarReserva={onCerrarReserva}
+                onReabrirReserva={onReabrirReserva}
+                onEliminarReserva={onEliminarReserva}
+                onRegistrarComunicacion={onRegistrarComunicacion}
                 showToast={showToast}
+                openConfirm={openConfirm}
               />
             </div>
           )}

@@ -83,7 +83,7 @@ const FORM_VACIO: Partial<Reserva> = {
 const PAGO_VACIO = { tipo: 'abono' as PagoTipo, fecha: new Date().toISOString().split('T')[0], valor: 0, observacion: '' };
 
 // ─── Badge de consecutivo copiable ────────────────────────────────────────────
-const ConsecutivoBadge: React.FC<{ consecutivo: string }> = ({ consecutivo }) => {
+export const ConsecutivoBadge: React.FC<{ consecutivo: string }> = ({ consecutivo }) => {
   const [copiado, setCopiado] = useState(false);
   const consecutivoNum = consecutivo.match(/\d+/g)?.join('') || consecutivo.replace(/^[A-Za-z\-]+/, '');
   const copiar = async () => {
