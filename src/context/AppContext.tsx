@@ -464,7 +464,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .select('*, menu_imagenes(*)')
         .order('created_at', { ascending: true });
       if (error) throw error;
-      setMenus((data as MenuType[]) || []);
+      const arr = ((data as MenuType[]) || []).map(m => {
+        const sortedImgs = (m.menu_imagenes || []).sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+        return { ...m, menu_imagenes: sortedImgs };
+      });
+      setMenus(arr);
+      guardarCache('fc_cache_menus', arr);
     } catch (err) {
       console.warn('[AppContext] Error cargando menus:', err);
     }
@@ -1762,13 +1767,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const guardarMenu = async (menuData: Partial<MenuType>, imagenesUrls: string[] = []): Promise<{ success: boolean; id?: string; error?: string }> => {
     try {
+      // Determinar la foto principal: si menuData.imagen_url está en la lista de imágenes, usarla.
+      // Si no, tomar la primera de imagenesUrls; si no hay fotos, dejar null.
+      const fotoPrincipal = imagenesUrls.length > 0
+        ? (menuData.imagen_url && imagenesUrls.includes(menuData.imagen_url) ? menuData.imagen_url : imagenesUrls[0])
+        : null;
+
       const payload: any = {
-        nombre: menuData.nombre,
-        descripcion: menuData.descripcion || null,
+        nombre: menuData.nombre?.trim(),
+        descripcion: menuData.descripcion?.trim() || null,
         categoria: menuData.categoria || 'Almuerzo',
-        precio_pp: menuData.precio_pp || 0,
-        condiciones: menuData.condiciones || null,
-        imagen_url: menuData.imagen_url || null,
+        precio_pp: Number(menuData.precio_pp) || 0,
+        condiciones: menuData.condiciones?.trim() || null,
+        imagen_url: fotoPrincipal,
         activo: menuData.activo ?? true,
       };
       if (menuData.id) payload.id = menuData.id;
@@ -1777,13 +1788,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (error) throw error;
 
       const menuId = data.id;
+
+      // Limpiar imágenes existentes en Supabase para evitar fotos huérfanas
+      await supabase.from('menu_imagenes').delete().eq('menu_id', menuId);
+
+      // Si hay fotos, insertarlas con orden y marcar la foto principal
       if (imagenesUrls && imagenesUrls.length > 0) {
-        await supabase.from('menu_imagenes').delete().eq('menu_id', menuId);
         const imgInserts = imagenesUrls.map((url, idx) => ({
           menu_id: menuId,
           url,
           orden: idx,
-          es_principal: idx === 0,
+          es_principal: url === fotoPrincipal || (idx === 0 && !fotoPrincipal),
         }));
         await supabase.from('menu_imagenes').insert(imgInserts);
       }
@@ -1791,13 +1806,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await cargarMenus();
       return { success: true, id: menuId };
     } catch (err: any) {
+      console.error('[AppContext] Error guardando menú:', err);
       return { success: false, error: err.message };
     }
   };
 
   const cambiarEstadoMenu = async (id: string, activo: boolean): Promise<{ success: boolean; error?: string }> => {
     try {
-      setMenus(prev => prev.map(m => (m.id === id ? { ...m, activo } : m)));
+      setMenus(prev => {
+        const updated = prev.map(m => (m.id === id ? { ...m, activo } : m));
+        guardarCache('fc_cache_menus', updated);
+        return updated;
+      });
       const { error } = await supabase.from('menus').update({ activo }).eq('id', id);
       if (error) throw error;
       return { success: true };
@@ -1808,7 +1828,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const eliminarMenu = async (id: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      setMenus(prev => prev.filter(m => m.id !== id));
+      setMenus(prev => {
+        const updated = prev.filter(m => m.id !== id);
+        guardarCache('fc_cache_menus', updated);
+        return updated;
+      });
       const { error } = await supabase.from('menus').delete().eq('id', id);
       if (error) throw error;
       return { success: true };

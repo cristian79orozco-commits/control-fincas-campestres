@@ -65,7 +65,7 @@ export async function optimizarImagen(
   const tipo = file.type.toLowerCase();
   const esRaster = tipo.includes('jpeg') || tipo.includes('jpg') || tipo.includes('png') || tipo.includes('webp');
 
-  if (!esRaster || tipo.includes('gif') || tipo.includes('svg') || originalSize < 60 * 1024) {
+  if (!esRaster || tipo.includes('gif') || tipo.includes('svg')) {
     return {
       file,
       originalSize,
@@ -137,8 +137,8 @@ export async function optimizarImagen(
               return;
             }
 
-            // Si por alguna razón la imagen procesada es más pesada que la original, conservar original
-            if (blob.size >= originalSize) {
+            // Si el archivo original ya era WebP y el blob resultante es más pesado, conservar original
+            if (tipo.includes('webp') && blob.size >= originalSize) {
               resolve({
                 file,
                 originalSize,
@@ -151,7 +151,7 @@ export async function optimizarImagen(
               return;
             }
 
-            // Determinar extensión según mime
+            // Determinar extensión según mime (prioridad webp)
             const ext = mime.includes('webp') ? 'webp' : 'jpg';
             const baseName = file.name.replace(/\.[^/.]+$/, '');
             const newFileName = `${baseName}.${ext}`;
@@ -161,7 +161,9 @@ export async function optimizarImagen(
               lastModified: Date.now(),
             });
 
-            const reductionPct = Math.round((1 - blob.size / originalSize) * 100);
+            const reductionPct = originalSize > blob.size 
+              ? Math.round((1 - blob.size / originalSize) * 100)
+              : 0;
 
             resolve({
               file: optimizedFile,

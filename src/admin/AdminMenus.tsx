@@ -7,6 +7,7 @@ import {
 import { supabase } from '../services/supabase';
 import { generarPropuestaAlimentacion } from '../services/documentos';
 import { optimizarImagen, formatearBytes } from '../utils/imageOptimizer';
+import { obtenerFotoMenu } from '../utils/menuUtils';
 import type { Menu, MenuCategoria, Cliente, Finca } from '../types';
 import { CurrencyInput } from '../components/CurrencyInput';
 
@@ -103,9 +104,18 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
 
   // Abrir modal de edición
   const abrirEdicion = (m: Menu) => {
-    setForm({ ...m });
-    const urls = m.menu_imagenes?.map(i => i.url) || (m.imagen_url ? [m.imagen_url] : []);
-    setImagenesUrls(urls);
+    const hijas = (m.menu_imagenes || []).map(i => i.url).filter(Boolean);
+    const portadaActual = m.imagen_url || hijas[0] || '';
+    const lista = [...hijas];
+    if (portadaActual && !lista.includes(portadaActual)) {
+      lista.unshift(portadaActual);
+    }
+
+    setForm({
+      ...m,
+      imagen_url: portadaActual,
+    });
+    setImagenesUrls(lista);
     setEditando(true);
   };
 
@@ -115,7 +125,7 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
     setEditando(false);
   };
 
-  // Subir imagen a Supabase Storage
+  // Subir imagen a Supabase Storage convertida a WebP
   const handleSubirImagen = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -127,15 +137,14 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
     const nuevas: string[] = [];
 
     for (const rawFile of files) {
-      // Optimización automática en cliente (Fase 5)
-      const opt = await optimizarImagen(rawFile);
+      // Optimización automática y obligatoria a WebP en el navegador
+      const opt = await optimizarImagen(rawFile, { format: 'image/webp' });
       const fileToUpload = opt.file;
       totalOriginales += opt.originalSize;
       totalOptimizados += opt.optimizedSize;
 
-      const mimeType = fileToUpload.type || 'image/webp';
-      const ext = mimeType.includes('webp') ? 'webp' : (fileToUpload.name.split('.').pop()?.toLowerCase() || 'jpg');
-      const path = `menus/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const mimeType = 'image/webp';
+      const path = `menus/${Date.now()}_${Math.random().toString(36).slice(2)}.webp`;
 
       const { error } = await supabase.storage
         .from('finca-imagenes')
@@ -159,13 +168,24 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
 
     if (nuevas.length > 0) {
       setImagenesUrls(prev => [...prev, ...nuevas]);
-      if (!form.imagen_url) {
-        setForm(prev => ({ ...prev, imagen_url: nuevas[0] }));
-      }
+      // Si la foto actual es vacía o es una plantilla de Unsplash, reemplazarla por la foto real subida
+      setForm(prev => {
+        const esUnsplash = prev.imagen_url && prev.imagen_url.includes('unsplash.com');
+        if (!prev.imagen_url || esUnsplash) {
+          return { ...prev, imagen_url: nuevas[0] };
+        }
+        return prev;
+      });
       const ahorro = totalOriginales - totalOptimizados;
       const ahorroTxt = ahorro > 0 ? ` (ahorro de peso: ${formatearBytes(ahorro)})` : '';
-      showToast(`${subidasOk} foto(s) de menú optimizada(s) a WebP y subida(s) ✅${ahorroTxt}`, 'success');
+      showToast(`${subidasOk} foto(s) convertida(s) a WebP y subida(s) ✅${ahorroTxt}`, 'success');
     }
+  };
+
+  // Asignar foto de portada / principal
+  const handleSeleccionarPrincipal = (url: string) => {
+    setForm(prev => ({ ...prev, imagen_url: url }));
+    showToast('Foto asignada como portada del menú ★', 'info');
   };
 
   // Agregar URL manual
@@ -173,15 +193,18 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
     const url = prompt('Ingresa la URL pública de la fotografía del menú:');
     if (!url || !url.startsWith('http')) return;
     setImagenesUrls(prev => [...prev, url]);
-    if (!form.imagen_url) setForm(prev => ({ ...prev, imagen_url: url }));
+    if (!form.imagen_url || form.imagen_url.includes('unsplash.com')) {
+      setForm(prev => ({ ...prev, imagen_url: url }));
+    }
     showToast('Foto agregada a la lista', 'info');
   };
 
   // Eliminar imagen de la lista del formulario
   const handleEliminarImagen = (idx: number) => {
     setImagenesUrls(prev => {
+      const removed = prev[idx];
       const updated = prev.filter((_, i) => i !== idx);
-      if (form.imagen_url === prev[idx]) {
+      if (form.imagen_url === removed) {
         setForm(f => ({ ...f, imagen_url: updated[0] || '' }));
       }
       return updated;
@@ -200,8 +223,13 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
       return;
     }
 
+    // Determinar la foto de portada: si form.imagen_url está en imagenesUrls, usarla; si no, la primera de imagenesUrls
+    const portadaFinal = imagenesUrls.length > 0
+      ? (form.imagen_url && imagenesUrls.includes(form.imagen_url) ? form.imagen_url : imagenesUrls[0])
+      : null;
+
     setGuardando(true);
-    const res = await onGuardar(form, imagenesUrls);
+    const res = await onGuardar({ ...form, imagen_url: portadaFinal }, imagenesUrls);
     setGuardando(false);
 
     if (res.success) {
@@ -402,7 +430,7 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '1rem' }}>
           {menusFiltrados.map(m => {
             const catStyle = CATEGORIA_COLORS[m.categoria] || { bg: '#e5e7eb', text: '#374151' };
-            const foto = m.imagen_url || (m.menu_imagenes && m.menu_imagenes[0]?.url);
+            const foto = obtenerFotoMenu(m);
 
             return (
               <div
@@ -662,48 +690,78 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
 
                 {/* Previsualización de miniaturas */}
                 {imagenesUrls.length > 0 && (
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.65rem' }}>
-                    {imagenesUrls.map((url, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          width: '74px',
-                          height: '74px',
-                          borderRadius: 'var(--rad-xs)',
-                          overflow: 'hidden',
-                          position: 'relative',
-                          border: form.imagen_url === url ? '2px solid var(--primary)' : '1px solid var(--border)',
-                        }}
-                      >
-                        <img src={url} alt={`Foto ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        <button
-                          type="button"
-                          onClick={() => handleEliminarImagen(idx)}
-                          style={{
-                            position: 'absolute',
-                            top: '2px',
-                            right: '2px',
-                            background: 'rgba(0,0,0,0.65)',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '18px',
-                            height: '18px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <X size={10} />
-                        </button>
-                        {form.imagen_url === url && (
-                          <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'var(--primary)', color: '#fff', fontSize: '0.55rem', textAlign: 'center', fontWeight: 600 }}>
-                            Principal
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                  <div style={{ display: 'grid', gap: '0.4rem', marginTop: '0.65rem' }}>
+                    <div className="text-xs text-muted" style={{ fontStyle: 'italic' }}>
+                      💡 Haz clic sobre una foto para definirla como la <strong>Portada / Principal</strong> del menú.
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                      {imagenesUrls.map((url, idx) => {
+                        const esPrincipal = form.imagen_url === url || (idx === 0 && !form.imagen_url);
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => handleSeleccionarPrincipal(url)}
+                            title={esPrincipal ? 'Foto de portada activa (Principal)' : 'Clic para asignar como portada de este menú'}
+                            style={{
+                              width: '78px',
+                              height: '78px',
+                              borderRadius: 'var(--rad-xs)',
+                              overflow: 'hidden',
+                              position: 'relative',
+                              border: esPrincipal ? '2.5px solid var(--primary)' : '1px solid var(--border)',
+                              cursor: 'pointer',
+                              boxShadow: esPrincipal ? '0 0 0 2px color-mix(in srgb, var(--primary) 28%, transparent)' : 'none',
+                              transition: 'transform 0.15s, border-color 0.15s',
+                            }}
+                          >
+                            <img src={url} alt={`Foto ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEliminarImagen(idx);
+                              }}
+                              title="Eliminar foto"
+                              style={{
+                                position: 'absolute',
+                                top: '2px',
+                                right: '2px',
+                                background: 'rgba(0,0,0,0.65)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '18px',
+                                height: '18px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                zIndex: 3,
+                              }}
+                            >
+                              <X size={10} />
+                            </button>
+                            {esPrincipal && (
+                              <span style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                background: 'var(--primary)',
+                                color: '#fff',
+                                fontSize: '0.6rem',
+                                textAlign: 'center',
+                                fontWeight: 700,
+                                padding: '1px 0',
+                                letterSpacing: '0.02em',
+                              }}>
+                                ★ Portada
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

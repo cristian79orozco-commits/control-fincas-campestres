@@ -1,6 +1,7 @@
 import React from 'react';
 import { UtensilsCrossed, CheckCircle2, MessageCircle } from 'lucide-react';
 import type { Menu } from '../types';
+import { obtenerFotoMenu } from '../utils/menuUtils';
 
 interface MenusPublicosSectionProps {
   visible: boolean;
@@ -61,7 +62,7 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = ({
         }}
       >
         {menusActivos.map(menu => {
-          const imgPrincipal = menu.imagen_url || menu.menu_imagenes?.[0]?.url;
+          const imgPrincipal = obtenerFotoMenu(menu);
           return (
             <div
               key={menu.id}

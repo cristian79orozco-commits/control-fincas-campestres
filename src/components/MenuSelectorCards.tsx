@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Utensils, X } from 'lucide-react';
 import type { Menu } from '../types';
+import { obtenerFotoMenu } from '../utils/menuUtils';
 
 interface MenuSelectorCardsProps {
   menus: Menu[];
@@ -58,6 +59,7 @@ interface MenuCardProps {
 const MenuCard: React.FC<MenuCardProps> = ({ menu, isSelected, onSelect }) => {
   const [expandDesc, setExpandDesc] = useState(false);
   const colorCategoria = CATEGORIA_COLORS[menu.categoria] || 'var(--primary)';
+  const foto = obtenerFotoMenu(menu);
 
   return (
     <div
@@ -95,9 +97,9 @@ const MenuCard: React.FC<MenuCardProps> = ({ menu, isSelected, onSelect }) => {
       )}
 
       {/* Imagen */}
-      {menu.imagen_url ? (
+      {foto ? (
         <img
-          src={menu.imagen_url}
+          src={foto}
           alt={menu.nombre}
           loading="lazy"
           style={{
