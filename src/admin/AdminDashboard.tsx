@@ -35,7 +35,12 @@ interface AdminDashboardProps {
   metricasReservas: { total: number; activas: number; llegasHoy: number; salenHoy: number };
   onLogin: (email: string, pass: string) => Promise<{ success: boolean; message?: string }>;
   onLogout: () => void;
-  onSaveFinca: (fincaData: Partial<Finca>, imagenesUrls: string[], planesStr: string) => Promise<{ success: boolean; id?: string; error?: string }>;
+  onSaveFinca: (
+    fincaData: Partial<Finca>,
+    imagenesUrls: string[],
+    planesStr: string,
+    amenidadesArr?: { nombre: string; icono?: string }[]
+  ) => Promise<{ success: boolean; id?: string; error?: string }>;
   onDeleteFinca: (id: string) => Promise<{ success: boolean; error?: string }>;
   onMarcarDiasAdmin: (fincaId: string, fechas: string[], estado: 'ocupado' | 'libre', nombreCliente?: string) => Promise<{ success: boolean; error?: string }>;
   onEliminarBloqueo: (id: number | string) => Promise<{ success: boolean; error?: string }>;

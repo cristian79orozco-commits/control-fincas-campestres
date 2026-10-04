@@ -80,7 +80,12 @@ interface AppContextValue {
   guardarCotizacionPublica: (datos: DatosCotizacionPublica) => Promise<ResultadoCotizacionPublica>;
 
   // Operaciones de Fincas y Disponibilidad
-  guardarFinca: (fincaData: Partial<Finca>, imagenesUrls: string[], planesStr: string) => Promise<{ success: boolean; id?: string; error?: string }>;
+  guardarFinca: (
+    fincaData: Partial<Finca>,
+    imagenesUrls: string[],
+    planesStr: string,
+    amenidadesArr?: { nombre: string; icono?: string }[]
+  ) => Promise<{ success: boolean; id?: string; error?: string }>;
   desactivarFinca: (id: string) => Promise<{ success: boolean; error?: string }>;
   reactivarFinca: (id: string) => Promise<{ success: boolean; error?: string }>;
   eliminarFinca: (id: string) => Promise<{ success: boolean; error?: string }>;
@@ -1623,27 +1628,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const guardarFinca = async (
     fincaData: Partial<Finca>,
     imagenesUrls: string[],
-    planesStr: string
+    planesStr: string,
+    amenidadesArr?: { nombre: string; icono?: string }[]
   ): Promise<{ success: boolean; id?: string; error?: string }> => {
     try {
-      const payload: any = {
+      // 1. Preparar payload completo con campos extendidos
+      const payloadExtendido: any = {
         nombre: fincaData.nombre,
         zona: fincaData.zona || 'Santa Elena, Valle',
-        capacidad: fincaData.capacidad || 10,
-        precio_pp: fincaData.precio_pp || 0,
+        capacidad: fincaData.capacidad !== undefined ? fincaData.capacidad : 10,
+        precio_pp: fincaData.precio_pp !== undefined ? fincaData.precio_pp : 0,
         descripcion: fincaData.descripcion || null,
         estado: fincaData.estado || 'disponible',
         whatsapp: fincaData.whatsapp || null,
-        activo: true,
+        activo: fincaData.activo !== undefined ? fincaData.activo : true,
+        // Campos profesionales extendidos
+        habitaciones: fincaData.habitaciones !== undefined ? fincaData.habitaciones : 3,
+        camas: fincaData.camas !== undefined ? fincaData.camas : 5,
+        banos: fincaData.banos !== undefined ? fincaData.banos : 2,
+        checkin_hora: fincaData.checkin_hora || '15:00',
+        checkout_hora: fincaData.checkout_hora || '13:00',
+        politica_mascotas: fincaData.politica_mascotas || 'permitido',
+        politica_musica: fincaData.politica_musica || 'moderada',
+        precio_finca_completa: fincaData.precio_finca_completa || 0,
+        deposito_garantia: fincaData.deposito_garantia || 0,
+        normas: fincaData.normas || null,
+        indicaciones_llegada: fincaData.indicaciones_llegada || null,
       };
-      if (fincaData.id) payload.id = fincaData.id;
+      if (fincaData.id) payloadExtendido.id = fincaData.id;
 
-      const { data, error } = await supabase.from('fincas').upsert(payload).select('id').single();
-      if (error) throw error;
+      let fincaId: string;
 
-      const fincaId = data.id;
+      // Intentar guardar con campos extendidos
+      let res = await supabase.from('fincas').upsert(payloadExtendido).select('id').single();
 
-      // Actualizar imágenes y planes
+      // Si falla por alguna columna no migrada en la base de datos remota, recurrir de forma segura a columnas base
+      if (res.error && res.error.message?.includes('column')) {
+        console.warn('[AppContext] Supabase reporta columna pendiente de migración. Guardando con columnas base:', res.error.message);
+        const payloadBase: any = {
+          nombre: fincaData.nombre,
+          zona: fincaData.zona || 'Santa Elena, Valle',
+          capacidad: fincaData.capacidad || 10,
+          precio_pp: fincaData.precio_pp || 0,
+          descripcion: fincaData.descripcion || null,
+          estado: fincaData.estado || 'disponible',
+          whatsapp: fincaData.whatsapp || null,
+          activo: fincaData.activo !== undefined ? fincaData.activo : true,
+        };
+        if (fincaData.id) payloadBase.id = fincaData.id;
+        const resBase = await supabase.from('fincas').upsert(payloadBase).select('id').single();
+        if (resBase.error) throw resBase.error;
+        fincaId = resBase.data.id;
+      } else if (res.error) {
+        throw res.error;
+      } else {
+        fincaId = res.data.id;
+      }
+
+      // Actualizar imágenes
       if (imagenesUrls && imagenesUrls.length > 0) {
         await supabase.from('finca_imagenes').delete().eq('finca_id', fincaId);
         const imgInserts = imagenesUrls.map((url, idx) => ({
@@ -1655,11 +1697,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await supabase.from('finca_imagenes').insert(imgInserts);
       }
 
+      // Actualizar planes de alimentación
       if (planesStr !== undefined) {
         await supabase.from('finca_planes').delete().eq('finca_id', fincaId);
         const planes = planesStr.split(',').map(p => p.trim()).filter(Boolean);
         if (planes.length > 0) {
           await supabase.from('finca_planes').insert(planes.map(nombre => ({ finca_id: fincaId, nombre })));
+        }
+      }
+
+      // Actualizar amenidades en tabla finca_amenidades
+      if (amenidadesArr !== undefined) {
+        try {
+          await supabase.from('finca_amenidades').delete().eq('finca_id', fincaId);
+          if (amenidadesArr.length > 0) {
+            await supabase.from('finca_amenidades').insert(
+              amenidadesArr.map(a => ({
+                finca_id: fincaId,
+                nombre: a.nombre,
+                icono: a.icono || 'check',
+              }))
+            );
+          }
+        } catch (amenityErr) {
+          console.warn('[AppContext] Error guardando amenidades:', amenityErr);
         }
       }
 

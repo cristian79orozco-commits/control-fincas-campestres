@@ -33,6 +33,18 @@ export interface Finca {
   estado: FincaEstado;
   whatsapp?: string | null;
   activo: boolean;
+  // Campos profesionales extendidos
+  habitaciones?: number | null;
+  camas?: number | null;
+  banos?: number | null;
+  checkin_hora?: string | null;
+  checkout_hora?: string | null;
+  politica_mascotas?: string | null;
+  politica_musica?: string | null;
+  precio_finca_completa?: number | null;
+  deposito_garantia?: number | null;
+  normas?: string | null;
+  indicaciones_llegada?: string | null;
   created_at?: string;
   updated_at?: string;
   finca_imagenes?: FincaImagen[];
