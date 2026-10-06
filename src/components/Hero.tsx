@@ -103,7 +103,7 @@ export const Hero: React.FC<HeroProps> = ({
             )}
 
             <p className="text-muted text-xs" style={{ marginTop: '0.25rem' }}>
-              Sincronizado en tiempo real con Supabase · {badgeUbicacion}.
+              Disponibilidad verificada en tiempo real · {badgeUbicacion}.
             </p>
           </div>
         )}

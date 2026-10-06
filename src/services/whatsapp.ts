@@ -722,7 +722,18 @@ Hola, *{{cliente}}* 🌞 ¡Estamos muy emocionados por recibirte!
 2. El anfitrión / mayordomo estará esperándote para la entrega de llaves y recorrido inicial.
 3. Te recomendamos llegar con luz natural para facilitar el trayecto por carretera rural.
 
-Si necesitas la ubicación en tiempo real por Google Maps o Waze, ¡pídenosla por aquí! Te deseamos un descanso inolvidable. 🌺✨`
+Si necesitas la ubicación en tiempo real por Google Maps o Waze, ¡pídenosla por aquí! Te deseamos un descanso inolvidable. 🌺✨`,
+
+  solicitud_cliente_publica: `¡Hola! 👋 Me gustaría cotizar y reservar en *{{finca}}*.
+{{consecutivo_linea}}
+👤 *Cliente:* {{cliente}}
+📞 *Teléfono de contacto:* {{celular}}{{whatsapp_linea}}
+📅 *Fechas:* del *{{fecha_inicio}}* al *{{fecha_fin}}* ({{noches}} noche{{noches_plural}})
+👥 *Cantidad de personas:* {{personas}}
+{{alimentacion_detalle}}
+💰 *Cotización estimada total:* {{total}}
+
+📌 *Interés en reserva:* Tengo total interés en reservar esta finca para estas fechas. Por favor confírmenme disponibilidad y los pasos para consignar el anticipo de reserva con este código. ¡Muchas gracias! 🙏`
 };
 
 export function obtenerTokensParaMensaje(params: {

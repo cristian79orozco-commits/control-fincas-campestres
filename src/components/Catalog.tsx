@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Loader, Info, Filter, X } from 'lucide-react';
+import { Filter, X, Search, Sparkles, Dog, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { FincaCard } from './FincaCard';
 import type { Finca, BloqueoDisponibilidad, ContenidoSitio } from '../types';
 
@@ -13,25 +13,27 @@ interface CatalogProps {
 
 // ─── Skeleton Card para carga del catálogo ────────────────────────────────────
 const SkeletonFincaCard: React.FC = () => (
-  <div className="skeleton-finca-card">
-    <div className="skeleton-box" style={{ height: '210px', width: '100%', borderRadius: 0 }} />
-    <div style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div className="skeleton-box" style={{ height: '18px', width: '60%' }} />
-        <div className="skeleton-box" style={{ height: '16px', width: '25%' }} />
-      </div>
-      <div className="skeleton-box" style={{ height: '14px', width: '40%' }} />
-      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem' }}>
-        <div className="skeleton-box" style={{ height: '22px', width: '30%', borderRadius: '999px' }} />
-        <div className="skeleton-box" style={{ height: '22px', width: '30%', borderRadius: '999px' }} />
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', paddingTop: '0.65rem', borderTop: '1px solid var(--border)' }}>
-        <div className="skeleton-box" style={{ height: '20px', width: '45%' }} />
-        <div className="skeleton-box" style={{ height: '32px', width: '35%', borderRadius: '6px' }} />
+  <div className="skeleton-finca-card" style={{ border: '1px solid var(--border)', borderRadius: 'var(--rad-sm, 10px)', overflow: 'hidden' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', padding: '0.75rem', gap: '0.85rem', alignItems: 'center' }}>
+      <div className="skeleton-box" style={{ height: '75px', width: '100px', borderRadius: '6px' }} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div className="skeleton-box" style={{ height: '16px', width: '50%' }} />
+        <div className="skeleton-box" style={{ height: '14px', width: '70%' }} />
+        <div className="skeleton-box" style={{ height: '12px', width: '30%' }} />
       </div>
     </div>
   </div>
 );
+
+// Amenidades frecuentes para filtros rápidos de interés del cliente
+const AMENIDADES_FILTRO = [
+  'Piscina',
+  'Jacuzzi',
+  'Zona BBQ',
+  'Cancha',
+  'Wifi',
+  'Billar / Juegos',
+];
 
 export const Catalog: React.FC<CatalogProps> = ({
   fincas,
@@ -40,14 +42,36 @@ export const Catalog: React.FC<CatalogProps> = ({
   onSelectFinca,
   contenido,
 }) => {
+  const [busquedaTexto, setBusquedaTexto] = useState('');
   const [fechaEntrada, setFechaEntrada] = useState('');
   const [fechaSalida, setFechaSalida] = useState('');
   const [personasFiltro, setPersonasFiltro] = useState('');
+  const [amenidadesSeleccionadas, setAmenidadesSeleccionadas] = useState<string[]>([]);
+  const [soloPetFriendly, setSoloPetFriendly] = useState(false);
+  const [filtrosAvanzadosAbiertos, setFiltrosAvanzadosAbiertos] = useState(false);
+  const [expandirTodas, setExpandirTodas] = useState(false);
 
-  // Filtrado de fincas inteligente con comprobación de fechas reales y capacidad
+  const toggleAmenidad = (amenidad: string) => {
+    setAmenidadesSeleccionadas(prev =>
+      prev.includes(amenidad)
+        ? prev.filter(a => a !== amenidad)
+        : [...prev, amenidad]
+    );
+  };
+
+  // Filtrado de fincas inteligente con comprobación de fechas reales, capacidad y amenidades
   const fincasFiltradas = useMemo(() => {
     return fincas.filter(finca => {
-      // 1. Filtro por capacidad
+      // 1. Filtro por texto (nombre, zona o descripción)
+      if (busquedaTexto.trim()) {
+        const q = busquedaTexto.toLowerCase();
+        const coincideNombre = (finca.nombre || '').toLowerCase().includes(q);
+        const coincideZona = (finca.zona || '').toLowerCase().includes(q);
+        const coincideDesc = (finca.descripcion || '').toLowerCase().includes(q);
+        if (!coincideNombre && !coincideZona && !coincideDesc) return false;
+      }
+
+      // 2. Filtro por capacidad
       if (personasFiltro) {
         if (personasFiltro === 'Hasta 10' && finca.capacidad > 10) return false;
         if (personasFiltro === '10 – 20' && (finca.capacidad < 10 || finca.capacidad > 20)) return false;
@@ -55,7 +79,24 @@ export const Catalog: React.FC<CatalogProps> = ({
         if (personasFiltro === 'Más de 40' && finca.capacidad <= 40) return false;
       }
 
-      // 2. Filtro de disponibilidad real en fechas seleccionadas
+      // 3. Filtro Pet Friendly
+      if (soloPetFriendly) {
+        if (!finca.politica_mascotas || finca.politica_mascotas === 'no_permitido') {
+          return false;
+        }
+      }
+
+      // 4. Filtro por amenidades seleccionadas
+      if (amenidadesSeleccionadas.length > 0) {
+        const amenidadesFinca = (finca.finca_amenidades || []).map(a => a.nombre.toLowerCase());
+        const cumpleTodas = amenidadesSeleccionadas.every(sel => {
+          const selLower = sel.toLowerCase();
+          return amenidadesFinca.some(af => af.includes(selLower) || selLower.includes(af));
+        });
+        if (!cumpleTodas) return false;
+      }
+
+      // 5. Filtro de disponibilidad real en fechas seleccionadas
       if (fechaEntrada && fechaSalida) {
         const ini = new Date(fechaEntrada + 'T00:00:00').getTime();
         const fin = new Date(fechaSalida + 'T00:00:00').getTime();
@@ -75,98 +116,76 @@ export const Catalog: React.FC<CatalogProps> = ({
 
       return true;
     });
-  }, [fincas, personasFiltro, fechaEntrada, fechaSalida, bloquesAdmin]);
+  }, [fincas, busquedaTexto, personasFiltro, soloPetFriendly, amenidadesSeleccionadas, fechaEntrada, fechaSalida, bloquesAdmin]);
 
   const handleLimpiarFiltros = () => {
+    setBusquedaTexto('');
     setFechaEntrada('');
     setFechaSalida('');
     setPersonasFiltro('');
+    setAmenidadesSeleccionadas([]);
+    setSoloPetFriendly(false);
   };
 
-  const estadoBadgeMap: Record<string, string> = {
-    disponible: 's-avail',
-    alta_demanda: 's-warn',
-    no_disponible: 's-busy',
-    fin_de_semana: 's-info',
-  };
+  const hayFiltrosActivos = !!(
+    busquedaTexto ||
+    fechaEntrada ||
+    fechaSalida ||
+    personasFiltro ||
+    amenidadesSeleccionadas.length > 0 ||
+    soloPetFriendly
+  );
 
   // Textos y visibilidad configurables
-  const estadoVisible = contenido?.estado_visible ?? true;
-  const estadoTitulo = contenido?.estado_titulo || 'Estado actual · Fincas disponibles';
-  const estadoSubtitulo = contenido?.estado_subtitulo || 'propiedades registradas en Santa Elena, Valle';
-  const estadoBadgeTexto = contenido?.estado_badge_texto || 'Sistema operativo';
-  const estadoAyudaTexto = contenido?.estado_ayuda_texto || 'Toca Ver y cotizar en cualquier finca para consultar el calendario interactivo y obtener tu cotización directa para WhatsApp.';
-
   const filtrosVisible = contenido?.filtros_visible ?? true;
-  const filtrosTitulo = contenido?.filtros_titulo || 'Buscar disponibilidad';
-  const filtrosSubtitulo = contenido?.filtros_subtitulo || 'Filtra por fechas y capacidad para encontrar fincas libres';
-  const filtrosBadgeTitulo = contenido?.filtros_badge_titulo || '📍 Ubicación privilegiada';
-  const filtrosBadgeTexto = contenido?.filtros_badge_texto || 'Todas nuestras fincas campestres están ubicadas en Santa Elena, El Cerrito, Valle del Cauca.';
-
+  const filtrosTitulo = contenido?.filtros_titulo || 'Buscar disponibilidad y fincas';
+  const filtrosSubtitulo = contenido?.filtros_subtitulo || 'Filtra por fechas, capacidad y comodidades ideales para tu estancia';
   const catalogoVisible = contenido?.catalogo_visible ?? true;
   const catalogoTitulo = contenido?.catalogo_titulo || 'Fincas disponibles';
-  const catalogoSubtitulo = contenido?.catalogo_subtitulo || 'Selecciona una propiedad para ver fotografías en alta calidad y cotizar';
+  const catalogoSubtitulo = contenido?.catalogo_subtitulo || 'Lista interactiva de propiedades campestres en Santa Elena, Valle';
   const catalogoVacioTexto = contenido?.catalogo_vacio_texto || 'No se encontraron fincas disponibles para los criterios seleccionados.';
 
   return (
     <div className="cliente-flow">
-      {/* 1. Panel de Estado Actual */}
-      {estadoVisible && (
-        <div className="panel" id="estadoActual">
-          <div className="panel-header" style={{ marginBottom: '0.5rem' }}>
-            <div>
-              <div className="panel-title">{estadoTitulo}</div>
-              <div className="text-xs text-muted mt-1">
-                {fincas.length} {estadoSubtitulo}
-              </div>
-            </div>
-            {estadoBadgeTexto && (
-              <span className="status-badge s-avail">{estadoBadgeTexto}</span>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-            {loading ? (
-              <span className="status-badge s-info">Cargando fincas…</span>
-            ) : (
-              fincas.map(f => (
-                <span
-                  key={f.id}
-                  className={`status-badge ${estadoBadgeMap[f.estado] || 's-info'}`}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => onSelectFinca(f.id)}
-                  title="Clic para ver detalles"
-                >
-                  {f.nombre} · {f.estado.replace('_', ' ')}
-                </span>
-              ))
-            )}
-          </div>
-
-          {estadoAyudaTexto && (
-            <p className="text-xs text-muted" style={{ marginTop: '0.75rem' }}>
-              <Info size={13} style={{ display: 'inline', verticalAlign: '-2px', marginRight: '4px' }} />
-              {estadoAyudaTexto}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* 2. Filtros de Búsqueda */}
+      {/* 1. Panel de Búsqueda y Filtros Centralizados */}
       {filtrosVisible && (
-        <div className="filters-card" id="catalogo">
-          <div className="sec-header">
+        <div className="filters-card" id="catalogo" style={{ borderRadius: 'var(--rad-sm, 10px)' }}>
+          <div className="sec-header" style={{ marginBottom: '0.85rem' }}>
             <div>
               <div className="sec-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Filter size={18} style={{ color: 'var(--primary)' }} /> {filtrosTitulo}
               </div>
               <div className="sec-sub">{filtrosSubtitulo}</div>
             </div>
+
+            {hayFiltrosActivos && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={handleLimpiarFiltros}
+                style={{ fontSize: '0.75rem', gap: '4px' }}
+              >
+                <X size={13} /> Limpiar filtros
+              </button>
+            )}
           </div>
 
-          <div className="filters-grid">
+          {/* Fila principal: Búsqueda, Fechas y Capacidad */}
+          <div className="filters-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+            {/* Búsqueda por texto */}
             <div className="field">
-              <label>Desde (Fecha llegada)</label>
+              <label><Search size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> Finca o palabra clave</label>
+              <input
+                type="text"
+                placeholder="Ej: Paraíso, Piscina, Santa Elena..."
+                value={busquedaTexto}
+                onChange={e => setBusquedaTexto(e.target.value)}
+              />
+            </div>
+
+            {/* Fecha Llegada */}
+            <div className="field">
+              <label>Fecha de llegada</label>
               <input
                 type="date"
                 value={fechaEntrada}
@@ -175,8 +194,9 @@ export const Catalog: React.FC<CatalogProps> = ({
               />
             </div>
 
+            {/* Fecha Salida */}
             <div className="field">
-              <label>Hasta (Fecha salida)</label>
+              <label>Fecha de salida</label>
               <input
                 type="date"
                 value={fechaSalida}
@@ -185,8 +205,9 @@ export const Catalog: React.FC<CatalogProps> = ({
               />
             </div>
 
+            {/* Capacidad requerida */}
             <div className="field">
-              <label>Capacidad requerida</label>
+              <label>Capacidad de huéspedes</label>
               <select
                 value={personasFiltro}
                 onChange={e => setPersonasFiltro(e.target.value)}
@@ -198,72 +219,155 @@ export const Catalog: React.FC<CatalogProps> = ({
                 <option value="Más de 40">Más de 40 personas</option>
               </select>
             </div>
+          </div>
 
-            <div className="field">
-              <p
-                className="text-xs"
-                style={{
-                  background: 'var(--primary-bg)',
-                  color: 'var(--primary)',
-                  border: '1px solid color-mix(in srgb, var(--primary) 25%, transparent)',
-                  borderRadius: 'var(--rad-sm)',
-                  padding: '0.65rem 0.9rem',
-                  margin: 0,
-                  lineHeight: 1.5,
-                }}
-              >
-                <strong style={{ display: 'block', marginBottom: '0.15rem', letterSpacing: '0.04em', textTransform: 'uppercase', fontSize: '0.68rem' }}>
-                  {filtrosBadgeTitulo}
-                </strong>
-                {filtrosBadgeTexto}
-              </p>
+          {/* Botón para desplegar más filtros de interés (Amenidades, Mascotas) */}
+          <div style={{ marginTop: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <button
+              type="button"
+              onClick={() => setFiltrosAvanzadosAbiertos(v => !v)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--primary)',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                padding: 0,
+              }}
+            >
+              <Sparkles size={13} />
+              {filtrosAvanzadosAbiertos ? 'Ocultar filtros específicos' : 'Filtros específicos (Comodidades, Mascotas)'}
+              {filtrosAvanzadosAbiertos ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+
+            <span className="text-xs text-muted">
+              {fincasFiltradas.length} finca{fincasFiltradas.length !== 1 ? 's' : ''} encontrada{fincasFiltradas.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+
+          {/* Panel colapsable de amenidades y opciones avanzadas */}
+          {filtrosAvanzadosAbiertos && (
+            <div
+              style={{
+                marginTop: '0.75rem',
+                paddingTop: '0.75rem',
+                borderTop: '1px solid var(--border-subtle)',
+                display: 'grid',
+                gap: '0.65rem',
+              }}
+            >
+              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                Comodidades clave de tu preferencia:
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
+                {AMENIDADES_FILTRO.map(am => {
+                  const activa = amenidadesSeleccionadas.includes(am);
+                  return (
+                    <button
+                      key={am}
+                      type="button"
+                      onClick={() => toggleAmenidad(am)}
+                      style={{
+                        padding: '0.3rem 0.65rem',
+                        borderRadius: '20px',
+                        border: `1.5px solid ${activa ? 'var(--primary)' : 'var(--border)'}`,
+                        background: activa ? 'color-mix(in srgb, var(--primary) 12%, transparent)' : 'var(--surface)',
+                        color: activa ? 'var(--primary)' : 'var(--text-main)',
+                        fontSize: '0.75rem',
+                        fontWeight: activa ? 700 : 500,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {activa && <Check size={12} />}
+                      {am}
+                    </button>
+                  );
+                })}
+
+                {/* Chip Pet Friendly */}
+                <button
+                  type="button"
+                  onClick={() => setSoloPetFriendly(v => !v)}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    borderRadius: '20px',
+                    border: `1.5px solid ${soloPetFriendly ? 'var(--success)' : 'var(--border)'}`,
+                    background: soloPetFriendly ? 'color-mix(in srgb, var(--success) 12%, transparent)' : 'var(--surface)',
+                    color: soloPetFriendly ? 'var(--success)' : 'var(--text-main)',
+                    fontSize: '0.75rem',
+                    fontWeight: soloPetFriendly ? 700 : 500,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <Dog size={13} />
+                  Permite mascotas (Pet Friendly)
+                </button>
+              </div>
             </div>
-          </div>
-
-          <div className="filter-actions">
-            {(fechaEntrada || fechaSalida || personasFiltro) && (
-              <button className="btn btn-sm" onClick={handleLimpiarFiltros}>
-                <X size={14} /> Limpiar filtros
-              </button>
-            )}
-          </div>
+          )}
         </div>
       )}
 
-      {/* 3. Listado de Fincas */}
+      {/* 2. Listado de Fincas Disponibles Contraídas/Desplegables */}
       {catalogoVisible && (
-        <div>
+        <div style={{ marginTop: '1.25rem' }}>
           <div className="sec-header" style={{ marginBottom: '0.85rem' }}>
             <div>
               <div className="sec-title">{catalogoTitulo}</div>
               <div className="sec-sub">{catalogoSubtitulo}</div>
             </div>
-            <span className="status-badge s-info">
-              {fincasFiltradas.length} finca{fincasFiltradas.length !== 1 ? 's' : ''} disponible{fincasFiltradas.length !== 1 ? 's' : ''}
-            </span>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => setExpandirTodas(v => !v)}
+                style={{ fontSize: '0.72rem', padding: '0.25rem 0.55rem' }}
+              >
+                {expandirTodas ? 'Contraer todas' : 'Desplegar todas'}
+              </button>
+
+              <span className="status-badge s-info">
+                {fincasFiltradas.length} finca{fincasFiltradas.length !== 1 ? 's' : ''} disponible{fincasFiltradas.length !== 1 ? 's' : ''}
+              </span>
+            </div>
           </div>
 
           {loading ? (
-            <div className="catalog-grid">
+            <div style={{ display: 'grid', gap: '0.75rem' }}>
               {[1, 2, 3, 4].map(n => (
                 <SkeletonFincaCard key={n} />
               ))}
             </div>
           ) : fincasFiltradas.length === 0 ? (
             <div className="panel" style={{ textAlign: 'center', padding: '2.5rem' }}>
-              <p className="text-muted" style={{ fontSize: 'var(--text-sm)' }}>
+              <p className="text-muted" style={{ fontSize: 'var(--text-sm)', marginBottom: '0.75rem' }}>
                 {catalogoVacioTexto}
               </p>
-              <button className="btn btn-sm btn-primary" onClick={handleLimpiarFiltros} style={{ marginTop: '0.8rem' }}>
+              <button className="btn btn-sm btn-primary" onClick={handleLimpiarFiltros}>
                 Ver todas las fincas
               </button>
             </div>
           ) : (
-            <div className="catalog-grid">
+            <div style={{ display: 'grid', gap: '0.75rem' }}>
               {fincasFiltradas.map(f => (
                 <FincaCard
                   key={f.id}
                   finca={f}
+                  defaultExpanded={expandirTodas}
                   onSelect={onSelectFinca}
                 />
               ))}

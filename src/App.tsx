@@ -280,6 +280,7 @@ export const App: React.FC = () => {
             bloques={bloquesFinca}
             waNumberGlobal={waNumberGlobal}
             menus={menus}
+            configuracion={configuracion}
             onBackToCatalog={() => handleViewChange('cliente')}
             onGuardarCotizacion={guardarCotizacionPublica}
           />

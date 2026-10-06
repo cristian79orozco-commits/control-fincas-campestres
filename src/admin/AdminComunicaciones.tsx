@@ -1078,6 +1078,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
                 style={{ fontSize: '0.82rem', padding: '0.3rem 0.6rem', minWidth: '240px' }}
               >
                 <option value="cotizacion">📄 Cotización Oficial</option>
+                <option value="solicitud_cliente_publica">🌐 Solicitud Web de Cotización (Cliente → WhatsApp)</option>
                 <option value="separacion">🎉 Documento de Separación</option>
                 <option value="abono">💳 Comprobante de Abono / Pago</option>
                 <option value="estado_cuenta">📊 Estado de Cuenta Consolidado</option>
@@ -1110,13 +1111,21 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
                 {[
                   { tag: 'cliente', desc: 'Nombre del cliente' },
+                  { tag: 'celular', desc: 'Celular del cliente' },
                   { tag: 'finca', desc: 'Nombre de la finca' },
-                  { tag: 'consecutivo', desc: 'N° con prefijo (COT-, SEP-...)' },
+                  { tag: 'consecutivo', desc: 'N° consecutivo' },
+                  { tag: 'consecutivo_linea', desc: 'Línea de consecutivo formateada' },
+                  { tag: 'whatsapp_linea', desc: 'Línea con WhatsApp secundario' },
                   { tag: 'fechas', desc: 'Rango de fechas' },
+                  { tag: 'fecha_inicio', desc: 'Día de llegada' },
+                  { tag: 'fecha_fin', desc: 'Día de salida' },
                   { tag: 'fecha_llegada', desc: 'Día de llegada' },
                   { tag: 'fecha_salida', desc: 'Día de salida' },
                   { tag: 'noches', desc: 'Noches de estancia' },
+                  { tag: 'noches_plural', desc: 's o vacío' },
                   { tag: 'personas', desc: 'N° comensales / huéspedes' },
+                  { tag: 'alimentacion_detalle', desc: 'Detalle de menús seleccionados' },
+                  { tag: 'alojamiento_total', desc: 'Subtotal alojamiento' },
                   { tag: 'total', desc: 'Valor total' },
                   { tag: 'anticipo', desc: 'Valor anticipo / separación' },
                   { tag: 'saldo', desc: 'Saldo pendiente' },

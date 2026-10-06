@@ -120,8 +120,72 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
     }
   };
 
+  // Cálculo de noches
+  const nochesSeleccionadas = useMemo(() => {
+    if (!fechaInicio || !fechaFin) return 0;
+    const ini = new Date(fechaInicio + 'T00:00:00').getTime();
+    const fin = new Date(fechaFin + 'T00:00:00').getTime();
+    if (fin <= ini) return 0;
+    return Math.round((fin - ini) / (1000 * 60 * 60 * 24));
+  }, [fechaInicio, fechaFin]);
+
   return (
     <div>
+      {/* Guía visual paso a paso para el cliente */}
+      <div
+        style={{
+          background: fechaInicio && fechaFin
+            ? 'color-mix(in srgb, var(--primary) 10%, transparent)'
+            : 'var(--surface-sunken)',
+          border: `1px solid ${fechaInicio && fechaFin ? 'color-mix(in srgb, var(--primary) 30%, transparent)' : 'var(--border-subtle)'}`,
+          borderRadius: 'var(--rad-xs, 6px)',
+          padding: '0.6rem 0.85rem',
+          marginBottom: '0.85rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.5rem',
+          fontSize: '0.82rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              background: 'var(--primary)',
+              color: '#fff',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+            }}
+          >
+            {!fechaInicio ? '1' : !fechaFin ? '2' : '✓'}
+          </span>
+          <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+            {!fechaInicio
+              ? 'Paso 1: Toca el día de llegada en el calendario'
+              : !fechaFin
+              ? 'Paso 2: Toca el día de salida (mínimo 1 noche)'
+              : `${nochesSeleccionadas} noche${nochesSeleccionadas !== 1 ? 's' : ''} seleccionada${nochesSeleccionadas !== 1 ? 's' : ''}`}
+          </span>
+        </div>
+
+        {fechaInicio && (
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={onClearRange}
+            style={{ padding: '0.2rem 0.55rem', fontSize: '0.72rem', height: '26px' }}
+          >
+            Cambiar fechas
+          </button>
+        )}
+      </div>
+
       <div className="sec-header" style={{ marginBottom: '0.65rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <button className="btn btn-sm" onClick={handlePrevMonth} title="Mes anterior">
@@ -203,10 +267,10 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
       {fechaInicio && (
         <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
           <div>
-            <strong>Selección:</strong> {fechaInicio} {fechaFin ? `→ ${fechaFin}` : '(Elige fecha de salida)'}
+            <strong>Llegada:</strong> {fechaInicio} {fechaFin ? <>· <strong>Salida:</strong> {fechaFin} ({nochesSeleccionadas} noche{nochesSeleccionadas !== 1 ? 's' : ''})</> : '· (Toca tu fecha de salida)'}
           </div>
           <button className="btn btn-sm" onClick={onClearRange} style={{ padding: '0.2rem 0.6rem', height: '28px' }}>
-            Limpiar fechas
+            Limpiar
           </button>
         </div>
       )}

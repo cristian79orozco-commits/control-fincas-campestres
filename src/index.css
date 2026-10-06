@@ -1772,5 +1772,26 @@ textarea:focus {
   }
 }
 
+/* ==========================================================================
+   ESTILOS: PORTAL CLIENTE - TARJETAS CONTRAÍDAS / EXPANDIBLES
+   ========================================================================== */
+.finca-collapsible-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
 
+.finca-collapsible-card:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border-subtle));
+}
 
+@media (max-width: 640px) {
+  .finca-collapsible-card > div:first-child {
+    grid-template-columns: 85px 1fr !important;
+    gap: 0.65rem !important;
+    padding: 0.65rem !important;
+  }
+  .finca-collapsible-card > div:first-child > div:last-child {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+    margin-top: 0.25rem;
+  }
+}
