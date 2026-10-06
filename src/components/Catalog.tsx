@@ -182,20 +182,6 @@ export const Catalog: React.FC<CatalogProps> = ({
     setSoloPetFriendly(false);
   };
 
-  const handleConsultarFincaWa = (finca: Finca) => {
-    const num = (finca.whatsapp || waNumber || '573176827093').replace(/[^0-9]/g, '');
-    let fechasTexto = '';
-    if (fechaEntrada && fechaSalida) {
-      fechasTexto = ` para las fechas del ${fechaEntrada} al ${fechaSalida}`;
-    } else if (fechaEntrada) {
-      fechasTexto = ` a partir del ${fechaEntrada}`;
-    }
-    const msg = encodeURIComponent(
-      `¡Hola! 👋 Me interesa consultar disponibilidad y cotización de la finca *${finca.nombre}* (${finca.zona || 'Santa Elena, Valle'})${fechasTexto}. ¿Nos pueden confirmar disponibilidad y condiciones?`
-    );
-    window.open(`https://wa.me/${num}?text=${msg}`, '_blank');
-  };
-
   const hayFiltrosActivos = !!(
     busquedaTexto ||
     fechaEntrada ||
@@ -970,43 +956,26 @@ export const Catalog: React.FC<CatalogProps> = ({
                           </span>
                         </div>
 
-                        {/* Acciones de primera mano: Cotizar directamente o Consultar por WhatsApp */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem' }}>
+                        {/* Acción principal exclusiva: Cotizar y reservar estadía */}
+                        <div>
                           <button
                             type="button"
                             className="btn btn-primary"
                             onClick={() => onSelectFinca(fincaActiva.id)}
                             style={{
                               width: '100%',
-                              padding: '0.8rem',
-                              fontSize: '0.86rem',
+                              padding: '0.85rem',
+                              fontSize: '0.9rem',
                               fontWeight: 700,
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               gap: '0.5rem',
+                              boxShadow: '0 4px 14px rgba(26, 107, 94, 0.25)',
                             }}
                           >
                             <span>Cotizar y reservar estadía</span>
-                            <ArrowRight size={16} />
-                          </button>
-
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={() => handleConsultarFincaWa(fincaActiva)}
-                            style={{
-                              width: '100%',
-                              padding: '0.65rem',
-                              fontSize: '0.8rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '0.4rem',
-                            }}
-                          >
-                            <MessageCircle size={15} style={{ color: '#25d366' }} />
-                            <span>Consultar por WhatsApp</span>
+                            <ArrowRight size={17} />
                           </button>
                         </div>
                       </div>
