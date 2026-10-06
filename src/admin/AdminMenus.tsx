@@ -8,13 +8,15 @@ import { supabase } from '../services/supabase';
 import { generarPropuestaAlimentacion } from '../services/documentos';
 import { optimizarImagen, formatearBytes } from '../utils/imageOptimizer';
 import { obtenerFotoMenu } from '../utils/menuUtils';
-import type { Menu, MenuCategoria, Cliente, Finca } from '../types';
+import type { Menu, MenuCategoria, Cliente, Finca, ConfiguracionGeneral } from '../types';
 import { CurrencyInput } from '../components/CurrencyInput';
 
 interface AdminMenusProps {
   menus: Menu[];
   clientes: Cliente[];
   fincas: Finca[];
+  configuracion?: ConfiguracionGeneral;
+  onGuardarConfiguracion?: (datos: Partial<ConfiguracionGeneral>) => Promise<{ success: boolean; error?: string }>;
   onGuardar: (menuData: Partial<Menu>, imagenesUrls?: string[]) => Promise<{ success: boolean; id?: string; error?: string }>;
   onCambiarEstado: (id: string, activo: boolean) => Promise<{ success: boolean; error?: string }>;
   onEliminar: (id: string) => Promise<{ success: boolean; error?: string }>;
@@ -70,6 +72,8 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
   menus,
   clientes,
   fincas,
+  configuracion,
+  onGuardarConfiguracion,
   onGuardar,
   onCambiarEstado,
   onEliminar,
@@ -83,6 +87,37 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
   const [subiendoImg, setSubiendoImg] = useState(false);
   const [filtroCategoria, setFiltroCategoria] = useState<MenuCategoria | 'todas'>('todas');
   const [busqueda, setBusqueda] = useState('');
+
+  // Regla operativa de alimentación mínima
+  const [reglaActiva, setReglaActiva] = useState(configuracion?.regla_alimentacion_activa ?? true);
+  const [reglaMaxPersonas, setReglaMaxPersonas] = useState(configuracion?.regla_alimentacion_max_personas ?? 10);
+  const [reglaMinServicios, setReglaMinServicios] = useState(configuracion?.regla_alimentacion_min_servicios ?? 2);
+  const [reglaMensaje, setReglaMensaje] = useState(
+    configuracion?.regla_alimentacion_mensaje ||
+    'Para grupos de hasta 10 personas, como mínimo se debe contratar servicio de desayuno y almuerzo (mínimo 2 servicios de alimentación complementaria).'
+  );
+  const [guardandoRegla, setGuardandoRegla] = useState(false);
+  const [reglaExpandida, setReglaExpandida] = useState(false);
+
+  const handleGuardarRegla = async () => {
+    if (!onGuardarConfiguracion) {
+      showToast('No se dispone de permisos para guardar configuración', 'error');
+      return;
+    }
+    setGuardandoRegla(true);
+    const res = await onGuardarConfiguracion({
+      regla_alimentacion_activa: reglaActiva,
+      regla_alimentacion_max_personas: reglaMaxPersonas,
+      regla_alimentacion_min_servicios: reglaMinServicios,
+      regla_alimentacion_mensaje: reglaMensaje,
+    });
+    setGuardandoRegla(false);
+    if (res.success) {
+      showToast('Regla de alimentación mínima guardada en Supabase ✅', 'success');
+    } else {
+      showToast(res.error || 'Error al guardar regla', 'error');
+    }
+  };
 
   // Modal de propuesta PDF
   const [modalPdfAbierto, setModalPdfAbierto] = useState(false);
@@ -363,6 +398,133 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
           </div>
           <div className="stat-lbl">Tarifa desde</div>
         </div>
+      </div>
+
+      {/* ===== REGLA OPERATIVA DE ALIMENTACIÓN MÍNIMA ===== */}
+      <div
+        style={{
+          background: 'var(--surface-sunken)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: 'var(--rad-sm, 8px)',
+          padding: '0.85rem 1rem',
+          display: 'grid',
+          gap: '0.75rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '1.1rem' }}>⚖️</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-main)' }}>
+                Regla Operativa: Requisito Mínimo de Alimentación para Grupos Pequeños
+              </div>
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                Garantiza la rentabilidad operativa exigiendo servicios mínimos (ej. desayuno y almuerzo) si el grupo es de pocas personas.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span className={`status-badge ${reglaActiva ? 's-avail' : 's-busy'}`} style={{ fontSize: '0.72rem' }}>
+              {reglaActiva ? 'Regla activa' : 'Desactivada'}
+            </span>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setReglaExpandida(v => !v)}
+              style={{ fontSize: '0.74rem', padding: '0.25rem 0.6rem' }}
+            >
+              {reglaExpandida ? 'Ocultar ajuste ▴' : 'Configurar regla ▾'}
+            </button>
+          </div>
+        </div>
+
+        {reglaExpandida && (
+          <div
+            style={{
+              paddingTop: '0.75rem',
+              borderTop: '1px solid var(--border-subtle)',
+              display: 'grid',
+              gap: '0.75rem',
+              animation: 'fadeIn 0.15s ease',
+            }}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+              {/* Activar/Desactivar */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8rem', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={reglaActiva}
+                  onChange={e => setReglaActiva(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                />
+                <span style={{ fontWeight: 600 }}>Activar requisito mínimo para grupos pequeños</span>
+              </label>
+
+              {/* Límite de personas */}
+              <div className="field" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                  Aplica a grupos de hasta:
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={reglaMaxPersonas}
+                    onChange={e => setReglaMaxPersonas(Math.max(1, Number(e.target.value)))}
+                    style={{ height: '32px', fontSize: '0.82rem', width: '80px' }}
+                  />
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>personas (ej: 10)</span>
+                </div>
+              </div>
+
+              {/* Servicios mínimos */}
+              <div className="field" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                  Mínimo de servicios requeridos:
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={reglaMinServicios}
+                    onChange={e => setReglaMinServicios(Math.max(1, Number(e.target.value)))}
+                    style={{ height: '32px', fontSize: '0.82rem', width: '80px' }}
+                  />
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>servicios (ej: 2)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Mensaje personalizado */}
+            <div className="field" style={{ margin: 0 }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                Mensaje explicativo visible para el cliente en el cotizador:
+              </label>
+              <textarea
+                rows={2}
+                value={reglaMensaje}
+                onChange={e => setReglaMensaje(e.target.value)}
+                style={{ fontSize: '0.8rem', padding: '0.5rem', borderRadius: '4px' }}
+              />
+            </div>
+
+            {/* Botón guardar regla */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={handleGuardarRegla}
+                disabled={guardandoRegla}
+                style={{ fontSize: '0.78rem', padding: '0.35rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <Save size={13} /> {guardandoRegla ? 'Guardando regla...' : 'Guardar regla de servicio en Supabase'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ===== BARRA DE BÚSQUEDA Y CATEGORÍAS ===== */}

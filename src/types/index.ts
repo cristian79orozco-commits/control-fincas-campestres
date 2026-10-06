@@ -353,6 +353,12 @@ export interface ConfiguracionGeneral {
   // 5. Plantillas de Mensajes de Comunicación Editables
   plantillas_comunicacion?: Record<string, string>;
 
+  // 6. Regla Operativa de Alimentación Mínima por Tamaño de Grupo
+  regla_alimentacion_activa?: boolean;
+  regla_alimentacion_max_personas?: number;
+  regla_alimentacion_min_servicios?: number;
+  regla_alimentacion_mensaje?: string | null;
+
   created_at?: string;
   updated_at?: string;
 }

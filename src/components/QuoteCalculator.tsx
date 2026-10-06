@@ -95,6 +95,16 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
     );
   };
 
+  // Regla operativa: Requisito de alimentación mínima para grupos pequeños
+  const reglaActiva = configuracion?.regla_alimentacion_activa !== false;
+  const maxPersonasRegla = configuracion?.regla_alimentacion_max_personas ?? 10;
+  const minServiciosRegla = configuracion?.regla_alimentacion_min_servicios ?? 2;
+  const reglaAplica = reglaActiva && personas <= maxPersonasRegla;
+  const totalServicios = soloAlojamiento
+    ? 0
+    : planesSeleccionados.reduce((acc, p) => acc + p.cantidadServicios, 0);
+  const cumpleRegla = !reglaAplica || totalServicios >= minServiciosRegla;
+
   // Cálculo de estancia y valores
   const { noches, subtotalAlojamiento, costoTotalAlimentacion, totalEstimado, alimentacionDetalle, alimentacionTextoResumen } = useMemo(() => {
     let n = 1;
@@ -205,6 +215,15 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
     // Validación de fechas
     if (!fechaInicio || !fechaFin) {
       setErrorGuardado('Por favor selecciona las fechas de llegada y salida en el calendario interactivo.');
+      return;
+    }
+
+    // Validación de regla operativa de alimentación para grupos pequeños
+    if (reglaAplica && !cumpleRegla) {
+      const msg =
+        configuracion?.regla_alimentacion_mensaje ||
+        `Por política de servicio, para grupos de hasta ${maxPersonasRegla} personas es obligatorio seleccionar al menos ${minServiciosRegla} servicios de alimentación (llevas ${totalServicios}). Por favor selecciona los planes correspondientes.`;
+      setErrorGuardado(msg);
       return;
     }
 
@@ -337,6 +356,16 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
         onToggleSoloAlojamiento={handleToggleSoloAlojamiento}
         onToggleMenu={handleToggleMenu}
         onCambiarServicios={handleCambiarServicios}
+        personas={personas}
+        reglaAlimentacion={{
+          activa: reglaActiva,
+          maxPersonas: maxPersonasRegla,
+          minServicios: minServiciosRegla,
+          mensaje: configuracion?.regla_alimentacion_mensaje,
+          aplica: reglaAplica,
+          cumple: cumpleRegla,
+          totalServicios,
+        }}
       />
 
       {/* 3. Resumen y Desglose de Valores Transparente */}
@@ -535,6 +564,28 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
           {waMensaje}
         </div>
       </div>
+
+      {/* Recordatorio de requisito pendiente de alimentación */}
+      {reglaAplica && !cumpleRegla && (
+        <div
+          style={{
+            fontSize: '0.78rem',
+            color: '#b45309',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.5rem 0.75rem',
+            borderRadius: 'var(--rad-xs, 6px)',
+            background: 'rgba(245, 158, 11, 0.1)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+          }}
+        >
+          <AlertCircle size={15} style={{ flexShrink: 0 }} />
+          <span>
+            <strong>Requisito pendiente:</strong> Para {personas} personas debes seleccionar al menos {minServiciosRegla} servicios de alimentación (llevas {totalServicios}/{minServiciosRegla}).
+          </span>
+        </div>
+      )}
 
       {/* Botón principal de acción */}
       {!cotGuardada ? (

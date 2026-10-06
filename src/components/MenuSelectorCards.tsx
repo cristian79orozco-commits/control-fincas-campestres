@@ -18,6 +18,16 @@ export interface PlanAlimentacionSeleccionado {
   cantidadServicios: number;
 }
 
+export interface ReglaAlimentacionInfo {
+  activa: boolean;
+  maxPersonas: number;
+  minServicios: number;
+  mensaje?: string | null;
+  aplica: boolean;
+  cumple: boolean;
+  totalServicios: number;
+}
+
 interface MenuSelectorCardsProps {
   menus: Menu[];
   planesSeleccionados: PlanAlimentacionSeleccionado[];
@@ -26,6 +36,8 @@ interface MenuSelectorCardsProps {
   onToggleMenu: (menu: Menu) => void;
   onCambiarServicios: (menuId: string, cantidad: number) => void;
   loading?: boolean;
+  personas?: number;
+  reglaAlimentacion?: ReglaAlimentacionInfo;
 }
 
 function formatCOP(v: number) {
@@ -50,6 +62,8 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
   onToggleMenu,
   onCambiarServicios,
   loading = false,
+  personas = 1,
+  reglaAlimentacion,
 }) => {
   const [expandido, setExpandido] = useState(true);
   const [descripcionesAbiertas, setDescripcionesAbiertas] = useState<Record<string, boolean>>({});
@@ -118,6 +132,66 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
       {/* Contenido expandible */}
       {expandido && (
         <div style={{ display: 'grid', gap: '0.75rem' }}>
+          {/* Banner de Regla de Alimentación para Grupos Pequeños */}
+          {reglaAlimentacion?.aplica && (
+            <div
+              style={{
+                padding: '0.75rem 0.9rem',
+                borderRadius: 'var(--rad-xs, 8px)',
+                background: reglaAlimentacion.cumple
+                  ? 'rgba(16, 185, 129, 0.08)'
+                  : 'rgba(245, 158, 11, 0.09)',
+                border: `1px solid ${
+                  reglaAlimentacion.cumple
+                    ? 'rgba(16, 185, 129, 0.35)'
+                    : 'rgba(245, 158, 11, 0.4)'
+                }`,
+                display: 'grid',
+                gap: '0.35rem',
+                fontSize: '0.8rem',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.5rem',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700 }}>
+                  <span style={{ fontSize: '1rem' }}>⚖️</span>
+                  <span
+                    style={{
+                      color: reglaAlimentacion.cumple ? '#059669' : '#d97706',
+                    }}
+                  >
+                    {reglaAlimentacion.cumple
+                      ? 'Requisito de alimentación completado'
+                      : `Política para grupos de hasta ${reglaAlimentacion.maxPersonas} personas`}
+                  </span>
+                </div>
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    padding: '0.15rem 0.55rem',
+                    borderRadius: '12px',
+                    background: reglaAlimentacion.cumple ? '#10b981' : '#f59e0b',
+                    color: '#fff',
+                  }}
+                >
+                  {reglaAlimentacion.totalServicios} / {reglaAlimentacion.minServicios} servicios elegidos
+                </span>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                {reglaAlimentacion.mensaje ||
+                  `Para garantizar la atención y rentabilidad operativa en grupos de ${personas} personas, se requiere elegir como mínimo ${reglaAlimentacion.minServicios} servicios de alimentación (ej. Desayuno y Almuerzo).`}
+              </div>
+            </div>
+          )}
+
           {/* Opción 1: Solo Alojamiento */}
           <div
             onClick={onToggleSoloAlojamiento}
@@ -161,6 +235,11 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
                 <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                   Traes tus propios alimentos o cocinas en la finca con cocina equipada.
                 </div>
+                {reglaAlimentacion?.aplica && (
+                  <div style={{ fontSize: '0.72rem', color: '#d97706', fontWeight: 600, marginTop: '0.2rem' }}>
+                    ⚠️ Tu grupo ({personas} pers.) requiere contratar al menos {reglaAlimentacion.minServicios} servicios de alimentación.
+                  </div>
+                )}
               </div>
             </div>
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>

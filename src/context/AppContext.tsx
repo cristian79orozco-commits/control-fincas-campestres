@@ -503,8 +503,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .maybeSingle();
 
       if (!error && data) {
-        setConfiguracion(data as ConfiguracionGeneral);
-        setConfiguracionGlobal(data as ConfiguracionGeneral);
+        const dAny = data as any;
+        const reglaEnPlantillas = dAny.plantillas_comunicacion?._regla_alimentacion;
+        const configCombinada: ConfiguracionGeneral = {
+          ...CONFIGURACION_DEFAULT,
+          ...dAny,
+          ...(reglaEnPlantillas ? {
+            regla_alimentacion_activa: reglaEnPlantillas.activa ?? dAny.regla_alimentacion_activa ?? true,
+            regla_alimentacion_max_personas: reglaEnPlantillas.maxPersonas ?? dAny.regla_alimentacion_max_personas ?? 10,
+            regla_alimentacion_min_servicios: reglaEnPlantillas.minServicios ?? dAny.regla_alimentacion_min_servicios ?? 2,
+            regla_alimentacion_mensaje: reglaEnPlantillas.mensaje ?? dAny.regla_alimentacion_mensaje,
+          } : {}),
+        };
+        setConfiguracion(configCombinada);
+        setConfiguracionGlobal(configCombinada);
       }
     } catch (err) {
       console.warn('[AppContext] Error cargando configuracion:', err);
@@ -1930,9 +1942,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setConfiguracion(actualizado);
       setConfiguracionGlobal(actualizado);
 
-      const { error } = await supabase
+      // Empaquetar regla en plantillas_comunicacion para persistencia garantizada
+      const reglaObjeto = {
+        activa: actualizado.regla_alimentacion_activa,
+        maxPersonas: actualizado.regla_alimentacion_max_personas,
+        minServicios: actualizado.regla_alimentacion_min_servicios,
+        mensaje: actualizado.regla_alimentacion_mensaje,
+      };
+
+      const plantillasActualizadas = {
+        ...(actualizado.plantillas_comunicacion || {}),
+        _regla_alimentacion: reglaObjeto,
+      };
+
+      const payloadParaSupabase: Record<string, any> = {
+        id: 'general',
+        ...datos,
+        plantillas_comunicacion: plantillasActualizadas,
+      };
+
+      let { error } = await supabase
         .from('configuracion_general')
-        .upsert({ id: 'general', ...datos }, { onConflict: 'id' });
+        .upsert(payloadParaSupabase, { onConflict: 'id' });
+
+      // Si falla porque las columnas directas regla_alimentacion_* aún no se han migrado en PostgreSQL
+      if (error && error.message && error.message.includes('column of \'configuracion_general\' in the schema cache')) {
+        const payloadSeguro = { ...payloadParaSupabase };
+        delete payloadSeguro.regla_alimentacion_activa;
+        delete payloadSeguro.regla_alimentacion_max_personas;
+        delete payloadSeguro.regla_alimentacion_min_servicios;
+        delete payloadSeguro.regla_alimentacion_mensaje;
+
+        const resReintento = await supabase
+          .from('configuracion_general')
+          .upsert(payloadSeguro, { onConflict: 'id' });
+        error = resReintento.error;
+      }
 
       if (error) throw error;
       return { success: true };

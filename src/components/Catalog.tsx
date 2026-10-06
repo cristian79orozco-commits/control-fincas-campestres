@@ -51,12 +51,16 @@ export const Catalog: React.FC<CatalogProps> = ({
   const [filtrosAvanzadosAbiertos, setFiltrosAvanzadosAbiertos] = useState(false);
   const [expandirTodas, setExpandirTodas] = useState(false);
 
+  // Estado de la sección de fincas disponibles: CONTRAÍDA por defecto para evitar crecimiento vertical
+  const [seccionFincasAbierta, setSeccionFincasAbierta] = useState(false);
+
   const toggleAmenidad = (amenidad: string) => {
     setAmenidadesSeleccionadas(prev =>
       prev.includes(amenidad)
         ? prev.filter(a => a !== amenidad)
         : [...prev, amenidad]
     );
+    setSeccionFincasAbierta(true);
   };
 
   // Filtrado de fincas inteligente con comprobación de fechas reales, capacidad y amenidades
@@ -179,7 +183,10 @@ export const Catalog: React.FC<CatalogProps> = ({
                 type="text"
                 placeholder="Ej: Paraíso, Piscina, Santa Elena..."
                 value={busquedaTexto}
-                onChange={e => setBusquedaTexto(e.target.value)}
+                onChange={e => {
+                  setBusquedaTexto(e.target.value);
+                  if (e.target.value) setSeccionFincasAbierta(true);
+                }}
               />
             </div>
 
@@ -190,7 +197,10 @@ export const Catalog: React.FC<CatalogProps> = ({
                 type="date"
                 value={fechaEntrada}
                 min={new Date().toISOString().split('T')[0]}
-                onChange={e => setFechaEntrada(e.target.value)}
+                onChange={e => {
+                  setFechaEntrada(e.target.value);
+                  if (e.target.value) setSeccionFincasAbierta(true);
+                }}
               />
             </div>
 
@@ -201,7 +211,10 @@ export const Catalog: React.FC<CatalogProps> = ({
                 type="date"
                 value={fechaSalida}
                 min={fechaEntrada || new Date().toISOString().split('T')[0]}
-                onChange={e => setFechaSalida(e.target.value)}
+                onChange={e => {
+                  setFechaSalida(e.target.value);
+                  if (e.target.value) setSeccionFincasAbierta(true);
+                }}
               />
             </div>
 
@@ -210,7 +223,10 @@ export const Catalog: React.FC<CatalogProps> = ({
               <label>Capacidad de huéspedes</label>
               <select
                 value={personasFiltro}
-                onChange={e => setPersonasFiltro(e.target.value)}
+                onChange={e => {
+                  setPersonasFiltro(e.target.value);
+                  if (e.target.value) setSeccionFincasAbierta(true);
+                }}
               >
                 <option value="">Cualquier capacidad</option>
                 <option value="Hasta 10">Hasta 10 personas</option>
@@ -296,7 +312,10 @@ export const Catalog: React.FC<CatalogProps> = ({
                 {/* Chip Pet Friendly */}
                 <button
                   type="button"
-                  onClick={() => setSoloPetFriendly(v => !v)}
+                  onClick={() => {
+                    setSoloPetFriendly(v => !v);
+                    setSeccionFincasAbierta(true);
+                  }}
                   style={{
                     padding: '0.3rem 0.65rem',
                     borderRadius: '20px',
@@ -321,56 +340,142 @@ export const Catalog: React.FC<CatalogProps> = ({
         </div>
       )}
 
-      {/* 2. Listado de Fincas Disponibles Contraídas/Desplegables */}
+      {/* 2. Sección de Fincas Disponibles — Contraída por Defecto para evitar desbordamiento vertical */}
       {catalogoVisible && (
         <div style={{ marginTop: '1.25rem' }}>
-          <div className="sec-header" style={{ marginBottom: '0.85rem' }}>
+          {/* Cabecera / Barra Contraída Predeterminada */}
+          <div
+            onClick={() => setSeccionFincasAbierta(v => !v)}
+            style={{
+              background: 'var(--surface)',
+              border: `1.5px solid ${seccionFincasAbierta ? 'var(--primary)' : 'var(--border)'}`,
+              borderRadius: 'var(--rad-sm, 10px)',
+              padding: '0.85rem 1.1rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.75rem',
+              flexWrap: 'wrap',
+              boxShadow: seccionFincasAbierta ? '0 3px 12px rgba(0,0,0,0.06)' : 'none',
+              transition: 'all 0.18s ease',
+            }}
+          >
             <div>
-              <div className="sec-title">{catalogoTitulo}</div>
-              <div className="sec-sub">{catalogoSubtitulo}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span
+                  style={{
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    background: fincasFiltradas.length > 0 ? 'var(--success)' : 'var(--text-muted)',
+                  }}
+                />
+                <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>
+                  {catalogoTitulo}
+                </h2>
+                <span className="status-badge s-info" style={{ fontSize: '0.7rem' }}>
+                  {fincasFiltradas.length} propiedad{fincasFiltradas.length !== 1 ? 'es' : ''}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                {catalogoSubtitulo}
+              </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <button
                 type="button"
-                className="btn btn-sm"
-                onClick={() => setExpandirTodas(v => !v)}
-                style={{ fontSize: '0.72rem', padding: '0.25rem 0.55rem' }}
+                className="btn btn-sm btn-primary"
+                onClick={e => {
+                  e.stopPropagation();
+                  setSeccionFincasAbierta(v => !v);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  fontSize: '0.78rem',
+                  padding: '0.4rem 0.85rem',
+                }}
               >
-                {expandirTodas ? 'Contraer todas' : 'Desplegar todas'}
+                {seccionFincasAbierta ? (
+                  <>Ocultar listado <ChevronUp size={14} /></>
+                ) : (
+                  <>Ver y desplegar fincas <ChevronDown size={14} /></>
+                )}
               </button>
-
-              <span className="status-badge s-info">
-                {fincasFiltradas.length} finca{fincasFiltradas.length !== 1 ? 's' : ''} disponible{fincasFiltradas.length !== 1 ? 's' : ''}
-              </span>
             </div>
           </div>
 
-          {loading ? (
-            <div style={{ display: 'grid', gap: '0.75rem' }}>
-              {[1, 2, 3, 4].map(n => (
-                <SkeletonFincaCard key={n} />
-              ))}
-            </div>
-          ) : fincasFiltradas.length === 0 ? (
-            <div className="panel" style={{ textAlign: 'center', padding: '2.5rem' }}>
-              <p className="text-muted" style={{ fontSize: 'var(--text-sm)', marginBottom: '0.75rem' }}>
-                {catalogoVacioTexto}
-              </p>
-              <button className="btn btn-sm btn-primary" onClick={handleLimpiarFiltros}>
-                Ver todas las fincas
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gap: '0.75rem' }}>
-              {fincasFiltradas.map(f => (
-                <FincaCard
-                  key={f.id}
-                  finca={f}
-                  defaultExpanded={expandirTodas}
-                  onSelect={onSelectFinca}
-                />
-              ))}
+          {/* Listado desplegado con contenedor scrollable para no extender la página */}
+          {seccionFincasAbierta && (
+            <div
+              style={{
+                marginTop: '0.85rem',
+                animation: 'fadeIn 0.2s ease',
+              }}
+            >
+              {/* Barra de utilidades del catálogo */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '0.65rem',
+                  padding: '0 0.25rem',
+                }}
+              >
+                <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                  Toca cualquier finca para ver detalles o cotizar directamente
+                </span>
+
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => setExpandirTodas(v => !v)}
+                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}
+                >
+                  {expandirTodas ? 'Contraer detalles de todas' : 'Desplegar detalles de todas'}
+                </button>
+              </div>
+
+              {/* Contenedor con altura máxima y scroll interno para prevenir crecimiento vertical excesivo */}
+              <div
+                style={{
+                  maxHeight: '680px',
+                  overflowY: 'auto',
+                  paddingRight: '0.35rem',
+                  display: 'grid',
+                  gap: '0.75rem',
+                }}
+              >
+                {loading ? (
+                  <div style={{ display: 'grid', gap: '0.75rem' }}>
+                    {[1, 2, 3, 4].map(n => (
+                      <SkeletonFincaCard key={n} />
+                    ))}
+                  </div>
+                ) : fincasFiltradas.length === 0 ? (
+                  <div className="panel" style={{ textAlign: 'center', padding: '2.5rem' }}>
+                    <p className="text-muted" style={{ fontSize: 'var(--text-sm)', marginBottom: '0.75rem' }}>
+                      {catalogoVacioTexto}
+                    </p>
+                    <button className="btn btn-sm btn-primary" onClick={handleLimpiarFiltros}>
+                      Ver todas las fincas
+                    </button>
+                  </div>
+                ) : (
+                  fincasFiltradas.map(f => (
+                    <FincaCard
+                      key={f.id}
+                      finca={f}
+                      defaultExpanded={expandirTodas}
+                      onSelect={onSelectFinca}
+                    />
+                  ))
+                )}
+              </div>
             </div>
           )}
         </div>

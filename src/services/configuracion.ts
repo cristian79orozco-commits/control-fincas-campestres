@@ -51,6 +51,12 @@ export const CONFIGURACION_DEFAULT: ConfiguracionGeneral = {
   banco_tipo_cuenta: 'Ahorros',
   banco_cuenta: '',
   banco_titular: 'Control de Fincas Campestres',
+
+  // 5. Regla Operativa de Alimentación Mínima por Tamaño de Grupo
+  regla_alimentacion_activa: true,
+  regla_alimentacion_max_personas: 10,
+  regla_alimentacion_min_servicios: 2,
+  regla_alimentacion_mensaje: 'Para grupos de hasta 10 personas, como mínimo se debe contratar servicio de desayuno y almuerzo (mínimo 2 servicios de alimentación complementaria).',
 };
 
 // Variable en memoria global para sincronización inmediata
