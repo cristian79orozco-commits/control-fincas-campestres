@@ -201,6 +201,7 @@ export const App: React.FC = () => {
                 bloquesAdmin={bloquesAdmin}
                 onSelectFinca={handleSelectFinca}
                 contenido={contenidoSitio}
+                waNumber={waNumberGlobal}
               />
             </main>
           );

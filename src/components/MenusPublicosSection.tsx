@@ -39,8 +39,8 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = ({
 }) => {
   const menusActivos = menus.filter(m => m.activo);
 
-  // Estado contraído por defecto según requerimiento
-  const [desplegado, setDesplegado] = useState(false);
+  // Estado desplegado por defecto para mostrar información de primera mano
+  const [desplegado, setDesplegado] = useState(true);
 
   // Menú actualmente seleccionado para la vista maximizada
   const [menuSeleccionadoId, setMenuSeleccionadoId] = useState<string>(
