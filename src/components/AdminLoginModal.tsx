@@ -42,14 +42,34 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   return (
     <div className="admin-modal-overlay open" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="admin-modal-box" role="dialog" aria-modal="true">
-        <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem' }}>
-          <div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.35rem', fontWeight: 600 }}>
-              Acceso Administrador
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+            <div
+              style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '12px',
+                background: '#FAF7EE',
+                border: '1px solid var(--border)',
+                overflow: 'hidden',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                flexShrink: 0,
+              }}
+            >
+              <img
+                src="/logo.png"
+                alt="Paraíso Terrenal"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
             </div>
-            <p className="text-muted text-sm mt-1">Ingreso protegido con Supabase Auth</p>
+            <div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 600 }}>
+                Acceso Administrador
+              </div>
+              <p className="text-muted text-xs" style={{ margin: 0, marginTop: '2px' }}>Paraíso Terrenal · Supabase Auth</p>
+            </div>
           </div>
-          <button className="icon-btn" onClick={onClose}>
+          <button className="icon-btn" onClick={onClose} aria-label="Cerrar">
             <X size={18} />
           </button>
         </div>

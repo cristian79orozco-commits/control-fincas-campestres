@@ -44,15 +44,20 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="topbar">
-      <div className="brand" onClick={handleBrandClick} style={{ cursor: 'pointer' }} title="Fincas Campestres">
+      <div className="brand" onClick={handleBrandClick} style={{ cursor: 'pointer' }} title="Paraíso Terrenal — Fincas de Alquiler">
         <div className="brand-mark">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 20h18" /><path d="M5 20V10l7-5 7 5v10" /><path d="M9 20v-5h6v5" />
-          </svg>
+          <img
+            src="/logo.png"
+            alt="Paraíso Terrenal - Fincas de Alquiler"
+            className="brand-logo-img"
+            width={44}
+            height={44}
+            loading="eager"
+          />
         </div>
-        <div>
-          <div className="brand-name">Fincas Campestres</div>
-          <div className="brand-sub">Valle del Cauca · Santa Elena</div>
+        <div className="brand-text-block">
+          <div className="brand-name">Paraíso Terrenal</div>
+          <div className="brand-sub">Fincas de Alquiler · Santa Elena</div>
         </div>
       </div>
 

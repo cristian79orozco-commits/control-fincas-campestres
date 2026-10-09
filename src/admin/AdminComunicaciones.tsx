@@ -233,9 +233,9 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
       if (cli) {
         tel = cli.whatsapp || (cli as any)?.telefono || tel;
         nom = `${cli.nombre} ${cli.apellido || ''}`.trim();
-        msg = `Hola, *${nom}* 👋\n\nTe escribimos de *Control de Fincas Campestres*.`;
+        msg = `Hola, *${nom}* 👋\n\nTe escribimos de *Paraíso Terrenal*.`;
       } else {
-        msg = `Hola 👋\n\nTe escribimos de *Control de Fincas Campestres*.`;
+        msg = `Hola 👋\n\nTe escribimos de *Paraíso Terrenal*.`;
       }
     }
 

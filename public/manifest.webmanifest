@@ -1,14 +1,20 @@
 {
-  "name": "Fincas Campestres · Control y Reservas",
-  "short_name": "Fincas Campestres",
-  "description": "Sistema de Control, Cotizaciones y Reservas de Fincas Campestres en Santa Elena, Valle",
+  "name": "Paraíso Terrenal · Fincas de Alquiler",
+  "short_name": "Paraíso Terrenal",
+  "description": "Sistema de Control, Cotizaciones y Reservas de Paraíso Terrenal - Fincas de Alquiler en Santa Elena, Valle",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0f2f28",
+  "background_color": "#FAF7EE",
   "theme_color": "#1a6b5e",
   "icons": [
+    {
+      "src": "./logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "./icon-192.svg",
       "sizes": "192x192",

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Servicio Independiente de WhatsApp y Comunicaciones — Fase 3
  * 
  * Reglas de diseño del Plan Maestro:
@@ -127,7 +127,7 @@ export function plantillaCotizacion(
   const consecPrefijado = formatearConsecutivoConPrefijo(cotizacion.consecutivo, 'cotizacion');
 
   let msg = `🏡 *COTIZACIÓN OFICIAL DE ESTANCIA*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 ¡Hola, *${cNombre}*! 👋 Con gusto te presentamos los detalles de tu cotización para disfrutar de una experiencia campestre inolvidable.
 
@@ -192,7 +192,7 @@ export function plantillaPedirAbonoCotizacion(
   const abonoSugerido = Math.round(valorAlojamiento * (porcentaje / 100));
 
   let msg = `🌿 *SOLICITUD OFICIAL DE SEPARACIÓN Y BLOQUEO DE FECHAS*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 Hola, *${cNombre}* 👋
 Adjuntamos la propuesta formal para tu estadía en *${fNombre}*.
@@ -294,7 +294,7 @@ export function plantillaSeparacion(reserva: Reserva, enlacePdf?: string): strin
   const consecPrefijado = formatearConsecutivoConPrefijo(reserva.consecutivo, 'separacion');
 
   let msg = `🎉 *CONFIRMACIÓN DE RESERVA Y SEPARACIÓN*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 Hola, *${clienteNombre}* 🙌 Hemos emitido satisfactoriamente tu *Documento Oficial de Separación*.
 
@@ -339,7 +339,7 @@ export function plantillaComprobantePago(reserva: Reserva, pago: Pago, enlacePdf
     pago.tipo === 'pago_total' ? 'Cancelación total' : 'Devolución';
 
   let msg = `💳 *COMPROBANTE OFICIAL DE PAGO / ABONO*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 Hola, *${clienteNombre}* ✅ Confirmamos la recepción de tu pago para la finca *${fincaNombre}*.
 🆔 *Comprobante N°:* ${consecPrefijado}
@@ -386,7 +386,7 @@ export function plantillaEstadoCuenta(reserva: Reserva, enlacePdf?: string): str
   }
 
   let msg = `📊 *ESTADO DE CUENTA DE RESERVA*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 Hola, *${clienteNombre}* 📋 Te compartimos el balance financiero detallado de tu reserva:
 
@@ -422,7 +422,7 @@ export function plantillaPazYSalvo(reserva: Reserva, enlacePdf?: string): string
   const consecPrefijado = formatearConsecutivoConPrefijo(reserva.consecutivo, 'paz_salvo');
 
   let msg = `🏅 *CERTIFICADO OFICIAL DE PAZ Y SALVO*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 Estimado/a *${clienteNombre}* 🌟
 
@@ -454,7 +454,7 @@ export function plantillaPropuestaAlimentacion(datos: PropuestaAlimentacionDatos
   const consecPrefijado = formatearConsecutivoConPrefijo(datos.menu.id || '1001', 'menu');
 
   let msg = `🍽️ *PROPUESTA GASTRONÓMICA CAMPESTRE*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 Hola, *${cNombre}* 👨‍🍳 Te presentamos la propuesta culinaria para tu estadía en *${fNombre}*:
 
@@ -490,7 +490,7 @@ export function plantillaRecordatorioPago(reserva: Reserva): string {
   const saldo = calcularSaldo(reserva);
 
   return `⏰ *RECORDATORIO AMISTOSO DE SALDO*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 Hola, *${clienteNombre}* 👋 Esperamos que te encuentres muy bien.
 
@@ -509,7 +509,7 @@ export function plantillaBienvenida(reserva: Reserva): string {
   const fincaNombre = reserva.fincas?.nombre || 'Finca Campestre';
 
   return `👋 *¡BIENVENIDOS A ${fincaNombre.toUpperCase()}!*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 Hola, *${clienteNombre}* 🌞 ¡Estamos muy emocionados por recibirte!
 
@@ -629,7 +629,7 @@ export async function ejecutarEnvioWhatsAppConDocumento(
           }
           break;
         case 'personalizado':
-          mensajeFinal = mensajePersonalizado || 'Hola, te escribimos de Control de Fincas Campestres.';
+          mensajeFinal = mensajePersonalizado || 'Hola, te escribimos de Paraíso Terrenal.';
           break;
       }
     }
@@ -660,7 +660,7 @@ export async function ejecutarEnvioWhatsAppConDocumento(
 // ---------------------------------------------------------------
 export const PLANTILLAS_PREDETERMINADAS: Record<string, string> = {
   cotizacion: `🏡 *COTIZACIÓN OFICIAL DE ESTANCIA*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 ¡Hola, *{{cliente}}*! 👋 Con gusto te presentamos los detalles de tu cotización para disfrutar de una experiencia campestre inolvidable.
 
@@ -676,7 +676,7 @@ export const PLANTILLAS_PREDETERMINADAS: Record<string, string> = {
 💡 Para separar tus fechas y asegurar disponibilidad, por favor indícanos si deseas proceder con el pago del anticipo de reserva. ¡Estamos atentos a tus inquietudes! ✨`,
 
   separacion: `🎉 *CONFIRMACIÓN DE RESERVA Y SEPARACIÓN*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 Hola, *{{cliente}}* 🙌 Hemos emitido satisfactoriamente tu *Documento Oficial de Separación*.
 
@@ -695,7 +695,7 @@ Hola, *{{cliente}}* 🙌 Hemos emitido satisfactoriamente tu *Documento Oficial 
 ¡Te agradecemos por tu preferencia y te deseamos una maravillosa estadía campestre! 🌿🏡`,
 
   abono: `💳 *COMPROBANTE OFICIAL DE PAGO / ABONO*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 Hola, *{{cliente}}* ✅ Confirmamos la recepción de tu pago para la finca *{{finca}}*.
 🆔 *Comprobante N°:* {{consecutivo}}
@@ -709,7 +709,7 @@ Hola, *{{cliente}}* ✅ Confirmamos la recepción de tu pago para la finca *{{fi
 ¡Muchas gracias por tu oportuno cumplimiento! 🙏`,
 
   estado_cuenta: `📊 *ESTADO DE CUENTA DE RESERVA*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 Hola, *{{cliente}}* 📋 Te compartimos el balance financiero detallado de tu reserva:
 
@@ -726,7 +726,7 @@ Hola, *{{cliente}}* 📋 Te compartimos el balance financiero detallado de tu re
 Cualquier duda o aclaración sobre los pagos, con gusto te atendemos. 🤝`,
 
   paz_salvo: `🏅 *CERTIFICADO OFICIAL DE PAZ Y SALVO*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 Estimado/a *{{cliente}}* 🌟
 
@@ -743,7 +743,7 @@ Nos complace certificarte que tu reserva para la finca *{{finca}}* se encuentra 
 ¡Todo está listo para tu llegada! Te deseamos un descanso inolvidable. 🌿☀️`,
 
   menu: `🍽️ *PROPUESTA GASTRONÓMICA CAMPESTRE*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 Hola, *{{cliente}}* 👨‍🍳 Te presentamos la propuesta culinaria para tu estadía en *{{finca}}*:
 🆔 *Propuesta N°:* {{consecutivo}}
@@ -756,7 +756,7 @@ Hola, *{{cliente}}* 👨‍🍳 Te presentamos la propuesta culinaria para tu es
 ¿Deseas que coordinemos y reservemos este menú para tus fechas? 👩‍🍳✨`,
 
   recordatorio_pago: `⏰ *RECORDATORIO AMISTOSO DE SALDO*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 Hola, *{{cliente}}* 👋 Esperamos que te encuentres muy bien.
 
@@ -768,7 +768,7 @@ Llegada programada: {{fecha_llegada}}.
 Por favor compártenos el comprobante una vez realices la consignación o transferencia para emitir tu Paz y Salvo oficial. ¡Muchas gracias! 🌿🏡`,
 
   bienvenida: `👋 *¡BIENVENIDOS A {{finca}}!*
-*Control de Fincas Campestres*
+*Paraíso Terrenal*
 
 Hola, *{{cliente}}* 🌞 ¡Estamos muy emocionados por recibirte!
 

@@ -322,6 +322,45 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '1rem',
+                  padding: '0.85rem',
+                  background: 'var(--surface-2)',
+                  borderRadius: 'var(--rad-sm, 12px)',
+                  border: '1px solid var(--border)',
+                }}>
+                  <div style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '12px',
+                    background: '#FAF7EE',
+                    border: '1px solid var(--border)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                    flexShrink: 0,
+                  }}>
+                    <img
+                      src={formData.logo_url || '/logo.png'}
+                      alt="Logo Oficial"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.png'; }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text)' }}>Logo Oficial — Paraíso Terrenal</div>
+                    <p className="text-xs text-muted" style={{ margin: '0.15rem 0 0.35rem 0' }}>
+                      Activo en la web y en todos los encabezados de documentos PDF enviados al cliente.
+                    </p>
+                    <span className="badge s-avail" style={{ fontSize: '0.72rem' }}>
+                      <Check size={11} style={{ marginRight: '3px', display: 'inline' }} /> Alta Resolución (300+ DPI)
+                    </span>
+                  </div>
+                </div>
                 <div className="field">
                   <label>Nombre de la Empresa o Marca Comercial *</label>
                   <input
@@ -329,7 +368,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                     required
                     value={formData.nombre_empresa}
                     onChange={e => handleChange('nombre_empresa', e.target.value)}
-                    placeholder="Ej: Control de Fincas Campestres"
+                    placeholder="Ej: Paraíso Terrenal"
                   />
                 </div>
 
@@ -486,7 +525,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                     type="text"
                     value={formData.doc_encabezado || ''}
                     onChange={e => handleChange('doc_encabezado', e.target.value)}
-                    placeholder="CONTROL DE FINCAS CAMPESTRES — ALQUILER Y SERVICIOS TURÍSTICOS"
+                    placeholder="PARAÍSO TERRENAL — FINCAS DE ALQUILER Y SERVICIOS TURÍSTICOS"
                   />
                   <span className="text-xs text-muted">
                     Texto que identifica formalmente la razón de ser comercial en el título del membrete.
@@ -499,7 +538,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                     type="text"
                     value={formData.doc_pie_pagina || ''}
                     onChange={e => handleChange('doc_pie_pagina', e.target.value)}
-                    placeholder="Control de Fincas Campestres • Documento oficial generado automáticamente"
+                    placeholder="Paraíso Terrenal • Fincas de Alquiler • Documento oficial generado automáticamente"
                   />
                   <span className="text-xs text-muted">
                     Aparece centrado en la franja inferior de cada documento emitido.
@@ -536,35 +575,63 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                   color: '#ffffff',
                   padding: '1.25rem 1rem',
                   borderRadius: 'var(--radius-md) var(--radius-md) 0 0',
-                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+                  borderBottom: '2.5px solid #d4ac3f',
+                  position: 'relative',
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.01em' }}>
-                        {formData.nombre_empresa || 'Control de Fincas Campestres'}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{
+                        width: '52px',
+                        height: '52px',
+                        borderRadius: '8px',
+                        background: '#FAF7EE',
+                        border: '1px solid rgba(219, 212, 195, 0.8)',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                      }}>
+                        <img
+                          src={formData.doc_logo_url || '/logo.png'}
+                          alt="Logo PDF"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.png'; }}
+                        />
                       </div>
-                      <div style={{ fontSize: '0.75rem', fontStyle: 'italic', opacity: 0.9, marginTop: '0.15rem' }}>
-                        {formData.eslogan || 'Experiencias exclusivas y descanso en la naturaleza'}
-                      </div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, marginTop: '0.65rem' }}>
-                        DOCUMENTO OFICIAL (EJEMPLO)
-                      </div>
-                      <div style={{ fontSize: '0.7rem', opacity: 0.85, marginTop: '0.2rem' }}>
-                        {formData.nit ? `NIT: ${formData.nit}` : ''} {formData.telefono ? `• ${formData.telefono}` : ''}
+                      <div>
+                        <div style={{ fontSize: '0.98rem', fontWeight: 700, letterSpacing: '-0.01em' }}>
+                          {formData.nombre_empresa || 'Paraíso Terrenal'}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', fontStyle: 'italic', opacity: 0.9, marginTop: '0.1rem' }}>
+                          {formData.eslogan || 'Fincas de Alquiler · Experiencias exclusivas y descanso en la naturaleza'}
+                        </div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 600, marginTop: '0.45rem' }}>
+                          DOCUMENTO OFICIAL (EJEMPLO)
+                        </div>
+                        <div style={{ fontSize: '0.68rem', opacity: 0.85, marginTop: '0.15rem' }}>
+                          {formData.nit ? `NIT: ${formData.nit}` : ''} {formData.telefono ? `• ${formData.telefono}` : ''}
+                        </div>
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{
-                        background: 'rgba(255,255,255,0.2)',
-                        padding: '0.2rem 0.6rem',
+                        background: '#124c43',
+                        padding: '0.25rem 0.65rem',
                         borderRadius: '4px',
                         fontSize: '0.8rem',
-                        fontWeight: 700
+                        fontWeight: 700,
+                        border: '1px solid rgba(255,255,255,0.2)'
                       }}>
                         {formData.prefijo_separacion || 'SEP-'}1001
                       </div>
-                      <div style={{ fontSize: '0.7rem', opacity: 0.85, marginTop: '0.35rem' }}>
+                      <div style={{ fontSize: '0.68rem', opacity: 0.85, marginTop: '0.35rem' }}>
                         Emitido: {new Date().toLocaleDateString('es-CO')}
+                      </div>
+                      <div style={{ fontSize: '0.62rem', opacity: 0.7, marginTop: '0.15rem' }}>
+                        Validez Oficial
                       </div>
                     </div>
                   </div>
@@ -600,7 +667,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                   textAlign: 'center'
                 }}>
                   <div style={{ fontSize: '0.7rem' }}>
-                    {formData.doc_pie_pagina || 'Control de Fincas Campestres • Documento oficial generado automáticamente'}
+                    {formData.doc_pie_pagina || 'Paraíso Terrenal • Fincas de Alquiler • Documento oficial generado automáticamente'}
                   </div>
                   <div style={{ fontSize: '0.62rem', opacity: 0.85, marginTop: '0.15rem' }}>
                     {formData.doc_contacto_info || 'WhatsApp: +57 317 682 7093 | reservas@fincascampestres.com'}

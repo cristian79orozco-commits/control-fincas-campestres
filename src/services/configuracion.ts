@@ -3,10 +3,10 @@ import type { ConfiguracionGeneral } from '../types';
 export const CONFIGURACION_DEFAULT: ConfiguracionGeneral = {
   id: 'general',
   // 1. Empresa
-  nombre_empresa: 'Control de Fincas Campestres',
+  nombre_empresa: 'Paraíso Terrenal',
   nit: '900.123.456-7',
-  eslogan: 'Experiencias exclusivas y descanso en la naturaleza',
-  logo_url: '',
+  eslogan: 'Fincas de Alquiler · Experiencias exclusivas y descanso en la naturaleza',
+  logo_url: '/logo.png',
   telefono: '+57 317 682 7093',
   whatsapp: '573176827093',
   correo: 'reservas@fincascampestres.com',
@@ -20,9 +20,9 @@ export const CONFIGURACION_DEFAULT: ConfiguracionGeneral = {
   },
 
   // 2. Documentos
-  doc_logo_url: '',
-  doc_encabezado: 'CONTROL DE FINCAS CAMPESTRES — ALQUILER Y SERVICIOS TURÍSTICOS',
-  doc_pie_pagina: 'Control de Fincas Campestres • Documento oficial generado automáticamente • Santa Elena, Valle del Cauca',
+  doc_logo_url: '/logo.png',
+  doc_encabezado: 'PARAÍSO TERRENAL — FINCAS DE ALQUILER Y SERVICIOS TURÍSTICOS',
+  doc_pie_pagina: 'Paraíso Terrenal • Fincas de Alquiler • Documento oficial generado automáticamente • Santa Elena, Valle del Cauca',
   doc_contacto_info: 'WhatsApp: +57 317 682 7093 | reservas@fincascampestres.com | Santa Elena, Valle',
   terminos_condiciones: `• La separación garantiza la reserva y bloquea la disponibilidad para las fechas pactadas.
 • El saldo pendiente debe cancelarse en su totalidad antes del ingreso a la finca.
@@ -50,7 +50,7 @@ export const CONFIGURACION_DEFAULT: ConfiguracionGeneral = {
   banco_nombre: 'Bancolombia',
   banco_tipo_cuenta: 'Ahorros',
   banco_cuenta: '',
-  banco_titular: 'Control de Fincas Campestres',
+  banco_titular: 'Paraíso Terrenal - Fincas de Alquiler',
 
   // 5. Regla Operativa de Alimentación Mínima por Tamaño de Grupo
   regla_alimentacion_activa: true,

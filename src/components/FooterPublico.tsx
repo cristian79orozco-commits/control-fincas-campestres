@@ -24,8 +24,8 @@ export const FooterPublico: React.FC<FooterPublicoProps> = ({
 }) => {
   if (!visible) return null;
 
-  const nombreEmpresa = titulo || configuracion?.nombre_empresa || 'Control de Fincas Campestres';
-  const descEmpresa = subtitulo || configuracion?.eslogan || 'Alquiler exclusivo de fincas de recreo y descanso en Santa Elena, El Cerrito, Valle del Cauca.';
+  const nombreEmpresa = titulo || configuracion?.nombre_empresa || 'Paraíso Terrenal';
+  const descEmpresa = subtitulo || configuracion?.eslogan || 'Fincas de Alquiler · Experiencias exclusivas y descanso en Santa Elena, El Cerrito, Valle del Cauca.';
   const tel = configuracion?.telefono || '+57 317 682 7093';
   const email = configuracion?.correo || 'reservas@fincascampestres.com';
   const dir = configuracion?.direccion || 'Santa Elena, El Cerrito, Valle del Cauca';
@@ -56,22 +56,28 @@ export const FooterPublico: React.FC<FooterPublicoProps> = ({
       >
         {/* Columna 1: Empresa & Propuesta */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.75rem' }}>
             <div
               style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '8px',
-                background: 'var(--primary)',
-                color: '#fff',
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: '#FAF7EE',
+                border: '1px solid var(--border)',
+                overflow: 'hidden',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '1rem',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                flexShrink: 0,
               }}
             >
-              FC
+              <img
+                src="/logo.png"
+                alt={nombreEmpresa}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                loading="lazy"
+              />
             </div>
             <span
               style={{

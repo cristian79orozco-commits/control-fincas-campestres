@@ -322,11 +322,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             >
               <Menu size={16} />
             </button>
-            <div className="login-icon" style={{ width: '38px', height: '38px', borderRadius: '12px', flexShrink: 0 }}>
-              <ShieldCheck size={18} />
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: '#FAF7EE',
+                border: '1px solid var(--border)',
+                overflow: 'hidden',
+                flexShrink: 0,
+                boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <img
+                src="/logo.png"
+                alt="Paraíso Terrenal"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
             </div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>Panel de Administración</div>
+              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>Paraíso Terrenal · Administración</div>
               <div className="text-xs text-muted">{userEmail || 'admin@fincas.com'} · Sesión activa</div>
             </div>
           </div>

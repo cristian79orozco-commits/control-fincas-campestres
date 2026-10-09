@@ -129,8 +129,8 @@ export const CONTENIDO_SITIO_DEFAULT: ContenidoSitio = {
 
   // 9. Pie de página (Footer)
   footer_visible: true,
-  footer_titulo: 'Control de Fincas Campestres',
-  footer_subtitulo: 'Alquiler exclusivo de fincas de recreo y descanso en Santa Elena, El Cerrito, Valle del Cauca.',
+  footer_titulo: 'Paraíso Terrenal',
+  footer_subtitulo: 'Fincas de Alquiler · Alquiler exclusivo de fincas de recreo y descanso en Santa Elena, El Cerrito, Valle del Cauca.',
   footer_whatsapp_cta: '¿Tienes alguna duda especial? Escríbenos directamente a WhatsApp',
 };
 

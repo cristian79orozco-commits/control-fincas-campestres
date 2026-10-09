@@ -27,6 +27,7 @@ import {
 } from '../types';
 import { getConfiguracionGlobal } from './configuracion';
 import { formatearConsecutivoConPrefijo } from '../utils/consecutivos';
+import { LOGO_EMPRESA_BASE64, LOGO_FORMAT } from '../assets/logoBase64';
 
 export interface ResultadoDocumentoPdf {
   doc: jsPDF;
@@ -101,58 +102,90 @@ async function urlABase64(url: string): Promise<string | null> {
 }
 
 // ---------------------------------------------------------------
-// Encabezado corporativo adaptable (Fase 4)
+// Encabezado corporativo adaptable (Fase 4 - Logo Paraíso Terrenal)
 // ---------------------------------------------------------------
 function encabezado(doc: jsPDF, titulo: string, numero?: string, configParam?: ConfiguracionGeneral) {
   const config = configParam || getConfiguracionGlobal();
   const ancho = doc.internal.pageSize.getWidth();
 
-  // Franja verde institucional
+  // Franja verde institucional (esmeralda corporativo)
   doc.setFillColor(26, 107, 94);
-  doc.rect(0, 0, ancho, 40, 'F');
+  doc.rect(0, 0, ancho, 42, 'F');
+
+  // Filete dorado inferior para acabado de papelería de lujo
+  doc.setDrawColor(212, 172, 63);
+  doc.setLineWidth(0.8);
+  doc.line(0, 42, ancho, 42);
+
+  // Tarjeta / Emblema contenedor del Logo oficial
+  // Fondo marfil cálido (#FAF7EE) con borde sutil para destacar el logo sobre el verde
+  doc.setFillColor(250, 247, 238);
+  doc.setDrawColor(219, 212, 195);
+  doc.roundedRect(12, 5.5, 31, 31, 2.5, 2.5, 'FD');
+
+  // Incrustación de la imagen del logo
+  try {
+    doc.addImage(LOGO_EMPRESA_BASE64, LOGO_FORMAT, 12.5, 6, 30, 30);
+  } catch (err) {
+    console.warn('[documentos] Aviso al incrustar logo en PDF:', err);
+  }
+
+  // Bloque tipográfico corporativo (inicia a la derecha del logo: X = 47 mm)
+  const xTexto = 47;
 
   // Nombre de empresa
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
+  doc.setFontSize(12.5);
   doc.setTextColor(255, 255, 255);
-  doc.text(config.nombre_empresa || 'Control de Fincas Campestres', 14, 13);
+  doc.text(config.nombre_empresa || 'Paraíso Terrenal', xTexto, 13);
 
   // Eslogan o Encabezado institucional
-  if (config.eslogan) {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(7.5);
-    doc.setTextColor(209, 234, 217);
-    doc.text(config.eslogan.slice(0, 75), 14, 19);
-  }
+  const esloganTxt = config.eslogan || 'Fincas de Alquiler · Experiencias exclusivas y descanso en la naturaleza';
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(7.5);
+  doc.setTextColor(215, 238, 225);
+  doc.text(esloganTxt.slice(0, 75), xTexto, 19);
 
   // Título del documento
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
-  doc.text(titulo, 14, 28);
+  doc.text(titulo, xTexto, 28);
 
-  // Información de contacto rápida (teléfono / nit)
+  // Información de contacto rápida (teléfono / NIT / ubicación)
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(220, 240, 235);
-  const infoExtra = [config.nit ? `NIT: ${config.nit}` : '', config.telefono || ''].filter(Boolean).join(' • ');
+  const infoExtra = [
+    config.nit ? `NIT: ${config.nit}` : '',
+    config.telefono || '+57 317 682 7093',
+    config.ciudad || 'Santa Elena, Valle',
+  ].filter(Boolean).join(' • ');
   if (infoExtra) {
-    doc.text(infoExtra, 14, 35);
+    doc.text(infoExtra, xTexto, 35);
   }
 
-  // Número de documento (derecha)
+  // Bloque derecho: Número de documento y fecha de emisión
   if (numero) {
+    const numTexto = String(numero);
+    const numWidth = Math.max(doc.getTextWidth(numTexto) + 8, 32);
+    // Caja destacada tipo píldora para el número
+    doc.setFillColor(18, 76, 67);
+    doc.roundedRect(ancho - 14 - numWidth, 11, numWidth, 9, 2, 2, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10.5);
+    doc.setFontSize(10);
     doc.setTextColor(255, 255, 255);
-    doc.text(numero, ancho - 14, 20, { align: 'right' });
+    doc.text(numTexto, ancho - 14 - (numWidth / 2), 17.2, { align: 'center' });
   }
 
   // Fecha de emisión
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(220, 240, 235);
-  doc.text(`Emitido: ${formatFecha(new Date().toISOString().split('T')[0])}`, ancho - 14, 29, { align: 'right' });
+  doc.setTextColor(215, 238, 225);
+  doc.text(`Emitido: ${formatFecha(new Date().toISOString().split('T')[0])}`, ancho - 14, 28, { align: 'right' });
+  doc.setFontSize(7);
+  doc.setTextColor(190, 225, 215);
+  doc.text('Validez Oficial Verificada', ancho - 14, 34, { align: 'right' });
 
   doc.setTextColor(30, 27, 19);
 }
@@ -219,11 +252,16 @@ function pie(doc: jsPDF, configParam?: ConfiguracionGeneral) {
   doc.setFillColor(26, 107, 94);
   doc.rect(0, alto - 15, ancho, 15, 'F');
 
+  // Filete dorado superior en pie de página
+  doc.setDrawColor(212, 172, 63);
+  doc.setLineWidth(0.5);
+  doc.line(0, alto - 15, ancho, alto - 15);
+
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.2);
   doc.setTextColor(255, 255, 255);
 
-  const textoPie = config.doc_pie_pagina || 'Control de Fincas Campestres • Documento oficial generado automáticamente';
+  const textoPie = config.doc_pie_pagina || 'Paraíso Terrenal • Fincas de Alquiler • Documento oficial generado automáticamente';
   doc.text(textoPie, ancho / 2, alto - 8.5, { align: 'center' });
 
   const textoContacto = config.doc_contacto_info || `${config.whatsapp ? `WhatsApp: +${config.whatsapp}` : ''} • ${config.correo || ''}`;
