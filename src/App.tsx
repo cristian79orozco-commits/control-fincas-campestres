@@ -114,6 +114,21 @@ export const App: React.FC = () => {
     localStorage.setItem('fc_theme', theme);
   }, [theme]);
 
+  // Navegar a Cotizaciones cuando el administrador hace clic en una notificación nativa de Windows/PWA
+  useEffect(() => {
+    const handleSwMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'FOCUS_COTIZACIONES') {
+        navegarAAdmin('cotizaciones');
+      }
+    };
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      };
+    }
+  }, [navegarAAdmin]);
+
   const toggleTheme = () => {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };

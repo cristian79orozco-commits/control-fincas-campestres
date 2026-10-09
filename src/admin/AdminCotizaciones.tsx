@@ -560,13 +560,41 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
             const clienteNombre = c.clientes ? `${c.clientes.nombre} ${c.clientes.apellido || ''}`.trim() : '—';
             const fincaNombre = c.fincas?.nombre || '—';
             const tieneAlimentacion = (c.costo_alimentacion || 0) > 0 || (c.alimentacion && c.alimentacion !== 'Sin alimentación');
+            const esReciente = !!(c.created_at && (Date.now() - new Date(c.created_at).getTime()) < 30 * 60 * 1000);
 
             return (
-              <div key={c.id} className="avail-row" style={{ alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div
+                key={c.id}
+                className="avail-row"
+                style={{
+                  alignItems: 'flex-start',
+                  flexWrap: 'wrap',
+                  gap: '0.5rem',
+                  borderLeft: esReciente ? '3px solid var(--accent, #ea580c)' : undefined,
+                  background: esReciente ? 'color-mix(in srgb, var(--accent, #ea580c) 3%, var(--surface))' : undefined,
+                }}
+              >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <Tag size={12} /> {fincaNombre}
                     <span className={`status-badge ${ESTADO_COLORS[c.estado]}`} style={{ fontSize: '0.68rem' }}>{c.estado}</span>
+                    {esReciente && (
+                      <span
+                        className="status-badge"
+                        style={{
+                          fontSize: '0.68rem',
+                          background: 'rgba(234, 88, 12, 0.14)',
+                          color: '#ea580c',
+                          borderColor: '#ea580c',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.2rem',
+                        }}
+                      >
+                        🔔 ¡Nueva!
+                      </span>
+                    )}
                     {/* Badge consecutivo copiable */}
                     {c.consecutivo && (
                       <ConsecutivoBadge consecutivo={c.consecutivo} />

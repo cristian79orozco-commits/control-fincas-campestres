@@ -13,6 +13,11 @@ import { generarUUID, esUUID } from '../utils/uuid';
 import { CONFIGURACION_DEFAULT, setConfiguracionGlobal } from '../services/configuracion';
 import { CONTENIDO_SITIO_DEFAULT, setContenidoSitioGlobal } from '../services/contenidoSitio';
 import type { DatosCotizacionPublica, ResultadoCotizacionPublica } from '../hooks/useCotizadorPublico';
+import {
+  notificarNuevaCotizacion,
+  esAdminAutenticado,
+  probarNotificacionAdmin,
+} from '../services/notificaciones';
 
 // -----------------------------------------------------------------------------
 // Interfaz del Estado y Acciones Centralizadas
@@ -49,6 +54,7 @@ interface AppContextValue {
   toasts: ToastMessage[];
   showToast: (text: string, type?: 'success' | 'error' | 'info') => void;
   dismissToast: (id: string) => void;
+  probarNotificacionAdmin: () => void;
   confirmModalState: {
     isOpen: boolean;
     title: string;
@@ -397,14 +403,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         (a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
       );
       setCotizaciones(prev => {
-        if (!silencioso && prev.length > 0 && ordenadas.length > prev.length) {
+        if (prev.length > 0 && ordenadas.length > prev.length) {
           const prevIds = new Set(prev.map(c => c.id));
           const nuevas = ordenadas.filter(c => !prevIds.has(c.id));
-          if (nuevas.length > 0) {
-            const masReciente = nuevas[0];
-            const num = masReciente.consecutivo ? `[#${masReciente.consecutivo}]` : '';
-            const nom = masReciente.clientes?.nombre ? ` de ${masReciente.clientes.nombre}` : '';
-            showToast(`🔔 ¡Nueva cotización web recibida! ${num}${nom}`, 'info');
+          if (nuevas.length > 0 && esAdminAutenticado()) {
+            nuevas.forEach(cot => {
+              notificarNuevaCotizacion({
+                cotizacion: cot,
+                currentView: localStorage.getItem('fc_app_view') || view,
+                showToast,
+                onNavigateToCotizaciones: () => navegarAAdmin('cotizaciones'),
+              });
+            });
           }
         }
         return ordenadas;
@@ -413,7 +423,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err) {
       console.warn('[AppContext] Error cargando cotizaciones:', err);
     }
-  }, [showToast]);
+  }, [showToast, view, navegarAAdmin]);
 
   const cargarReservas = useCallback(async () => {
     try {
@@ -574,11 +584,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const channel = supabase
       .channel('app-global-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, (payload) => {
-        cargarCotizaciones();
+        cargarCotizaciones(true);
         if (payload.eventType === 'INSERT') {
           const nueva = payload.new as any;
-          const consecutivo = nueva?.consecutivo ? `[${nueva.consecutivo}] ` : '';
-          showToast(`🔔 ¡Nueva cotización web recibida! ${consecutivo}Disponible en el panel admin.`, 'info');
+          if (esAdminAutenticado()) {
+            notificarNuevaCotizacion({
+              cotizacion: nueva,
+              currentView: localStorage.getItem('fc_app_view') || view,
+              showToast,
+              onNavigateToCotizaciones: () => navegarAAdmin('cotizaciones'),
+            });
+          }
         }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fincas' }, () => {
@@ -618,8 +634,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         bc = new BroadcastChannel('fc_realtime_sync_channel');
         bc.onmessage = (event) => {
           if (event.data?.type === 'NUEVA_COTIZACION') {
-            cargarCotizaciones();
+            cargarCotizaciones(true);
             cargarClientes();
+            if (esAdminAutenticado() && event.data?.payload) {
+              notificarNuevaCotizacion({
+                cotizacion: {
+                  ...event.data.payload,
+                  clientes: event.data.cliente,
+                },
+                currentView: localStorage.getItem('fc_app_view') || view,
+                showToast,
+                onNavigateToCotizaciones: () => navegarAAdmin('cotizaciones'),
+              });
+            }
           }
         };
       }
@@ -2076,6 +2103,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     toasts,
     showToast,
     dismissToast,
+    probarNotificacionAdmin: () => probarNotificacionAdmin(showToast, () => navegarAAdmin('cotizaciones')),
     confirmModalState,
     openConfirm,
     closeConfirm,

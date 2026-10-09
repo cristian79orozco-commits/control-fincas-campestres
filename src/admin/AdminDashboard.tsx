@@ -3,7 +3,7 @@ import {
   LayoutDashboard, LogOut, Lock, LogIn, ShieldCheck, Database,
   Home, Users, FileText, ClipboardList, Calendar, MessageCircle,
   Menu, X, TrendingUp, CheckCircle, AlertTriangle, Clock, UtensilsCrossed, Settings,
-  Palette, History, Globe
+  Palette, History, Globe, Bell, BellRing, BellOff, Volume2, VolumeX, Laptop
 } from 'lucide-react';
 import { AdminFincaForm } from './AdminFincaForm';
 import { AdminCalendar } from './AdminCalendar';
@@ -17,6 +17,13 @@ import { AdminHistorial } from './AdminHistorial';
 import { AdminConfiguracion } from './AdminConfiguracion';
 import { AdminPersonalizacion } from './AdminPersonalizacion';
 import { useApp } from '../context/AppContext';
+import {
+  obtenerEstadoPermisoNotificaciones,
+  solicitarPermisoNotificaciones,
+  isSoundEnabled,
+  setSoundEnabled,
+  probarNotificacionAdmin,
+} from '../services/notificaciones';
 import type {
   Finca, BloqueoDisponibilidad, Cliente, CotizacionDB, CotizacionEstado,
   Reserva, ReservaEstado, PagoTipo, AdminSection, Menu as MenuType, Comunicacion,
@@ -164,6 +171,51 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Para "convertir cotización en reserva"
   const [cotizacionParaReserva, setCotizacionParaReserva] = useState<CotizacionDB | null>(null);
 
+  // Estado de Notificaciones y PWA para Administrador
+  const [notifPermiso, setNotifPermiso] = useState<NotificationPermission | 'unsupported'>(() => obtenerEstadoPermisoNotificaciones());
+  const [sonidoActivo, setSonidoActivo] = useState<boolean>(() => isSoundEnabled());
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
+
+  const handleSolicitarPermiso = async () => {
+    const res = await solicitarPermisoNotificaciones();
+    setNotifPermiso(res);
+    if (res === 'granted') {
+      showToast('✓ Notificaciones de escritorio activadas en tu computador', 'success');
+    } else if (res === 'denied') {
+      showToast('Las notificaciones fueron bloqueadas en los ajustes del navegador.', 'error');
+    }
+  };
+
+  const handleToggleSonido = () => {
+    const nuevo = !sonidoActivo;
+    setSonidoActivo(nuevo);
+    setSoundEnabled(nuevo);
+    showToast(nuevo ? '🔊 Sonido de alerta de cotizaciones activado' : '🔇 Sonido de alerta silenciado', 'info');
+  };
+
+  const handleProbarAlerta = () => {
+    probarNotificacionAdmin(showToast, () => navigateTo('cotizaciones'));
+  };
+
+  const handleInstalarApp = async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    if (outcome === 'accepted') {
+      showToast('✓ Aplicación instalada con éxito en tu computador', 'success');
+      setDeferredInstallPrompt(null);
+    }
+  };
+
   // Sincronizar sección si cambia externamente desde la barra flotante u otra vista
   useEffect(() => {
     if (adminActiveSection) {
@@ -259,7 +311,85 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Botón de Instalación PWA (Solo si el navegador tiene disponible el prompt) */}
+            {deferredInstallPrompt && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  background: 'color-mix(in srgb, var(--primary) 12%, transparent)',
+                  color: 'var(--primary)',
+                  borderColor: 'var(--primary)',
+                  fontWeight: 600,
+                }}
+                onClick={handleInstalarApp}
+                title="Descargar e instalar el panel de control como aplicación en tu computador"
+              >
+                <Laptop size={14} /> Instalar en PC
+              </button>
+            )}
+
+            {/* Widget de Notificaciones de Escritorio / Windows */}
+            {notifPermiso === 'granted' ? (
+              <span
+                className="status-badge s-avail"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'default' }}
+                title="Las notificaciones nativas de Windows/PC están activas y listas"
+              >
+                <Bell size={12} /> Alertas PC Activas
+              </span>
+            ) : notifPermiso === 'default' ? (
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}
+                onClick={handleSolicitarPermiso}
+                title="Haz clic para recibir alertas en Windows cuando entre una nueva cotización"
+              >
+                <BellRing size={13} /> Activar Notif. en PC
+              </button>
+            ) : (
+              <span
+                className="status-badge s-busy"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                title="Permiso bloqueado en el navegador. Actívalo haciendo clic en el candado de la barra de direcciones."
+              >
+                <BellOff size={12} /> Notif. Bloqueadas
+              </span>
+            )}
+
+            {/* Interruptor de sonido de alerta */}
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={handleToggleSonido}
+              title={sonidoActivo ? 'Silenciar alertas sonoras de cotizaciones' : 'Activar sonido de campana de cotizaciones'}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                color: sonidoActivo ? 'var(--primary)' : 'var(--text-muted)',
+              }}
+            >
+              {sonidoActivo ? <Volume2 size={14} /> : <VolumeX size={14} />}
+              <span className="text-xs">{sonidoActivo ? 'Sonido ON' : 'Mudo'}</span>
+            </button>
+
+            {/* Botón de prueba rápida de alertas */}
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={handleProbarAlerta}
+              title="Probar sonido y notificación de escritorio en tu computador"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+            >
+              <Bell size={13} /> Probar
+            </button>
+
             <button
               type="button"
               className="btn btn-sm"
