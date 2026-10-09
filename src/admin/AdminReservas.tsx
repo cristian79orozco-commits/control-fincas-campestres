@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   ClipboardList, Plus, Edit3, Trash2, X, Save, CreditCard,
   Calendar, Users, DollarSign, ChevronDown, ChevronUp, FileCheck, MessageCircle,
-  FileText, CheckCircle, Hash, Copy, Check, Award, AlertTriangle, ArrowRight
+  FileText, CheckCircle, Hash, Copy, Check, Award, AlertTriangle, ArrowRight, Utensils
 } from 'lucide-react';
 import type { Reserva, ReservaEstado, Cliente, Finca, Pago, PagoTipo, CotizacionDB, CierreReserva, ConfiguracionGeneral } from '../types';
 import { calcularSaldo } from '../types';
@@ -143,7 +143,8 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
   const [pagoForm, setPagoForm] = useState<typeof PAGO_VACIO>(PAGO_VACIO);
   const [pagoReservaId, setPagoReservaId] = useState<string | null>(null);
   const [guardandoPago, setGuardandoPago] = useState(false);
-  const [filtroEstado, setFiltroEstado] = useState<ReservaEstado | 'todas'>('todas');
+  type FiltroReservaTab = 'activas' | 'completadas' | 'canceladas' | 'todas';
+  const [tabReservaActiva, setTabReservaActiva] = useState<FiltroReservaTab>('activas');
   const [reservaParaCierre, setReservaParaCierre] = useState<Reserva | null>(null);
   const [reservaParaExpediente, setReservaParaExpediente] = useState<Reserva | null>(null);
   const [modalWaReserva, setModalWaReserva] = useState<{
@@ -255,9 +256,16 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
     );
   };
 
-  const filtradas = reservas.filter(r =>
-    filtroEstado === 'todas' || r.estado === filtroEstado
-  );
+  const conteoActivas = reservas.filter(r => r.estado === 'activa').length;
+  const conteoCompletadas = reservas.filter(r => r.estado === 'completada').length;
+  const conteoCanceladas = reservas.filter(r => ['cancelada', 'no_show'].includes(r.estado)).length;
+
+  const filtradas = reservas.filter(r => {
+    if (tabReservaActiva === 'activas') return r.estado === 'activa';
+    if (tabReservaActiva === 'completadas') return r.estado === 'completada';
+    if (tabReservaActiva === 'canceladas') return ['cancelada', 'no_show'].includes(r.estado);
+    return true; // todas
+  });
 
   return (
     <div className="panel">
@@ -266,25 +274,60 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
           <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
             <ClipboardList size={18} /> Reservas
           </div>
-          <div className="text-xs text-muted mt-1">{reservas.length} reservas registradas</div>
+          <div className="text-xs text-muted mt-1">
+            {conteoActivas} activa{conteoActivas !== 1 ? 's' : ''} en curso · {reservas.length} en total
+          </div>
         </div>
         <button className="btn btn-primary btn-sm" onClick={abrirNuevo}>
           <Plus size={14} /> Nueva reserva
         </button>
       </div>
 
-      {/* Filtros */}
-      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', paddingBottom: '1rem' }}>
-        {(['todas', ...ESTADOS_RESERVA] as const).map(e => (
-          <button
-            key={e}
-            className={`btn btn-sm${filtroEstado === e ? ' btn-primary' : ''}`}
-            onClick={() => setFiltroEstado(e)}
-            style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem' }}
-          >
-            {e}
-          </button>
-        ))}
+      {/* Pestañas de Navegación Inteligente de Reservas */}
+      <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', paddingBottom: '0.85rem', borderBottom: '1px solid var(--border)', marginBottom: '1rem' }}>
+        <button
+          className={`btn btn-sm${tabReservaActiva === 'activas' ? ' btn-primary' : ''}`}
+          onClick={() => setTabReservaActiva('activas')}
+          style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}
+        >
+          🟢 Reservas Activas
+          {conteoActivas > 0 && (
+            <span style={{
+              background: tabReservaActiva === 'activas' ? 'rgba(255,255,255,0.25)' : 'var(--success, #16a34a)',
+              color: '#fff',
+              padding: '0.1rem 0.45rem',
+              borderRadius: '999px',
+              fontSize: '0.68rem',
+              fontWeight: 700,
+            }}>
+              {conteoActivas}
+            </span>
+          )}
+        </button>
+
+        <button
+          className={`btn btn-sm${tabReservaActiva === 'completadas' ? ' btn-primary' : ''}`}
+          onClick={() => setTabReservaActiva('completadas')}
+          style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+        >
+          🏁 Completadas / Historial ({conteoCompletadas})
+        </button>
+
+        <button
+          className={`btn btn-sm${tabReservaActiva === 'canceladas' ? ' btn-primary' : ''}`}
+          onClick={() => setTabReservaActiva('canceladas')}
+          style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+        >
+          ❌ Canceladas ({conteoCanceladas})
+        </button>
+
+        <button
+          className={`btn btn-sm${tabReservaActiva === 'todas' ? ' btn-primary' : ''}`}
+          onClick={() => setTabReservaActiva('todas')}
+          style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+        >
+          📋 Todas ({reservas.length})
+        </button>
       </div>
 
       {/* Modal formulario reserva */}
@@ -440,7 +483,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
       <div className="avail-table">
         {filtradas.length === 0 ? (
           <p className="text-muted text-sm" style={{ textAlign: 'center', padding: '1.5rem' }}>
-            No hay reservas{filtroEstado !== 'todas' ? ` en estado "${filtroEstado}"` : ''}.
+            No hay reservas{tabReservaActiva !== 'todas' ? ` en la categoría "${tabReservaActiva}"` : ''}.
           </p>
         ) : (
           filtradas.map(r => {
@@ -494,8 +537,29 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                       {fincaNombre}
-                      <span className={`status-badge ${ESTADO_COLORS[r.estado]}`} style={{ fontSize: '0.68rem' }}>{r.estado}</span>
+                      {r.estado === 'activa' ? (
+                        <span className="status-badge s-avail" style={{ fontSize: '0.7rem', fontWeight: 600 }}>
+                          🟢 Activa
+                        </span>
+                      ) : r.estado === 'completada' ? (
+                        <span className="status-badge" style={{ fontSize: '0.7rem', fontWeight: 600, background: 'rgba(59, 130, 246, 0.12)', color: '#2563eb', borderColor: '#2563eb' }}>
+                          🏁 Completada
+                        </span>
+                      ) : r.estado === 'cancelada' ? (
+                        <span className="status-badge s-busy" style={{ fontSize: '0.7rem', fontWeight: 600 }}>
+                          ❌ Cancelada
+                        </span>
+                      ) : (
+                        <span className="status-badge s-busy" style={{ fontSize: '0.7rem', fontWeight: 600 }}>
+                          🚫 No Show
+                        </span>
+                      )}
                       {r.consecutivo && <ConsecutivoBadge consecutivo={r.consecutivo} />}
+                      {((r.costo_alimentacion || 0) > 0 || (r.alimentacion && r.alimentacion !== 'Sin alimentación')) && (
+                        <span className="status-badge s-avail" style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#ea580c', borderColor: 'rgba(234, 88, 12, 0.3)' }}>
+                          <Utensils size={10} /> Menú Admin: {formatCOP(r.costo_alimentacion || 0)}
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
                       <Calendar size={10} style={{ display:'inline', verticalAlign:'-1px' }} /> {formatFecha(r.fecha_inicio)} → {formatFecha(r.fecha_fin)}
@@ -520,29 +584,68 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {/* Estado rápido */}
-                    <div style={{ position: 'relative' }}>
-                      <select
-                        value={r.estado}
-                        onChange={e => handleEstado(r.id, e.target.value as ReservaEstado)}
-                        className="btn btn-sm"
-                        style={{ appearance: 'none', paddingRight: '1.4rem', cursor: 'pointer', fontSize: '0.72rem' }}
+                    {/* ACCIONES INTELIGENTES DE LA RESERVA */}
+                    {/* 1. Registrar Abono / Pago (Acción Primaria para reservas activas) */}
+                    {r.estado === 'activa' && (
+                      <button
+                        className="btn btn-sm btn-primary"
+                        title="Registrar un abono o amortización de pago"
+                        style={{ fontSize: '0.74rem', fontWeight: 600, gap: '0.35rem', padding: '0.28rem 0.65rem' }}
+                        onClick={() => { setPagoReservaId(r.id); setPagoForm(PAGO_VACIO); }}
                       >
-                        {ESTADOS_RESERVA.map(e => <option key={e} value={e}>{e}</option>)}
-                      </select>
-                      <ChevronDown size={11} style={{ position: 'absolute', right: '0.35rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                    </div>
+                        <CreditCard size={13} /> Registrar Abono
+                      </button>
+                    )}
 
-                    {/* ACCIONES UNIFICADAS DE LA RESERVA */}
-                    {/* 1. Registrar Abono / Pago (Acción Primaria) */}
-                    <button
-                      className="btn btn-sm btn-primary"
-                      title="Registrar un abono o amortización de pago"
-                      style={{ fontSize: '0.74rem', fontWeight: 600, gap: '0.35rem', padding: '0.28rem 0.65rem' }}
-                      onClick={() => { setPagoReservaId(r.id); setPagoForm(PAGO_VACIO); }}
-                    >
-                      <CreditCard size={13} /> Registrar Abono
-                    </button>
+                    {/* 2. Botón Destacado: Cerrar Reserva (Check-out guiado + Paz y Salvo) */}
+                    {r.estado === 'activa' && onCerrarReserva && (
+                      <button
+                        className="btn btn-sm"
+                        style={{
+                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                          gap: '0.35rem',
+                          padding: '0.28rem 0.75rem',
+                          background: 'rgba(234, 88, 12, 0.12)',
+                          borderColor: 'rgba(234, 88, 12, 0.35)',
+                          color: '#c2410c',
+                        }}
+                        title="Verificar saldo en $0, efectuar check-out y generar Paz y Salvo"
+                        onClick={() => setReservaParaCierre(r)}
+                      >
+                        <CheckCircle size={13} /> Cerrar Reserva
+                      </button>
+                    )}
+
+                    {/* 3. Botón directo de Paz y Salvo (Habilitado si saldo es $0) */}
+                    {pazYSalvoHabilitado && (
+                      <button
+                        className="btn btn-sm"
+                        style={{
+                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                          gap: '0.3rem',
+                          padding: '0.28rem 0.65rem',
+                          background: 'rgba(34, 197, 94, 0.12)',
+                          borderColor: 'rgba(34, 197, 94, 0.35)',
+                          color: '#15803d',
+                        }}
+                        title="Descargar o enviar por WhatsApp el Certificado Oficial de Paz y Salvo"
+                        onClick={() => {
+                          setModalWaReserva({
+                            abierto: true,
+                            reserva: r,
+                            titulo: `Certificado de Paz y Salvo · ${r.fincas?.nombre || 'Finca'}`,
+                            nombreDoc: 'Certificado de Paz y Salvo (PDF)',
+                            mensaje: plantillaPazYSalvo(r),
+                            onGenerarPdf: () => generarPazYSalvo(r),
+                            tipo: 'paz_salvo',
+                          });
+                        }}
+                      >
+                        <Award size={13} /> Paz y Salvo
+                      </button>
+                    )}
 
                     {/* 2. Menú de Documentos Oficiales Unificado */}
                     <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
@@ -745,6 +848,21 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
             if (!res.success) {
               throw new Error(res.error || 'Error al cerrar reserva');
             }
+            const reservaCerrada: Reserva = {
+              ...reservaParaCierre,
+              estado: (datosCierre.estado_cierre || 'completada') as ReservaEstado,
+            };
+            setReservaParaCierre(null);
+            // Inmediatamente abrir y sugerir enviar el Paz y Salvo al cliente
+            setModalWaReserva({
+              abierto: true,
+              reserva: reservaCerrada,
+              titulo: `🏆 Certificado de Paz y Salvo · ${reservaCerrada.fincas?.nombre || 'Finca'}`,
+              nombreDoc: 'Certificado de Paz y Salvo (PDF)',
+              mensaje: plantillaPazYSalvo(reservaCerrada),
+              onGenerarPdf: () => generarPazYSalvo(reservaCerrada),
+              tipo: 'paz_salvo',
+            });
           }}
           showToast={showToast}
         />

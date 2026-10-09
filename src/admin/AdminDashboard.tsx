@@ -275,6 +275,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return acc + Math.max(0, r.valor_total - pagado);
   }, 0);
 
+  // Métricas del servicio de alimentación (suministrado directamente por el Administrador)
+  const reservasConMenu = reservas.filter(
+    r => (r.costo_alimentacion || 0) > 0 || (r.alimentacion && r.alimentacion !== 'Sin alimentación')
+  );
+  const ingresosAlimentacionConfirmados = reservas
+    .filter(r => ['activa', 'completada'].includes(r.estado))
+    .reduce((acc, r) => acc + (r.costo_alimentacion || 0), 0);
+  const ingresosAlimentacionPendientes = cotizaciones
+    .filter(c => ['borrador', 'cotizada', 'pendiente'].includes(c.estado))
+    .reduce((acc, c) => acc + (c.costo_alimentacion || 0), 0);
+  const totalPersonasAlimentadas = reservas
+    .filter(r => ['activa', 'completada'].includes(r.estado) && (r.costo_alimentacion || 0) > 0)
+    .reduce((acc, r) => acc + (r.personas || 1), 0);
+
   const navigateTo = (section: AdminSection) => {
     setActiveSection(section);
     setAdminActiveSection(section);
@@ -500,6 +514,59 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="stat-card">
                   <div className="stat-val" style={{ color: 'var(--danger)', fontSize: '1.1rem' }}>{formatCOP(totalSaldoPendiente)}</div>
                   <div className="stat-lbl">Saldo por cobrar</div>
+                </div>
+                <div className="stat-card" style={{ cursor: 'pointer', borderLeft: '3px solid var(--accent, #ea580c)' }} onClick={() => navigateTo('menus')}>
+                  <div className="stat-val" style={{ color: 'var(--accent, #ea580c)', fontSize: '1.1rem' }}>{formatCOP(ingresosAlimentacionConfirmados)}</div>
+                  <div className="stat-lbl">Ingresos Menús (Admin)</div>
+                </div>
+              </div>
+
+              {/* Rendimiento del Servicio de Alimentación (Admin) */}
+              <div className="panel" style={{ borderLeft: '4px solid var(--accent, #ea580c)' }}>
+                <div className="panel-header" style={{ marginBottom: '0.85rem' }}>
+                  <div>
+                    <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: 'var(--accent, #ea580c)' }}>
+                      <UtensilsCrossed size={16} /> Estadísticas de Planes de Alimentación (Gestión Admin)
+                    </div>
+                    <div className="text-xs text-muted mt-1">
+                      Servicio gastronómico directo del administrador (pagos independientes del hospedaje)
+                    </div>
+                  </div>
+                  <button className="btn btn-sm" onClick={() => navigateTo('menus')}>
+                    Ver Menús →
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                  <div style={{ background: 'var(--surface-alt, var(--surface))', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <div className="text-xs text-muted">Facturado en Reservas Activas/Completadas</div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#16a34a', marginTop: '0.2rem' }}>
+                      {formatCOP(ingresosAlimentacionConfirmados)} COP
+                    </div>
+                    <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
+                      {reservasConMenu.filter(r => ['activa', 'completada'].includes(r.estado)).length} reservas con alimentación confirmada
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'var(--surface-alt, var(--surface))', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <div className="text-xs text-muted">Proyección en Cotizaciones Pendientes</div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--warning, #f59e0b)', marginTop: '0.2rem' }}>
+                      {formatCOP(ingresosAlimentacionPendientes)} COP
+                    </div>
+                    <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
+                      {cotizaciones.filter(c => ['borrador', 'cotizada', 'pendiente'].includes(c.estado) && (c.costo_alimentacion || 0) > 0).length} cotizaciones con menú por cerrar
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'var(--surface-alt, var(--surface))', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <div className="text-xs text-muted">Comensales Atendidos</div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--primary)', marginTop: '0.2rem' }}>
+                      {totalPersonasAlimentadas} personas
+                    </div>
+                    <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
+                      En estancias confirmadas y finalizadas
+                    </div>
+                  </div>
                 </div>
               </div>
 

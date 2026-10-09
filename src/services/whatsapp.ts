@@ -184,41 +184,99 @@ export function plantillaPedirAbonoCotizacion(
   const cNombre = cliente ? `${cliente.nombre || ''} ${cliente.apellido || ''}`.trim() : (cotizacion.clientes ? `${cotizacion.clientes.nombre} ${cotizacion.clientes.apellido || ''}`.trim() : 'Estimado/a cliente');
   const fNombre = finca?.nombre || cotizacion.fincas?.nombre || 'Finca Campestre';
   const noches = calcularNoches(cotizacion.fecha_inicio, cotizacion.fecha_fin);
-  const total = cotizacion.total || 0;
-  const abonoSugerido = Math.round(total * (porcentaje / 100));
+  
+  // El 50% de separación aplica sobre el valor de alojamiento de la propiedad
+  const valorAlojamiento = (cotizacion.subtotal_alojamiento && cotizacion.subtotal_alojamiento > 0)
+    ? cotizacion.subtotal_alojamiento
+    : Math.max(0, (cotizacion.total || 0) - (cotizacion.costo_alimentacion || 0));
+  const abonoSugerido = Math.round(valorAlojamiento * (porcentaje / 100));
 
-  let msg = `🌿 *SOLICITUD OFICIAL DE ABONO Y BLOQUEO DE FECHAS*
+  let msg = `🌿 *SOLICITUD OFICIAL DE SEPARACIÓN Y BLOQUEO DE FECHAS*
 *Control de Fincas Campestres*
 
 Hola, *${cNombre}* 👋
-Adjuntamos la propuesta oficial de cotización para tu estadía en *${fNombre}*.
+Adjuntamos la propuesta formal para tu estadía en *${fNombre}*.
 
 📅 *Fechas solicitadas:* ${formatFecha(cotizacion.fecha_inicio)} al ${formatFecha(cotizacion.fecha_fin)} (${noches} noche${noches > 1 ? 's' : ''})
 👥 *Huéspedes:* ${cotizacion.personas} personas
-${cotizacion.consecutivo ? `🆔 *Cotización N°:* ${cotizacion.consecutivo}\n` : ''}💰 *Valor Total:* *${formatCOP(total)}*
+${cotizacion.consecutivo ? `🆔 *Cotización N°:* ${cotizacion.consecutivo}\n` : ''}🏠 *Valor Alojamiento Finca:* *${formatCOP(valorAlojamiento)}*
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔒 *ABONO REQUERIDO (${porcentaje}%):* *${formatCOP(abonoSugerido)}*
+🔒 *ABONO REQUERIDO PARA SEPARAR (${porcentaje}%):* *${formatCOP(abonoSugerido)}*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-_Con este abono garantizamos tu cupo y bloqueamos de inmediato la disponibilidad de la finca en el calendario oficial._
+_Con este abono garantizamos tu cupo y bloqueamos de inmediato la disponibilidad de la finca en el calendario oficial a nombre del propietario._
 
-💳 *DATOS DE CONSIGNACIÓN / TRANSFERENCIA:*`;
+💳 *DATOS DE CONSIGNACIÓN / CUENTA DEL PROPIETARIO:*`;
 
   if (bancosInfo && bancosInfo.cuenta) {
     msg += `
 • *Banco:* ${bancosInfo.banco || 'Bancolombia'}
 • *Tipo de Cuenta:* ${bancosInfo.tipoCuenta || 'Ahorros'}
 • *Número de Cuenta:* ${bancosInfo.cuenta}
-• *Titular:* ${bancosInfo.titular || 'Administración de Fincas'}
-${bancosInfo.nit ? `• *Identificación:* ${bancosInfo.nit}` : ''}`;
+• *Titular:* ${bancosInfo.titular || 'Propietario de la Finca'}
+${bancosInfo.nit ? `• *Identificación / NIT:* ${bancosInfo.nit}` : ''}`;
   } else {
     msg += `
-• Por favor consúltanos los datos de transferencia directa (Bancolombia, Nequi o Daviplata).`;
+• Por favor consúltanos los datos de transferencia directa para el pago del abono a la propiedad.`;
   }
 
   msg += `
 
-📲 *Siguiente paso:* Una vez realices la transferencia, por favor compártenos el comprobante por este medio para emitir tu *Documento Oficial de Reserva* y bloquear formalmente tus fechas. ¡Quedamos muy atentos! ✨`;
+📲 *Siguiente paso:* Una vez realices la transferencia, por favor compártenos el comprobante por este medio para confirmar y emitir tu *Documento Oficial de Reserva*. ¡Quedamos muy atentos! ✨`;
+
+  return msg;
+}
+
+/**
+ * 1.2 Plantilla Oficial: Cobro Independiente de Planes de Alimentación (Administración)
+ */
+export function plantillaCobroAlimentacion(
+  cotizacion: CotizacionDB,
+  finca?: { nombre?: string } | null,
+  cliente?: { nombre?: string; apellido?: string | null; whatsapp?: string | null } | null,
+  bancosAdmin?: { banco?: string; tipoCuenta?: string; cuenta?: string; titular?: string; nit?: string } | null
+): string {
+  const cNombre = cliente ? `${cliente.nombre || ''} ${cliente.apellido || ''}`.trim() : (cotizacion.clientes ? `${cotizacion.clientes.nombre} ${cotizacion.clientes.apellido || ''}`.trim() : 'Estimado/a cliente');
+  const fNombre = finca?.nombre || cotizacion.fincas?.nombre || 'Finca Campestre';
+  const costoAlim = cotizacion.costo_alimentacion || 0;
+  const planNombre = cotizacion.alimentacion || 'Plan de Alimentación';
+  const personas = cotizacion.personas || 1;
+  const noches = calcularNoches(cotizacion.fecha_inicio, cotizacion.fecha_fin);
+  const cantServ = cotizacion.cantidad_alimentacion || noches;
+
+  let msg = `🍽️ *SOLICITUD DE PAGO · PLANES DE ALIMENTACIÓN Y MENÚS*
+*Administración Fincas Campestres*
+
+Hola, *${cNombre}* 👋
+Te compartimos el detalle para la confirmación de tu servicio gastronómico para tu estadía en *${fNombre}*.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 *DETALLE DEL SERVICIO GASTRONÓMICO:*
+• *Menú / Plan:* ${planNombre}
+• *Personas:* ${personas} personas
+• *Cantidad de servicios:* ${cantServ}
+${cotizacion.consecutivo ? `• *Cotización N°:* ${cotizacion.consecutivo}\n` : ''}💰 *TOTAL ALIMENTACIÓN:* *${formatCOP(costoAlim)}*
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+_Nota: El servicio de alimentación es suministrado y coordinado de forma directa por la Administración de Fincas Campestres, garantizando compras de insumos frescos y personal de cocina en la finca._
+
+💳 *DATOS BANCARIOS DE LA ADMINISTRACIÓN:*`;
+
+  if (bancosAdmin && bancosAdmin.cuenta) {
+    msg += `
+• *Banco:* ${bancosAdmin.banco || 'Bancolombia'}
+• *Tipo de Cuenta:* ${bancosAdmin.tipoCuenta || 'Ahorros'}
+• *Número de Cuenta:* ${bancosAdmin.cuenta}
+• *Titular:* ${bancosAdmin.titular || 'Administración de Fincas'}
+${bancosAdmin.nit ? `• *Identificación / NIT:* ${bancosAdmin.nit}` : ''}`;
+  } else {
+    msg += `
+• Consúltanos por este medio los datos de transferencia directa (Bancolombia, Nequi o Daviplata).`;
+  }
+
+  msg += `
+
+📲 Por favor envíanos el comprobante de transferencia para programar los insumos y el personal de cocina para tu llegada. ¡Muchas gracias! ✨`;
 
   return msg;
 }
