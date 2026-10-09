@@ -146,6 +146,7 @@ export interface CotizacionDB {
 }
 
 export type ReservaEstado = 'activa' | 'completada' | 'cancelada' | 'no_show';
+export type EstadoAlimentacion = 'pendiente' | 'pagada' | 'cancelada';
 
 export interface Reserva {
   id: string;
@@ -160,6 +161,9 @@ export interface Reserva {
   menu_id?: string | null;
   alimentacion?: string | null;
   costo_alimentacion?: number;
+  estado_alimentacion?: EstadoAlimentacion | null;
+  fecha_pago_alimentacion?: string | null;
+  metodo_pago_alimentacion?: string | null;
   consecutivo?: string | null;  // Consecutivo numérico de seguimiento (ej: 1001, sin letras al inicio)
   estado: ReservaEstado;
   observaciones?: string | null;

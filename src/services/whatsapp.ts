@@ -231,18 +231,19 @@ ${bancosInfo.nit ? `• *Identificación / NIT:* ${bancosInfo.nit}` : ''}`;
  * 1.2 Plantilla Oficial: Cobro Independiente de Planes de Alimentación (Administración)
  */
 export function plantillaCobroAlimentacion(
-  cotizacion: CotizacionDB,
+  item: CotizacionDB | Reserva,
   finca?: { nombre?: string } | null,
   cliente?: { nombre?: string; apellido?: string | null; whatsapp?: string | null } | null,
   bancosAdmin?: { banco?: string; tipoCuenta?: string; cuenta?: string; titular?: string; nit?: string } | null
 ): string {
-  const cNombre = cliente ? `${cliente.nombre || ''} ${cliente.apellido || ''}`.trim() : (cotizacion.clientes ? `${cotizacion.clientes.nombre} ${cotizacion.clientes.apellido || ''}`.trim() : 'Estimado/a cliente');
-  const fNombre = finca?.nombre || cotizacion.fincas?.nombre || 'Finca Campestre';
-  const costoAlim = cotizacion.costo_alimentacion || 0;
-  const planNombre = cotizacion.alimentacion || 'Plan de Alimentación';
-  const personas = cotizacion.personas || 1;
-  const noches = calcularNoches(cotizacion.fecha_inicio, cotizacion.fecha_fin);
-  const cantServ = cotizacion.cantidad_alimentacion || noches;
+  const cNombre = cliente ? `${cliente.nombre || ''} ${cliente.apellido || ''}`.trim() : (item.clientes ? `${item.clientes.nombre} ${item.clientes.apellido || ''}`.trim() : 'Estimado/a cliente');
+  const fNombre = finca?.nombre || item.fincas?.nombre || 'Finca Campestre';
+  const costoAlim = item.costo_alimentacion || 0;
+  const planNombre = item.alimentacion || 'Plan de Alimentación';
+  const personas = item.personas || 1;
+  const noches = calcularNoches(item.fecha_inicio, item.fecha_fin);
+  const cantServ = ('cantidad_alimentacion' in item ? item.cantidad_alimentacion : null) || noches;
+  const esReserva = 'cotizacion_id' in item || 'valor_total' in item;
 
   let msg = `🍽️ *SOLICITUD DE PAGO · PLANES DE ALIMENTACIÓN Y MENÚS*
 *Administración Fincas Campestres*
@@ -255,7 +256,7 @@ Te compartimos el detalle para la confirmación de tu servicio gastronómico par
 • *Menú / Plan:* ${planNombre}
 • *Personas:* ${personas} personas
 • *Cantidad de servicios:* ${cantServ}
-${cotizacion.consecutivo ? `• *Cotización N°:* ${cotizacion.consecutivo}\n` : ''}💰 *TOTAL ALIMENTACIÓN:* *${formatCOP(costoAlim)}*
+${item.consecutivo ? `• *${esReserva ? 'Reserva' : 'Cotización'} N°:* ${item.consecutivo}\n` : ''}💰 *TOTAL ALIMENTACIÓN:* *${formatCOP(costoAlim)}*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 _Nota: El servicio de alimentación es suministrado y coordinado de forma directa por la Administración de Fincas Campestres, garantizando compras de insumos frescos y personal de cocina en la finca._

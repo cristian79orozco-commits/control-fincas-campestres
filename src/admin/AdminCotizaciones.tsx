@@ -126,11 +126,13 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
     abierto: boolean;
     cotizacion: CotizacionDB | null;
     anticipo: number;
+    alimentacionPagada?: boolean;
     guardando: boolean;
   }>({
     abierto: false,
     cotizacion: null,
     anticipo: 0,
+    alimentacionPagada: false,
     guardando: false,
   });
 
@@ -315,6 +317,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
       abierto: true,
       cotizacion: c,
       anticipo: anticipoSugerido,
+      alimentacionPagada: false,
       guardando: false,
     });
   };
@@ -325,10 +328,11 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
     setModalConfirmarReserva(prev => ({ ...prev, guardando: true }));
     const c = modalConfirmarReserva.cotizacion;
     const anticipo = modalConfirmarReserva.anticipo;
+    const alimentacionPagada = modalConfirmarReserva.alimentacionPagada;
 
     try {
-      const res = await convertirCotizacionAReserva(c, anticipo);
-      setModalConfirmarReserva({ abierto: false, cotizacion: null, anticipo: 0, guardando: false });
+      const res = await convertirCotizacionAReserva(c, anticipo, alimentacionPagada);
+      setModalConfirmarReserva({ abierto: false, cotizacion: null, anticipo: 0, alimentacionPagada: false, guardando: false });
       if (res.success) {
         showToast(`✓ ¡Cotización convertida en Reserva Activa con éxito!`, 'success');
         if (onConvertirReserva) {
@@ -929,6 +933,24 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
                   </strong>
                 </div>
               </div>
+
+              {/* Opciones de Alimentación Independiente */}
+              {(modalConfirmarReserva.cotizacion.costo_alimentacion || 0) > 0 && (
+                <div style={{ padding: '0.75rem', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={modalConfirmarReserva.alimentacionPagada}
+                      onChange={e => setModalConfirmarReserva(prev => ({ ...prev, alimentacionPagada: e.target.checked }))}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                    />
+                    <span>¿El cliente ya pagó también la alimentación ({formatCOP(modalConfirmarReserva.cotizacion.costo_alimentacion || 0)})?</span>
+                  </label>
+                  <div className="text-xs text-muted" style={{ marginTop: '0.35rem', paddingLeft: '1.5rem', lineHeight: 1.4 }}>
+                    ℹ️ <em>Nota importante:</em> El abono del 50% de alojamiento asegura la reserva de la finca con el propietario. Si el cliente aún no ha cancelado la alimentación, puedes dejarlo desmarcado y saldrá el botón de <strong>"Cobrar Alimentación"</strong> en el módulo de Reservas para cobrarlo después a la cuenta del administrador.
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                 <button

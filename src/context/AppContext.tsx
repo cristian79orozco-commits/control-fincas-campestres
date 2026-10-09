@@ -107,7 +107,12 @@ interface AppContextValue {
   guardarCotizacion: (datos: Partial<CotizacionDB>) => Promise<{ success: boolean; id?: string; error?: string }>;
   cambiarEstadoCotizacion: (id: string, estado: CotizacionEstado) => Promise<{ success: boolean; error?: string }>;
   eliminarCotizacion: (id: string) => Promise<{ success: boolean; error?: string }>;
-  convertirCotizacionAReserva: (cotizacion: CotizacionDB, anticipo?: number) => Promise<{ success: boolean; reservaId?: string; error?: string }>;
+  convertirCotizacionAReserva: (cotizacion: CotizacionDB, anticipo?: number, alimentacionPagada?: boolean) => Promise<{ success: boolean; reservaId?: string; error?: string }>;
+  cambiarEstadoAlimentacionReserva: (
+    reservaId: string,
+    estadoAlimentacion: 'pendiente' | 'pagada' | 'cancelada',
+    detalles?: { metodo?: string; notas?: string }
+  ) => Promise<{ success: boolean; error?: string }>;
 
   // Operaciones de Reservas y Pagos
   guardarReserva: (datos: Partial<Reserva>) => Promise<{ success: boolean; id?: string; error?: string }>;
@@ -459,7 +464,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const procesadas: Reserva[] = (data || []).map((r: any) => {
         const cierreRaw = r.cierres_reservas;
         const cierre = Array.isArray(cierreRaw) ? (cierreRaw[0] || null) : (cierreRaw || null);
-        return { ...r, cierre };
+        const estadoAlimentacion = r.estado_alimentacion || r.cotizacion_snapshot?.estado_alimentacion || ((r.costo_alimentacion || 0) > 0 ? 'pendiente' : null);
+        const fechaPagoAlim = r.fecha_pago_alimentacion || r.cotizacion_snapshot?.fecha_pago_alimentacion || null;
+        const metodoPagoAlim = r.metodo_pago_alimentacion || r.cotizacion_snapshot?.metodo_pago_alimentacion || null;
+        return {
+          ...r,
+          cierre,
+          estado_alimentacion: estadoAlimentacion,
+          fecha_pago_alimentacion: fechaPagoAlim,
+          metodo_pago_alimentacion: metodoPagoAlim,
+        };
       });
 
       const ordenadas = procesadas.sort(
@@ -918,7 +932,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const convertirCotizacionAReserva = async (
     cotizacion: CotizacionDB,
-    anticipo: number = 0
+    anticipo: number = 0,
+    alimentacionPagada: boolean = false
   ): Promise<{ success: boolean; reservaId?: string; error?: string }> => {
     try {
       // 1. Marcar cotización como confirmada en memoria y BD
@@ -943,6 +958,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const fincaSel = fincas.find(f => f.id === cotizacion.finca_id);
       const clienteSel = clientes.find(c => c.id === cotizacion.cliente_id);
 
+      const tieneMenu = Boolean(
+        (cotizacion.costo_alimentacion && cotizacion.costo_alimentacion > 0) ||
+        (cotizacion.alimentacion && cotizacion.alimentacion !== 'Sin alimentación')
+      );
+      const estAlim = tieneMenu ? (alimentacionPagada ? 'pagada' : 'pendiente') : null;
+      const fechaPagoAlim = alimentacionPagada ? new Date().toISOString() : null;
+
       const nuevaReserva: Reserva = {
         id: newResId,
         cotizacion_id: cotizacion.id,
@@ -954,6 +976,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         valor_total: cotizacion.total,
         separacion: anticipo,
         consecutivo: consecutivoReserva,
+        menu_id: cotizacion.menu_id || null,
+        alimentacion: cotizacion.alimentacion || null,
+        costo_alimentacion: cotizacion.costo_alimentacion || 0,
+        estado_alimentacion: estAlim,
+        fecha_pago_alimentacion: fechaPagoAlim,
         estado: 'activa',
         observaciones: `Convertida de cotización ${cotizacion.consecutivo || cotizacion.id}`,
         created_at: new Date().toISOString(),
@@ -976,6 +1003,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           valor: anticipo,
           observacion: 'Anticipo registrado al convertir cotización en reserva',
         }] : [],
+        cotizacion_snapshot: {
+          cotizacion_id: cotizacion.id,
+          consecutivo: cotizacion.consecutivo,
+          subtotal_alojamiento: cotizacion.subtotal_alojamiento,
+          costo_alimentacion: cotizacion.costo_alimentacion,
+          estado_alimentacion: estAlim,
+          fecha_pago_alimentacion: fechaPagoAlim,
+        },
       };
 
       // Actualización optimista de reserva con persistencia local
@@ -1022,8 +1057,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           valor_total: cotizacion.total,
           separacion: anticipo,
           consecutivo: consecutivoReserva,
+          menu_id: cotizacion.menu_id || null,
+          alimentacion: cotizacion.alimentacion || null,
+          costo_alimentacion: cotizacion.costo_alimentacion || 0,
           estado: 'activa',
           observaciones: nuevaReserva.observaciones,
+          cotizacion_snapshot: nuevaReserva.cotizacion_snapshot,
         });
 
         if (anticipo > 0) {
@@ -1158,6 +1197,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         observaciones: datos.observaciones || null,
         consecutivo: payloadReserva.consecutivo,
         cotizacion_id: datos.cotizacion_id || null,
+        menu_id: datos.menu_id !== undefined ? datos.menu_id : null,
+        alimentacion: datos.alimentacion !== undefined ? datos.alimentacion : null,
+        costo_alimentacion: datos.costo_alimentacion !== undefined ? datos.costo_alimentacion : 0,
       };
 
       try {
@@ -1326,6 +1368,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       return { success: true };
     } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const cambiarEstadoAlimentacionReserva = async (
+    reservaId: string,
+    estadoAlimentacion: 'pendiente' | 'pagada' | 'cancelada',
+    detalles?: { metodo?: string; notas?: string }
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const fecha = estadoAlimentacion === 'pagada' ? new Date().toISOString() : null;
+
+      // Actualización optimista en memoria
+      setReservas(prev =>
+        prev.map(r => {
+          if (r.id === reservaId) {
+            const snap = r.cotizacion_snapshot || {};
+            const nuevoSnap = {
+              ...snap,
+              estado_alimentacion: estadoAlimentacion,
+              fecha_pago_alimentacion: fecha,
+              metodo_pago_alimentacion: detalles?.metodo || null,
+              notas_pago_alimentacion: detalles?.notas || null,
+            };
+            return {
+              ...r,
+              estado_alimentacion: estadoAlimentacion,
+              fecha_pago_alimentacion: fecha,
+              metodo_pago_alimentacion: detalles?.metodo || null,
+              cotizacion_snapshot: nuevoSnap,
+            };
+          }
+          return r;
+        })
+      );
+
+      // Persistir en Supabase
+      try {
+        const reservaActual = reservas.find(r => r.id === reservaId);
+        const snap = reservaActual?.cotizacion_snapshot || {};
+        const nuevoSnap = {
+          ...snap,
+          estado_alimentacion: estadoAlimentacion,
+          fecha_pago_alimentacion: fecha,
+          metodo_pago_alimentacion: detalles?.metodo || null,
+          notas_pago_alimentacion: detalles?.notas || null,
+        };
+        await supabase.from('reservas').update({
+          cotizacion_snapshot: nuevoSnap,
+        }).eq('id', reservaId);
+      } catch (errDb) {
+        console.warn('[cambiarEstadoAlimentacionReserva] Aviso de sincronización Supabase:', errDb);
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      console.error('[AppContext.cambiarEstadoAlimentacionReserva]', err);
       return { success: false, error: err.message };
     }
   };
@@ -2129,6 +2228,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     cambiarEstadoReserva,
     cerrarReserva,
     reabrirReserva,
+    cambiarEstadoAlimentacionReserva,
     eliminarReserva,
     registrarPago,
     eliminarPago,

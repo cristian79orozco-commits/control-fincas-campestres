@@ -279,10 +279,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const reservasConMenu = reservas.filter(
     r => (r.costo_alimentacion || 0) > 0 || (r.alimentacion && r.alimentacion !== 'Sin alimentación')
   );
-  const ingresosAlimentacionConfirmados = reservas
-    .filter(r => ['activa', 'completada'].includes(r.estado))
+  // 1. Alimentación cobrada y cerrada a la cuenta del admin
+  const ingresosAlimentacionLiquidados = reservas
+    .filter(r => r.estado_alimentacion === 'pagada' || r.cotizacion_snapshot?.estado_alimentacion === 'pagada')
     .reduce((acc, r) => acc + (r.costo_alimentacion || 0), 0);
-  const ingresosAlimentacionPendientes = cotizaciones
+  // 2. Alimentación pendiente de cobro en reservas activas
+  const ingresosAlimentacionPorCobrar = reservas
+    .filter(r => r.estado === 'activa' && r.estado_alimentacion !== 'pagada' && r.cotizacion_snapshot?.estado_alimentacion !== 'pagada' && ((r.costo_alimentacion || 0) > 0))
+    .reduce((acc, r) => acc + (r.costo_alimentacion || 0), 0);
+  // 3. Proyección en cotizaciones aún no confirmadas
+  const ingresosAlimentacionEnCotizaciones = cotizaciones
     .filter(c => ['borrador', 'cotizada', 'pendiente'].includes(c.estado))
     .reduce((acc, c) => acc + (c.costo_alimentacion || 0), 0);
   const totalPersonasAlimentadas = reservas
@@ -516,8 +522,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="stat-lbl">Saldo por cobrar</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer', borderLeft: '3px solid var(--accent, #ea580c)' }} onClick={() => navigateTo('menus')}>
-                  <div className="stat-val" style={{ color: 'var(--accent, #ea580c)', fontSize: '1.1rem' }}>{formatCOP(ingresosAlimentacionConfirmados)}</div>
-                  <div className="stat-lbl">Ingresos Menús (Admin)</div>
+                  <div className="stat-val" style={{ color: 'var(--accent, #ea580c)', fontSize: '1.1rem' }}>{formatCOP(ingresosAlimentacionLiquidados)}</div>
+                  <div className="stat-lbl">Menús Cobrados (Admin)</div>
                 </div>
               </div>
 
@@ -539,19 +545,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
                   <div style={{ background: 'var(--surface-alt, var(--surface))', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                    <div className="text-xs text-muted">Facturado en Reservas Activas/Completadas</div>
+                    <div className="text-xs text-muted">Menús Cobrados / Liquidados</div>
                     <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#16a34a', marginTop: '0.2rem' }}>
-                      {formatCOP(ingresosAlimentacionConfirmados)} COP
+                      {formatCOP(ingresosAlimentacionLiquidados)} COP
                     </div>
                     <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
-                      {reservasConMenu.filter(r => ['activa', 'completada'].includes(r.estado)).length} reservas con alimentación confirmada
+                      {reservasConMenu.filter(r => r.estado_alimentacion === 'pagada' || r.cotizacion_snapshot?.estado_alimentacion === 'pagada').length} reservas con alimentación liquidada
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'var(--surface-alt, var(--surface))', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <div className="text-xs text-muted">Pendiente de Cobro (En Reservas Activas)</div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#c2410c', marginTop: '0.2rem' }}>
+                      {formatCOP(ingresosAlimentacionPorCobrar)} COP
+                    </div>
+                    <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
+                      {reservasConMenu.filter(r => r.estado === 'activa' && r.estado_alimentacion !== 'pagada' && r.cotizacion_snapshot?.estado_alimentacion !== 'pagada').length} reservas con menú pendiente de cobro
                     </div>
                   </div>
 
                   <div style={{ background: 'var(--surface-alt, var(--surface))', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
                     <div className="text-xs text-muted">Proyección en Cotizaciones Pendientes</div>
                     <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--warning, #f59e0b)', marginTop: '0.2rem' }}>
-                      {formatCOP(ingresosAlimentacionPendientes)} COP
+                      {formatCOP(ingresosAlimentacionEnCotizaciones)} COP
                     </div>
                     <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
                       {cotizaciones.filter(c => ['borrador', 'cotizada', 'pendiente'].includes(c.estado) && (c.costo_alimentacion || 0) > 0).length} cotizaciones con menú por cerrar

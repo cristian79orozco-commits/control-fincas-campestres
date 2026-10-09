@@ -16,9 +16,11 @@ import {
   plantillaSeparacion,
   plantillaPazYSalvo,
   plantillaEstadoCuenta,
+  plantillaCobroAlimentacion,
 } from '../services/whatsapp';
 import { generarDocSeparacion, generarPazYSalvo, generarEstadoCuenta } from '../services/documentos';
 import { CurrencyInput } from '../components/CurrencyInput';
+import { useApp } from '../context/AppContext';
 
 interface AdminReservasProps {
   reservas: Reserva[];
@@ -161,6 +163,59 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
     mensaje: '',
     tipo: 'recordatorio_pago',
   });
+
+  const { cambiarEstadoAlimentacionReserva } = useApp();
+
+  // Modal para liquidar y cerrar servicio de alimentación (Admin)
+  const [modalCerrarAlimentacion, setModalCerrarAlimentacion] = useState<{
+    abierto: boolean;
+    reserva: Reserva | null;
+    metodo: string;
+    notas: string;
+    guardando: boolean;
+  }>({
+    abierto: false,
+    reserva: null,
+    metodo: 'Transferencia Bancolombia / Nequi',
+    notas: '',
+    guardando: false,
+  });
+
+  // Abrir WhatsApp para cobrar alimentación
+  const handleAbrirCobroAlimentacion = (r: Reserva) => {
+    const bancosAdmin = configuracion?.banco_cuenta ? {
+      banco: configuracion.banco_nombre || undefined,
+      tipoCuenta: configuracion.banco_tipo_cuenta || undefined,
+      cuenta: configuracion.banco_cuenta || undefined,
+      titular: configuracion.banco_titular || undefined,
+      nit: configuracion.nit || undefined,
+    } : null;
+
+    setModalWaReserva({
+      abierto: true,
+      reserva: r,
+      titulo: `Solicitud de Pago · Alimentación · ${r.fincas?.nombre || 'Finca'}`,
+      mensaje: plantillaCobroAlimentacion(r, r.fincas, r.clientes, bancosAdmin),
+      tipo: 'cobro_alimentacion',
+    });
+  };
+
+  // Confirmar recepción de pago y cierre del servicio de alimentación
+  const handleConfirmarCierreAlimentacion = async () => {
+    if (!modalCerrarAlimentacion.reserva) return;
+    setModalCerrarAlimentacion(p => ({ ...p, guardando: true }));
+    const r = modalCerrarAlimentacion.reserva;
+    const res = await cambiarEstadoAlimentacionReserva(r.id, 'pagada', {
+      metodo: modalCerrarAlimentacion.metodo,
+      notas: modalCerrarAlimentacion.notas,
+    });
+    setModalCerrarAlimentacion(p => ({ ...p, guardando: false, abierto: false, reserva: null }));
+    if (res.success) {
+      showToast('Servicio de alimentación liquidado y cerrado con éxito ✅', 'success');
+    } else {
+      showToast(`Error al cerrar alimentación: ${res.error}`, 'error');
+    }
+  };
 
   // Si llega cotización pre-cargada, abrir formulario con sus datos y preservar consecutivo
   React.useEffect(() => {
@@ -556,9 +611,23 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                       )}
                       {r.consecutivo && <ConsecutivoBadge consecutivo={r.consecutivo} />}
                       {((r.costo_alimentacion || 0) > 0 || (r.alimentacion && r.alimentacion !== 'Sin alimentación')) && (
-                        <span className="status-badge s-avail" style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#ea580c', borderColor: 'rgba(234, 88, 12, 0.3)' }}>
-                          <Utensils size={10} /> Menú Admin: {formatCOP(r.costo_alimentacion || 0)}
-                        </span>
+                        r.estado_alimentacion === 'pagada' ? (
+                          <span
+                            className="status-badge s-avail"
+                            style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#16a34a', borderColor: 'rgba(22, 163, 74, 0.35)', fontWeight: 600 }}
+                            title={`Alimentación liquidada y pagada a la administración ${r.fecha_pago_alimentacion ? '(' + formatFecha(r.fecha_pago_alimentacion.split('T')[0]) + ')' : ''}`}
+                          >
+                            <Utensils size={10} /> Menú Admin: {formatCOP(r.costo_alimentacion || 0)} (Pagado ✅)
+                          </span>
+                        ) : (
+                          <span
+                            className="status-badge"
+                            style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#c2410c', background: 'rgba(234, 88, 12, 0.12)', borderColor: 'rgba(234, 88, 12, 0.35)', fontWeight: 600 }}
+                            title="Servicio de alimentación pendiente de pago para la administración"
+                          >
+                            <Utensils size={10} /> Menú Admin: {formatCOP(r.costo_alimentacion || 0)} (Pendiente Cobro ⚠️)
+                          </span>
+                        )
                       )}
                     </div>
                     <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
@@ -585,11 +654,73 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
 
                   <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     {/* ACCIONES INTELIGENTES DE LA RESERVA */}
+                    {/* Botones de Alimentación Independiente (Cuenta Admin) */}
+                    {((r.costo_alimentacion || 0) > 0 || (r.alimentacion && r.alimentacion !== 'Sin alimentación')) && r.estado !== 'cancelada' && (
+                      r.estado_alimentacion === 'pagada' ? (
+                        <span
+                          className="status-badge s-avail"
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            padding: '0.25rem 0.55rem',
+                          }}
+                          title={`Servicio gastronómico liquidado ${r.metodo_pago_alimentacion ? 'vía ' + r.metodo_pago_alimentacion : ''}`}
+                        >
+                          <Utensils size={11} /> Menú Liquidado ✓
+                        </span>
+                      ) : (
+                        <>
+                          <button
+                            className="btn btn-sm"
+                            style={{
+                              fontSize: '0.74rem',
+                              fontWeight: 600,
+                              gap: '0.35rem',
+                              padding: '0.28rem 0.65rem',
+                              color: '#c2410c',
+                              background: 'rgba(234, 88, 12, 0.12)',
+                              borderColor: 'rgba(234, 88, 12, 0.35)',
+                            }}
+                            title="Solicitar por WhatsApp el pago de la alimentación para la cuenta de la administración"
+                            onClick={() => handleAbrirCobroAlimentacion(r)}
+                          >
+                            <Utensils size={13} /> Cobrar Alimentación
+                          </button>
+
+                          <button
+                            className="btn btn-sm"
+                            style={{
+                              fontSize: '0.74rem',
+                              fontWeight: 600,
+                              gap: '0.35rem',
+                              padding: '0.28rem 0.65rem',
+                              color: '#15803d',
+                              background: 'rgba(34, 197, 94, 0.12)',
+                              borderColor: 'rgba(34, 197, 94, 0.35)',
+                            }}
+                            title="Registrar pago recibido y cerrar el servicio de alimentación para la administración"
+                            onClick={() => setModalCerrarAlimentacion({
+                              abierto: true,
+                              reserva: r,
+                              metodo: 'Transferencia Bancolombia / Nequi',
+                              notas: '',
+                              guardando: false,
+                            })}
+                          >
+                            <Check size={13} /> Cerrar Alimentación
+                          </button>
+                        </>
+                      )
+                    )}
+
                     {/* 1. Registrar Abono / Pago (Acción Primaria para reservas activas) */}
                     {r.estado === 'activa' && (
                       <button
                         className="btn btn-sm btn-primary"
-                        title="Registrar un abono o amortización de pago"
+                        title="Registrar un abono o amortización de pago del alojamiento"
                         style={{ fontSize: '0.74rem', fontWeight: 600, gap: '0.35rem', padding: '0.28rem 0.65rem' }}
                         onClick={() => { setPagoReservaId(r.id); setPagoForm(PAGO_VACIO); }}
                       >
@@ -887,6 +1018,98 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
           onRegistrarComunicacion={onRegistrarComunicacion}
           showToast={showToast}
         />
+      )}
+
+      {/* Modal para Cerrar y Liquidar Servicio de Alimentación */}
+      {modalCerrarAlimentacion.abierto && modalCerrarAlimentacion.reserva && (
+        <div className="modal-overlay" onClick={() => setModalCerrarAlimentacion(p => ({ ...p, abierto: false }))}>
+          <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#c2410c' }}>
+                <Utensils size={18} /> Liquidar y Cerrar Alimentación (Admin)
+              </div>
+              <button className="btn btn-sm" onClick={() => setModalCerrarAlimentacion(p => ({ ...p, abierto: false }))}>
+                <X size={14} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.25rem', display: 'grid', gap: '0.85rem' }}>
+              <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem', borderRadius: '8px', fontSize: '0.85rem', display: 'grid', gap: '0.35rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span className="text-muted">Reserva:</span>
+                  <strong>{modalCerrarAlimentacion.reserva.fincas?.nombre || 'Finca'} #{modalCerrarAlimentacion.reserva.consecutivo || ''}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span className="text-muted">Cliente:</span>
+                  <strong>
+                    {modalCerrarAlimentacion.reserva.clientes?.nombre
+                      ? `${modalCerrarAlimentacion.reserva.clientes.nombre} ${modalCerrarAlimentacion.reserva.clientes.apellido || ''}`.trim()
+                      : 'Cliente'}
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span className="text-muted">Menú solicitado:</span>
+                  <span>{modalCerrarAlimentacion.reserva.alimentacion || 'Plan de alimentación'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '0.35rem', fontWeight: 700, color: 'var(--primary)' }}>
+                  <span>Total Alimentación a liquidar:</span>
+                  <span style={{ fontSize: '1rem', color: '#16a34a' }}>
+                    {formatCOP(modalCerrarAlimentacion.reserva.costo_alimentacion || 0)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-xs text-muted" style={{ lineHeight: 1.4 }}>
+                ℹ️ Esta acción confirma que el cliente canceló el valor de la alimentación en la cuenta de la administración. La reserva del alojamiento permanece intacta en sus fechas y condiciones acordadas con el propietario.
+              </div>
+
+              <div className="field">
+                <label>Método / Cuenta de recepción</label>
+                <select
+                  value={modalCerrarAlimentacion.metodo}
+                  onChange={e => setModalCerrarAlimentacion(p => ({ ...p, metodo: e.target.value }))}
+                >
+                  <option value="Transferencia Bancolombia / Nequi">Transferencia Bancolombia / Nequi (Admin)</option>
+                  <option value="Daviplata">Daviplata (Admin)</option>
+                  <option value="Efectivo en Finca">Efectivo recibido en finca</option>
+                  <option value="Consignación Bancaria">Consignación Bancaria</option>
+                  <option value="Otro medio de pago">Otro medio de pago</option>
+                </select>
+              </div>
+
+              <div className="field">
+                <label>Observaciones / Referencia de comprobante (opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Aprobación Nequi #849204"
+                  value={modalCerrarAlimentacion.notas}
+                  onChange={e => setModalCerrarAlimentacion(p => ({ ...p, notas: e.target.value }))}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={modalCerrarAlimentacion.guardando}
+                  onClick={() => setModalCerrarAlimentacion(p => ({ ...p, abierto: false }))}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                  disabled={modalCerrarAlimentacion.guardando}
+                  onClick={handleConfirmarCierreAlimentacion}
+                >
+                  <Check size={15} />
+                  {modalCerrarAlimentacion.guardando ? 'Guardando…' : 'Confirmar Pago y Cerrar Servicio 🍽️'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
