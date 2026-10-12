@@ -3,7 +3,7 @@ import {
   ChevronLeft, ChevronRight, CheckCircle, XCircle, User, Lock, Calendar,
   CreditCard, FileText, MessageCircle, FileCheck, Check, Copy, Hash,
   ChevronDown, ChevronUp, AlertTriangle, UtensilsCrossed, Sparkles, Building2,
-  Clock, X, Save
+  Clock, X, Save, Search, Percent, ShieldCheck, CheckSquare, Info, ExternalLink
 } from 'lucide-react';
 import type {
   Finca, BloqueoDisponibilidad, Reserva, Cliente, CotizacionDB,
@@ -114,6 +114,8 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
   const [fechasSeleccionadas, setFechasSeleccionadas] = useState<Set<string>>(new Set());
   const [nombreCliente, setNombreCliente] = useState('');
   const [procesando, setProcesando] = useState(false);
+  const [busquedaFinca, setBusquedaFinca] = useState('');
+  const [fechaInspeccionada, setFechaInspeccionada] = useState<string | null>(null);
 
   // Estados de interfaz de reservas inferiores
   const [filtroFincaReservas, setFiltroFincaReservas] = useState<'esta_finca' | 'todas'>('esta_finca');
@@ -223,6 +225,28 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
     return map;
   }, [fincas, reservas]);
 
+  // Fincas filtradas para la ventana menú estática
+  const fincasFiltradasMenu = useMemo(() => {
+    if (!busquedaFinca.trim()) return fincas;
+    const q = busquedaFinca.toLowerCase();
+    return fincas.filter(f =>
+      f.nombre.toLowerCase().includes(q) ||
+      (f.zona && f.zona.toLowerCase().includes(q))
+    );
+  }, [fincas, busquedaFinca]);
+
+  // Métricas objetivas de ocupación para el mes visible
+  const metricasMes = useMemo(() => {
+    let ocupados = 0;
+    for (let dia = 1; dia <= diasMes; dia++) {
+      const fStr = `${anio}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+      if (ocupadosSet.has(fStr)) ocupados++;
+    }
+    const libres = diasMes - ocupados;
+    const porcentaje = diasMes > 0 ? Math.round((ocupados / diasMes) * 100) : 0;
+    return { diasMes, ocupados, libres, porcentaje };
+  }, [anio, mes, diasMes, ocupadosSet]);
+
   const toggleDia = (fechaStr: string) => {
     setFechasSeleccionadas(prev => {
       const next = new Set(prev);
@@ -230,6 +254,46 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
       else next.add(fechaStr);
       return next;
     });
+    setFechaInspeccionada(fechaStr);
+  };
+
+  // Atajo: Seleccionar fines de semana (Viernes, Sábado y Domingo)
+  const handleSeleccionarFinesDeSemana = () => {
+    const nuevos = new Set(fechasSeleccionadas);
+    for (let dia = 1; dia <= diasMes; dia++) {
+      const dateObj = new Date(anio, mes, dia);
+      const dayOfWeek = dateObj.getDay(); // 0 = Dom, 5 = Vie, 6 = Sáb
+      if (dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0) {
+        const fStr = `${anio}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+        nuevos.add(fStr);
+      }
+    }
+    setFechasSeleccionadas(nuevos);
+    showToast('Fines de semana (Vie-Sáb-Dom) seleccionados', 'info');
+  };
+
+  // Liberar fecha individual directamente desde el inspector de fecha
+  const handleLiberarBloqueoRapido = async (bloqueo: BloqueoDisponibilidad) => {
+    setProcesando(true);
+    let res: { success: boolean; error?: string };
+    if (onEliminarBloqueo) {
+      res = await onEliminarBloqueo(bloqueo.id);
+    } else {
+      res = await onMarcarDias(selectedFincaId, [bloqueo.fecha_inicio], 'libre');
+    }
+    setProcesando(false);
+
+    if (res.success) {
+      showToast('Bloqueo eliminado y fecha liberada ✅', 'success');
+      setFechaInspeccionada(null);
+      setFechasSeleccionadas(prev => {
+        const next = new Set(prev);
+        next.delete(bloqueo.fecha_inicio);
+        return next;
+      });
+    } else {
+      showToast(`Error: ${res.error}`, 'error');
+    }
   };
 
   const handleMarcar = async (estado: 'ocupado' | 'libre') => {
@@ -299,66 +363,185 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
 
   return (
     <div className="admin-big-cal-wrapper">
-      {/* ─── ENCABEZADO Y SELECTOR DE FINCAS ────────────────────────────────────────── */}
-      <div className="panel" style={{ padding: '1.25rem 1.25rem 0.85rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+      {/* ─── ENCABEZADO PRINCIPAL DEL MÓDULO ────────────────────────────────────────── */}
+      <div className="panel" style={{ padding: '1.25rem 1.25rem 0.95rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
-            <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.2rem' }}>
+            <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.25rem' }}>
               <Calendar size={22} style={{ color: 'var(--primary)' }} /> Calendario de Disponibilidad
             </div>
             <div className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
-              Selecciona una finca para ver sus fechas disponibles y ocupadas en tiempo real.
+              Gestión centralizada de fechas libres, bloqueos manuales y reservas confirmadas en tiempo real.
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <span className="status-badge s-avail" style={{ gap: '0.35rem' }}>
               <Sparkles size={12} /> Sincronización en vivo
             </span>
-          </div>
-        </div>
-
-        {/* Fila interactiva de chips de fincas */}
-        <div style={{ marginBottom: '0.35rem' }}>
-          <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem' }}>
-            <Building2 size={12} style={{ display: 'inline', verticalAlign: '-1px', marginRight: '0.25rem' }} />
-            Finca Activa en el Calendario
-          </label>
-          <div className="admin-fincas-selector-bar">
-            {fincas.map(f => {
-              const esActiva = (selectedFincaId || fincas[0]?.id) === f.id;
-              const activasCount = conteoPorFinca[f.id] || 0;
-              return (
-                <button
-                  key={f.id}
-                  type="button"
-                  className={`admin-finca-tab-chip ${esActiva ? 'active' : ''}`}
-                  onClick={() => {
-                    setSelectedFincaId(f.id);
-                    setFechasSeleccionadas(new Set());
-                  }}
-                  title={`Ver disponibilidad de ${f.nombre}`}
-                >
-                  <span>{f.nombre}</span>
-                  <span className="chip-badge">
-                    {activasCount} activa{activasCount !== 1 ? 's' : ''}
-                  </span>
-                </button>
-              );
-            })}
+            {fincaActual && (
+              <span className="status-badge s-info" style={{ gap: '0.35rem' }}>
+                <Building2 size={12} /> Finca: {fincaActual.nombre}
+              </span>
+            )}
           </div>
         </div>
       </div>
 
-      {/* ─── CALENDARIO GRANDE VISUALIZADO POR DEFECTO ───────────────────────────── */}
+      {/* ─── VENTANA MENÚ ESTÁTICA DE FINCAS (SIN DESPLIEGUE HORIZONTAL) ────────────── */}
+      <div className="admin-fincas-menu-window">
+        <div className="admin-fincas-menu-header">
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.98rem' }}>
+              <Building2 size={16} style={{ color: 'var(--primary)' }} /> Propiedades y Fincas
+              <span className="status-badge s-info" style={{ fontSize: '0.68rem', padding: '0.15rem 0.5rem' }}>
+                {fincas.length} en total
+              </span>
+            </div>
+            <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
+              Haz clic en cualquier propiedad para inspeccionar y administrar su disponibilidad:
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: '1', justifyContent: 'flex-end', minWidth: '220px' }}>
+            <div style={{ position: 'relative', width: '100%', maxWidth: '260px' }}>
+              <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                className="admin-fincas-search-input"
+                placeholder="Buscar finca por nombre o lugar..."
+                value={busquedaFinca}
+                onChange={e => setBusquedaFinca(e.target.value)}
+                style={{ paddingLeft: '28px', width: '100%' }}
+              />
+              {busquedaFinca && (
+                <button
+                  type="button"
+                  onClick={() => setBusquedaFinca('')}
+                  style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                  title="Limpiar búsqueda"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Viewport estático con scroll vertical acotado */}
+        <div className="admin-fincas-menu-viewport">
+          {fincasFiltradasMenu.length === 0 ? (
+            <div style={{ padding: '1.25rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              No se encontraron fincas con "{busquedaFinca}".
+            </div>
+          ) : (
+            fincasFiltradasMenu.map(f => {
+              const esActiva = (selectedFincaId || fincas[0]?.id) === f.id;
+              const activasCount = conteoPorFinca[f.id] || 0;
+              const fotoUrl = f.finca_imagenes?.[0]?.url || '';
+
+              return (
+                <div
+                  key={f.id}
+                  className={`admin-finca-menu-item ${esActiva ? 'active' : ''}`}
+                  onClick={() => {
+                    setSelectedFincaId(f.id);
+                    setFechasSeleccionadas(new Set());
+                    setFechaInspeccionada(null);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  title={`Seleccionar ${f.nombre}`}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1 }}>
+                    {fotoUrl ? (
+                      <img src={fotoUrl} alt={f.nombre} className="admin-finca-menu-thumb" />
+                    ) : (
+                      <div className="admin-finca-menu-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Building2 size={20} style={{ opacity: 0.4 }} />
+                      </div>
+                    )}
+                    <div className="admin-finca-menu-info">
+                      <div className="admin-finca-menu-name">{f.nombre}</div>
+                      <div className="admin-finca-menu-meta">
+                        {f.capacidad ? <span>👥 Hasta {f.capacidad} personas</span> : null}
+                        {f.zona ? <span>📍 {f.zona}</span> : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                    {activasCount > 0 ? (
+                      <span className="status-badge s-busy" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem' }}>
+                        {activasCount} reserva{activasCount !== 1 ? 's' : ''} activa{activasCount !== 1 ? 's' : ''}
+                      </span>
+                    ) : (
+                      <span className="status-badge s-avail" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem' }}>
+                        100% Libre
+                      </span>
+                    )}
+                    {esActiva && (
+                      <span style={{ color: 'var(--primary)', fontWeight: 700, display: 'flex', alignItems: 'center' }}>
+                        <Check size={16} />
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* ─── CALENDARIO PRINCIPAL Y MÉTRICAS DE OCUPACIÓN ─────────────────────────── */}
       <div className="admin-big-cal-container">
-        {/* Barra superior de navegación de mes */}
+        {/* Barra superior de métricas de ocupación del mes actual */}
+        <div className="cal-occupancy-kpi-bar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <Percent size={18} style={{ color: 'var(--primary)' }} />
+            <div>
+              <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>
+                Ocupación: {fincaActual?.nombre || 'Finca'} ({MESES[mes]} {anio})
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.2rem' }}>
+                <div style={{ width: '120px', height: '7px', borderRadius: '4px', background: 'var(--surface-3)', overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      width: `${metricasMes.porcentaje}%`,
+                      height: '100%',
+                      background: metricasMes.porcentaje > 70 ? 'var(--danger)' : metricasMes.porcentaje > 30 ? 'var(--warning)' : 'var(--success)',
+                      borderRadius: '4px',
+                      transition: 'width 0.3s ease'
+                    }}
+                  />
+                </div>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)' }}>
+                  {metricasMes.porcentaje}% ocupado
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span className="occ-stat-pill" style={{ color: 'var(--danger)' }}>
+              ● {metricasMes.ocupados} días ocupados
+            </span>
+            <span className="occ-stat-pill" style={{ color: 'var(--success)' }}>
+              ● {metricasMes.libres} días libres
+            </span>
+            <span className="occ-stat-pill" style={{ color: 'var(--text-muted)' }}>
+              Mes: {metricasMes.diasMes} días
+            </span>
+          </div>
+        </div>
+
+        {/* Barra de navegación de mes y leyenda */}
         <div className="admin-big-cal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button className="btn btn-sm" onClick={handlePrevMonth} title="Mes anterior">
               <ChevronLeft size={16} />
             </button>
-            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.25rem', minWidth: '180px', textAlign: 'center' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.25rem', minWidth: '160px', textAlign: 'center' }}>
               {MESES[mes]} {anio}
             </span>
             <button className="btn btn-sm" onClick={handleNextMonth} title="Mes siguiente">
@@ -368,23 +551,23 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
             <button
               className="btn btn-sm"
               onClick={handleIrAHoy}
-              style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.3rem 0.65rem', marginLeft: '0.4rem' }}
+              style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.3rem 0.65rem', marginLeft: '0.25rem' }}
               title="Volver al día y mes actual"
             >
               <Clock size={13} /> Hoy
             </button>
           </div>
 
-          {/* Leyenda de colores explicativa */}
-          <div className="cal-legend" style={{ alignItems: 'center' }}>
-            <span className="legend-dot free">Disponible (Libre)</span>
-            <span className="legend-dot busy">Ocupado / Reservado</span>
+          {/* Leyenda de colores adaptativa */}
+          <div className="cal-legend" style={{ alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem' }}>
+            <span className="legend-dot free">Libre</span>
+            <span className="legend-dot busy">Reserva Huésped</span>
             <span className="legend-dot sel">Seleccionado ({fechasSeleccionadas.size})</span>
           </div>
         </div>
 
-        {/* Cuadrícula grande del calendario */}
-        <div className="calendar-wrap">
+        {/* Cuadrícula grande y responsiva del calendario */}
+        <div className="calendar-wrap" style={{ width: '100%', overflowX: 'hidden' }}>
           <div className="admin-big-cal-grid">
             {/* Cabeceras de días de la semana */}
             {DIAS_SEMANA.map(d => (
@@ -440,6 +623,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
 
               let cls = 'admin-cal-day-large';
               if (esSeleccionado) cls += ' selected';
+              else if (bloqueoVinculado) cls += ' busy-admin';
               else if (esOcupado) cls += ' busy';
               else cls += ' free';
               if (esHoy) cls += ' today';
@@ -449,7 +633,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
                   key={fechaStr}
                   className={cls}
                   onClick={() => toggleDia(fechaStr)}
-                  title={`${fechaStr}: ${esOcupado ? `Ocupado ${clienteEtiqueta ? `(${clienteEtiqueta})` : ''}` : 'Disponible / Libre'}`}
+                  title={`${fechaStr}: ${esOcupado ? `Ocupado (${clienteEtiqueta || 'Bloqueado'})` : 'Disponible / Libre'}`}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
@@ -472,9 +656,12 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
                     )}
                   </div>
 
-                  {/* Estado o huésped en la celda grande */}
-                  <div style={{ marginTop: '0.35rem', fontSize: '0.72rem', overflow: 'hidden' }}>
-                    {esOcupado ? (
+                  {/* Micro-indicador de color para móviles */}
+                  <div className={`cal-mobile-indicator ${esOcupado ? (bloqueoVinculado ? 'busy-admin' : 'busy') : 'free'}`} />
+
+                  {/* Contenido enriquecido para PC */}
+                  <div className="desktop-cal-content" style={{ marginTop: '0.35rem', fontSize: '0.72rem', overflow: 'hidden' }}>
+                    {reservaVinculada ? (
                       <div
                         style={{
                           padding: '0.2rem 0.35rem',
@@ -493,7 +680,23 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
                             {consecutivoTexto}
                           </span>
                         )}
-                        {clienteEtiqueta || 'Ocupado'}
+                        {clienteEtiqueta || 'Reserva'}
+                      </div>
+                    ) : bloqueoVinculado ? (
+                      <div
+                        style={{
+                          padding: '0.2rem 0.35rem',
+                          borderRadius: '4px',
+                          background: 'rgba(245, 158, 11, 0.18)',
+                          color: '#b45309',
+                          fontWeight: 600,
+                          lineHeight: 1.2,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        🔒 {bloqueoVinculado.notas || 'Bloqueo'}
                       </div>
                     ) : (
                       <div
@@ -515,23 +718,122 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
           </div>
         </div>
 
+        {/* ─── INSPECTOR CONTEXTUAL DE FECHA SELECCIONADA ─────────────────────── */}
+        {fechaInspeccionada && (
+          <div className="cal-date-inspector-card">
+            {(() => {
+              const resVin = reservasPorFecha.get(fechaInspeccionada);
+              const bloqVin = bloqueosPorFecha.get(fechaInspeccionada);
+              const nomCliente = resVin?.clientes
+                ? `${resVin.clientes.nombre} ${resVin.clientes.apellido || ''}`.trim()
+                : 'Reserva activa';
+              const tel = resVin?.clientes?.whatsapp || resVin?.clientes?.telefono;
+
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)' }}>
+                      📅 {formatFecha(fechaInspeccionada)}
+                    </span>
+
+                    {bloqVin ? (
+                      <span className="status-badge s-warn" style={{ gap: '0.3rem', fontSize: '0.74rem' }}>
+                        <Lock size={12} /> Bloqueo manual: <strong>{bloqVin.notas || 'Sin notas'}</strong>
+                      </span>
+                    ) : resVin ? (
+                      <span className="status-badge s-busy" style={{ gap: '0.35rem', fontSize: '0.74rem' }}>
+                        👤 <strong>{nomCliente}</strong> {resVin.consecutivo ? `(#${resVin.consecutivo})` : ''}
+                      </span>
+                    ) : (
+                      <span className="status-badge s-avail" style={{ gap: '0.35rem', fontSize: '0.74rem' }}>
+                        <CheckCircle size={12} /> Fecha disponible
+                      </span>
+                    )}
+
+                    {resVin && tel && (
+                      <a
+                        href={`https://wa.me/${tel.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-sm"
+                        style={{ color: '#25d366', fontSize: '0.72rem', padding: '0.2rem 0.5rem', gap: '0.3rem' }}
+                      >
+                        <MessageCircle size={12} /> Contactar WhatsApp
+                      </a>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {bloqVin && (
+                      <button
+                        className="btn btn-sm btn-danger"
+                        style={{ fontSize: '0.74rem', padding: '0.25rem 0.65rem' }}
+                        disabled={procesando}
+                        onClick={() => handleLiberarBloqueoRapido(bloqVin)}
+                      >
+                        <CheckCircle size={13} /> Liberar este día ahora
+                      </button>
+                    )}
+                    {resVin && (
+                      <button
+                        className="btn btn-sm btn-primary"
+                        style={{ fontSize: '0.74rem', padding: '0.25rem 0.65rem' }}
+                        onClick={() => {
+                          setFiltroFincaReservas('esta_finca');
+                          setReservaExpandida(resVin.id);
+                        }}
+                      >
+                        <FileText size={13} /> Ver reserva en lista
+                      </button>
+                    )}
+                    <button
+                      className="btn btn-sm"
+                      style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
+                      onClick={() => setFechaInspeccionada(null)}
+                      title="Cerrar inspector"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {/* ─── HERRAMIENTA RÁPIDA DE BLOQUEO / DESBLOQUEO ─────────────────────── */}
-        <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border)' }}>
+        <div style={{ marginTop: '1.25rem', paddingTop: '1.15rem', borderTop: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '0.75rem' }}>
             <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>
               {fechasSeleccionadas.size > 0
                 ? `⚡ ${fechasSeleccionadas.size} día(s) seleccionado(s) en ${fincaActual?.nombre || 'la finca'}`
-                : 'Haz clic en los días del calendario arriba para bloquearlos o liberarlos manualmente:'}
+                : 'Selecciona días en el calendario para bloquearlos o liberarlos en lote:'}
             </span>
-            {fechasSeleccionadas.size > 0 && (
+
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <button
+                type="button"
                 className="btn btn-sm"
-                onClick={() => setFechasSeleccionadas(new Set())}
-                style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
+                onClick={handleSeleccionarFinesDeSemana}
+                style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}
+                title="Seleccionar todos los Viernes, Sábados y Domingos de este mes"
               >
-                Limpiar selección
+                <CheckSquare size={12} /> Fines de semana
               </button>
-            )}
+              {fechasSeleccionadas.size > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => {
+                    setFechasSeleccionadas(new Set());
+                    setFechaInspeccionada(null);
+                  }}
+                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
+                >
+                  Limpiar selección
+                </button>
+              )}
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
@@ -541,7 +843,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
               </label>
               <input
                 type="text"
-                placeholder="Ej: Mantenimiento, Reserva externa, Carlos Pérez..."
+                placeholder="Ej: Mantenimiento piscina, Uso familiar, Reserva externa..."
                 value={nombreCliente}
                 onChange={e => setNombreCliente(e.target.value)}
               />
