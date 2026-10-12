@@ -2007,3 +2007,77 @@ textarea:focus {
     margin-top: 0.25rem;
   }
 }
+
+/* ==========================================================================
+   VENTANA ESTÁTICA Y LISTADO INTERACTIVO DE FINCAS DISPONIBLES
+   ========================================================================== */
+.fincas-scroll-window {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--rad-sm, 10px);
+  padding: 0.85rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.fincas-scroll-viewport {
+  max-height: 520px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding-right: 0.35rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-2) transparent;
+}
+
+.fincas-scroll-viewport::-webkit-scrollbar {
+  width: 6px;
+}
+
+.fincas-scroll-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fincas-scroll-viewport::-webkit-scrollbar-thumb {
+  background: var(--border-2);
+  border-radius: 4px;
+}
+
+.fincas-scroll-viewport::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+.finca-list-interactive-item {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--rad-xs, 8px);
+  border: 1.5px solid var(--border-subtle);
+  background: var(--surface);
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.finca-list-interactive-item:hover {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.finca-list-interactive-item:active {
+  transform: scale(0.985);
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+
+@media (max-width: 600px) {
+  .finca-list-interactive-item {
+    gap: 0.65rem;
+    padding: 0.6rem 0.7rem;
+  }
+}
+

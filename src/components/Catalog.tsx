@@ -437,21 +437,11 @@ export const Catalog: React.FC<CatalogProps> = ({
             </div>
           </div>
 
-          {/* ─── Vista Maestro-Detalle de Fincas Desplegada por Defecto ─── */}
+          {/* ─── Ventana Estática con Scroll Interno para Fincas Disponibles ─── */}
           {seccionFincasAbierta && (
-            <div
-              style={{
-                marginTop: '0.85rem',
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--rad-sm, 10px)',
-                overflow: 'hidden',
-                padding: '1rem',
-                animation: 'fadeIn 0.2s ease',
-              }}
-            >
+            <div className="fincas-scroll-window" style={{ marginTop: '0.85rem', animation: 'fadeIn 0.2s ease' }}>
               {loading ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                   {[1, 2, 3, 4].map(n => (
                     <SkeletonFincaItem key={n} />
                   ))}
@@ -466,121 +456,184 @@ export const Catalog: React.FC<CatalogProps> = ({
                   </button>
                 </div>
               ) : (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                    gap: '1.25rem',
-                  }}
-                >
-                  {fincasFiltradas.map(f => {
-                    const primeraFoto = (f.finca_imagenes && f.finca_imagenes.length > 0)
-                      ? f.finca_imagenes[0].url
-                      : '';
-                    const totalFotos = f.finca_imagenes?.length || 0;
+                <>
+                  {/* Barra de estado interna de la ventana estática */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.2rem 0.35rem 0.65rem 0.35rem',
+                      borderBottom: '1px solid var(--border-subtle)',
+                      marginBottom: '0.65rem',
+                      fontSize: '0.76rem',
+                      color: 'var(--text-muted)',
+                      flexWrap: 'wrap',
+                      gap: '0.4rem',
+                    }}
+                  >
+                    <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>
+                      {fincasFiltradas.length} propiedad{fincasFiltradas.length !== 1 ? 'es' : ''} disponible{fincasFiltradas.length !== 1 ? 's' : ''} para reservar
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 600 }}>
+                      ↕ Desliza para explorar la lista (toca para ver detalles)
+                    </span>
+                  </div>
 
-                    return (
-                      <div
-                        key={f.id}
-                        onClick={() => onSelectFinca(f.id)}
-                        className="finca-direct-card"
-                        style={{
-                          background: 'var(--surface)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--rad-sm, 10px)',
-                          overflow: 'hidden',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                        }}
-                      >
-                        {/* Foto de portada con badges superpuestos */}
-                        <div style={{ position: 'relative', width: '100%', height: '210px', background: '#0f172a' }}>
-                          {primeraFoto ? (
-                            <img
-                              src={primeraFoto}
-                              alt={f.nombre}
-                              loading="lazy"
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-                          ) : (
-                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)' }}>
-                              <Home size={38} />
-                            </div>
-                          )}
+                  {/* Viewport estático con scroll interno */}
+                  <div className="fincas-scroll-viewport">
+                    {fincasFiltradas.map(f => {
+                      const primeraFoto = (f.finca_imagenes && f.finca_imagenes.length > 0)
+                        ? f.finca_imagenes[0].url
+                        : '';
+                      const totalFotos = f.finca_imagenes?.length || 0;
 
-                          {/* Badges superiores */}
-                          <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                            <span style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', color: '#fff', padding: '0.2rem 0.55rem', borderRadius: '12px', fontSize: '0.68rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                              <MapPin size={11} /> {f.zona || 'Santa Elena, Valle'}
-                            </span>
-                            <span style={{ background: 'rgba(16, 185, 129, 0.9)', color: '#fff', padding: '0.2rem 0.55rem', borderRadius: '12px', fontSize: '0.68rem', fontWeight: 700 }}>
-                              Disponible
-                            </span>
+                      return (
+                        <div
+                          key={f.id}
+                          onClick={() => onSelectFinca(f.id)}
+                          className="finca-list-interactive-item"
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              onSelectFinca(f.id);
+                            }
+                          }}
+                        >
+                          {/* Miniatura cuadrada / rectangular cuidada con badges */}
+                          <div
+                            style={{
+                              width: '84px',
+                              height: '84px',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              flexShrink: 0,
+                              position: 'relative',
+                              background: '#0f172a',
+                            }}
+                          >
+                            {primeraFoto ? (
+                              <img
+                                src={primeraFoto}
+                                alt={f.nombre}
+                                loading="lazy"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            ) : (
+                              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)' }}>
+                                <Home size={26} />
+                              </div>
+                            )}
+
+                            {totalFotos > 1 && (
+                              <span
+                                style={{
+                                  position: 'absolute',
+                                  bottom: '3px',
+                                  right: '3px',
+                                  background: 'rgba(0, 0, 0, 0.72)',
+                                  backdropFilter: 'blur(3px)',
+                                  color: '#fff',
+                                  fontSize: '0.6rem',
+                                  fontWeight: 700,
+                                  padding: '0.08rem 0.3rem',
+                                  borderRadius: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '2px',
+                                }}
+                              >
+                                <ImageIcon size={9} /> {totalFotos}
+                              </span>
+                            )}
                           </div>
 
-                          {totalFotos > 1 && (
-                            <div style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', color: '#fff', padding: '0.2rem 0.55rem', borderRadius: '12px', fontSize: '0.68rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                              <ImageIcon size={11} /> {totalFotos} fotos
+                          {/* Información condensada (Nombre, ubicación, specs clave sin exceso) */}
+                          <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem' }}>
+                              <h3
+                                style={{
+                                  fontSize: '0.96rem',
+                                  fontWeight: 800,
+                                  margin: 0,
+                                  color: 'var(--text-main)',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  lineHeight: 1.25,
+                                }}
+                              >
+                                {f.nombre}
+                              </h3>
+                              <span
+                                style={{
+                                  fontSize: '0.64rem',
+                                  fontWeight: 700,
+                                  color: '#059669',
+                                  background: 'rgba(16, 185, 129, 0.1)',
+                                  padding: '0.1rem 0.45rem',
+                                  borderRadius: '10px',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                Disponible
+                              </span>
                             </div>
-                          )}
-                        </div>
 
-                        {/* Contenido de la tarjeta */}
-                        <div style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem', flexGrow: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
-                              {f.nombre}
-                            </h3>
-                          </div>
-
-                          {f.descripcion && (
-                            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                              {f.descripcion}
-                            </p>
-                          )}
-
-                          {/* Ficha técnica compacta */}
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem', margin: '0.2rem 0' }}>
-                            <div style={{ background: 'var(--surface-sunken)', padding: '0.45rem 0.55rem', borderRadius: '6px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                              <Users size={13} style={{ color: 'var(--primary)' }} />
-                              <span>Hasta <strong>{f.capacidad}</strong></span>
+                            {/* Ubicación y zona */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                              <MapPin size={12} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {f.zona || 'Santa Elena, Valle del Cauca'}
+                              </span>
                             </div>
-                            <div style={{ background: 'var(--surface-sunken)', padding: '0.45rem 0.55rem', borderRadius: '6px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                              <Bed size={13} style={{ color: 'var(--primary)' }} />
-                              <span><strong>{f.habitaciones || '—'}</strong> habs</span>
-                            </div>
-                            <div style={{ background: 'var(--surface-sunken)', padding: '0.45rem 0.55rem', borderRadius: '6px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                              <Bath size={13} style={{ color: 'var(--primary)' }} />
-                              <span><strong>{f.banos || '—'}</strong> baños</span>
-                            </div>
-                          </div>
 
-                          {/* Chips de amenidades destacadas */}
-                          {f.finca_amenidades && f.finca_amenidades.length > 0 && (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
-                              {f.finca_amenidades.slice(0, 4).map((am, idx) => (
-                                <span key={idx} style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem', borderRadius: '10px', background: 'var(--surface-sunken)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>
-                                  ✓ {am.nombre}
+                            {/* Ficha técnica esencial: Capacidad, Habitaciones, Baños y Pet Friendly */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'var(--surface-sunken)', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
+                                <Users size={12} style={{ color: 'var(--primary)' }} /> Hasta {f.capacidad} pers.
+                              </span>
+
+                              {f.habitaciones && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'var(--surface-sunken)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                                  <Bed size={12} style={{ color: 'var(--primary)' }} /> {f.habitaciones} habs
                                 </span>
-                              ))}
-                              {f.finca_amenidades.length > 4 && (
-                                <span style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem', color: 'var(--primary)', fontWeight: 600 }}>
-                                  +{f.finca_amenidades.length - 4} más
+                              )}
+
+                              {f.banos && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'var(--surface-sunken)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                                  <Bath size={12} style={{ color: 'var(--primary)' }} /> {f.banos} baños
+                                </span>
+                              )}
+
+                              {f.politica_mascotas === 'permitido' && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'rgba(16, 185, 129, 0.08)', color: '#059669', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
+                                  <Dog size={12} /> Pet Friendly
                                 </span>
                               )}
                             </div>
-                          )}
+                          </div>
 
-                          {/* Precio y Botón directo de Cotizar */}
-                          <div style={{ marginTop: 'auto', paddingTop: '0.85rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                            <div>
-                              <div style={{ fontSize: '0.66rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
-                                Tarifa por persona / noche
+                          {/* Tarifa destacada y Botón de Cotizar */}
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'flex-end',
+                              justifyContent: 'center',
+                              gap: '0.35rem',
+                              flexShrink: 0,
+                              paddingLeft: '0.5rem',
+                              borderLeft: '1px solid var(--border-subtle)',
+                            }}
+                          >
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '0.62rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                Tarifa /pp noche
                               </div>
-                              <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--primary)' }}>
+                              <div style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--primary)', lineHeight: 1.1 }}>
                                 {formatCOP(Number(f.precio_pp) || 0)}
                               </div>
                             </div>
@@ -592,17 +645,25 @@ export const Catalog: React.FC<CatalogProps> = ({
                                 e.stopPropagation();
                                 onSelectFinca(f.id);
                               }}
-                              style={{ padding: '0.65rem 0.95rem', fontSize: '0.84rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', boxShadow: '0 2px 8px rgba(26, 107, 94, 0.2)' }}
+                              style={{
+                                padding: '0.4rem 0.75rem',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
+                                boxShadow: '0 2px 6px rgba(26, 107, 94, 0.25)',
+                              }}
                             >
-                              <span>Cotizar y reservar</span>
-                              <ArrowRight size={15} />
+                              <span>Cotizar</span>
+                              <ArrowRight size={13} />
                             </button>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
           )}
