@@ -83,6 +83,7 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
             categoria: menu.categoria,
             precioPp: menu.precio_pp || 0,
             cantidadServicios: 1,
+            personasAlimentacion: personas,
           },
         ];
       }
@@ -92,6 +93,12 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
   const handleCambiarServicios = (menuId: string, cantidad: number) => {
     setPlanesSeleccionados(prev =>
       prev.map(p => (p.menuId === menuId ? { ...p, cantidadServicios: cantidad } : p))
+    );
+  };
+
+  const handleCambiarPersonasMenu = (menuId: string, cantidadPersonas: number) => {
+    setPlanesSeleccionados(prev =>
+      prev.map(p => (p.menuId === menuId ? { ...p, personasAlimentacion: cantidadPersonas } : p))
     );
   };
 
@@ -121,7 +128,10 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
 
     const costoAlim = soloAlojamiento || planesSeleccionados.length === 0
       ? 0
-      : planesSeleccionados.reduce((acc, p) => acc + (p.precioPp * p.cantidadServicios * personas), 0);
+      : planesSeleccionados.reduce((acc, p) => {
+          const persPlan = p.personasAlimentacion ?? personas;
+          return acc + (p.precioPp * p.cantidadServicios * persPlan);
+        }, 0);
 
     const tot = subtotalAloja + costoAlim;
 
@@ -131,11 +141,16 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
     if (soloAlojamiento || planesSeleccionados.length === 0) {
       detAlim = '🍽️ *Alimentación:* Solo alojamiento (Sin planes adicionales)';
     } else {
-      const lineas = planesSeleccionados.map(
-        p => `• ${p.nombre} (${p.categoria}): ${p.cantidadServicios} serv. × ${personas} pers. ($${p.precioPp.toLocaleString('es-CO')}/pp) = $${(p.precioPp * p.cantidadServicios * personas).toLocaleString('es-CO')} COP`
-      );
+      const lineas = planesSeleccionados.map(p => {
+        const persPlan = p.personasAlimentacion ?? personas;
+        const sub = p.precioPp * p.cantidadServicios * persPlan;
+        return `• ${p.nombre} (${p.categoria}): ${p.cantidadServicios} serv. × ${persPlan} pers. ($${p.precioPp.toLocaleString('es-CO')}/pp) = $${sub.toLocaleString('es-CO')} COP`;
+      });
       detAlim = `🍽️ *Planes de alimentación complementaria:*\n${lineas.join('\n')}\n*Subtotal alimentación:* $${costoAlim.toLocaleString('es-CO')} COP`;
-      resAlim = planesSeleccionados.map(p => `${p.nombre} (${p.cantidadServicios} serv.)`).join(' + ');
+      resAlim = planesSeleccionados.map(p => {
+        const persPlan = p.personasAlimentacion ?? personas;
+        return `${p.nombre} (${p.cantidadServicios} serv. × ${persPlan} pers.)`;
+      }).join(' + ');
     }
 
     return {
@@ -356,6 +371,7 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
         onToggleSoloAlojamiento={handleToggleSoloAlojamiento}
         onToggleMenu={handleToggleMenu}
         onCambiarServicios={handleCambiarServicios}
+        onCambiarPersonasMenu={handleCambiarPersonasMenu}
         personas={personas}
         reglaAlimentacion={{
           activa: reglaActiva,
@@ -394,14 +410,17 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
         </div>
 
         {/* Desglose individual de cada menú complementario seleccionado */}
-        {!soloAlojamiento && planesSeleccionados.map(p => (
-          <div key={p.menuId} className="quote-row" style={{ fontSize: '0.8rem' }}>
-            <span className="text-muted" style={{ paddingLeft: '0.5rem' }}>
-              • {p.nombre} ({p.cantidadServicios} serv. × {personas} pers.):
-            </span>
-            <span>+ {formatCOP(p.precioPp * p.cantidadServicios * personas)}</span>
-          </div>
-        ))}
+        {!soloAlojamiento && planesSeleccionados.map(p => {
+          const persPlan = p.personasAlimentacion ?? personas;
+          return (
+            <div key={p.menuId} className="quote-row" style={{ fontSize: '0.8rem' }}>
+              <span className="text-muted" style={{ paddingLeft: '0.5rem' }}>
+                • {p.nombre} ({p.cantidadServicios} serv. × {persPlan} pers.):
+              </span>
+              <span>+ {formatCOP(p.precioPp * p.cantidadServicios * persPlan)}</span>
+            </div>
+          );
+        })}
 
         {costoTotalAlimentacion > 0 && planesSeleccionados.length > 1 && (
           <div className="quote-row" style={{ fontWeight: 600, color: 'var(--primary)' }}>

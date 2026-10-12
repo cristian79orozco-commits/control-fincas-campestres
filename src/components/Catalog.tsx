@@ -542,6 +542,12 @@ export const Catalog: React.FC<CatalogProps> = ({
                             onClick={() => {
                               setFincaSeleccionadaId(f.id);
                               setFotoActivaIndex(0);
+                              if (typeof window !== 'undefined' && window.innerWidth < 860) {
+                                setTimeout(() => {
+                                  const el = document.getElementById('finca-preview-card');
+                                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }, 60);
+                              }
                             }}
                             style={{
                               display: 'flex',
@@ -657,6 +663,7 @@ export const Catalog: React.FC<CatalogProps> = ({
                   {/* ─── PANEL DERECHO: Detalle Maximizado e Información de Primera Mano ─── */}
                   {fincaActiva && (
                     <div
+                      id="finca-preview-card"
                       style={{
                         background: 'var(--surface-sunken)',
                         borderRadius: 'var(--rad-sm, 10px)',

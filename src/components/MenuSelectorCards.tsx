@@ -16,6 +16,7 @@ export interface PlanAlimentacionSeleccionado {
   categoria: string;
   precioPp: number;
   cantidadServicios: number;
+  personasAlimentacion?: number;
 }
 
 export interface ReglaAlimentacionInfo {
@@ -35,6 +36,7 @@ interface MenuSelectorCardsProps {
   onToggleSoloAlojamiento: () => void;
   onToggleMenu: (menu: Menu) => void;
   onCambiarServicios: (menuId: string, cantidad: number) => void;
+  onCambiarPersonasMenu?: (menuId: string, cantidad: number) => void;
   loading?: boolean;
   personas?: number;
   reglaAlimentacion?: ReglaAlimentacionInfo;
@@ -61,6 +63,7 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
   onToggleSoloAlojamiento,
   onToggleMenu,
   onCambiarServicios,
+  onCambiarPersonasMenu,
   loading = false,
   personas = 1,
   reglaAlimentacion,
@@ -276,6 +279,7 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
               const foto = obtenerFotoMenu(m);
               const isDescOpen = !!descripcionesAbiertas[m.id];
               const serviciosActuales = itemSeleccionado?.cantidadServicios || 1;
+              const personasActuales = itemSeleccionado?.personasAlimentacion ?? personas;
 
               return (
                 <div
@@ -414,67 +418,178 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
                       </div>
                     )}
 
-                    {/* Si está seleccionado: Selector de cantidad de servicios */}
+                    {/* Si está seleccionado: Configuración de servicios y comensales */}
                     {isSelected && (
                       <div
                         onClick={e => e.stopPropagation()}
                         style={{
                           marginTop: 'auto',
-                          paddingTop: '0.5rem',
+                          paddingTop: '0.65rem',
                           borderTop: '1px solid var(--border-subtle)',
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '0.5rem',
+                          flexDirection: 'column',
+                          gap: '0.55rem',
                         }}
                       >
-                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                          Servicios a contratar:
-                        </span>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <button
-                            type="button"
-                            onClick={() => onCambiarServicios(m.id, Math.max(1, serviciosActuales - 1))}
-                            disabled={serviciosActuales <= 1}
-                            style={{
-                              width: '26px',
-                              height: '26px',
-                              borderRadius: '4px',
-                              border: '1px solid var(--border)',
-                              background: 'var(--surface)',
-                              cursor: serviciosActuales <= 1 ? 'not-allowed' : 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'var(--text-main)',
-                            }}
-                          >
-                            <Minus size={12} />
-                          </button>
-
-                          <span style={{ minWidth: '22px', textAlign: 'center', fontWeight: 700, fontSize: '0.82rem' }}>
-                            {serviciosActuales}
+                        {/* 1. Selector de cantidad de servicios */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '0.5rem',
+                          }}
+                        >
+                          <span style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                            Servicios (comidas):
                           </span>
 
-                          <button
-                            type="button"
-                            onClick={() => onCambiarServicios(m.id, Math.min(30, serviciosActuales + 1))}
-                            style={{
-                              width: '26px',
-                              height: '26px',
-                              borderRadius: '4px',
-                              border: '1px solid var(--border)',
-                              background: 'var(--surface)',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'var(--text-main)',
-                            }}
-                          >
-                            <Plus size={12} />
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => onCambiarServicios(m.id, Math.max(1, serviciosActuales - 1))}
+                              disabled={serviciosActuales <= 1}
+                              style={{
+                                width: '26px',
+                                height: '26px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--border)',
+                                background: 'var(--surface)',
+                                cursor: serviciosActuales <= 1 ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'var(--text-main)',
+                              }}
+                              title="Disminuir servicios"
+                            >
+                              <Minus size={12} />
+                            </button>
+
+                            <span style={{ minWidth: '22px', textAlign: 'center', fontWeight: 700, fontSize: '0.82rem' }}>
+                              {serviciosActuales}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => onCambiarServicios(m.id, Math.min(30, serviciosActuales + 1))}
+                              style={{
+                                width: '26px',
+                                height: '26px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--border)',
+                                background: 'var(--surface)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'var(--text-main)',
+                              }}
+                              title="Aumentar servicios"
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 2. Selector de cantidad de comensales / platos */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '0.5rem',
+                            background: 'var(--surface-sunken)',
+                            padding: '0.35rem 0.5rem',
+                            borderRadius: '5px',
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                              Comensales / Platos:
+                            </div>
+                            <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>
+                              {personasActuales === personas
+                                ? `Para los ${personas} huéspedes`
+                                : `${personasActuales} de ${personas} huéspedes`}
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => onCambiarPersonasMenu && onCambiarPersonasMenu(m.id, Math.max(1, personasActuales - 1))}
+                              disabled={personasActuales <= 1}
+                              style={{
+                                width: '26px',
+                                height: '26px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--border)',
+                                background: 'var(--surface)',
+                                cursor: personasActuales <= 1 ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'var(--text-main)',
+                              }}
+                              title="Disminuir comensales"
+                            >
+                              <Minus size={12} />
+                            </button>
+
+                            <span
+                              style={{
+                                minWidth: '24px',
+                                textAlign: 'center',
+                                fontWeight: 700,
+                                fontSize: '0.82rem',
+                                color: personasActuales < personas ? 'var(--primary)' : 'var(--text-main)',
+                              }}
+                            >
+                              {personasActuales}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => onCambiarPersonasMenu && onCambiarPersonasMenu(m.id, Math.min(100, personasActuales + 1))}
+                              style={{
+                                width: '26px',
+                                height: '26px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--border)',
+                                background: 'var(--surface)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'var(--text-main)',
+                              }}
+                              title="Aumentar comensales"
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 3. Subtotal transparente para este plan */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            fontSize: '0.72rem',
+                            color: 'var(--primary)',
+                            fontWeight: 700,
+                            paddingTop: '0.2rem',
+                            borderTop: '1px dashed var(--border-subtle)',
+                          }}
+                        >
+                          <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
+                            {serviciosActuales} serv. × {personasActuales} pers.:
+                          </span>
+                          <span>
+                            {formatCOP(m.precio_pp * serviciosActuales * personasActuales)}
+                          </span>
                         </div>
                       </div>
                     )}
