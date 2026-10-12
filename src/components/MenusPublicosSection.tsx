@@ -289,10 +289,12 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = ({
                           fontWeight: 800,
                           color: isExpanded ? 'var(--primary)' : 'var(--text-main)',
                           margin: 0,
-                          lineHeight: 1.25,
-                          whiteSpace: 'nowrap',
+                          lineHeight: 1.3,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
                           overflow: 'hidden',
-                          textOverflow: 'ellipsis',
+                          wordBreak: 'break-word',
                         }}
                       >
                         {m.nombre}
@@ -305,9 +307,10 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = ({
                             color: 'var(--text-muted)',
                             margin: 0,
                             lineHeight: 1.35,
-                            whiteSpace: 'nowrap',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 1,
+                            WebkitBoxOrient: 'vertical',
                             overflow: 'hidden',
-                            textOverflow: 'ellipsis',
                           }}
                         >
                           {m.descripcion}
@@ -316,12 +319,12 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = ({
                     </div>
 
                     {/* Precio y flecha de despliegue */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexShrink: 0, marginLeft: 'auto' }}>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        <div style={{ fontSize: '0.58rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
                           Tarifa /pp
                         </div>
-                        <div style={{ fontSize: '0.98rem', fontWeight: 900, color: 'var(--primary)' }}>
+                        <div style={{ fontSize: '0.96rem', fontWeight: 900, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
                           {formatCOP(m.precio_pp)}
                         </div>
                       </div>
@@ -337,6 +340,7 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = ({
                           alignItems: 'center',
                           justifyContent: 'center',
                           transition: 'all 0.15s ease',
+                          flexShrink: 0,
                         }}
                       >
                         {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
@@ -346,196 +350,225 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = ({
 
                   {/* Cuerpo expandido in-place */}
                   {isExpanded && (
-                    <div
-                      style={{
-                        padding: '0.85rem 1rem 1rem 1rem',
-                        borderTop: '1px solid var(--border-subtle)',
-                        background: 'var(--surface)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.75rem',
-                        animation: 'fadeIn 0.2s ease',
-                      }}
-                    >
-                      {/* Galería de imágenes del menú */}
-                      {fotoMostrada && (
-                        <div>
-                          <div
-                            style={{
-                              position: 'relative',
-                              width: '100%',
-                              height: '210px',
-                              borderRadius: '8px',
-                              overflow: 'hidden',
-                              background: '#0f172a',
-                            }}
-                          >
-                            <img
-                              src={fotoMostrada}
-                              alt={m.nombre}
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-
-                            <span
+                    <div className="menu-expanded-container">
+                      <div
+                        className="menu-expanded-grid"
+                        style={{ gridTemplateColumns: fotoMostrada ? undefined : '1fr' }}
+                      >
+                        {/* Columna Izquierda: Galería y Fotos con aspecto proporcional */}
+                        {fotoMostrada && (
+                          <div style={{ width: '100%', minWidth: 0 }}>
+                            <div
                               style={{
-                                position: 'absolute',
-                                top: '8px',
-                                left: '8px',
-                                fontSize: '0.68rem',
-                                fontWeight: 700,
-                                textTransform: 'uppercase',
-                                padding: '0.15rem 0.5rem',
-                                borderRadius: '4px',
-                                background: 'rgba(0,0,0,0.7)',
-                                backdropFilter: 'blur(4px)',
-                                color: '#fff',
+                                position: 'relative',
+                                width: '100%',
+                                aspectRatio: '16 / 10',
+                                maxHeight: '250px',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                background: '#0f172a',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                               }}
                             >
-                              {m.categoria}
-                            </span>
+                              <img
+                                src={fotoMostrada}
+                                alt={m.nombre}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
 
-                            {fotosMenu.length > 1 && (
                               <span
                                 style={{
                                   position: 'absolute',
-                                  bottom: '8px',
-                                  right: '8px',
+                                  top: '8px',
+                                  left: '8px',
+                                  fontSize: '0.65rem',
+                                  fontWeight: 700,
+                                  textTransform: 'uppercase',
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: '4px',
                                   background: 'rgba(0,0,0,0.7)',
                                   backdropFilter: 'blur(4px)',
                                   color: '#fff',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 600,
-                                  padding: '0.15rem 0.45rem',
-                                  borderRadius: '6px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
                                 }}
                               >
-                                <ImageIcon size={10} /> {fotoIdx + 1} de {fotosMenu.length}
+                                {m.categoria}
                               </span>
+
+                              {fotosMenu.length > 1 && (
+                                <span
+                                  style={{
+                                    position: 'absolute',
+                                    bottom: '8px',
+                                    right: '8px',
+                                    background: 'rgba(0,0,0,0.72)',
+                                    backdropFilter: 'blur(4px)',
+                                    color: '#fff',
+                                    fontSize: '0.65rem',
+                                    fontWeight: 600,
+                                    padding: '0.15rem 0.45rem',
+                                    borderRadius: '5px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                  }}
+                                >
+                                  <ImageIcon size={10} /> {fotoIdx + 1} de {fotosMenu.length}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Tira interactiva de fotos si hay más de 1 */}
+                            {fotosMenu.length > 1 && (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  gap: '0.45rem',
+                                  marginTop: '0.55rem',
+                                  overflowX: 'auto',
+                                  paddingBottom: '0.2rem',
+                                }}
+                              >
+                                {fotosMenu.map((img, idx) => (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={e => setFotoIndex(m.id, idx, e)}
+                                    style={{
+                                      width: '56px',
+                                      height: '42px',
+                                      borderRadius: '5px',
+                                      overflow: 'hidden',
+                                      padding: 0,
+                                      cursor: 'pointer',
+                                      border: `2px solid ${idx === fotoIdx ? 'var(--primary)' : 'var(--border)'}`,
+                                      opacity: idx === fotoIdx ? 1 : 0.65,
+                                      flexShrink: 0,
+                                      transition: 'all 0.15s ease',
+                                      background: '#000',
+                                    }}
+                                    title={`Ver foto ${idx + 1}`}
+                                  >
+                                    <img
+                                      src={img}
+                                      alt=""
+                                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                    />
+                                  </button>
+                                ))}
+                              </div>
                             )}
                           </div>
+                        )}
 
-                          {/* Tira interactiva de fotos si hay más de 1 */}
-                          {fotosMenu.length > 1 && (
+                        {/* Columna Derecha: Información detallada, condiciones y notas */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: 0 }}>
+                          {/* Cabecera del detalle */}
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <div>
+                              <span
+                                style={{
+                                  fontSize: '0.62rem',
+                                  fontWeight: 700,
+                                  textTransform: 'uppercase',
+                                  padding: '0.12rem 0.45rem',
+                                  borderRadius: '4px',
+                                  background: catColor.bg,
+                                  color: catColor.text,
+                                  letterSpacing: '0.02em',
+                                }}
+                              >
+                                {m.categoria}
+                              </span>
+                              <h4 style={{ fontSize: '1.05rem', fontWeight: 800, margin: '0.35rem 0 0 0', color: 'var(--text-main)', lineHeight: 1.3 }}>
+                                {m.nombre}
+                              </h4>
+                            </div>
+
+                            <div
+                              style={{
+                                textAlign: 'right',
+                                background: 'var(--surface-sunken)',
+                                padding: '0.45rem 0.75rem',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-subtle)',
+                                flexShrink: 0,
+                              }}
+                            >
+                              <div style={{ fontSize: '0.58rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                Tarifa por persona
+                              </div>
+                              <div style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                                {formatCOP(m.precio_pp)}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Descripción detallada */}
+                          {m.descripcion && (
+                            <div>
+                              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
+                                Descripción y contenido del menú:
+                              </div>
+                              <p
+                                style={{
+                                  fontSize: '0.8rem',
+                                  color: 'var(--text-muted)',
+                                  lineHeight: 1.5,
+                                  margin: 0,
+                                  background: 'var(--surface-sunken)',
+                                  padding: '0.65rem 0.8rem',
+                                  borderRadius: '6px',
+                                  border: '1px solid var(--border-subtle)',
+                                }}
+                              >
+                                {m.descripcion}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Condiciones necesarias */}
+                          {m.condiciones && (
                             <div
                               style={{
                                 display: 'flex',
-                                gap: '0.4rem',
-                                marginTop: '0.5rem',
-                                overflowX: 'auto',
-                                paddingBottom: '0.2rem',
+                                alignItems: 'flex-start',
+                                gap: '0.45rem',
+                                fontSize: '0.76rem',
+                                color: 'var(--text-muted)',
+                                background: 'var(--surface-sunken)',
+                                padding: '0.55rem 0.75rem',
+                                borderRadius: '6px',
+                                border: '1px solid var(--border-subtle)',
                               }}
                             >
-                              {fotosMenu.map((img, idx) => (
-                                <button
-                                  key={idx}
-                                  type="button"
-                                  onClick={e => setFotoIndex(m.id, idx, e)}
-                                  style={{
-                                    width: '54px',
-                                    height: '42px',
-                                    borderRadius: '5px',
-                                    overflow: 'hidden',
-                                    padding: 0,
-                                    cursor: 'pointer',
-                                    border: `2px solid ${idx === fotoIdx ? 'var(--primary)' : 'var(--border)'}`,
-                                    opacity: idx === fotoIdx ? 1 : 0.65,
-                                    flexShrink: 0,
-                                    transition: 'all 0.15s ease',
-                                    background: '#000',
-                                  }}
-                                >
-                                  <img
-                                    src={img}
-                                    alt=""
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                  />
-                                </button>
-                              ))}
+                              <CheckCircle2 size={15} style={{ color: 'var(--success)', flexShrink: 0, marginTop: '2px' }} />
+                              <div>
+                                <strong style={{ color: 'var(--text-main)' }}>Condiciones:</strong> {m.condiciones}
+                              </div>
                             </div>
                           )}
-                        </div>
-                      )}
 
-                      {/* Características y ficha técnica */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <div>
-                          <div style={{ fontSize: '0.66rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
-                            Tarifa por persona / servicio
-                          </div>
-                          <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--primary)' }}>
-                            {formatCOP(m.precio_pp)}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Descripción detallada */}
-                      {m.descripcion && (
-                        <div>
-                          <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
-                            Descripción y contenido del menú:
-                          </div>
-                          <p
+                          {/* Mensaje informativo claro: Puedes incluirlo en tu cotización (sin botón WhatsApp redundante) */}
+                          <div
                             style={{
-                              fontSize: '0.8rem',
-                              color: 'var(--text-muted)',
-                              lineHeight: 1.5,
-                              margin: 0,
-                              background: 'var(--surface-sunken)',
-                              padding: '0.65rem 0.8rem',
-                              borderRadius: '6px',
-                              border: '1px solid var(--border-subtle)',
+                              background: 'color-mix(in srgb, var(--primary) 8%, var(--surface))',
+                              border: '1px solid color-mix(in srgb, var(--primary) 25%, transparent)',
+                              borderRadius: '8px',
+                              padding: '0.7rem 0.85rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.6rem',
+                              fontSize: '0.78rem',
+                              color: 'var(--text-main)',
+                              lineHeight: 1.45,
                             }}
                           >
-                            {m.descripcion}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Condiciones necesarias */}
-                      {m.condiciones && (
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: '0.45rem',
-                            fontSize: '0.76rem',
-                            color: 'var(--text-muted)',
-                            background: 'var(--surface-sunken)',
-                            padding: '0.55rem 0.75rem',
-                            borderRadius: '6px',
-                            border: '1px solid var(--border-subtle)',
-                          }}
-                        >
-                          <CheckCircle2 size={14} style={{ color: 'var(--success)', flexShrink: 0, marginTop: '2px' }} />
-                          <div>
-                            <strong>Condiciones:</strong> {m.condiciones}
+                            <Sparkles size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                            <span>
+                              <strong>Servicio de alimentación opcional:</strong> Podrás incluir este menú directamente en tu cotización al seleccionar tu finca y configurar la cantidad exacta de comensales.
+                            </span>
                           </div>
                         </div>
-                      )}
-
-                      {/* Mensaje informativo claro: Puedes incluirlo en tu cotización (sin botón WhatsApp) */}
-                      <div
-                        style={{
-                          background: 'color-mix(in srgb, var(--primary) 8%, var(--surface))',
-                          border: '1px solid color-mix(in srgb, var(--primary) 25%, transparent)',
-                          borderRadius: '8px',
-                          padding: '0.75rem 0.9rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.6rem',
-                          fontSize: '0.78rem',
-                          color: 'var(--text-main)',
-                          lineHeight: 1.45,
-                          marginTop: '0.2rem',
-                        }}
-                      >
-                        <Sparkles size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                        <span>
-                          <strong>Servicio de alimentación opcional:</strong> Podrás incluir este menú directamente en tu cotización al seleccionar tu finca y configurar la cantidad exacta de comensales.
-                        </span>
                       </div>
                     </div>
                   )}
