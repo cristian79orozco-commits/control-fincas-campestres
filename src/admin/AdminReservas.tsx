@@ -562,26 +562,97 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
         const tieneAlim = desglose.costoAlimentacion > 0;
 
         return (
-          <div className="modal-overlay" onClick={() => setPagoReservaId(null)}>
-            <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px' }}>
-              <div className="modal-header">
-                <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                  <CreditCard size={16} /> Registrar Abono #{reservaActual.consecutivo || ''}
+          <div className="modal-overlay" onClick={() => setPagoReservaId(null)} style={{ padding: '0.75rem', zIndex: 100 }}>
+            <div
+              className="modal-box"
+              onClick={e => e.stopPropagation()}
+              style={{
+                maxWidth: '520px',
+                width: '100%',
+                maxHeight: '92vh',
+                display: 'flex',
+                flexDirection: 'column',
+                borderRadius: '16px',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.22)',
+                boxSizing: 'border-box',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Header */}
+              <div className="modal-header" style={{ flexShrink: 0, padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)' }}>
+                <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '1rem', fontWeight: 700 }}>
+                  <CreditCard size={17} style={{ color: 'var(--primary)' }} />
+                  <span>Registrar Abono</span>
+                  {reservaActual.consecutivo && <ConsecutivoBadge consecutivo={reservaActual.consecutivo} />}
                 </div>
-                <button className="btn btn-sm" onClick={() => setPagoReservaId(null)}><X size={14} /></button>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => setPagoReservaId(null)}
+                  title="Cerrar ventana"
+                  style={{ minWidth: '32px', width: '32px', height: '32px', padding: 0, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <X size={15} />
+                </button>
               </div>
 
-              <form onSubmit={handleRegistrarPago} style={{ display: 'grid', gap: '0.85rem', padding: '1.25rem' }}>
+              {/* Formulario con scroll independiente y diseño adaptable a PC / Móviles */}
+              <form
+                onSubmit={handleRegistrarPago}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.9rem',
+                  padding: '1.2rem',
+                  overflowY: 'auto',
+                  boxSizing: 'border-box',
+                  width: '100%',
+                }}
+              >
+                {/* Tarjeta de contexto de la reserva */}
+                <div
+                  style={{
+                    background: 'color-mix(in srgb, var(--primary) 6%, var(--surface-2))',
+                    border: '1px solid color-mix(in srgb, var(--primary) 18%, transparent)',
+                    borderRadius: '10px',
+                    padding: '0.75rem 0.95rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.35rem',
+                    fontSize: '0.8rem',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem' }}>
+                    <strong style={{ fontSize: '0.88rem', color: 'var(--text)' }}>
+                      🏡 {reservaActual.fincas?.nombre || 'Finca Campestre'}
+                    </strong>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                      {reservaActual.clientes ? `${reservaActual.clientes.nombre} ${reservaActual.clientes.apellido || ''}`.trim() : 'Cliente'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem', fontSize: '0.75rem' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      Total reserva: <strong>{formatCOP(reservaActual.valor_total || 0)}</strong>
+                    </span>
+                    <span>
+                      Saldo pendiente: <strong style={{ color: desglose.saldoConsolidado > 0 ? '#dc2626' : '#16a34a' }}>
+                        {formatCOP(desglose.saldoConsolidado)}
+                      </strong>
+                    </span>
+                  </div>
+                </div>
+
                 {/* Selector de Destino de Abono (solo si la reserva tiene servicio de alimentación) */}
                 {tieneAlim && (
                   <div>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Concepto del abono a registrar:
                     </label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.55rem', width: '100%', boxSizing: 'border-box' }}>
+                      {/* Opción Alojamiento */}
                       <button
                         type="button"
-                        className={`btn btn-sm ${destinoAbono === 'alojamiento' ? 'btn-primary' : ''}`}
                         onClick={() => {
                           setDestinoAbono('alojamiento');
                           setPagoForm(p => ({
@@ -590,15 +661,54 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                             observacion: 'Abono de alojamiento - Propietario',
                           }));
                         }}
-                        style={{ textAlign: 'left', padding: '0.45rem 0.65rem' }}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                          gap: '0.25rem',
+                          padding: '0.7rem 0.85rem',
+                          borderRadius: '10px',
+                          border: destinoAbono === 'alojamiento'
+                            ? '2px solid var(--primary)'
+                            : '1px solid var(--border)',
+                          background: destinoAbono === 'alojamiento'
+                            ? 'color-mix(in srgb, var(--primary) 12%, var(--surface))'
+                            : 'var(--surface-2)',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'all 0.18s ease',
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          minWidth: 0,
+                        }}
                       >
-                        <div style={{ fontWeight: 700, fontSize: '0.78rem' }}>🏡 Alojamiento</div>
-                        <div style={{ fontSize: '0.68rem', opacity: 0.85 }}>Saldo: {formatCOP(desglose.saldoFincaCheckIn)}</div>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          width: '100%',
+                          fontWeight: 700,
+                          fontSize: '0.84rem',
+                          color: destinoAbono === 'alojamiento' ? 'var(--primary)' : 'var(--text)',
+                        }}>
+                          <span>🏡 Alojamiento</span>
+                          {destinoAbono === 'alojamiento' && (
+                            <span style={{ fontSize: '0.65rem', background: 'var(--primary)', color: 'white', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
+                              Activo
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.3 }}>
+                          Saldo finca:{' '}
+                          <strong style={{ color: desglose.saldoFincaCheckIn > 0 ? 'var(--text)' : '#16a34a' }}>
+                            {formatCOP(desglose.saldoFincaCheckIn)}
+                          </strong>
+                        </div>
                       </button>
 
+                      {/* Opción Alimentación */}
                       <button
                         type="button"
-                        className={`btn btn-sm ${destinoAbono === 'alimentacion' ? 'btn-primary' : ''}`}
                         onClick={() => {
                           setDestinoAbono('alimentacion');
                           setPagoForm(p => ({
@@ -607,10 +717,49 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                             observacion: `Abono de alimentación (${metodoPagoAbono})`,
                           }));
                         }}
-                        style={{ textAlign: 'left', padding: '0.45rem 0.65rem' }}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                          gap: '0.25rem',
+                          padding: '0.7rem 0.85rem',
+                          borderRadius: '10px',
+                          border: destinoAbono === 'alimentacion'
+                            ? '2px solid var(--primary)'
+                            : '1px solid var(--border)',
+                          background: destinoAbono === 'alimentacion'
+                            ? 'color-mix(in srgb, var(--primary) 12%, var(--surface))'
+                            : 'var(--surface-2)',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'all 0.18s ease',
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          minWidth: 0,
+                        }}
                       >
-                        <div style={{ fontWeight: 700, fontSize: '0.78rem' }}>🍽️ Alimentación</div>
-                        <div style={{ fontSize: '0.68rem', opacity: 0.85 }}>Saldo: {formatCOP(desglose.saldoAlimentacionAdmin)}</div>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          width: '100%',
+                          fontWeight: 700,
+                          fontSize: '0.84rem',
+                          color: destinoAbono === 'alimentacion' ? 'var(--primary)' : 'var(--text)',
+                        }}>
+                          <span>🍽️ Alimentación</span>
+                          {destinoAbono === 'alimentacion' && (
+                            <span style={{ fontSize: '0.65rem', background: 'var(--primary)', color: 'white', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
+                              Activo
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.3 }}>
+                          Saldo admin:{' '}
+                          <strong style={{ color: desglose.saldoAlimentacionAdmin > 0 ? 'var(--text)' : '#16a34a' }}>
+                            {formatCOP(desglose.saldoAlimentacionAdmin)}
+                          </strong>
+                        </div>
                       </button>
                     </div>
                   </div>
@@ -652,13 +801,22 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                 </div>
 
                 <div className="field">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.2rem' }}>
                     <label style={{ margin: 0 }}>Valor abonado (COP) *</label>
                     {destinoAbono === 'alimentacion' && desglose.saldoAlimentacionAdmin > 0 && (
                       <button
                         type="button"
-                        className="btn btn-sm"
-                        style={{ fontSize: '0.68rem', padding: '0.1rem 0.4rem', color: 'var(--primary)' }}
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          padding: '0.2rem 0.55rem',
+                          borderRadius: '6px',
+                          background: 'color-mix(in srgb, var(--primary) 12%, transparent)',
+                          border: '1px solid color-mix(in srgb, var(--primary) 25%, transparent)',
+                          color: 'var(--primary)',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                        }}
                         onClick={() => setPagoForm(p => ({ ...p, valor: desglose.saldoAlimentacionAdmin }))}
                       >
                         Saldar total ({formatCOP(desglose.saldoAlimentacionAdmin)})
@@ -667,8 +825,17 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                     {destinoAbono === 'alojamiento' && desglose.saldoFincaCheckIn > 0 && (
                       <button
                         type="button"
-                        className="btn btn-sm"
-                        style={{ fontSize: '0.68rem', padding: '0.1rem 0.4rem', color: 'var(--primary)' }}
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          padding: '0.2rem 0.55rem',
+                          borderRadius: '6px',
+                          background: 'color-mix(in srgb, var(--primary) 12%, transparent)',
+                          border: '1px solid color-mix(in srgb, var(--primary) 25%, transparent)',
+                          color: 'var(--primary)',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                        }}
                         onClick={() => setPagoForm(p => ({ ...p, valor: desglose.saldoFincaCheckIn }))}
                       >
                         Saldar total ({formatCOP(desglose.saldoFincaCheckIn)})
@@ -704,10 +871,37 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                   />
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.4rem' }}>
-                  <button type="button" className="btn" onClick={() => setPagoReservaId(null)}>Cancelar</button>
-                  <button type="submit" className="btn btn-primary" disabled={guardandoPago || pagoForm.valor <= 0}>
-                    <Save size={14} /> {guardandoPago ? 'Registrando…' : 'Confirmar Abono'}
+                <div style={{
+                  display: 'flex',
+                  gap: '0.65rem',
+                  justifyContent: 'flex-end',
+                  marginTop: '0.4rem',
+                  flexWrap: 'wrap',
+                  paddingTop: '0.6rem',
+                  borderTop: '1px solid var(--border)',
+                }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setPagoReservaId(null)}
+                    style={{ flex: '1 1 auto', minWidth: '100px' }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={guardandoPago || pagoForm.valor <= 0}
+                    style={{
+                      flex: '2 1 auto',
+                      minWidth: '150px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.45rem',
+                    }}
+                  >
+                    <Save size={15} /> {guardandoPago ? 'Registrando…' : 'Confirmar Abono'}
                   </button>
                 </div>
               </form>
