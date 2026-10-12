@@ -70,10 +70,6 @@ export const Catalog: React.FC<CatalogProps> = ({
   // Estado de la sección de fincas disponibles: DESPLEGADA por defecto según requerimiento
   const [seccionFincasAbierta, setSeccionFincasAbierta] = useState(true);
 
-  // Finca seleccionada para la vista maximizada de primera mano
-  const [fincaSeleccionadaId, setFincaSeleccionadaId] = useState<string>('');
-  const [fotoActivaIndex, setFotoActivaIndex] = useState(0);
-
   const toggleAmenidad = (amenidad: string) => {
     setAmenidadesSeleccionadas(prev =>
       prev.includes(amenidad)
@@ -141,37 +137,6 @@ export const Catalog: React.FC<CatalogProps> = ({
       return true;
     });
   }, [fincas, busquedaTexto, personasFiltro, soloPetFriendly, amenidadesSeleccionadas, fechaEntrada, fechaSalida, bloquesAdmin]);
-
-  // Finca activa en el panel maximizado
-  const fincaActiva = useMemo(() => {
-    if (!fincasFiltradas.length) return null;
-    return fincasFiltradas.find(f => f.id === fincaSeleccionadaId) || fincasFiltradas[0];
-  }, [fincasFiltradas, fincaSeleccionadaId]);
-
-  // Sincronizar selección si la actual ya no coincide con los filtros aplicados
-  useEffect(() => {
-    if (fincasFiltradas.length > 0) {
-      if (!fincaSeleccionadaId || !fincasFiltradas.some(f => f.id === fincaSeleccionadaId)) {
-        setFincaSeleccionadaId(fincasFiltradas[0].id);
-        setFotoActivaIndex(0);
-      }
-    }
-  }, [fincasFiltradas, fincaSeleccionadaId]);
-
-  // Extraer fotos de la finca activa
-  const fotosFincaActiva = useMemo(() => {
-    if (!fincaActiva) return [];
-    const fotos: string[] = [];
-    if (fincaActiva.finca_imagenes && fincaActiva.finca_imagenes.length > 0) {
-      const ordenadas = [...fincaActiva.finca_imagenes].sort((a, b) => a.orden - b.orden);
-      ordenadas.forEach(img => {
-        if (img.url && !fotos.includes(img.url)) fotos.push(img.url);
-      });
-    }
-    return fotos;
-  }, [fincaActiva]);
-
-  const fotoPrincipalMostrada = fotosFincaActiva[fotoActivaIndex] || fotosFincaActiva[0] || '';
 
   const handleLimpiarFiltros = () => {
     setBusquedaTexto('');
@@ -504,490 +469,139 @@ export const Catalog: React.FC<CatalogProps> = ({
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
                     gap: '1.25rem',
-                    alignItems: 'start',
                   }}
                 >
-                  {/* ─── PANEL IZQUIERDO: Lista en Miniatura de Fincas ─── */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.15rem' }}>
-                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-                        Selecciona una finca para ver fotos y cotizar:
-                      </span>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 600 }}>
-                        {fincasFiltradas.length} opciones
-                      </span>
-                    </div>
+                  {fincasFiltradas.map(f => {
+                    const primeraFoto = (f.finca_imagenes && f.finca_imagenes.length > 0)
+                      ? f.finca_imagenes[0].url
+                      : '';
+                    const totalFotos = f.finca_imagenes?.length || 0;
 
-                    <div
-                      style={{
-                        maxHeight: '560px',
-                        overflowY: 'auto',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.5rem',
-                        paddingRight: '0.35rem',
-                      }}
-                    >
-                      {fincasFiltradas.map(f => {
-                        const isSelected = f.id === fincaActiva?.id;
-                        const primeraFoto = (f.finca_imagenes && f.finca_imagenes.length > 0)
-                          ? f.finca_imagenes[0].url
-                          : '';
-
-                        return (
-                          <div
-                            key={f.id}
-                            onClick={() => {
-                              setFincaSeleccionadaId(f.id);
-                              setFotoActivaIndex(0);
-                              if (typeof window !== 'undefined' && window.innerWidth < 860) {
-                                setTimeout(() => {
-                                  const el = document.getElementById('finca-preview-card');
-                                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                }, 60);
-                              }
-                            }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.75rem',
-                              padding: '0.65rem 0.8rem',
-                              borderRadius: 'var(--rad-xs, 8px)',
-                              cursor: 'pointer',
-                              border: `1.5px solid ${isSelected ? 'var(--primary)' : 'var(--border-subtle)'}`,
-                              background: isSelected
-                                ? 'color-mix(in srgb, var(--primary) 8%, var(--surface))'
-                                : 'var(--surface)',
-                              boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                              transition: 'all 0.15s ease',
-                            }}
-                          >
-                            {/* Miniatura cuadrada */}
-                            <div
-                              style={{
-                                width: '64px',
-                                height: '64px',
-                                borderRadius: '6px',
-                                overflow: 'hidden',
-                                background: 'var(--surface-sunken)',
-                                flexShrink: 0,
-                              }}
-                            >
-                              {primeraFoto ? (
-                                <img
-                                  src={primeraFoto}
-                                  alt={f.nombre}
-                                  loading="lazy"
-                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                />
-                              ) : (
-                                <div
-                                  style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: 'var(--text-muted)',
-                                  }}
-                                >
-                                  <Home size={22} opacity={0.5} />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Información preliminar de la finca */}
-                            <div style={{ flexGrow: 1, minWidth: 0 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
-                                <div
-                                  style={{
-                                    fontSize: '0.86rem',
-                                    fontWeight: 700,
-                                    color: 'var(--text-main)',
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                  }}
-                                >
-                                  {f.nombre}
-                                </div>
-                                {isSelected && (
-                                  <span style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: 700 }}>
-                                    ● En pantalla
-                                  </span>
-                                )}
-                              </div>
-
-                              <div
-                                style={{
-                                  fontSize: '0.72rem',
-                                  color: 'var(--text-muted)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.3rem',
-                                  marginTop: '0.15rem',
-                                }}
-                              >
-                                <MapPin size={11} style={{ flexShrink: 0 }} />
-                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {f.zona || 'Santa Elena, Valle'}
-                                </span>
-                              </div>
-
-                              <div
-                                style={{
-                                  fontSize: '0.72rem',
-                                  color: 'var(--text-muted)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.5rem',
-                                  marginTop: '0.2rem',
-                                  flexWrap: 'wrap',
-                                }}
-                              >
-                                <span>👥 Hasta {f.capacidad} pers.</span>
-                                <span>•</span>
-                                <strong style={{ color: 'var(--primary)' }}>
-                                  {formatCOP(Number(f.precio_pp) || 0)} /pp
-                                </strong>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* ─── PANEL DERECHO: Detalle Maximizado e Información de Primera Mano ─── */}
-                  {fincaActiva && (
-                    <div
-                      id="finca-preview-card"
-                      style={{
-                        background: 'var(--surface-sunken)',
-                        borderRadius: 'var(--rad-sm, 10px)',
-                        padding: '1.15rem',
-                        border: '1px solid var(--border-subtle)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.9rem',
-                        position: 'sticky',
-                        top: '1rem',
-                      }}
-                    >
-                      {/* Galería / Foto Principal de la Finca */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <div
-                          style={{
-                            width: '100%',
-                            height: '240px',
-                            borderRadius: 'var(--rad-xs, 8px)',
-                            overflow: 'hidden',
-                            position: 'relative',
-                            background: '#0f172a',
-                          }}
-                        >
-                          {fotoPrincipalMostrada ? (
+                    return (
+                      <div
+                        key={f.id}
+                        onClick={() => onSelectFinca(f.id)}
+                        className="finca-direct-card"
+                        style={{
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--rad-sm, 10px)',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                        }}
+                      >
+                        {/* Foto de portada con badges superpuestos */}
+                        <div style={{ position: 'relative', width: '100%', height: '210px', background: '#0f172a' }}>
+                          {primeraFoto ? (
                             <img
-                              src={fotoPrincipalMostrada}
-                              alt={fincaActiva.nombre}
+                              src={primeraFoto}
+                              alt={f.nombre}
+                              loading="lazy"
                               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             />
                           ) : (
-                            <div
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: 'rgba(255,255,255,0.7)',
-                                gap: '0.5rem',
-                              }}
-                            >
+                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)' }}>
                               <Home size={38} />
-                              <span style={{ fontSize: '0.78rem' }}>Fotos no disponibles</span>
                             </div>
                           )}
 
-                          {/* Badges superpuestos sobre la foto */}
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: '0.65rem',
-                              left: '0.65rem',
-                              display: 'flex',
-                              gap: '0.4rem',
-                              flexWrap: 'wrap',
-                            }}
-                          >
-                            <span
-                              style={{
-                                background: 'rgba(0,0,0,0.65)',
-                                backdropFilter: 'blur(4px)',
-                                color: '#fff',
-                                padding: '0.2rem 0.55rem',
-                                borderRadius: '14px',
-                                fontSize: '0.68rem',
-                                fontWeight: 600,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                              }}
-                            >
-                              <MapPin size={10} /> {fincaActiva.zona || 'Santa Elena, Valle'}
+                          {/* Badges superiores */}
+                          <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <span style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', color: '#fff', padding: '0.2rem 0.55rem', borderRadius: '12px', fontSize: '0.68rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <MapPin size={11} /> {f.zona || 'Santa Elena, Valle'}
                             </span>
-                            <span
-                              style={{
-                                background: 'rgba(16, 185, 129, 0.85)',
-                                color: '#fff',
-                                padding: '0.2rem 0.55rem',
-                                borderRadius: '14px',
-                                fontSize: '0.68rem',
-                                fontWeight: 700,
-                              }}
-                            >
+                            <span style={{ background: 'rgba(16, 185, 129, 0.9)', color: '#fff', padding: '0.2rem 0.55rem', borderRadius: '12px', fontSize: '0.68rem', fontWeight: 700 }}>
                               Disponible
                             </span>
                           </div>
 
-                          {fotosFincaActiva.length > 1 && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                bottom: '0.65rem',
-                                right: '0.65rem',
-                                background: 'rgba(0,0,0,0.7)',
-                                backdropFilter: 'blur(4px)',
-                                color: '#fff',
-                                padding: '0.2rem 0.55rem',
-                                borderRadius: '12px',
-                                fontSize: '0.68rem',
-                                fontWeight: 600,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.3rem',
-                              }}
-                            >
-                              <ImageIcon size={11} /> {fotoActivaIndex + 1} / {fotosFincaActiva.length}
+                          {totalFotos > 1 && (
+                            <div style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', color: '#fff', padding: '0.2rem 0.55rem', borderRadius: '12px', fontSize: '0.68rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <ImageIcon size={11} /> {totalFotos} fotos
                             </div>
                           )}
                         </div>
 
-                        {/* Carrusel de miniaturas para alternar fotos */}
-                        {fotosFincaActiva.length > 1 && (
-                          <div
-                            style={{
-                              display: 'flex',
-                              gap: '0.45rem',
-                              overflowX: 'auto',
-                              paddingBottom: '0.3rem',
-                            }}
-                          >
-                            {fotosFincaActiva.map((foto, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => setFotoActivaIndex(idx)}
-                                style={{
-                                  width: '50px',
-                                  height: '40px',
-                                  borderRadius: '4px',
-                                  overflow: 'hidden',
-                                  border: `2px solid ${idx === fotoActivaIndex ? 'var(--primary)' : 'transparent'}`,
-                                  padding: 0,
-                                  cursor: 'pointer',
-                                  flexShrink: 0,
-                                  opacity: idx === fotoActivaIndex ? 1 : 0.65,
-                                  transition: 'all 0.15s ease',
-                                }}
-                              >
-                                <img
-                                  src={foto}
-                                  alt=""
-                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                />
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Título y especificaciones principales */}
-                      <div>
-                        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 0.35rem 0', color: 'var(--text-main)' }}>
-                          {fincaActiva.nombre}
-                        </h3>
-
-                        {fincaActiva.descripcion && (
-                          <p
-                            style={{
-                              fontSize: '0.8rem',
-                              color: 'var(--text-muted)',
-                              margin: '0 0 0.65rem 0',
-                              lineHeight: 1.45,
-                              display: '-webkit-box',
-                              WebkitLineClamp: 3,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden',
-                            }}
-                          >
-                            {fincaActiva.descripcion}
-                          </p>
-                        )}
-
-                        {/* Fichas técnicas rápidas de capacidad y cuartos */}
-                        <div
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
-                            gap: '0.45rem',
-                            marginBottom: '0.65rem',
-                          }}
-                        >
-                          <div
-                            style={{
-                              background: 'var(--surface)',
-                              border: '1px solid var(--border-subtle)',
-                              borderRadius: '6px',
-                              padding: '0.45rem 0.6rem',
-                              fontSize: '0.74rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.35rem',
-                            }}
-                          >
-                            <Users size={14} style={{ color: 'var(--primary)' }} />
-                            <span>Hasta <strong>{fincaActiva.capacidad}</strong> pers.</span>
+                        {/* Contenido de la tarjeta */}
+                        <div style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem', flexGrow: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                              {f.nombre}
+                            </h3>
                           </div>
 
-                          <div
-                            style={{
-                              background: 'var(--surface)',
-                              border: '1px solid var(--border-subtle)',
-                              borderRadius: '6px',
-                              padding: '0.45rem 0.6rem',
-                              fontSize: '0.74rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.35rem',
-                            }}
-                          >
-                            <Bed size={14} style={{ color: 'var(--primary)' }} />
-                            <span><strong>{fincaActiva.habitaciones}</strong> habitaciones</span>
+                          {f.descripcion && (
+                            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                              {f.descripcion}
+                            </p>
+                          )}
+
+                          {/* Ficha técnica compacta */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem', margin: '0.2rem 0' }}>
+                            <div style={{ background: 'var(--surface-sunken)', padding: '0.45rem 0.55rem', borderRadius: '6px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <Users size={13} style={{ color: 'var(--primary)' }} />
+                              <span>Hasta <strong>{f.capacidad}</strong></span>
+                            </div>
+                            <div style={{ background: 'var(--surface-sunken)', padding: '0.45rem 0.55rem', borderRadius: '6px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <Bed size={13} style={{ color: 'var(--primary)' }} />
+                              <span><strong>{f.habitaciones || '—'}</strong> habs</span>
+                            </div>
+                            <div style={{ background: 'var(--surface-sunken)', padding: '0.45rem 0.55rem', borderRadius: '6px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <Bath size={13} style={{ color: 'var(--primary)' }} />
+                              <span><strong>{f.banos || '—'}</strong> baños</span>
+                            </div>
                           </div>
 
-                          <div
-                            style={{
-                              background: 'var(--surface)',
-                              border: '1px solid var(--border-subtle)',
-                              borderRadius: '6px',
-                              padding: '0.45rem 0.6rem',
-                              fontSize: '0.74rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.35rem',
-                            }}
-                          >
-                            <Bath size={14} style={{ color: 'var(--primary)' }} />
-                            <span><strong>{fincaActiva.banos}</strong> baños</span>
-                          </div>
-
-                          {fincaActiva.politica_mascotas === 'permitido' && (
-                            <div
-                              style={{
-                                background: 'color-mix(in srgb, var(--success) 10%, var(--surface))',
-                                border: '1px solid color-mix(in srgb, var(--success) 30%, transparent)',
-                                borderRadius: '6px',
-                                padding: '0.45rem 0.6rem',
-                                fontSize: '0.74rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.35rem',
-                                color: 'var(--success)',
-                                fontWeight: 600,
-                              }}
-                            >
-                              <Dog size={14} />
-                              <span>Pet Friendly</span>
+                          {/* Chips de amenidades destacadas */}
+                          {f.finca_amenidades && f.finca_amenidades.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                              {f.finca_amenidades.slice(0, 4).map((am, idx) => (
+                                <span key={idx} style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem', borderRadius: '10px', background: 'var(--surface-sunken)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>
+                                  ✓ {am.nombre}
+                                </span>
+                              ))}
+                              {f.finca_amenidades.length > 4 && (
+                                <span style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem', color: 'var(--primary)', fontWeight: 600 }}>
+                                  +{f.finca_amenidades.length - 4} más
+                                </span>
+                              )}
                             </div>
                           )}
-                        </div>
 
-                        {/* Chips de amenidades destacadas */}
-                        {fincaActiva.finca_amenidades && fincaActiva.finca_amenidades.length > 0 && (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.65rem' }}>
-                            {fincaActiva.finca_amenidades.map(am => (
-                              <span
-                                key={am.id || am.nombre}
-                                style={{
-                                  fontSize: '0.7rem',
-                                  padding: '0.2rem 0.5rem',
-                                  borderRadius: '12px',
-                                  background: 'var(--surface)',
-                                  border: '1px solid var(--border-subtle)',
-                                  color: 'var(--text-muted)',
-                                }}
-                              >
-                                ✓ {am.nombre}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Bloque de Precio y Garantía Directa */}
-                        <div
-                          style={{
-                            background: 'var(--surface)',
-                            border: '1px solid var(--border)',
-                            borderRadius: '8px',
-                            padding: '0.75rem 0.9rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            marginBottom: '0.75rem',
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-                              Tarifa por persona / noche
+                          {/* Precio y Botón directo de Cotizar */}
+                          <div style={{ marginTop: 'auto', paddingTop: '0.85rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                            <div>
+                              <div style={{ fontSize: '0.66rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                Tarifa por persona / noche
+                              </div>
+                              <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--primary)' }}>
+                                {formatCOP(Number(f.precio_pp) || 0)}
+                              </div>
                             </div>
-                            <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--primary)' }}>
-                              {formatCOP(Number(fincaActiva.precio_pp) || 0)}
-                            </div>
-                          </div>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <ShieldCheck size={13} style={{ color: 'var(--success)' }} /> Tarifa directa garantizada
-                          </span>
-                        </div>
 
-                        {/* Acción principal exclusiva: Cotizar y reservar estadía */}
-                        <div>
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={() => onSelectFinca(fincaActiva.id)}
-                            style={{
-                              width: '100%',
-                              padding: '0.85rem',
-                              fontSize: '0.9rem',
-                              fontWeight: 700,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '0.5rem',
-                              boxShadow: '0 4px 14px rgba(26, 107, 94, 0.25)',
-                            }}
-                          >
-                            <span>Cotizar y reservar estadía</span>
-                            <ArrowRight size={17} />
-                          </button>
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectFinca(f.id);
+                              }}
+                              style={{ padding: '0.65rem 0.95rem', fontSize: '0.84rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', boxShadow: '0 2px 8px rgba(26, 107, 94, 0.2)' }}
+                            >
+                              <span>Cotizar y reservar</span>
+                              <ArrowRight size={15} />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
               )}
             </div>
