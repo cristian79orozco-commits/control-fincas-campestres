@@ -208,13 +208,21 @@ _Con este abono garantizamos tu cupo y bloqueamos de inmediato la disponibilidad
 
 💳 *DATOS DE CONSIGNACIÓN / CUENTA DEL PROPIETARIO:*`;
 
-  if (bancosInfo && bancosInfo.cuenta) {
+  const fAny: any = finca;
+  const cFinca: any = cotizacion.fincas;
+  const cuentaFinal = bancosInfo?.cuenta || fAny?.banco_cuenta || cFinca?.banco_cuenta;
+  const bancoFinal = bancosInfo?.banco || fAny?.banco_nombre || cFinca?.banco_nombre || 'Bancolombia';
+  const tipoCuentaFinal = bancosInfo?.tipoCuenta || fAny?.banco_tipo_cuenta || cFinca?.banco_tipo_cuenta || 'Ahorros';
+  const titularFinal = bancosInfo?.titular || fAny?.banco_titular || cFinca?.banco_titular || 'Propietario de la Finca';
+  const nitFinal = bancosInfo?.nit || fAny?.banco_identificacion || cFinca?.banco_identificacion;
+
+  if (cuentaFinal) {
     msg += `
-• *Banco:* ${bancosInfo.banco || 'Bancolombia'}
-• *Tipo de Cuenta:* ${bancosInfo.tipoCuenta || 'Ahorros'}
-• *Número de Cuenta:* ${bancosInfo.cuenta}
-• *Titular:* ${bancosInfo.titular || 'Propietario de la Finca'}
-${bancosInfo.nit ? `• *Identificación / NIT:* ${bancosInfo.nit}` : ''}`;
+• *Banco:* ${bancoFinal}
+• *Tipo de Cuenta:* ${tipoCuentaFinal}
+• *Número de Cuenta:* ${cuentaFinal}
+• *Titular:* ${titularFinal}
+${nitFinal ? `• *Identificación / NIT:* ${nitFinal}` : ''}`;
   } else {
     msg += `
 • Por favor consúltanos los datos de transferencia directa para el pago del abono a la propiedad.`;
@@ -846,6 +854,13 @@ export function obtenerTokensParaMensaje(params: {
   const anticipo = reserva?.separacion || 0;
   const valorPago = pago?.valor || 0;
 
+  const fObj: any = finca || reserva?.fincas || cotizacion?.fincas || null;
+  const bBanco = fObj?.banco_nombre || 'Bancolombia';
+  const bTipo = fObj?.banco_tipo_cuenta || 'Ahorros';
+  const bCuenta = fObj?.banco_cuenta || '';
+  const bTitular = fObj?.banco_titular || 'Propietario de la Finca';
+  const bId = fObj?.banco_identificacion || '';
+
   return {
     cliente: cNombre,
     finca: fNombre,
@@ -861,5 +876,13 @@ export function obtenerTokensParaMensaje(params: {
     saldo: formatCOP(saldo),
     pago_valor: formatCOP(valorPago),
     enlace_pdf: enlacePdf ? `📎 *Documento oficial adjunto (PDF):*\n${enlacePdf}` : '',
+    banco: bBanco,
+    tipo_cuenta: bTipo,
+    cuenta: bCuenta,
+    titular_cuenta: bTitular,
+    identificacion_cuenta: bId,
+    datos_bancarios: bCuenta
+      ? `• *Banco:* ${bBanco}\n• *Tipo de Cuenta:* ${bTipo}\n• *Número de Cuenta:* ${bCuenta}\n• *Titular:* ${bTitular}${bId ? `\n• *Identificación / NIT:* ${bId}` : ''}`
+      : '',
   };
 }

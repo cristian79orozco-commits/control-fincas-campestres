@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Save, Trash2, Plus, Upload, Link as LinkIcon, Loader, Image as ImageIcon,
   Eye, ChevronDown, ChevronUp, Search, Check, Sparkles, MapPin, Users,
-  Bed, Bath, Clock, ShieldAlert, Volume2, Dog, HelpCircle, AlertCircle, Home
+  Bed, Bath, Clock, ShieldAlert, Volume2, Dog, HelpCircle, AlertCircle, Home,
+  CreditCard, Copy, Building, DollarSign
 } from 'lucide-react';
 import { supabase, DEFAULT_WA_NUMBER } from '../services/supabase';
 import { optimizarImagen, formatearBytes } from '../utils/imageOptimizer';
@@ -50,7 +51,7 @@ const PLANES_SUGERIDOS = [
   'Todo incluido campestre',
 ];
 
-type TabId = 'general' | 'acomodacion' | 'tarifas' | 'amenidades' | 'politicas' | 'fotos';
+type TabId = 'general' | 'acomodacion' | 'tarifas' | 'bancario' | 'amenidades' | 'politicas' | 'fotos';
 
 export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
   fincas,
@@ -98,6 +99,14 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
   const [politicaMusica, setPoliticaMusica] = useState('moderada');
   const [normas, setNormas] = useState('');
   const [waNumber, setWaNumber] = useState(DEFAULT_WA_NUMBER);
+
+  // Datos bancarios del propietario (exclusivo para solicitud de abonos / separación)
+  const [bancoNombre, setBancoNombre] = useState('Bancolombia');
+  const [bancoTipoCuenta, setBancoTipoCuenta] = useState('Ahorros');
+  const [bancoCuenta, setBancoCuenta] = useState('');
+  const [bancoTitular, setBancoTitular] = useState('');
+  const [bancoIdentificacion, setBancoIdentificacion] = useState('');
+  const [copiadoCuenta, setCopiadoCuenta] = useState(false);
 
   // Referencia para evitar sobreescribir las ediciones del usuario al cambiar de pestañas
   const lastLoadedFincaIdRef = useRef<string | null>(null);
@@ -160,6 +169,12 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
       setPoliticaMusica('moderada');
       setNormas('Cuidar las instalaciones y la naturaleza. Respetar horarios de silencio. Dejar la finca en las condiciones recibidas.');
       setWaNumber(DEFAULT_WA_NUMBER);
+      setBancoNombre('Bancolombia');
+      setBancoTipoCuenta('Ahorros');
+      setBancoCuenta('');
+      setBancoTitular('');
+      setBancoIdentificacion('');
+      setCopiadoCuenta(false);
       setAmenidades([
         { nombre: 'Piscina privada', icono: 'waves' },
         { nombre: 'Zona BBQ / Asador campestre', icono: 'flame' },
@@ -194,6 +209,12 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
         setPoliticaMusica(f.politica_musica || 'moderada');
         setNormas(f.normas || '');
         setWaNumber(f.whatsapp || DEFAULT_WA_NUMBER);
+        setBancoNombre(f.banco_nombre || 'Bancolombia');
+        setBancoTipoCuenta(f.banco_tipo_cuenta || 'Ahorros');
+        setBancoCuenta(f.banco_cuenta || '');
+        setBancoTitular(f.banco_titular || '');
+        setBancoIdentificacion(f.banco_identificacion || '');
+        setCopiadoCuenta(false);
 
         // Cargar amenidades existentes
         if (f.finca_amenidades && f.finca_amenidades.length > 0) {
@@ -409,6 +430,11 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
       politica_musica: politicaMusica,
       normas: normas.trim(),
       whatsapp: waNumber.replace(/[^0-9]/g, ''),
+      banco_nombre: bancoNombre.trim() || null,
+      banco_tipo_cuenta: bancoTipoCuenta || 'Ahorros',
+      banco_cuenta: bancoCuenta.trim() || null,
+      banco_titular: bancoTitular.trim() || null,
+      banco_identificacion: bancoIdentificacion.trim() || null,
     };
 
     if (selectedFincaId !== 'new') {
@@ -476,7 +502,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
   const fotoPortadaActual = imagenes[0] || (fincaActual?.finca_imagenes?.[0]?.url) || '';
 
   return (
-    <div className="panel" style={{ padding: '1.25rem' }}>
+    <div className="panel" style={{ padding: '1.25rem', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
       {/* ============================================================== */}
       {/* 1. CABECERA: TÍTULO, SELECTOR CONTRAÍDO Y BOTÓN NUEVA FINCA */}
       {/* ============================================================== */}
@@ -666,7 +692,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
               </div>
 
               {/* Buscador en la lista */}
-              <div style={{ position: 'relative', width: '220px' }}>
+              <div style={{ position: 'relative', width: '100%', maxWidth: '240px', minWidth: '160px' }}>
                 <Search size={14} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input
                   type="text"
@@ -681,6 +707,8 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                     fontSize: '0.8rem',
                     borderRadius: 'var(--rad-xs, 8px)',
                     height: '32px',
+                    width: '100%',
+                    boxSizing: 'border-box',
                   }}
                 />
               </div>
@@ -690,7 +718,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 240px), 1fr))',
                 gap: '0.65rem',
                 maxHeight: '320px',
                 overflowY: 'auto',
@@ -823,25 +851,27 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
       </div>
 
       {/* ============================================================== */}
-      {/* 2. PESTAÑAS DEL FORMULARIO ORGANIZADAS POR SECCIÓN */}
+      {/* 2. PESTAÑAS DEL FORMULARIO ORGANIZADAS POR SECCIÓN (RESPONSIVE - CERO SCROLL HORIZONTAL) */}
       {/* ============================================================== */}
       <div
         style={{
-          display: 'flex',
-          gap: '0.4rem',
-          borderBottom: '1px solid var(--border)',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))',
+          gap: '0.45rem',
           marginBottom: '1.25rem',
-          overflowX: 'auto',
-          paddingBottom: '0.35rem',
+          width: '100%',
+          maxWidth: '100%',
+          boxSizing: 'border-box',
         }}
       >
         {[
-          { id: 'general', label: '1. General y Ubicación', icon: <MapPin size={14} /> },
-          { id: 'acomodacion', label: '2. Capacidad y Distribución', icon: <Bed size={14} /> },
-          { id: 'tarifas', label: '3. Tarifas y Precios', icon: <Sparkles size={14} /> },
-          { id: 'amenidades', label: '4. Comodidades y Servicios', icon: <Check size={14} />, badge: amenidades.length },
-          { id: 'politicas', label: '5. Políticas y Horarios', icon: <Clock size={14} /> },
-          { id: 'fotos', label: '6. Galería WebP', icon: <ImageIcon size={14} />, badge: imagenes.length },
+          { id: 'general', label: '1. General', icon: <MapPin size={14} /> },
+          { id: 'acomodacion', label: '2. Capacidad', icon: <Bed size={14} /> },
+          { id: 'tarifas', label: '3. Tarifas', icon: <DollarSign size={14} /> },
+          { id: 'bancario', label: '4. Cuenta y Abonos', icon: <CreditCard size={14} /> },
+          { id: 'amenidades', label: '5. Comodidades', icon: <Check size={14} />, badge: amenidades.length },
+          { id: 'politicas', label: '6. Políticas', icon: <Clock size={14} /> },
+          { id: 'fotos', label: '7. Galería', icon: <ImageIcon size={14} />, badge: imagenes.length },
         ].map(tab => {
           const isActive = activeTab === tab.id;
           return (
@@ -852,29 +882,35 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.55rem 0.95rem',
-                border: 'none',
-                background: isActive ? 'var(--primary)' : 'transparent',
-                color: isActive ? '#fff' : 'var(--text-muted)',
+                justifyContent: 'center',
+                gap: '0.4rem',
+                padding: '0.55rem 0.5rem',
+                border: isActive ? '1px solid var(--primary)' : '1px solid var(--border)',
+                background: isActive ? 'var(--primary)' : 'var(--surface-2)',
+                color: isActive ? '#fff' : 'var(--text)',
                 borderRadius: 'var(--rad-xs, 8px)',
                 cursor: 'pointer',
-                fontWeight: 600,
-                fontSize: '0.84rem',
-                whiteSpace: 'nowrap',
+                fontWeight: isActive ? 700 : 500,
+                fontSize: '0.82rem',
                 transition: 'all 0.15s ease',
+                boxShadow: isActive ? '0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent)' : 'none',
+                width: '100%',
+                boxSizing: 'border-box',
+                textAlign: 'center',
               }}
             >
-              {tab.icon}
-              <span>{tab.label}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>{tab.icon}</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tab.label}</span>
               {tab.badge !== undefined && (
                 <span
                   style={{
-                    fontSize: '0.68rem',
-                    padding: '0.1rem 0.4rem',
+                    fontSize: '0.65rem',
+                    padding: '0.1rem 0.35rem',
                     borderRadius: '999px',
                     background: isActive ? 'rgba(255,255,255,0.25)' : 'var(--surface-3)',
                     color: isActive ? '#fff' : 'var(--text-muted)',
+                    fontWeight: 700,
+                    lineHeight: 1,
                   }}
                 >
                   {tab.badge}
@@ -891,7 +927,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
 
       {/* TAB 1: GENERAL Y UBICACIÓN */}
       {activeTab === 'general' && (
-        <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+        <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))' }}>
           <div className="field col-span-full">
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span>Nombre comercial de la finca campestre *</span>
@@ -1032,7 +1068,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
             💡 <strong>Edición rápida sin trabas:</strong> Puedes hacer clic en los campos, borrar libremente con Backspace o escribir directamente el número deseado, o usar los controles (+ / -).
           </div>
 
-          <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+          <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))' }}>
             <div className="field">
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Users size={14} style={{ color: 'var(--primary)' }} />
@@ -1102,7 +1138,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
       {/* TAB 3: TARIFAS Y PRECIOS */}
       {activeTab === 'tarifas' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+          <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))' }}>
             <div className="field">
               <label>Precio por persona / noche (COP) *</label>
               <CurrencyInput
@@ -1142,7 +1178,264 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
         </div>
       )}
 
-      {/* TAB 4: AMENIDADES Y SERVICIOS */}
+      {/* TAB 4: DATOS BANCARIOS DEL PROPIETARIO PARA SEPARACIÓN / ABONOS */}
+      {activeTab === 'bancario' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Banner de Privacidad y Alcance */}
+          <div
+            style={{
+              background: 'var(--surface-sunken)',
+              padding: '1rem 1.15rem',
+              borderRadius: 'var(--rad-xs, 10px)',
+              border: '1px solid var(--border)',
+              display: 'flex',
+              gap: '0.85rem',
+              alignItems: 'flex-start',
+            }}
+          >
+            <div
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                background: 'color-mix(in srgb, var(--primary) 15%, transparent)',
+                color: 'var(--primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                marginTop: '0.1rem',
+              }}
+            >
+              <CreditCard size={18} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text)', marginBottom: '0.2rem' }}>
+                Cuenta Bancaria y Entidad Financiera del Propietario
+              </div>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                🔒 <strong>Privacidad protegida:</strong> Esta información <strong>NO</strong> aparece en el catálogo ni en la web pública del cliente. Se utilizará e insertará de manera centralizada y automática <strong>únicamente en el mensaje oficial de WhatsApp</strong> que se le envía al cliente cuando se le solicita el dinero de separación o anticipo de la finca.
+              </p>
+            </div>
+          </div>
+
+          <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))' }}>
+            {/* Entidad Financiera / Banco */}
+            <div className="field col-span-full">
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.3rem' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                  <Building size={14} style={{ color: 'var(--primary)' }} />
+                  Banco o Entidad Financiera *
+                </span>
+                <span className="text-xs text-muted">Selecciona una entidad rápida o escribe el nombre</span>
+              </label>
+
+              {/* Chips rápidos de bancos comunes en Colombia */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.65rem' }}>
+                {[
+                  { nombre: 'Bancolombia', tipo: 'Ahorros' },
+                  { nombre: 'Nequi', tipo: 'Billetera Digital / Celular' },
+                  { nombre: 'Daviplata', tipo: 'Billetera Digital / Celular' },
+                  { nombre: 'Davivienda', tipo: 'Ahorros' },
+                  { nombre: 'Banco de Bogotá', tipo: 'Ahorros' },
+                  { nombre: 'BBVA', tipo: 'Ahorros' },
+                  { nombre: 'Nu Colombia', tipo: 'Cuenta de Ahorros' },
+                  { nombre: 'Lulo Bank', tipo: 'Cuenta de Ahorros' },
+                  { nombre: 'Dale!', tipo: 'Billetera Digital / Celular' },
+                ].map(b => {
+                  const isSelected = bancoNombre.toLowerCase() === b.nombre.toLowerCase();
+                  return (
+                    <button
+                      key={b.nombre}
+                      type="button"
+                      onClick={() => {
+                        setBancoNombre(b.nombre);
+                        if (b.nombre === 'Nequi' || b.nombre === 'Daviplata' || b.nombre === 'Dale!') {
+                          setBancoTipoCuenta('Billetera Digital / Celular');
+                        } else if (!bancoTipoCuenta || bancoTipoCuenta === 'Billetera Digital / Celular') {
+                          setBancoTipoCuenta('Ahorros');
+                        }
+                      }}
+                      style={{
+                        padding: '0.35rem 0.75rem',
+                        borderRadius: '999px',
+                        fontSize: '0.78rem',
+                        fontWeight: isSelected ? 700 : 500,
+                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                        background: isSelected ? 'var(--primary)' : 'var(--surface-2)',
+                        color: isSelected ? '#fff' : 'var(--text)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {b.nombre} {isSelected && '✓'}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <input
+                type="text"
+                placeholder="Ej: Bancolombia, Nequi, Davivienda, etc."
+                value={bancoNombre}
+                onChange={e => setBancoNombre(e.target.value)}
+                style={{ fontSize: '0.95rem' }}
+              />
+            </div>
+
+            {/* Tipo de Cuenta */}
+            <div className="field">
+              <label>Tipo de Cuenta</label>
+              <select
+                value={bancoTipoCuenta}
+                onChange={e => setBancoTipoCuenta(e.target.value)}
+              >
+                <option value="Ahorros">Cuenta de Ahorros</option>
+                <option value="Corriente">Cuenta Corriente</option>
+                <option value="Billetera Digital / Celular">Billetera Digital / Celular (Nequi / Daviplata)</option>
+                <option value="Llave Transfiya / Bre-B">Llave Transfiya / Bre-B</option>
+              </select>
+            </div>
+
+            {/* Número de Cuenta / Celular */}
+            <div className="field">
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Número de Cuenta o Celular *</span>
+                {bancoCuenta && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(bancoCuenta);
+                      setCopiadoCuenta(true);
+                      setTimeout(() => setCopiadoCuenta(false), 2000);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: copiadoCuenta ? 'var(--success)' : 'var(--primary)',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      fontWeight: 600,
+                      padding: 0,
+                    }}
+                  >
+                    {copiadoCuenta ? <Check size={12} /> : <Copy size={12} />}
+                    {copiadoCuenta ? 'Copiado' : 'Copiar'}
+                  </button>
+                )}
+              </label>
+              <input
+                type="text"
+                placeholder="Ej: 123-456789-01 o 3151234567"
+                value={bancoCuenta}
+                onChange={e => setBancoCuenta(e.target.value)}
+                style={{ fontSize: '0.95rem', letterSpacing: '0.5px' }}
+              />
+              <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
+                Número al que consignará el cliente para separar la finca
+              </span>
+            </div>
+
+            {/* Nombre del Titular */}
+            <div className="field">
+              <label>Nombre del Titular / Beneficiario (Dueño)</label>
+              <input
+                type="text"
+                placeholder="Ej: Carlos Alberto Gómez"
+                value={bancoTitular}
+                onChange={e => setBancoTitular(e.target.value)}
+              />
+              <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
+                Nombre completo de la persona a nombre de quien está la cuenta
+              </span>
+            </div>
+
+            {/* Identificación / Cédula / NIT */}
+            <div className="field">
+              <label>Cédula o NIT del Titular (Opcional)</label>
+              <input
+                type="text"
+                placeholder="Ej: CC 16.789.012 o NIT 900.123.456-7"
+                value={bancoIdentificacion}
+                onChange={e => setBancoIdentificacion(e.target.value)}
+              />
+              <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
+                Facilita transferencias interbancarias y pagos vía PSE
+              </span>
+            </div>
+          </div>
+
+          {/* ============================================================== */}
+          {/* LIVE PREVIEW: CÓMO LO RECIBIRÁ EL CLIENTE EN WHATSAPP */}
+          {/* ============================================================== */}
+          <div
+            style={{
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--rad-xs, 10px)',
+              padding: '1rem',
+              marginTop: '0.5rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)' }}>
+                <span>📲</span>
+                <span>Previsualización exacta en el texto de separación del cliente:</span>
+              </div>
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '999px',
+                  background: 'color-mix(in srgb, #25d366 15%, transparent)',
+                  color: '#16a34a',
+                  fontWeight: 700,
+                }}
+              >
+                Formato WhatsApp Oficial
+              </span>
+            </div>
+
+            <div
+              style={{
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                padding: '0.85rem 1rem',
+                fontFamily: 'monospace, -apple-system, sans-serif',
+                fontSize: '0.82rem',
+                lineHeight: '1.6',
+                color: 'var(--text)',
+                whiteSpace: 'pre-wrap',
+              }}
+            >
+              <strong>💳 *DATOS DE CONSIGNACIÓN / CUENTA DEL PROPIETARIO:*</strong>{'\n'}
+              {bancoCuenta ? (
+                <>
+                  • *Banco:* {bancoNombre || 'Bancolombia'}{'\n'}
+                  • *Tipo de Cuenta:* {bancoTipoCuenta || 'Ahorros'}{'\n'}
+                  • *Número de Cuenta:* {bancoCuenta}{'\n'}
+                  • *Titular:* {bancoTitular || 'Propietario de la Finca'}
+                  {bancoIdentificacion ? `\n• *Identificación / NIT:* ${bancoIdentificacion}` : ''}
+                </>
+              ) : (
+                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  (No has definido un número de cuenta todavía. Al completar los campos arriba, aparecerán automáticamente aquí.)
+                </span>
+              )}
+            </div>
+
+            <div className="text-xs text-muted" style={{ marginTop: '0.5rem' }}>
+              💡 Este fragmento se inserta automáticamente al pulsar <strong>"Pedir Abono (50%)"</strong> en el módulo de Cotizaciones para esta propiedad.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: AMENIDADES Y SERVICIOS */}
       {activeTab === 'amenidades' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div>
@@ -1219,9 +1512,9 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
         </div>
       )}
 
-      {/* TAB 5: POLÍTICAS, HORARIOS Y NORMAS */}
+      {/* TAB 6: POLÍTICAS, HORARIOS Y NORMAS */}
       {activeTab === 'politicas' && (
-        <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+        <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))' }}>
           <div className="field">
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Clock size={14} style={{ color: 'var(--primary)' }} />
@@ -1365,7 +1658,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
         </div>
       )}
 
-      {/* TAB 6: FOTOGRAFÍAS Y GALERÍA WEBP */}
+      {/* TAB 7: FOTOGRAFÍAS Y GALERÍA WEBP */}
       {activeTab === 'fotos' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div className="sec-header" style={{ marginBottom: '0.25rem' }}>

@@ -46,6 +46,12 @@ export interface Finca {
   deposito_garantia?: number | null;
   normas?: string | null;
   indicaciones_llegada?: string | null;
+  // Cuenta bancaria del propietario para separación / abono
+  banco_nombre?: string | null;
+  banco_tipo_cuenta?: string | null;
+  banco_cuenta?: string | null;
+  banco_titular?: string | null;
+  banco_identificacion?: string | null;
   created_at?: string;
   updated_at?: string;
   finca_imagenes?: FincaImagen[];
@@ -141,7 +147,7 @@ export interface CotizacionDB {
   created_at?: string;
   updated_at?: string;
   clientes?: Pick<Cliente, 'id' | 'nombre' | 'apellido' | 'whatsapp'>;
-  fincas?: Pick<Finca, 'id' | 'nombre'>;
+  fincas?: Pick<Finca, 'id' | 'nombre' | 'banco_nombre' | 'banco_tipo_cuenta' | 'banco_cuenta' | 'banco_titular' | 'banco_identificacion'>;
   menus?: Pick<Menu, 'id' | 'nombre' | 'categoria' | 'precio_pp'>;
 }
 

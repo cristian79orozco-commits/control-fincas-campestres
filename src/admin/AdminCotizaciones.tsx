@@ -272,7 +272,14 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
 
   // 1. Pedir Abono Finca (50%) -> Cuenta del propietario
   const handleAbrirPedirAbono = (c: CotizacionDB) => {
-    const bancosInfo = {
+    const f = fincas.find(x => x.id === c.finca_id) || c.fincas;
+    const bancosInfo = f?.banco_cuenta ? {
+      banco: f.banco_nombre || 'Bancolombia',
+      tipoCuenta: f.banco_tipo_cuenta || 'Ahorros',
+      cuenta: f.banco_cuenta,
+      titular: f.banco_titular || 'Propietario de la Finca',
+      nit: f.banco_identificacion || undefined,
+    } : {
       banco: configuracion?.banco_nombre || 'Bancolombia',
       tipoCuenta: configuracion?.banco_tipo_cuenta || 'Ahorros',
       cuenta: configuracion?.banco_cuenta || '',

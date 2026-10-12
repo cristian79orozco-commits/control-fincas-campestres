@@ -1976,6 +1976,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deposito_garantia: fincaData.deposito_garantia || 0,
         normas: fincaData.normas || null,
         indicaciones_llegada: fincaData.indicaciones_llegada || null,
+        // Cuenta bancaria del propietario para separación / abono
+        banco_nombre: fincaData.banco_nombre || null,
+        banco_tipo_cuenta: fincaData.banco_tipo_cuenta || 'Ahorros',
+        banco_cuenta: fincaData.banco_cuenta || null,
+        banco_titular: fincaData.banco_titular || null,
+        banco_identificacion: fincaData.banco_identificacion || null,
       };
       if (fincaData.id) payloadExtendido.id = fincaData.id;
 
@@ -1984,23 +1990,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Intentar guardar con campos extendidos
       let res = await supabase.from('fincas').upsert(payloadExtendido).select('id').single();
 
-      // Si falla por alguna columna no migrada en la base de datos remota, recurrir de forma segura a columnas base
-      if (res.error && res.error.message?.includes('column')) {
-        console.warn('[AppContext] Supabase reporta columna pendiente de migración. Guardando con columnas base:', res.error.message);
-        const payloadBase: any = {
-          nombre: fincaData.nombre,
-          zona: fincaData.zona || 'Santa Elena, Valle',
-          capacidad: fincaData.capacidad || 10,
-          precio_pp: fincaData.precio_pp || 0,
-          descripcion: fincaData.descripcion || null,
-          estado: fincaData.estado || 'disponible',
-          whatsapp: fincaData.whatsapp || null,
-          activo: fincaData.activo !== undefined ? fincaData.activo : true,
-        };
-        if (fincaData.id) payloadBase.id = fincaData.id;
-        const resBase = await supabase.from('fincas').upsert(payloadBase).select('id').single();
-        if (resBase.error) throw resBase.error;
-        fincaId = resBase.data.id;
+      // Si falla por alguna columna no migrada en la base de datos remota, reintentar preservando campos existentes
+      if (res.error && (res.error.message?.includes('column') || res.error.message?.includes('schema cache'))) {
+        console.warn('[AppContext] Supabase reporta columna pendiente de migración. Reintentando sin columnas bancarias:', res.error.message);
+        const payloadSinBancos = { ...payloadExtendido };
+        delete payloadSinBancos.banco_nombre;
+        delete payloadSinBancos.banco_tipo_cuenta;
+        delete payloadSinBancos.banco_cuenta;
+        delete payloadSinBancos.banco_titular;
+        delete payloadSinBancos.banco_identificacion;
+
+        const resSinBancos = await supabase.from('fincas').upsert(payloadSinBancos).select('id').single();
+        if (!resSinBancos.error) {
+          fincaId = resSinBancos.data.id;
+        } else {
+          console.warn('[AppContext] Reintentando con columnas base mínimas:', resSinBancos.error.message);
+          const payloadBase: any = {
+            nombre: fincaData.nombre,
+            zona: fincaData.zona || 'Santa Elena, Valle',
+            capacidad: fincaData.capacidad || 10,
+            precio_pp: fincaData.precio_pp || 0,
+            descripcion: fincaData.descripcion || null,
+            estado: fincaData.estado || 'disponible',
+            whatsapp: fincaData.whatsapp || null,
+            activo: fincaData.activo !== undefined ? fincaData.activo : true,
+          };
+          if (fincaData.id) payloadBase.id = fincaData.id;
+          const resBase = await supabase.from('fincas').upsert(payloadBase).select('id').single();
+          if (resBase.error) throw resBase.error;
+          fincaId = resBase.data.id;
+        }
       } else if (res.error) {
         throw res.error;
       } else {
