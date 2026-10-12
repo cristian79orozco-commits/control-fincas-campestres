@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Servicio Independiente de WhatsApp y Comunicaciones — Fase 3
  * 
  * Reglas de diseño del Plan Maestro:
@@ -244,6 +244,22 @@ export function plantillaCobroAlimentacion(
   const noches = calcularNoches(item.fecha_inicio, item.fecha_fin);
   const cantServ = ('cantidad_alimentacion' in item ? item.cantidad_alimentacion : null) || noches;
   const esReserva = 'cotizacion_id' in item || 'valor_total' in item;
+  let desgloseAlimTexto = `💰 *TOTAL ALIMENTACIÓN:* *${formatCOP(costoAlim)}*`;
+  if (esReserva) {
+    const res = item as Reserva;
+    const pagadoAlim = typeof res.monto_pagado_alimentacion === 'number'
+      ? res.monto_pagado_alimentacion
+      : (typeof res.cotizacion_snapshot?.monto_pagado_alimentacion === 'number'
+          ? res.cotizacion_snapshot.monto_pagado_alimentacion
+          : 0);
+    if (pagadoAlim > 0 && pagadoAlim < costoAlim) {
+      const saldoPend = Math.max(0, costoAlim - pagadoAlim);
+      desgloseAlimTexto = `• *Valor Total Menú:* ${formatCOP(costoAlim)}
+• *Abono previo registrado:* ${formatCOP(pagadoAlim)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💰 *SALDO PENDIENTE A CANCELAR:* *${formatCOP(saldoPend)}*`;
+    }
+  }
 
   let msg = `🍽️ *SOLICITUD DE PAGO · PLANES DE ALIMENTACIÓN Y MENÚS*
 *Administración Fincas Campestres*
@@ -256,7 +272,7 @@ Te compartimos el detalle para la confirmación de tu servicio gastronómico par
 • *Menú / Plan:* ${planNombre}
 • *Personas:* ${personas} personas
 • *Cantidad de servicios:* ${cantServ}
-${item.consecutivo ? `• *${esReserva ? 'Reserva' : 'Cotización'} N°:* ${item.consecutivo}\n` : ''}💰 *TOTAL ALIMENTACIÓN:* *${formatCOP(costoAlim)}*
+${item.consecutivo ? `• *${esReserva ? 'Reserva' : 'Cotización'} N°:* ${item.consecutivo}\n` : ''}${desgloseAlimTexto}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 _Nota: El servicio de alimentación es suministrado y coordinado de forma directa por la Administración de Fincas Campestres, garantizando compras de insumos frescos y personal de cocina en la finca._

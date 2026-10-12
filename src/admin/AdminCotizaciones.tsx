@@ -125,14 +125,18 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
   const [modalConfirmarReserva, setModalConfirmarReserva] = useState<{
     abierto: boolean;
     cotizacion: CotizacionDB | null;
-    anticipo: number;
-    alimentacionPagada?: boolean;
+    anticipoFinca: number;
+    abonoAlimentacion: number;
+    alimentacionPagadaTotal: boolean;
+    metodoPagoAlimentacion: string;
     guardando: boolean;
   }>({
     abierto: false,
     cotizacion: null,
-    anticipo: 0,
-    alimentacionPagada: false,
+    anticipoFinca: 0,
+    abonoAlimentacion: 0,
+    alimentacionPagadaTotal: false,
+    metodoPagoAlimentacion: 'Transferencia Bancolombia / Nequi',
     guardando: false,
   });
 
@@ -316,8 +320,10 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
     setModalConfirmarReserva({
       abierto: true,
       cotizacion: c,
-      anticipo: anticipoSugerido,
-      alimentacionPagada: false,
+      anticipoFinca: anticipoSugerido,
+      abonoAlimentacion: 0,
+      alimentacionPagadaTotal: false,
+      metodoPagoAlimentacion: 'Transferencia Bancolombia / Nequi',
       guardando: false,
     });
   };
@@ -327,14 +333,28 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
     if (!modalConfirmarReserva.cotizacion) return;
     setModalConfirmarReserva(prev => ({ ...prev, guardando: true }));
     const c = modalConfirmarReserva.cotizacion;
-    const anticipo = modalConfirmarReserva.anticipo;
-    const alimentacionPagada = modalConfirmarReserva.alimentacionPagada;
+    const anticipoFinca = modalConfirmarReserva.anticipoFinca;
+    const abonoAlimentacion = modalConfirmarReserva.abonoAlimentacion;
+    const alimentacionPagadaTotal = modalConfirmarReserva.alimentacionPagadaTotal;
+    const metodo = modalConfirmarReserva.metodoPagoAlimentacion;
 
     try {
-      const res = await convertirCotizacionAReserva(c, anticipo, alimentacionPagada);
-      setModalConfirmarReserva({ abierto: false, cotizacion: null, anticipo: 0, alimentacionPagada: false, guardando: false });
+      const res = await convertirCotizacionAReserva(c, anticipoFinca, {
+        abonoAlimentacion,
+        pagadaTotal: alimentacionPagadaTotal,
+        metodo,
+      });
+      setModalConfirmarReserva({
+        abierto: false,
+        cotizacion: null,
+        anticipoFinca: 0,
+        abonoAlimentacion: 0,
+        alimentacionPagadaTotal: false,
+        metodoPagoAlimentacion: 'Transferencia Bancolombia / Nequi',
+        guardando: false,
+      });
       if (res.success) {
-        showToast(`✓ ¡Cotización convertida en Reserva Activa con éxito!`, 'success');
+        showToast(`✓ ¡Cotización #${c.consecutivo || ''} convertida en Reserva Activa con éxito!`, 'success');
         if (onConvertirReserva) {
           onConvertirReserva(c);
         }
@@ -857,125 +877,250 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
       </div>
 
       {/* MODAL DE CONFIRMACIÓN: PASAR A RESERVA */}
-      {modalConfirmarReserva.abierto && modalConfirmarReserva.cotizacion && (
-        <div className="modal-overlay" onClick={() => setModalConfirmarReserva({ abierto: false, cotizacion: null, anticipo: 0, guardando: false })}>
-          <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px' }}>
-            <div className="modal-header">
-              <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: 'var(--primary)' }}>
-                <Check size={18} /> Confirmar Pago y Pasar a Reserva
-              </div>
-              <button
-                className="btn btn-sm"
-                onClick={() => setModalConfirmarReserva({ abierto: false, cotizacion: null, anticipo: 0, guardando: false })}
-              >
-                <X size={14} />
-              </button>
-            </div>
+      {modalConfirmarReserva.abierto && modalConfirmarReserva.cotizacion && (() => {
+        const cModal = modalConfirmarReserva.cotizacion;
+        const valorAlojamientoModal = (cModal.subtotal_alojamiento && cModal.subtotal_alojamiento > 0)
+          ? cModal.subtotal_alojamiento
+          : Math.max(0, (cModal.total || 0) - (cModal.costo_alimentacion || 0));
+        const costoAlimModal = cModal.costo_alimentacion || 0;
+        const tieneAlimModal = costoAlimModal > 0 || (cModal.alimentacion && cModal.alimentacion !== 'Sin alimentación');
 
-            <div style={{ padding: '1.25rem', display: 'grid', gap: '1rem' }}>
-              <div style={{ background: 'color-mix(in srgb, var(--primary) 8%, transparent)', padding: '0.85rem', borderRadius: '8px', border: '1px solid color-mix(in srgb, var(--primary) 20%, transparent)' }}>
-                <div style={{ fontSize: '0.92rem', fontWeight: 700, marginBottom: '0.35rem' }}>
-                  ¿El cliente ya realizó el pago del abono para separar la finca?
+        // Saldos en tiempo real
+        const saldoFincaCheckIn = Math.max(0, valorAlojamientoModal - modalConfirmarReserva.anticipoFinca);
+        const abonoAlimIngresado = Math.max(0, Math.min(costoAlimModal, modalConfirmarReserva.abonoAlimentacion));
+        const saldoAlimAdmin = Math.max(0, costoAlimModal - abonoAlimIngresado);
+
+        const totalCotizacionModal = cModal.total || (valorAlojamientoModal + costoAlimModal);
+        const totalRecibidoHoy = modalConfirmarReserva.anticipoFinca + abonoAlimIngresado;
+        const saldoTotalPendiente = saldoFincaCheckIn + saldoAlimAdmin;
+        const anticipoSugerido = Math.round(valorAlojamientoModal * 0.5);
+
+        return (
+          <div className="modal-overlay" onClick={() => setModalConfirmarReserva(p => ({ ...p, abierto: false, cotizacion: null, guardando: false }))}>
+            <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '580px', maxHeight: '92vh', overflowY: 'auto' }}>
+              <div className="modal-header">
+                <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: 'var(--primary)' }}>
+                  <Check size={18} /> Confirmar Pago y Pasar a Reserva
                 </div>
-                <div className="text-xs text-muted" style={{ lineHeight: 1.5 }}>
-                  Este es el requisito para bloquear el calendario y crear formalmente la <strong>Reserva Activa</strong> a nombre del cliente.
-                </div>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setModalConfirmarReserva(p => ({ ...p, abierto: false, cotizacion: null, guardando: false }))}
+                >
+                  <X size={14} />
+                </button>
               </div>
 
-              {/* Resumen económico */}
-              <div style={{ display: 'grid', gap: '0.45rem', fontSize: '0.85rem', background: 'var(--surface-sunken)', padding: '0.85rem', borderRadius: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span className="text-muted">Finca:</span>
-                  <strong>{modalConfirmarReserva.cotizacion.fincas?.nombre || 'Finca Campestre'}</strong>
+              <div style={{ padding: '1.25rem', display: 'grid', gap: '1rem' }}>
+                <div style={{ background: 'color-mix(in srgb, var(--primary) 8%, transparent)', padding: '0.85rem', borderRadius: '8px', border: '1px solid color-mix(in srgb, var(--primary) 20%, transparent)' }}>
+                  <div style={{ fontSize: '0.92rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                    ¿El cliente ya realizó el pago del abono para separar la finca?
+                  </div>
+                  <div className="text-xs text-muted" style={{ lineHeight: 1.5 }}>
+                    Este es el requisito para bloquear el calendario y crear formalmente la <strong>Reserva Activa</strong> a nombre del cliente. Los valores se centralizan de forma transparente respetando la separación entre la cuenta del propietario y la de la administración.
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span className="text-muted">Cliente:</span>
-                  <strong>
-                    {modalConfirmarReserva.cotizacion.clientes?.nombre
-                      ? `${modalConfirmarReserva.cotizacion.clientes.nombre} ${modalConfirmarReserva.cotizacion.clientes.apellido || ''}`.trim()
-                      : 'Cliente Web'}
-                  </strong>
+
+                {/* Resumen de la Cotización */}
+                <div style={{ display: 'grid', gap: '0.45rem', fontSize: '0.85rem', background: 'var(--surface-sunken)', padding: '0.85rem', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="text-muted">Finca:</span>
+                    <strong style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      {cModal.fincas?.nombre || 'Finca Campestre'}
+                      {cModal.consecutivo && <ConsecutivoBadge consecutivo={cModal.consecutivo} />}
+                    </strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span className="text-muted">Cliente:</span>
+                    <strong>
+                      {cModal.clientes?.nombre
+                        ? `${cModal.clientes.nombre} ${cModal.clientes.apellido || ''}`.trim()
+                        : 'Cliente Particular'}
+                    </strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span className="text-muted">Fechas:</span>
+                    <span>{formatFecha(cModal.fecha_inicio)} → {formatFecha(cModal.fecha_fin)} ({cModal.personas} personas)</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span className="text-muted">Valor Finca (Alojamiento):</span>
+                    <strong>{formatCOP(valorAlojamientoModal)}</strong>
+                  </div>
+                  {tieneAlimModal && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent, #ea580c)' }}>
+                      <span>Planes de Alimentación (Admin):</span>
+                      <strong>{formatCOP(costoAlimModal)}</strong>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '0.35rem', fontWeight: 700 }}>
+                    <span>Total Cotización:</span>
+                    <span style={{ color: 'var(--primary)' }}>{formatCOP(totalCotizacionModal)}</span>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span className="text-muted">Fechas:</span>
-                  <span>{formatFecha(modalConfirmarReserva.cotizacion.fecha_inicio)} → {formatFecha(modalConfirmarReserva.cotizacion.fecha_fin)}</span>
+
+                {/* BLOQUE 1: ALOJAMIENTO / FINCA (CUENTA PROPIETARIO) */}
+                <div style={{ padding: '0.9rem', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)', display: 'grid', gap: '0.65rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--text)' }}>
+                      🏡 1. Alojamiento (Cuenta del Propietario)
+                    </span>
+                    <span style={{ fontSize: '0.72rem', background: 'rgba(34, 197, 94, 0.12)', color: '#16a34a', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 600 }}>
+                      Sugerido 50%: {formatCOP(anticipoSugerido)}
+                    </span>
+                  </div>
+
+                  <div className="field">
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600 }}>
+                      Monto recibido para separación de la finca *
+                    </label>
+                    <CurrencyInput
+                      value={modalConfirmarReserva.anticipoFinca}
+                      onChange={(val) => setModalConfirmarReserva(prev => ({ ...prev, anticipoFinca: val }))}
+                    />
+                  </div>
+
+                  <div style={{ fontSize: '0.78rem', background: 'var(--surface-sunken)', padding: '0.5rem 0.75rem', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="text-muted">Saldo Finca pendiente al check-in (para el dueño):</span>
+                    <strong style={{ color: saldoFincaCheckIn > 0 ? '#b45309' : '#16a34a' }}>
+                      {formatCOP(saldoFincaCheckIn)}
+                    </strong>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span className="text-muted">Valor Finca (Alojamiento):</span>
-                  <span>{formatCOP(modalConfirmarReserva.cotizacion.subtotal_alojamiento || 0)}</span>
-                </div>
-                {(modalConfirmarReserva.cotizacion.costo_alimentacion || 0) > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent, #ea580c)' }}>
-                    <span>Planes de Alimentación (Admin):</span>
-                    <span>{formatCOP(modalConfirmarReserva.cotizacion.costo_alimentacion || 0)}</span>
+
+                {/* BLOQUE 2: SERVICIO DE ALIMENTACIÓN (CUENTA ADMINISTRACIÓN) */}
+                {tieneAlimModal && (
+                  <div style={{ padding: '0.9rem', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)', display: 'grid', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--accent, #ea580c)' }}>
+                        🍽️ 2. Servicio de Alimentación (Cuenta Administración)
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        Total Menú: {formatCOP(costoAlimModal)}
+                      </span>
+                    </div>
+
+                    {/* Casilla de verificación para pago total directo */}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.84rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={modalConfirmarReserva.alimentacionPagadaTotal}
+                        onChange={e => {
+                          const pagado = e.target.checked;
+                          setModalConfirmarReserva(prev => ({
+                            ...prev,
+                            alimentacionPagadaTotal: pagado,
+                            abonoAlimentacion: pagado ? costoAlimModal : 0,
+                          }));
+                        }}
+                        style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                      />
+                      <span>¿El cliente canceló la totalidad de la alimentación ({formatCOP(costoAlimModal)})?</span>
+                    </label>
+
+                    {/* Casilla numérica para permitir abonos parciales */}
+                    <div className="field">
+                      <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Monto recibido / abonado para alimentación ($):</span>
+                        <span className="text-xs text-muted">
+                          {modalConfirmarReserva.abonoAlimentacion >= costoAlimModal
+                            ? 'Pago 100% Completo'
+                            : modalConfirmarReserva.abonoAlimentacion > 0
+                            ? 'Abono Parcial'
+                            : 'Pendiente de cobro'}
+                        </span>
+                      </label>
+                      <CurrencyInput
+                        value={modalConfirmarReserva.abonoAlimentacion}
+                        onChange={(val) => {
+                          const nuevoValor = Math.max(0, val);
+                          setModalConfirmarReserva(prev => ({
+                            ...prev,
+                            abonoAlimentacion: nuevoValor,
+                            alimentacionPagadaTotal: nuevoValor >= costoAlimModal && costoAlimModal > 0,
+                          }));
+                        }}
+                      />
+                    </div>
+
+                    {/* Indicador en vivo del estado de la alimentación */}
+                    <div style={{ fontSize: '0.78rem', background: 'var(--surface-sunken)', padding: '0.55rem 0.75rem', borderRadius: '6px', lineHeight: 1.45 }}>
+                      {abonoAlimIngresado >= costoAlimModal ? (
+                        <span style={{ color: '#16a34a', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                          ✓ Alimentación cancelada en su totalidad ({formatCOP(costoAlimModal)}). Servicio liquidado para la administración.
+                        </span>
+                      ) : abonoAlimIngresado > 0 ? (
+                        <div>
+                          <span style={{ color: '#c2410c', fontWeight: 600 }}>
+                            🟡 Abono parcial registrado: {formatCOP(abonoAlimIngresado)}.
+                          </span>
+                          <span className="text-muted" style={{ marginLeft: '0.35rem' }}>
+                            Saldo pendiente de alimentación para la administración: <strong>{formatCOP(saldoAlimAdmin)}</strong>. Se podrá cobrar después desde Reservas.
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-muted">
+                          ℹ️ <em>Alimentación pendiente de cobro ({formatCOP(costoAlimModal)}):</em> Podrás cobrarla después por WhatsApp o registrar su pago directo a la administración desde el módulo de Reservas.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '0.35rem', fontWeight: 700 }}>
-                  <span>Total Cotización:</span>
-                  <span style={{ color: 'var(--primary)' }}>{formatCOP(modalConfirmarReserva.cotizacion.total || 0)}</span>
-                </div>
-              </div>
 
-              {/* Monto de separación recibido */}
-              <div className="field">
-                <label style={{ fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Monto recibido para separación (Abono 50% finca) *</span>
-                  <span className="text-xs text-muted">Sugerido 50%</span>
-                </label>
-                <CurrencyInput
-                  value={modalConfirmarReserva.anticipo}
-                  onChange={(val) => setModalConfirmarReserva(prev => ({ ...prev, anticipo: val }))}
-                />
-                <div className="text-xs text-muted mt-1">
-                  Saldo pendiente por pagar al check-in:{' '}
-                  <strong style={{ color: 'var(--danger)' }}>
-                    {formatCOP(Math.max(0, (modalConfirmarReserva.cotizacion.total || 0) - modalConfirmarReserva.anticipo))}
-                  </strong>
-                </div>
-              </div>
-
-              {/* Opciones de Alimentación Independiente */}
-              {(modalConfirmarReserva.cotizacion.costo_alimentacion || 0) > 0 && (
-                <div style={{ padding: '0.75rem', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>
-                    <input
-                      type="checkbox"
-                      checked={modalConfirmarReserva.alimentacionPagada}
-                      onChange={e => setModalConfirmarReserva(prev => ({ ...prev, alimentacionPagada: e.target.checked }))}
-                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                    />
-                    <span>¿El cliente ya pagó también la alimentación ({formatCOP(modalConfirmarReserva.cotizacion.costo_alimentacion || 0)})?</span>
-                  </label>
-                  <div className="text-xs text-muted" style={{ marginTop: '0.35rem', paddingLeft: '1.5rem', lineHeight: 1.4 }}>
-                    ℹ️ <em>Nota importante:</em> El abono del 50% de alojamiento asegura la reserva de la finca con el propietario. Si el cliente aún no ha cancelado la alimentación, puedes dejarlo desmarcado y saldrá el botón de <strong>"Cobrar Alimentación"</strong> en el módulo de Reservas para cobrarlo después a la cuenta del administrador.
+                {/* BLOQUE 3: RESUMEN CONSOLIDADO CENTRALIZADO */}
+                <div style={{ background: 'color-mix(in srgb, var(--primary) 5%, var(--surface))', border: '1px solid color-mix(in srgb, var(--primary) 25%, transparent)', padding: '0.9rem', borderRadius: '8px', display: 'grid', gap: '0.45rem', fontSize: '0.84rem' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--primary)', borderBottom: '1px solid var(--border)', paddingBottom: '0.35rem' }}>
+                    📊 Resumen Consolidado de la Operación
                   </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span className="text-muted">Total General Contratado:</span>
+                    <strong>{formatCOP(totalCotizacionModal)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a' }}>
+                    <span>Total Recaudado Hoy (Abonos Recibidos):</span>
+                    <strong>+{formatCOP(totalRecibidoHoy)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border)', paddingTop: '0.35rem', fontWeight: 700 }}>
+                    <span style={{ color: saldoTotalPendiente > 0 ? 'var(--danger)' : '#16a34a' }}>
+                      Saldo Pendiente Total:
+                    </span>
+                    <strong style={{ color: saldoTotalPendiente > 0 ? 'var(--danger)' : '#16a34a', fontSize: '0.95rem' }}>
+                      {formatCOP(saldoTotalPendiente)}
+                    </strong>
+                  </div>
+                  {saldoTotalPendiente > 0 && (
+                    <div className="text-xs text-muted" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
+                      <span>• Al propietario al check-in: <strong>{formatCOP(saldoFincaCheckIn)}</strong></span>
+                      {tieneAlimModal && (
+                        <span>• A la administración (menú): <strong>{formatCOP(saldoAlimAdmin)}</strong></span>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
 
-              <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={modalConfirmarReserva.guardando}
-                  onClick={() => setModalConfirmarReserva({ abierto: false, cotizacion: null, anticipo: 0, guardando: false })}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={modalConfirmarReserva.guardando || modalConfirmarReserva.anticipo <= 0}
-                  onClick={handleConfirmarPasoAReserva}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}
-                >
-                  <Check size={15} />
-                  {modalConfirmarReserva.guardando ? 'Creando reserva…' : 'Sí, Pago Confirmado · Crear Reserva'}
-                </button>
+                <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={modalConfirmarReserva.guardando}
+                    onClick={() => setModalConfirmarReserva(p => ({ ...p, abierto: false, cotizacion: null, guardando: false }))}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={modalConfirmarReserva.guardando || modalConfirmarReserva.anticipoFinca <= 0}
+                    onClick={handleConfirmarPasoAReserva}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}
+                  >
+                    <Check size={15} />
+                    {modalConfirmarReserva.guardando ? 'Creando reserva…' : 'Sí, Pago Confirmado · Crear Reserva'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Modal de WhatsApp para Cotizaciones y Menús */}
       {modalWaCotiz.abierto && modalWaCotiz.cotizacion && (

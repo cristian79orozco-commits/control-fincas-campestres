@@ -4,7 +4,8 @@ import type {
   Finca, Cliente, CotizacionDB, Reserva, Pago, PagoTipo,
   ReservaEstado, CotizacionEstado, BloqueoDisponibilidad,
   Menu as MenuType, Comunicacion, ConfiguracionGeneral,
-  ContenidoSitio, CierreReserva, ViewType, AdminSection
+  ContenidoSitio, CierreReserva, ViewType, AdminSection,
+  EstadoAlimentacion
 } from '../types';
 import type { ToastMessage } from '../components/Toast';
 import { calcularSaldo } from '../types';
@@ -107,11 +108,15 @@ interface AppContextValue {
   guardarCotizacion: (datos: Partial<CotizacionDB>) => Promise<{ success: boolean; id?: string; error?: string }>;
   cambiarEstadoCotizacion: (id: string, estado: CotizacionEstado) => Promise<{ success: boolean; error?: string }>;
   eliminarCotizacion: (id: string) => Promise<{ success: boolean; error?: string }>;
-  convertirCotizacionAReserva: (cotizacion: CotizacionDB, anticipo?: number, alimentacionPagada?: boolean) => Promise<{ success: boolean; reservaId?: string; error?: string }>;
+  convertirCotizacionAReserva: (
+    cotizacion: CotizacionDB,
+    anticipo?: number,
+    alimentacionOpciones?: boolean | { abonoAlimentacion?: number; pagadaTotal?: boolean; metodo?: string; notas?: string }
+  ) => Promise<{ success: boolean; reservaId?: string; error?: string }>;
   cambiarEstadoAlimentacionReserva: (
     reservaId: string,
-    estadoAlimentacion: 'pendiente' | 'pagada' | 'cancelada',
-    detalles?: { metodo?: string; notas?: string }
+    estadoAlimentacion: EstadoAlimentacion,
+    detalles?: { metodo?: string; notas?: string; monto?: number }
   ) => Promise<{ success: boolean; error?: string }>;
 
   // Operaciones de Reservas y Pagos
@@ -464,15 +469,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const procesadas: Reserva[] = (data || []).map((r: any) => {
         const cierreRaw = r.cierres_reservas;
         const cierre = Array.isArray(cierreRaw) ? (cierreRaw[0] || null) : (cierreRaw || null);
-        const estadoAlimentacion = r.estado_alimentacion || r.cotizacion_snapshot?.estado_alimentacion || ((r.costo_alimentacion || 0) > 0 ? 'pendiente' : null);
+        const costoAlim = Number(r.costo_alimentacion || r.cotizacion_snapshot?.costo_alimentacion || 0);
+        const estadoAlimentacion = r.estado_alimentacion || r.cotizacion_snapshot?.estado_alimentacion || (costoAlim > 0 ? 'pendiente' : null);
         const fechaPagoAlim = r.fecha_pago_alimentacion || r.cotizacion_snapshot?.fecha_pago_alimentacion || null;
         const metodoPagoAlim = r.metodo_pago_alimentacion || r.cotizacion_snapshot?.metodo_pago_alimentacion || null;
+        const montoPagadoAlim = r.monto_pagado_alimentacion !== undefined && r.monto_pagado_alimentacion !== null
+          ? Number(r.monto_pagado_alimentacion)
+          : (r.cotizacion_snapshot?.monto_pagado_alimentacion !== undefined && r.cotizacion_snapshot?.monto_pagado_alimentacion !== null
+              ? Number(r.cotizacion_snapshot.monto_pagado_alimentacion)
+              : (estadoAlimentacion === 'pagada' ? costoAlim : 0));
+        const saldoPendAlim = r.saldo_pendiente_alimentacion !== undefined && r.saldo_pendiente_alimentacion !== null
+          ? Number(r.saldo_pendiente_alimentacion)
+          : (r.cotizacion_snapshot?.saldo_pendiente_alimentacion !== undefined && r.cotizacion_snapshot?.saldo_pendiente_alimentacion !== null
+              ? Number(r.cotizacion_snapshot.saldo_pendiente_alimentacion)
+              : Math.max(0, costoAlim - montoPagadoAlim));
         return {
           ...r,
           cierre,
+          costo_alimentacion: costoAlim,
           estado_alimentacion: estadoAlimentacion,
           fecha_pago_alimentacion: fechaPagoAlim,
           metodo_pago_alimentacion: metodoPagoAlim,
+          monto_pagado_alimentacion: montoPagadoAlim,
+          saldo_pendiente_alimentacion: saldoPendAlim,
         };
       });
 
@@ -933,7 +952,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const convertirCotizacionAReserva = async (
     cotizacion: CotizacionDB,
     anticipo: number = 0,
-    alimentacionPagada: boolean = false
+    alimentacionOpciones?: boolean | { abonoAlimentacion?: number; pagadaTotal?: boolean; metodo?: string; notas?: string }
   ): Promise<{ success: boolean; reservaId?: string; error?: string }> => {
     try {
       // 1. Marcar cotización como confirmada en memoria y BD
@@ -958,12 +977,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const fincaSel = fincas.find(f => f.id === cotizacion.finca_id);
       const clienteSel = clientes.find(c => c.id === cotizacion.cliente_id);
 
+      const costoAlim = cotizacion.costo_alimentacion || 0;
       const tieneMenu = Boolean(
-        (cotizacion.costo_alimentacion && cotizacion.costo_alimentacion > 0) ||
+        costoAlim > 0 ||
         (cotizacion.alimentacion && cotizacion.alimentacion !== 'Sin alimentación')
       );
-      const estAlim = tieneMenu ? (alimentacionPagada ? 'pagada' : 'pendiente') : null;
-      const fechaPagoAlim = alimentacionPagada ? new Date().toISOString() : null;
+
+      // Calcular abono y método de pago de alimentación
+      let abonoAlim = 0;
+      let metodoPagoAlim = 'Transferencia Bancaria';
+      if (typeof alimentacionOpciones === 'boolean') {
+        abonoAlim = alimentacionOpciones ? costoAlim : 0;
+      } else if (alimentacionOpciones) {
+        if (typeof alimentacionOpciones.abonoAlimentacion === 'number') {
+          abonoAlim = alimentacionOpciones.abonoAlimentacion;
+        } else if (alimentacionOpciones.pagadaTotal) {
+          abonoAlim = costoAlim;
+        }
+        if (alimentacionOpciones.metodo) {
+          metodoPagoAlim = alimentacionOpciones.metodo;
+        }
+      }
+      abonoAlim = Math.max(0, Math.min(costoAlim, abonoAlim));
+
+      let estAlim: EstadoAlimentacion | null = null;
+      if (tieneMenu) {
+        if (abonoAlim >= costoAlim && costoAlim > 0) {
+          estAlim = 'pagada';
+        } else if (abonoAlim > 0) {
+          estAlim = 'parcial';
+        } else {
+          estAlim = 'pendiente';
+        }
+      }
+      const fechaPagoAlim = abonoAlim > 0 ? new Date().toISOString() : null;
+
+      // Generar pagos oficiales
+      const hoyFecha = new Date().toISOString().split('T')[0];
+      const pagosIniciales: Pago[] = [];
+
+      if (anticipo > 0) {
+        pagosIniciales.push({
+          id: `pago-${Date.now()}-finca`,
+          reserva_id: newResId,
+          tipo: 'separacion',
+          fecha: hoyFecha,
+          valor: anticipo,
+          observacion: 'Abono separación finca (propietario)',
+        });
+      }
+
+      if (abonoAlim > 0) {
+        pagosIniciales.push({
+          id: `pago-${Date.now() + 1}-alim`,
+          reserva_id: newResId,
+          tipo: 'abono',
+          fecha: hoyFecha,
+          valor: abonoAlim,
+          observacion: abonoAlim >= costoAlim
+            ? `Pago total de alimentación (${metodoPagoAlim}) - Administración`
+            : `Abono parcial de alimentación (${metodoPagoAlim}) - Administración`,
+        });
+      }
 
       const nuevaReserva: Reserva = {
         id: newResId,
@@ -978,9 +1053,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         consecutivo: consecutivoReserva,
         menu_id: cotizacion.menu_id || null,
         alimentacion: cotizacion.alimentacion || null,
-        costo_alimentacion: cotizacion.costo_alimentacion || 0,
+        costo_alimentacion: costoAlim,
         estado_alimentacion: estAlim,
+        monto_pagado_alimentacion: abonoAlim,
+        saldo_pendiente_alimentacion: Math.max(0, costoAlim - abonoAlim),
         fecha_pago_alimentacion: fechaPagoAlim,
+        metodo_pago_alimentacion: abonoAlim > 0 ? metodoPagoAlim : null,
         estado: 'activa',
         observaciones: `Convertida de cotización ${cotizacion.consecutivo || cotizacion.id}`,
         created_at: new Date().toISOString(),
@@ -995,21 +1073,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           id: fincaSel.id,
           nombre: fincaSel.nombre,
         } : cotizacion.fincas,
-        pagos: anticipo > 0 ? [{
-          id: `pago-${Date.now()}`,
-          reserva_id: newResId,
-          tipo: 'separacion',
-          fecha: new Date().toISOString().split('T')[0],
-          valor: anticipo,
-          observacion: 'Anticipo registrado al convertir cotización en reserva',
-        }] : [],
+        pagos: pagosIniciales,
         cotizacion_snapshot: {
           cotizacion_id: cotizacion.id,
           consecutivo: cotizacion.consecutivo,
           subtotal_alojamiento: cotizacion.subtotal_alojamiento,
-          costo_alimentacion: cotizacion.costo_alimentacion,
+          costo_alimentacion: costoAlim,
           estado_alimentacion: estAlim,
+          monto_pagado_alimentacion: abonoAlim,
+          saldo_pendiente_alimentacion: Math.max(0, costoAlim - abonoAlim),
           fecha_pago_alimentacion: fechaPagoAlim,
+          metodo_pago_alimentacion: abonoAlim > 0 ? metodoPagoAlim : null,
         },
       };
 
@@ -1046,7 +1120,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Persistir en Supabase (con fallback silencioso para no bloquear la app si RLS está pendiente)
       try {
-        await supabase.from('reservas').insert({
+        const payloadConColumnas: any = {
           id: newResId,
           cotizacion_id: cotizacion.id,
           cliente_id: cotizacion.cliente_id,
@@ -1059,19 +1133,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           consecutivo: consecutivoReserva,
           menu_id: cotizacion.menu_id || null,
           alimentacion: cotizacion.alimentacion || null,
-          costo_alimentacion: cotizacion.costo_alimentacion || 0,
+          costo_alimentacion: costoAlim,
           estado: 'activa',
           observaciones: nuevaReserva.observaciones,
           cotizacion_snapshot: nuevaReserva.cotizacion_snapshot,
-        });
+          estado_alimentacion: estAlim,
+          monto_pagado_alimentacion: abonoAlim,
+          saldo_pendiente_alimentacion: Math.max(0, costoAlim - abonoAlim),
+          fecha_pago_alimentacion: fechaPagoAlim,
+          metodo_pago_alimentacion: abonoAlim > 0 ? metodoPagoAlim : null,
+        };
 
-        if (anticipo > 0) {
+        const { error: insErr } = await supabase.from('reservas').insert(payloadConColumnas);
+        if (insErr) {
+          // Fallback seguro si las columnas explícitas aún no han sido migradas en la base de datos
+          await supabase.from('reservas').insert({
+            id: newResId,
+            cotizacion_id: cotizacion.id,
+            cliente_id: cotizacion.cliente_id,
+            finca_id: cotizacion.finca_id,
+            fecha_inicio: cotizacion.fecha_inicio,
+            fecha_fin: cotizacion.fecha_fin,
+            personas: cotizacion.personas,
+            valor_total: cotizacion.total,
+            separacion: anticipo,
+            consecutivo: consecutivoReserva,
+            menu_id: cotizacion.menu_id || null,
+            alimentacion: cotizacion.alimentacion || null,
+            costo_alimentacion: costoAlim,
+            estado: 'activa',
+            observaciones: nuevaReserva.observaciones,
+            cotizacion_snapshot: nuevaReserva.cotizacion_snapshot,
+          });
+        }
+
+        for (const p of pagosIniciales) {
           await supabase.from('pagos').insert({
             reserva_id: newResId,
-            tipo: 'separacion',
-            fecha: new Date().toISOString().split('T')[0],
-            valor: anticipo,
-            observacion: 'Anticipo registrado al convertir cotización en reserva',
+            tipo: p.tipo,
+            fecha: p.fecha,
+            valor: p.valor,
+            observacion: p.observacion,
           });
         }
 
@@ -1374,29 +1476,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const cambiarEstadoAlimentacionReserva = async (
     reservaId: string,
-    estadoAlimentacion: 'pendiente' | 'pagada' | 'cancelada',
-    detalles?: { metodo?: string; notas?: string }
+    estadoAlimentacion: EstadoAlimentacion,
+    detalles?: { metodo?: string; notas?: string; monto?: number }
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const fecha = estadoAlimentacion === 'pagada' ? new Date().toISOString() : null;
+      const reservaActual = reservas.find(r => r.id === reservaId);
+      const costoAlim = reservaActual?.costo_alimentacion || 0;
+      const snap = reservaActual?.cotizacion_snapshot || {};
+      const montoAbono = typeof detalles?.monto === 'number' ? detalles.monto : 0;
+      const pagadoPrevio = reservaActual?.monto_pagado_alimentacion || snap.monto_pagado_alimentacion || 0;
+      const nuevoMontoPagado = montoAbono > 0
+        ? Math.min(costoAlim, pagadoPrevio + montoAbono)
+        : (estadoAlimentacion === 'pagada' ? costoAlim : pagadoPrevio);
+      const nuevoSaldoPendiente = Math.max(0, costoAlim - nuevoMontoPagado);
+      const estFinal: EstadoAlimentacion = nuevoMontoPagado >= costoAlim && costoAlim > 0
+        ? 'pagada'
+        : (nuevoMontoPagado > 0 ? 'parcial' : estadoAlimentacion);
+
+      const fecha = nuevoMontoPagado > 0 ? new Date().toISOString() : null;
+      const hoyFecha = new Date().toISOString().split('T')[0];
+
+      let nuevoPago: Pago | null = null;
+      if (montoAbono > 0) {
+        nuevoPago = {
+          id: `pago-${Date.now()}-alim`,
+          reserva_id: reservaId,
+          tipo: 'abono',
+          fecha: hoyFecha,
+          valor: montoAbono,
+          observacion: estFinal === 'pagada'
+            ? `Liquidación total de alimentación (${detalles?.metodo || 'Transferencia'}) - Administración`
+            : `Abono de alimentación (${detalles?.metodo || 'Transferencia'}) - Administración`,
+        };
+      }
 
       // Actualización optimista en memoria
       setReservas(prev =>
         prev.map(r => {
           if (r.id === reservaId) {
-            const snap = r.cotizacion_snapshot || {};
+            const rSnap = r.cotizacion_snapshot || {};
             const nuevoSnap = {
-              ...snap,
-              estado_alimentacion: estadoAlimentacion,
+              ...rSnap,
+              estado_alimentacion: estFinal,
+              monto_pagado_alimentacion: nuevoMontoPagado,
+              saldo_pendiente_alimentacion: nuevoSaldoPendiente,
               fecha_pago_alimentacion: fecha,
-              metodo_pago_alimentacion: detalles?.metodo || null,
+              metodo_pago_alimentacion: detalles?.metodo || r.metodo_pago_alimentacion || null,
               notas_pago_alimentacion: detalles?.notas || null,
             };
+            const pagosActualizados = nuevoPago ? [...(r.pagos || []), nuevoPago] : (r.pagos || []);
             return {
               ...r,
-              estado_alimentacion: estadoAlimentacion,
+              estado_alimentacion: estFinal,
+              monto_pagado_alimentacion: nuevoMontoPagado,
+              saldo_pendiente_alimentacion: nuevoSaldoPendiente,
               fecha_pago_alimentacion: fecha,
-              metodo_pago_alimentacion: detalles?.metodo || null,
+              metodo_pago_alimentacion: detalles?.metodo || r.metodo_pago_alimentacion || null,
+              pagos: pagosActualizados,
               cotizacion_snapshot: nuevoSnap,
             };
           }
@@ -1406,18 +1542,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Persistir en Supabase
       try {
-        const reservaActual = reservas.find(r => r.id === reservaId);
-        const snap = reservaActual?.cotizacion_snapshot || {};
         const nuevoSnap = {
           ...snap,
-          estado_alimentacion: estadoAlimentacion,
+          estado_alimentacion: estFinal,
+          monto_pagado_alimentacion: nuevoMontoPagado,
+          saldo_pendiente_alimentacion: nuevoSaldoPendiente,
           fecha_pago_alimentacion: fecha,
           metodo_pago_alimentacion: detalles?.metodo || null,
           notas_pago_alimentacion: detalles?.notas || null,
         };
-        await supabase.from('reservas').update({
+        const updatePayload: any = {
           cotizacion_snapshot: nuevoSnap,
-        }).eq('id', reservaId);
+          estado_alimentacion: estFinal,
+          monto_pagado_alimentacion: nuevoMontoPagado,
+          saldo_pendiente_alimentacion: nuevoSaldoPendiente,
+          fecha_pago_alimentacion: fecha,
+          metodo_pago_alimentacion: detalles?.metodo || null,
+        };
+        const { error: updErr } = await supabase.from('reservas').update(updatePayload).eq('id', reservaId);
+        if (updErr) {
+          // Fallback seguro si las columnas explícitas aún no han sido migradas
+          await supabase.from('reservas').update({
+            cotizacion_snapshot: nuevoSnap,
+          }).eq('id', reservaId);
+        }
+
+        if (nuevoPago) {
+          await supabase.from('pagos').insert({
+            reserva_id: reservaId,
+            tipo: nuevoPago.tipo,
+            fecha: nuevoPago.fecha,
+            valor: nuevoPago.valor,
+            observacion: nuevoPago.observacion,
+          });
+        }
       } catch (errDb) {
         console.warn('[cambiarEstadoAlimentacionReserva] Aviso de sincronización Supabase:', errDb);
       }

@@ -5,7 +5,7 @@ import {
   FileText, CheckCircle, Hash, Copy, Check, Award, AlertTriangle, ArrowRight, Utensils
 } from 'lucide-react';
 import type { Reserva, ReservaEstado, Cliente, Finca, Pago, PagoTipo, CotizacionDB, CierreReserva, ConfiguracionGeneral } from '../types';
-import { calcularSaldo } from '../types';
+import { calcularSaldo, desglosarFinanzasReserva } from '../types';
 import { AdminDocumentos } from './AdminDocumentos';
 import { WhatsAppModal } from '../components/WhatsAppModal';
 import { AdminCierreModal } from './AdminCierreModal';
@@ -172,12 +172,14 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
     reserva: Reserva | null;
     metodo: string;
     notas: string;
+    monto: number;
     guardando: boolean;
   }>({
     abierto: false,
     reserva: null,
     metodo: 'Transferencia Bancolombia / Nequi',
     notas: '',
+    monto: 0,
     guardando: false,
   });
 
@@ -205,15 +207,25 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
     if (!modalCerrarAlimentacion.reserva) return;
     setModalCerrarAlimentacion(p => ({ ...p, guardando: true }));
     const r = modalCerrarAlimentacion.reserva;
-    const res = await cambiarEstadoAlimentacionReserva(r.id, 'pagada', {
-      metodo: modalCerrarAlimentacion.metodo,
-      notas: modalCerrarAlimentacion.notas,
-    });
-    setModalCerrarAlimentacion(p => ({ ...p, guardando: false, abierto: false, reserva: null }));
+    const desglose = desglosarFinanzasReserva(r);
+    const monto = modalCerrarAlimentacion.monto > 0 ? modalCerrarAlimentacion.monto : desglose.saldoAlimentacionAdmin;
+    const nuevoTotalPagadoAlim = desglose.pagadoAlimentacion + monto;
+    const esPagadaTotal = nuevoTotalPagadoAlim >= desglose.costoAlimentacion;
+
+    const res = await cambiarEstadoAlimentacionReserva(
+      r.id,
+      esPagadaTotal ? 'pagada' : 'parcial',
+      {
+        metodo: modalCerrarAlimentacion.metodo,
+        notas: modalCerrarAlimentacion.notas,
+        monto,
+      }
+    );
+    setModalCerrarAlimentacion(p => ({ ...p, guardando: false, abierto: false, reserva: null, monto: 0 }));
     if (res.success) {
-      showToast('Servicio de alimentación liquidado y cerrado con éxito ✅', 'success');
+      showToast(esPagadaTotal ? 'Servicio de alimentación liquidado y cerrado con éxito ✅' : 'Abono de alimentación registrado con éxito ✅', 'success');
     } else {
-      showToast(`Error al cerrar alimentación: ${res.error}`, 'error');
+      showToast(`Error al registrar alimentación: ${res.error}`, 'error');
     }
   };
 
@@ -544,6 +556,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
           filtradas.map(r => {
             const saldo = calcularSaldo(r);
             const totalPagado = (r.valor_total) - saldo;
+            const desglose = desglosarFinanzasReserva(r);
             const clienteNombre = r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim() : '—';
             const clienteTel = r.clientes?.whatsapp || r.clientes?.telefono;
             const fincaNombre = r.fincas?.nombre || '—';
@@ -619,6 +632,14 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                           >
                             <Utensils size={10} /> Menú Admin: {formatCOP(r.costo_alimentacion || 0)} (Pagado ✅)
                           </span>
+                        ) : r.estado_alimentacion === 'parcial' ? (
+                          <span
+                            className="status-badge"
+                            style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#c2410c', background: 'rgba(234, 88, 12, 0.12)', borderColor: 'rgba(234, 88, 12, 0.35)', fontWeight: 600 }}
+                            title={`Abono registrado: ${formatCOP(desglose.pagadoAlimentacion)} · Pendiente por cobrar: ${formatCOP(desglose.saldoAlimentacionAdmin)}`}
+                          >
+                            <Utensils size={10} /> Menú Admin: {formatCOP(r.costo_alimentacion || 0)} (Abonado: {formatCOP(desglose.pagadoAlimentacion)} · Saldo: {formatCOP(desglose.saldoAlimentacionAdmin)} ⚠️)
+                          </span>
                         ) : (
                           <span
                             className="status-badge"
@@ -645,10 +666,15 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                         </a>
                       )}
                     </div>
-                    <div style={{ marginTop: '0.25rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+                    <div style={{ marginTop: '0.25rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'baseline', fontSize: '0.8rem' }}>
                       <span>Total: <strong>{formatCOP(r.valor_total)}</strong></span>
                       <span>Pagado: <strong style={{ color: 'var(--success)' }}>{formatCOP(totalPagado)}</strong></span>
                       <span>Saldo: <strong style={{ color: saldo > 0 ? 'var(--danger)' : 'var(--success)' }}>{formatCOP(saldo)}</strong></span>
+                      {desglose.costoAlimentacion > 0 && (
+                        <span className="text-muted" style={{ fontSize: '0.74rem' }}>
+                          (Check-in dueño: <strong>{formatCOP(desglose.saldoFincaCheckIn)}</strong> · Menú admin: <strong>{formatCOP(desglose.saldoAlimentacionAdmin)}</strong>)
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -701,16 +727,20 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                               background: 'rgba(34, 197, 94, 0.12)',
                               borderColor: 'rgba(34, 197, 94, 0.35)',
                             }}
-                            title="Registrar pago recibido y cerrar el servicio de alimentación para la administración"
-                            onClick={() => setModalCerrarAlimentacion({
-                              abierto: true,
-                              reserva: r,
-                              metodo: 'Transferencia Bancolombia / Nequi',
-                              notas: '',
-                              guardando: false,
-                            })}
+                            title="Registrar pago recibido o abonar a la alimentación para la administración"
+                            onClick={() => {
+                              const f = desglosarFinanzasReserva(r);
+                              setModalCerrarAlimentacion({
+                                abierto: true,
+                                reserva: r,
+                                metodo: 'Transferencia Bancolombia / Nequi',
+                                notas: '',
+                                monto: f.saldoAlimentacionAdmin,
+                                guardando: false,
+                              });
+                            }}
                           >
-                            <Check size={13} /> Cerrar Alimentación
+                            <Check size={13} /> {r.estado_alimentacion === 'parcial' ? 'Abonar / Liquidar Alimentación' : 'Cerrar Alimentación'}
                           </button>
                         </>
                       )
@@ -1020,97 +1050,145 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
         />
       )}
 
-      {/* Modal para Cerrar y Liquidar Servicio de Alimentación */}
-      {modalCerrarAlimentacion.abierto && modalCerrarAlimentacion.reserva && (
-        <div className="modal-overlay" onClick={() => setModalCerrarAlimentacion(p => ({ ...p, abierto: false }))}>
-          <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px' }}>
-            <div className="modal-header">
-              <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#c2410c' }}>
-                <Utensils size={18} /> Liquidar y Cerrar Alimentación (Admin)
-              </div>
-              <button className="btn btn-sm" onClick={() => setModalCerrarAlimentacion(p => ({ ...p, abierto: false }))}>
-                <X size={14} />
-              </button>
-            </div>
+      {/* Modal para liquidar y registrar pago / abono de alimentación */}
+      {modalCerrarAlimentacion.abierto && modalCerrarAlimentacion.reserva && (() => {
+        const rModal = modalCerrarAlimentacion.reserva;
+        const desgModal = desglosarFinanzasReserva(rModal);
+        const montoIngresado = modalCerrarAlimentacion.monto;
+        const nuevoTotal = desgModal.pagadoAlimentacion + montoIngresado;
+        const esLiquidacionCompleta = nuevoTotal >= desgModal.costoAlimentacion;
+        const nuevoSaldoRestante = Math.max(0, desgModal.costoAlimentacion - nuevoTotal);
 
-            <div style={{ padding: '1.25rem', display: 'grid', gap: '0.85rem' }}>
-              <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem', borderRadius: '8px', fontSize: '0.85rem', display: 'grid', gap: '0.35rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span className="text-muted">Reserva:</span>
-                  <strong>{modalCerrarAlimentacion.reserva.fincas?.nombre || 'Finca'} #{modalCerrarAlimentacion.reserva.consecutivo || ''}</strong>
+        return (
+          <div className="modal-overlay" onClick={() => setModalCerrarAlimentacion(p => ({ ...p, abierto: false, reserva: null }))}>
+            <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+              <div className="modal-header">
+                <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#16a34a' }}>
+                  <Utensils size={18} /> Registrar Pago de Alimentación (Admin)
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span className="text-muted">Cliente:</span>
-                  <strong>
-                    {modalCerrarAlimentacion.reserva.clientes?.nombre
-                      ? `${modalCerrarAlimentacion.reserva.clientes.nombre} ${modalCerrarAlimentacion.reserva.clientes.apellido || ''}`.trim()
-                      : 'Cliente'}
-                  </strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span className="text-muted">Menú solicitado:</span>
-                  <span>{modalCerrarAlimentacion.reserva.alimentacion || 'Plan de alimentación'}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '0.35rem', fontWeight: 700, color: 'var(--primary)' }}>
-                  <span>Total Alimentación a liquidar:</span>
-                  <span style={{ fontSize: '1rem', color: '#16a34a' }}>
-                    {formatCOP(modalCerrarAlimentacion.reserva.costo_alimentacion || 0)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-xs text-muted" style={{ lineHeight: 1.4 }}>
-                ℹ️ Esta acción confirma que el cliente canceló el valor de la alimentación en la cuenta de la administración. La reserva del alojamiento permanece intacta en sus fechas y condiciones acordadas con el propietario.
-              </div>
-
-              <div className="field">
-                <label>Método / Cuenta de recepción</label>
-                <select
-                  value={modalCerrarAlimentacion.metodo}
-                  onChange={e => setModalCerrarAlimentacion(p => ({ ...p, metodo: e.target.value }))}
-                >
-                  <option value="Transferencia Bancolombia / Nequi">Transferencia Bancolombia / Nequi (Admin)</option>
-                  <option value="Daviplata">Daviplata (Admin)</option>
-                  <option value="Efectivo en Finca">Efectivo recibido en finca</option>
-                  <option value="Consignación Bancaria">Consignación Bancaria</option>
-                  <option value="Otro medio de pago">Otro medio de pago</option>
-                </select>
-              </div>
-
-              <div className="field">
-                <label>Observaciones / Referencia de comprobante (opcional)</label>
-                <input
-                  type="text"
-                  placeholder="Ej: Aprobación Nequi #849204"
-                  value={modalCerrarAlimentacion.notas}
-                  onChange={e => setModalCerrarAlimentacion(p => ({ ...p, notas: e.target.value }))}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={modalCerrarAlimentacion.guardando}
-                  onClick={() => setModalCerrarAlimentacion(p => ({ ...p, abierto: false }))}
-                >
-                  Cancelar
+                <button className="btn btn-sm" onClick={() => setModalCerrarAlimentacion(p => ({ ...p, abierto: false, reserva: null }))}>
+                  <X size={14} />
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-                  disabled={modalCerrarAlimentacion.guardando}
-                  onClick={handleConfirmarCierreAlimentacion}
-                >
-                  <Check size={15} />
-                  {modalCerrarAlimentacion.guardando ? 'Guardando…' : 'Confirmar Pago y Cerrar Servicio 🍽️'}
-                </button>
+              </div>
+
+              <div style={{ padding: '1.25rem', display: 'grid', gap: '0.9rem' }}>
+                <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem', borderRadius: '8px', display: 'grid', gap: '0.35rem', fontSize: '0.84rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span className="text-muted">Finca / Reserva:</span>
+                    <strong>{rModal.fincas?.nombre || 'Finca'} #{rModal.consecutivo || ''}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span className="text-muted">Cliente:</span>
+                    <strong>
+                      {rModal.clientes?.nombre
+                        ? `${rModal.clientes.nombre} ${rModal.clientes.apellido || ''}`.trim()
+                        : 'Cliente'}
+                    </strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span className="text-muted">Menú solicitado:</span>
+                    <span>{rModal.alimentacion || 'Plan de alimentación'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span className="text-muted">Valor Total del Menú:</span>
+                    <span>{formatCOP(desgModal.costoAlimentacion)}</span>
+                  </div>
+                  {desgModal.pagadoAlimentacion > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a' }}>
+                      <span>Ya abonado previamente:</span>
+                      <strong>+{formatCOP(desgModal.pagadoAlimentacion)}</strong>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '0.35rem', fontWeight: 700, color: '#c2410c' }}>
+                    <span>Saldo pendiente actual de alimentación:</span>
+                    <span style={{ fontSize: '0.95rem' }}>
+                      {formatCOP(desgModal.saldoAlimentacionAdmin)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Monto a registrar ahora ($) *</span>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem', height: 'auto' }}
+                      onClick={() => setModalCerrarAlimentacion(p => ({ ...p, monto: desgModal.saldoAlimentacionAdmin }))}
+                    >
+                      Pagar saldo total ({formatCOP(desgModal.saldoAlimentacionAdmin)})
+                    </button>
+                  </label>
+                  <CurrencyInput
+                    value={modalCerrarAlimentacion.monto}
+                    onChange={(val) => setModalCerrarAlimentacion(p => ({ ...p, monto: Math.max(0, val) }))}
+                  />
+                  <div className="text-xs text-muted mt-1">
+                    {esLiquidacionCompleta ? (
+                      <span style={{ color: '#16a34a', fontWeight: 600 }}>
+                        ✓ Con este pago el servicio de alimentación quedará 100% liquidado.
+                      </span>
+                    ) : (
+                      <span>
+                        Quedará un saldo pendiente de <strong>{formatCOP(nuevoSaldoRestante)}</strong> para la administración.
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label>Método / Cuenta de recepción</label>
+                  <select
+                    value={modalCerrarAlimentacion.metodo}
+                    onChange={e => setModalCerrarAlimentacion(p => ({ ...p, metodo: e.target.value }))}
+                  >
+                    <option value="Transferencia Bancolombia / Nequi">Transferencia Bancolombia / Nequi (Admin)</option>
+                    <option value="Daviplata">Daviplata (Admin)</option>
+                    <option value="Efectivo recibido">Efectivo recibido</option>
+                    <option value="Consignación Bancaria">Consignación Bancaria</option>
+                    <option value="Otro medio de pago">Otro medio de pago</option>
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label>Observaciones / Referencia de comprobante (opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Ej: Aprobación Nequi #849204"
+                    value={modalCerrarAlimentacion.notas}
+                    onChange={e => setModalCerrarAlimentacion(p => ({ ...p, notas: e.target.value }))}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={modalCerrarAlimentacion.guardando}
+                    onClick={() => setModalCerrarAlimentacion(p => ({ ...p, abierto: false }))}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                    disabled={modalCerrarAlimentacion.guardando || modalCerrarAlimentacion.monto <= 0}
+                    onClick={handleConfirmarCierreAlimentacion}
+                  >
+                    <Check size={15} />
+                    {modalCerrarAlimentacion.guardando
+                      ? 'Registrando…'
+                      : esLiquidacionCompleta
+                      ? 'Liquidar Servicio Total 🍽️'
+                      : 'Registrar Abono Parcial 🍽️'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

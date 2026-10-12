@@ -146,7 +146,7 @@ export interface CotizacionDB {
 }
 
 export type ReservaEstado = 'activa' | 'completada' | 'cancelada' | 'no_show';
-export type EstadoAlimentacion = 'pendiente' | 'pagada' | 'cancelada';
+export type EstadoAlimentacion = 'pendiente' | 'parcial' | 'pagada' | 'cancelada';
 
 export interface Reserva {
   id: string;
@@ -162,6 +162,8 @@ export interface Reserva {
   alimentacion?: string | null;
   costo_alimentacion?: number;
   estado_alimentacion?: EstadoAlimentacion | null;
+  monto_pagado_alimentacion?: number;
+  saldo_pendiente_alimentacion?: number;
   fecha_pago_alimentacion?: string | null;
   metodo_pago_alimentacion?: string | null;
   consecutivo?: string | null;  // Consecutivo numérico de seguimiento (ej: 1001, sin letras al inicio)
@@ -218,6 +220,66 @@ export function calcularSaldo(reserva: Reserva): number {
     return acc + (p.tipo === 'devolucion' ? -p.valor : p.valor);
   }, 0);
   return reserva.valor_total - totalPagado;
+}
+
+/**
+ * Desglose financiero independiente pero centralizado:
+ * Separa de manera transparente lo que le corresponde al Propietario de la finca
+ * de lo que le corresponde a la Administración por servicios de alimentación.
+ */
+export function desglosarFinanzasReserva(reserva: Reserva) {
+  const costoAlim = reserva.costo_alimentacion || 0;
+  const snap = reserva.cotizacion_snapshot || {};
+  const subtotalAlojamiento = typeof snap.subtotal_alojamiento === 'number'
+    ? snap.subtotal_alojamiento
+    : Math.max(0, reserva.valor_total - costoAlim);
+
+  // Pagos totales
+  const totalPagos = (reserva.pagos || []).reduce((acc, p) => {
+    return acc + (p.tipo === 'devolucion' ? -p.valor : p.valor);
+  }, 0);
+  const totalRecaudado = (reserva.pagos && reserva.pagos.length > 0) ? totalPagos : reserva.separacion;
+
+  // Monto pagado de alimentación
+  let pagadoAlimentacion = 0;
+  if (costoAlim > 0) {
+    if (typeof reserva.monto_pagado_alimentacion === 'number') {
+      pagadoAlimentacion = reserva.monto_pagado_alimentacion;
+    } else if (typeof snap.monto_pagado_alimentacion === 'number') {
+      pagadoAlimentacion = snap.monto_pagado_alimentacion;
+    } else if (reserva.estado_alimentacion === 'pagada' || snap.estado_alimentacion === 'pagada') {
+      pagadoAlimentacion = costoAlim;
+    } else {
+      // Buscar en pagos aquellos con etiqueta de alimentación
+      const pagosAlim = (reserva.pagos || []).filter(p =>
+        p.observacion?.toLowerCase().includes('alimentaci') ||
+        p.observacion?.toLowerCase().includes('menú') ||
+        p.observacion?.toLowerCase().includes('menu')
+      );
+      if (pagosAlim.length > 0) {
+        pagadoAlimentacion = pagosAlim.reduce((acc, p) => acc + (p.tipo === 'devolucion' ? -p.valor : p.valor), 0);
+      }
+    }
+  }
+  pagadoAlimentacion = Math.max(0, Math.min(costoAlim, pagadoAlimentacion));
+
+  // El resto de los pagos corresponde al alojamiento (finca para el propietario)
+  const pagadoFinca = Math.max(0, Math.min(subtotalAlojamiento, totalRecaudado - pagadoAlimentacion));
+  const saldoFincaCheckIn = Math.max(0, subtotalAlojamiento - pagadoFinca);
+  const saldoAlimentacionAdmin = Math.max(0, costoAlim - pagadoAlimentacion);
+  const saldoConsolidado = saldoFincaCheckIn + saldoAlimentacionAdmin;
+
+  return {
+    subtotalAlojamiento,
+    pagadoFinca,
+    saldoFincaCheckIn,
+    costoAlimentacion: costoAlim,
+    pagadoAlimentacion,
+    saldoAlimentacionAdmin,
+    totalConsolidado: reserva.valor_total,
+    totalRecaudado,
+    saldoConsolidado,
+  };
 }
 
 // ---------------------------------------------------------------

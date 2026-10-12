@@ -300,6 +300,11 @@ ALTER TABLE public.reservas ADD COLUMN IF NOT EXISTS cotizacion_snapshot JSONB;
 ALTER TABLE public.reservas ADD COLUMN IF NOT EXISTS fecha_cierre TIMESTAMPTZ;
 ALTER TABLE public.reservas ADD COLUMN IF NOT EXISTS cerrada_por TEXT;
 ALTER TABLE public.reservas ADD COLUMN IF NOT EXISTS notas_cierre TEXT;
+ALTER TABLE public.reservas ADD COLUMN IF NOT EXISTS estado_alimentacion TEXT DEFAULT 'pendiente';
+ALTER TABLE public.reservas ADD COLUMN IF NOT EXISTS monto_pagado_alimentacion NUMERIC(12,2) DEFAULT 0;
+ALTER TABLE public.reservas ADD COLUMN IF NOT EXISTS saldo_pendiente_alimentacion NUMERIC(12,2) DEFAULT 0;
+ALTER TABLE public.reservas ADD COLUMN IF NOT EXISTS fecha_pago_alimentacion TIMESTAMPTZ;
+ALTER TABLE public.reservas ADD COLUMN IF NOT EXISTS metodo_pago_alimentacion TEXT;
 
 -- Permitir que las reservas mantengan su snapshot aunque la finca se elimine
 ALTER TABLE public.reservas ALTER COLUMN finca_id DROP NOT NULL;

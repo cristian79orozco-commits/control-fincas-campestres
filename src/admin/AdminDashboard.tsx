@@ -29,6 +29,7 @@ import type {
   Reserva, ReservaEstado, PagoTipo, AdminSection, Menu as MenuType, Comunicacion,
   ConfiguracionGeneral, ContenidoSitio, CierreReserva
 } from '../types';
+import { desglosarFinanzasReserva } from '../types';
 
 interface AdminDashboardProps {
   isAdminLoggedIn: boolean;
@@ -270,23 +271,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const hoy = new Date().toISOString().split('T')[0];
   const cotizacionesPendientes = cotizaciones.filter(c => ['borrador', 'cotizada', 'pendiente'].includes(c.estado)).length;
   const reservasActivas = reservas.filter(r => r.estado === 'activa');
-  const totalSaldoPendiente = reservasActivas.reduce((acc, r) => {
-    const pagado = (r.pagos || []).reduce((s, p) => s + (p.tipo === 'devolucion' ? -p.valor : p.valor), 0);
-    return acc + Math.max(0, r.valor_total - pagado);
-  }, 0);
+
+  let saldoPendienteFincasDueños = 0;
+  let saldoPendienteAdminAlimentacion = 0;
+
+  reservasActivas.forEach(r => {
+    const fin = desglosarFinanzasReserva(r);
+    saldoPendienteFincasDueños += fin.saldoFincaCheckIn;
+    saldoPendienteAdminAlimentacion += fin.saldoAlimentacionAdmin;
+  });
+
+  const totalSaldoPendiente = saldoPendienteFincasDueños + saldoPendienteAdminAlimentacion;
 
   // Métricas del servicio de alimentación (suministrado directamente por el Administrador)
   const reservasConMenu = reservas.filter(
     r => (r.costo_alimentacion || 0) > 0 || (r.alimentacion && r.alimentacion !== 'Sin alimentación')
   );
-  // 1. Alimentación cobrada y cerrada a la cuenta del admin
-  const ingresosAlimentacionLiquidados = reservas
-    .filter(r => r.estado_alimentacion === 'pagada' || r.cotizacion_snapshot?.estado_alimentacion === 'pagada')
-    .reduce((acc, r) => acc + (r.costo_alimentacion || 0), 0);
+  // 1. Alimentación cobrada y recaudada a la cuenta del admin (totales y abonos parciales)
+  const ingresosAlimentacionLiquidados = reservas.reduce((acc, r) => {
+    const fin = desglosarFinanzasReserva(r);
+    return acc + fin.pagadoAlimentacion;
+  }, 0);
   // 2. Alimentación pendiente de cobro en reservas activas
-  const ingresosAlimentacionPorCobrar = reservas
-    .filter(r => r.estado === 'activa' && r.estado_alimentacion !== 'pagada' && r.cotizacion_snapshot?.estado_alimentacion !== 'pagada' && ((r.costo_alimentacion || 0) > 0))
-    .reduce((acc, r) => acc + (r.costo_alimentacion || 0), 0);
+  const ingresosAlimentacionPorCobrar = saldoPendienteAdminAlimentacion;
   // 3. Proyección en cotizaciones aún no confirmadas
   const ingresosAlimentacionEnCotizaciones = cotizaciones
     .filter(c => ['borrador', 'cotizada', 'pendiente'].includes(c.estado))
@@ -538,6 +545,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="stat-card">
                   <div className="stat-val" style={{ color: 'var(--danger)', fontSize: '1.1rem' }}>{formatCOP(totalSaldoPendiente)}</div>
                   <div className="stat-lbl">Saldo por cobrar</div>
+                  {saldoPendienteAdminAlimentacion > 0 && (
+                    <div className="text-xs text-muted" style={{ marginTop: '0.2rem', fontSize: '0.68rem' }}>
+                      Dueños: {formatCOP(saldoPendienteFincasDueños)} · Admin: {formatCOP(saldoPendienteAdminAlimentacion)}
+                    </div>
+                  )}
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer', borderLeft: '3px solid var(--accent, #ea580c)' }} onClick={() => navigateTo('menus')}>
                   <div className="stat-val" style={{ color: 'var(--accent, #ea580c)', fontSize: '1.1rem' }}>{formatCOP(ingresosAlimentacionLiquidados)}</div>
