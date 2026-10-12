@@ -49,7 +49,7 @@ export const FooterPublico: React.FC<FooterPublicoProps> = ({
           maxWidth: '1280px',
           margin: '0 auto',
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))',
           gap: '2.5rem',
           marginBottom: '2.5rem',
         }}

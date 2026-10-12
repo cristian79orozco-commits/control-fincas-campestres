@@ -191,7 +191,7 @@ export const Catalog: React.FC<CatalogProps> = ({
           </div>
 
           {/* Fila principal: Búsqueda, Fechas y Capacidad */}
-          <div className="filters-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+          <div className="filters-grid">
             {/* Búsqueda por texto */}
             <div className="field">
               <label><Search size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> Finca o palabra clave</label>

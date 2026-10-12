@@ -193,13 +193,14 @@ export const App: React.FC = () => {
 
         case 'destacados':
           return (
-            <BeneficiosSection
-              key="destacados"
-              visible={contenidoSitio.destacados_visible}
-              titulo={contenidoSitio.destacados_titulo}
-              subtitulo={contenidoSitio.destacados_subtitulo}
-              items={contenidoSitio.destacados_items}
-            />
+            <div key="destacados" className="main-content">
+              <BeneficiosSection
+                visible={contenidoSitio.destacados_visible}
+                titulo={contenidoSitio.destacados_titulo}
+                subtitulo={contenidoSitio.destacados_subtitulo}
+                items={contenidoSitio.destacados_items}
+              />
+            </div>
           );
 
         case 'estado':
@@ -223,7 +224,7 @@ export const App: React.FC = () => {
 
         case 'menus':
           return (
-            <div key="menus" id="seccion-menus">
+            <div key="menus" id="seccion-menus" className="main-content">
               <MenusPublicosSection
                 visible={contenidoSitio.menus_visible}
                 titulo={contenidoSitio.menus_titulo}
@@ -237,13 +238,14 @@ export const App: React.FC = () => {
 
         case 'faq':
           return (
-            <FaqSection
-              key="faq"
-              visible={contenidoSitio.faq_visible}
-              titulo={contenidoSitio.faq_titulo}
-              subtitulo={contenidoSitio.faq_subtitulo}
-              items={contenidoSitio.faq_items}
-            />
+            <div key="faq" className="main-content">
+              <FaqSection
+                visible={contenidoSitio.faq_visible}
+                titulo={contenidoSitio.faq_titulo}
+                subtitulo={contenidoSitio.faq_subtitulo}
+                items={contenidoSitio.faq_items}
+              />
+            </div>
           );
 
         default:

@@ -462,7 +462,7 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
           </span>
         </div>
 
-        <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+        <div className="form-grid two-cols" style={{ gap: '0.75rem' }}>
           <div className="field" style={{ margin: 0 }}>
             <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>
               <User size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> Nombre completo <span style={{ color: 'var(--danger)' }}>*</span>
