@@ -425,7 +425,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
   );
 
   const filtradas = useMemo(() => {
-    return cotizaciones.filter(c => {
+    const list = cotizaciones.filter(c => {
       if (tabActiva === 'pendientes') {
         return ['borrador', 'cotizada', 'pendiente'].includes(c.estado);
       }
@@ -436,6 +436,19 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
         return ['cancelada', 'vencida'].includes(c.estado);
       }
       return true; // todas
+    });
+
+    // Orden de llegada estricto: las últimas cotizaciones recibidas siempre arriba
+    return [...list].sort((a, b) => {
+      const fechaB = new Date(b.created_at || '').getTime();
+      const fechaA = new Date(a.created_at || '').getTime();
+      if (!isNaN(fechaB) && !isNaN(fechaA) && fechaB !== fechaA) {
+        return fechaB - fechaA;
+      }
+      const numB = parseInt(String(b.consecutivo || '').replace(/\D/g, ''), 10) || 0;
+      const numA = parseInt(String(a.consecutivo || '').replace(/\D/g, ''), 10) || 0;
+      if (numB !== numA) return numB - numA;
+      return new Date(b.fecha_inicio || '').getTime() - new Date(a.fecha_inicio || '').getTime();
     });
   }, [cotizaciones, tabActiva]);
 

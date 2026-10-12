@@ -309,8 +309,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleConvertirReserva = (cotizacion: CotizacionDB) => {
-    setCotizacionParaReserva(cotizacion);
+  const handleConvertirReserva = () => {
+    // La cotización ya fue convertida e insertada como Reserva activa en AppContext.
+    // Limpiamos cotizacionParaReserva para evitar abrir formularios duplicados y navegamos a la vista
+    setCotizacionParaReserva(null);
     navigateTo('reservas');
   };
 

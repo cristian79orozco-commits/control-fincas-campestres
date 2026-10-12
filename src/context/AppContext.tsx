@@ -447,7 +447,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           pagos(id, reserva_id, tipo, fecha, valor, observacion, created_at),
           cierres_reservas(*)
         `)
-        .order('fecha_inicio', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (resFull.error) {
         const resFallback = await supabase
@@ -458,7 +458,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             fincas(id, nombre),
             pagos(id, reserva_id, tipo, fecha, valor, observacion, created_at)
           `)
-          .order('fecha_inicio', { ascending: false });
+          .order('created_at', { ascending: false });
 
         if (resFallback.error) throw resFallback.error;
         data = resFallback.data;
@@ -495,9 +495,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       });
 
-      const ordenadas = procesadas.sort(
-        (a, b) => new Date(b.fecha_inicio || '').getTime() - new Date(a.fecha_inicio || '').getTime()
-      );
+      // Deduplicar si accidentalmente existieran múltiples registros de reserva para una misma cotización
+      const unicasPorCotiz: Reserva[] = [];
+      const cotizVistos = new Set<string>();
+      for (const res of procesadas) {
+        if (res.cotizacion_id) {
+          if (cotizVistos.has(res.cotizacion_id)) continue;
+          cotizVistos.add(res.cotizacion_id);
+        }
+        unicasPorCotiz.push(res);
+      }
+
+      // Orden de llegada estricto: las últimas que llegaron arriba (created_at desc / consecutivo desc)
+      const ordenadas = unicasPorCotiz.sort((a, b) => {
+        const tB = new Date(b.created_at || '').getTime();
+        const tA = new Date(a.created_at || '').getTime();
+        if (!isNaN(tB) && !isNaN(tA) && tB !== tA) return tB - tA;
+        const numB = parseInt(String(b.consecutivo || '').replace(/\D/g, ''), 10) || 0;
+        const numA = parseInt(String(a.consecutivo || '').replace(/\D/g, ''), 10) || 0;
+        if (numB !== numA) return numB - numA;
+        return new Date(b.fecha_inicio || '').getTime() - new Date(a.fecha_inicio || '').getTime();
+      });
       setReservas(ordenadas);
       guardarCache('fc_cache_reservas', ordenadas);
     } catch (err) {
@@ -955,6 +973,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     alimentacionOpciones?: boolean | { abonoAlimentacion?: number; pagadaTotal?: boolean; metodo?: string; notas?: string }
   ): Promise<{ success: boolean; reservaId?: string; error?: string }> => {
     try {
+      // 0. Blindaje contra duplicados: si ya existe una reserva para esta cotización, no duplicar
+      const reservaExistente = reservas.find(r => r.cotizacion_id === cotizacion.id);
+      if (reservaExistente) {
+        return { success: true, reservaId: reservaExistente.id };
+      }
+
       // 1. Marcar cotización como confirmada en memoria y BD
       setCotizaciones(prev =>
         prev.map(c => (c.id === cotizacion.id ? { ...c, estado: 'confirmada' } : c))
@@ -1087,9 +1111,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         },
       };
 
-      // Actualización optimista de reserva con persistencia local
+      // Actualización optimista de reserva con persistencia local (limpiando duplicados previos)
       setReservas(prev => {
-        const up = [nuevaReserva, ...prev];
+        const sinDuplicados = prev.filter(r => r.id !== newResId && r.cotizacion_id !== cotizacion.id);
+        const up = [nuevaReserva, ...sinDuplicados];
         guardarCache('fc_cache_reservas', up);
         return up;
       });

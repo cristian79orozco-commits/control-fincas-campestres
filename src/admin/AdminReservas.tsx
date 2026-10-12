@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ClipboardList, Plus, Edit3, Trash2, X, Save, CreditCard,
   Calendar, Users, DollarSign, ChevronDown, ChevronUp, FileCheck, MessageCircle,
@@ -144,6 +144,8 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
   const [reservaExpandida, setReservaExpandida] = useState<string | null>(null);
   const [pagoForm, setPagoForm] = useState<typeof PAGO_VACIO>(PAGO_VACIO);
   const [pagoReservaId, setPagoReservaId] = useState<string | null>(null);
+  const [destinoAbono, setDestinoAbono] = useState<'alojamiento' | 'alimentacion'>('alojamiento');
+  const [metodoPagoAbono, setMetodoPagoAbono] = useState<string>('Transferencia Bancolombia / Nequi');
   const [guardandoPago, setGuardandoPago] = useState(false);
   type FiltroReservaTab = 'activas' | 'completadas' | 'canceladas' | 'todas';
   const [tabReservaActiva, setTabReservaActiva] = useState<FiltroReservaTab>('activas');
@@ -166,24 +168,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
 
   const { cambiarEstadoAlimentacionReserva } = useApp();
 
-  // Modal para liquidar y cerrar servicio de alimentación (Admin)
-  const [modalCerrarAlimentacion, setModalCerrarAlimentacion] = useState<{
-    abierto: boolean;
-    reserva: Reserva | null;
-    metodo: string;
-    notas: string;
-    monto: number;
-    guardando: boolean;
-  }>({
-    abierto: false,
-    reserva: null,
-    metodo: 'Transferencia Bancolombia / Nequi',
-    notas: '',
-    monto: 0,
-    guardando: false,
-  });
-
-  // Abrir WhatsApp para cobrar alimentación
+  // Abrir WhatsApp para cobrar alimentación (cuando aplica)
   const handleAbrirCobroAlimentacion = (r: Reserva) => {
     const bancosAdmin = configuracion?.banco_cuenta ? {
       banco: configuracion.banco_nombre || undefined,
@@ -202,30 +187,26 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
     });
   };
 
-  // Confirmar recepción de pago y cierre del servicio de alimentación
-  const handleConfirmarCierreAlimentacion = async () => {
-    if (!modalCerrarAlimentacion.reserva) return;
-    setModalCerrarAlimentacion(p => ({ ...p, guardando: true }));
-    const r = modalCerrarAlimentacion.reserva;
-    const desglose = desglosarFinanzasReserva(r);
-    const monto = modalCerrarAlimentacion.monto > 0 ? modalCerrarAlimentacion.monto : desglose.saldoAlimentacionAdmin;
-    const nuevoTotalPagadoAlim = desglose.pagadoAlimentacion + monto;
-    const esPagadaTotal = nuevoTotalPagadoAlim >= desglose.costoAlimentacion;
-
-    const res = await cambiarEstadoAlimentacionReserva(
-      r.id,
-      esPagadaTotal ? 'pagada' : 'parcial',
-      {
-        metodo: modalCerrarAlimentacion.metodo,
-        notas: modalCerrarAlimentacion.notas,
-        monto,
-      }
-    );
-    setModalCerrarAlimentacion(p => ({ ...p, guardando: false, abierto: false, reserva: null, monto: 0 }));
-    if (res.success) {
-      showToast(esPagadaTotal ? 'Servicio de alimentación liquidado y cerrado con éxito ✅' : 'Abono de alimentación registrado con éxito ✅', 'success');
+  // Abrir modal unificado de pago/abono
+  const handleAbrirModalPago = (r: Reserva) => {
+    const f = desglosarFinanzasReserva(r);
+    setPagoReservaId(r.id);
+    if (f.saldoAlimentacionAdmin > 0 && f.saldoFincaCheckIn === 0) {
+      setDestinoAbono('alimentacion');
+      setPagoForm({
+        tipo: 'abono',
+        fecha: new Date().toISOString().split('T')[0],
+        valor: f.saldoAlimentacionAdmin,
+        observacion: 'Abono de alimentación - Administración',
+      });
     } else {
-      showToast(`Error al registrar alimentación: ${res.error}`, 'error');
+      setDestinoAbono('alojamiento');
+      setPagoForm({
+        tipo: 'abono',
+        fecha: new Date().toISOString().split('T')[0],
+        valor: f.saldoFincaCheckIn > 0 ? f.saldoFincaCheckIn : calcularSaldo(r),
+        observacion: 'Abono de alojamiento - Propietario',
+      });
     }
   };
 
@@ -298,16 +279,51 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
   const handleRegistrarPago = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pagoReservaId) return;
-    if (!pagoForm.valor || pagoForm.valor <= 0) { showToast('El valor debe ser mayor a cero', 'error'); return; }
+    if (!pagoForm.valor || pagoForm.valor <= 0) {
+      showToast('El valor debe ser mayor a cero', 'error');
+      return;
+    }
+    const r = reservas.find(res => res.id === pagoReservaId);
+    if (!r) return;
+
     setGuardandoPago(true);
-    const res = await onRegistrarPago(pagoReservaId, pagoForm);
-    setGuardandoPago(false);
-    if (res.success) {
-      showToast('Pago registrado ✅', 'success');
-      setPagoForm(PAGO_VACIO);
-      setPagoReservaId(null);
+
+    if (destinoAbono === 'alimentacion') {
+      const desglose = desglosarFinanzasReserva(r);
+      const monto = pagoForm.valor;
+      const nuevoTotalPagadoAlim = desglose.pagadoAlimentacion + monto;
+      const esPagadaTotal = nuevoTotalPagadoAlim >= desglose.costoAlimentacion;
+
+      const res = await cambiarEstadoAlimentacionReserva(
+        r.id,
+        esPagadaTotal ? 'pagada' : 'parcial',
+        {
+          metodo: metodoPagoAbono,
+          notas: pagoForm.observacion || undefined,
+          monto,
+        }
+      );
+      setGuardandoPago(false);
+      if (res.success) {
+        showToast(esPagadaTotal ? '¡Alimentación liquidada totalmente! 🍽️✅' : 'Abono a alimentación registrado 🍽️✅', 'success');
+        setPagoForm(PAGO_VACIO);
+        setPagoReservaId(null);
+      } else {
+        showToast(`Error al registrar alimentación: ${res.error}`, 'error');
+      }
     } else {
-      showToast(`Error: ${res.error}`, 'error');
+      const res = await onRegistrarPago(pagoReservaId, {
+        ...pagoForm,
+        observacion: pagoForm.observacion || 'Abono de alojamiento - Propietario',
+      });
+      setGuardandoPago(false);
+      if (res.success) {
+        showToast('Abono registrado con éxito ✅', 'success');
+        setPagoForm(PAGO_VACIO);
+        setPagoReservaId(null);
+      } else {
+        showToast(`Error: ${res.error}`, 'error');
+      }
     }
   };
 
@@ -323,16 +339,49 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
     );
   };
 
-  const conteoActivas = reservas.filter(r => r.estado === 'activa').length;
-  const conteoCompletadas = reservas.filter(r => r.estado === 'completada').length;
-  const conteoCanceladas = reservas.filter(r => ['cancelada', 'no_show'].includes(r.estado)).length;
+  // Deduplicación inteligente por cotizacion_id y por ID para eliminar cualquier borrador accidental
+  const reservasUnicas = useMemo(() => {
+    const cotizVistas = new Set<string>();
+    const idsVistos = new Set<string>();
+    const lista: Reserva[] = [];
 
-  const filtradas = reservas.filter(r => {
-    if (tabReservaActiva === 'activas') return r.estado === 'activa';
-    if (tabReservaActiva === 'completadas') return r.estado === 'completada';
-    if (tabReservaActiva === 'canceladas') return ['cancelada', 'no_show'].includes(r.estado);
-    return true; // todas
-  });
+    for (const r of reservas) {
+      if (idsVistos.has(r.id)) continue;
+      if (r.cotizacion_id) {
+        if (cotizVistas.has(r.cotizacion_id)) continue;
+        cotizVistas.add(r.cotizacion_id);
+      }
+      idsVistos.add(r.id);
+      lista.push(r);
+    }
+    return lista;
+  }, [reservas]);
+
+  const conteoActivas = useMemo(() => reservasUnicas.filter(r => r.estado === 'activa').length, [reservasUnicas]);
+  const conteoCompletadas = useMemo(() => reservasUnicas.filter(r => r.estado === 'completada').length, [reservasUnicas]);
+  const conteoCanceladas = useMemo(() => reservasUnicas.filter(r => ['cancelada', 'no_show'].includes(r.estado)).length, [reservasUnicas]);
+
+  const filtradas = useMemo(() => {
+    const list = reservasUnicas.filter(r => {
+      if (tabReservaActiva === 'activas') return r.estado === 'activa';
+      if (tabReservaActiva === 'completadas') return r.estado === 'completada';
+      if (tabReservaActiva === 'canceladas') return ['cancelada', 'no_show'].includes(r.estado);
+      return true; // todas
+    });
+
+    // Orden de llegada estricto: las últimas reservas recibidas siempre arriba
+    return [...list].sort((a, b) => {
+      const fechaB = new Date(b.created_at || '').getTime();
+      const fechaA = new Date(a.created_at || '').getTime();
+      if (!isNaN(fechaB) && !isNaN(fechaA) && fechaB !== fechaA) {
+        return fechaB - fechaA;
+      }
+      const numB = parseInt(String(b.consecutivo || '').replace(/\D/g, ''), 10) || 0;
+      const numA = parseInt(String(a.consecutivo || '').replace(/\D/g, ''), 10) || 0;
+      if (numB !== numA) return numB - numA;
+      return new Date(b.fecha_inicio || '').getTime() - new Date(a.fecha_inicio || '').getTime();
+    });
+  }, [reservasUnicas, tabReservaActiva]);
 
   return (
     <div className="panel">
@@ -504,47 +553,168 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
         </div>
       )}
 
-      {/* Modal pago */}
-      {pagoReservaId && (
-        <div className="modal-overlay" onClick={() => setPagoReservaId(null)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '420px' }}>
-            <div className="modal-header">
-              <div className="panel-title"><CreditCard size={16} /> Registrar pago</div>
-              <button className="btn btn-sm" onClick={() => setPagoReservaId(null)}><X size={14} /></button>
+      {/* Modal unificado de Registro de Abono / Pago */}
+      {(() => {
+        if (!pagoReservaId) return null;
+        const reservaActual = reservas.find(res => res.id === pagoReservaId);
+        if (!reservaActual) return null;
+        const desglose = desglosarFinanzasReserva(reservaActual);
+        const tieneAlim = desglose.costoAlimentacion > 0;
+
+        return (
+          <div className="modal-overlay" onClick={() => setPagoReservaId(null)}>
+            <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+              <div className="modal-header">
+                <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <CreditCard size={16} /> Registrar Abono #{reservaActual.consecutivo || ''}
+                </div>
+                <button className="btn btn-sm" onClick={() => setPagoReservaId(null)}><X size={14} /></button>
+              </div>
+
+              <form onSubmit={handleRegistrarPago} style={{ display: 'grid', gap: '0.85rem', padding: '1.25rem' }}>
+                {/* Selector de Destino de Abono (solo si la reserva tiene servicio de alimentación) */}
+                {tieneAlim && (
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
+                      Concepto del abono a registrar:
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${destinoAbono === 'alojamiento' ? 'btn-primary' : ''}`}
+                        onClick={() => {
+                          setDestinoAbono('alojamiento');
+                          setPagoForm(p => ({
+                            ...p,
+                            valor: desglose.saldoFincaCheckIn > 0 ? desglose.saldoFincaCheckIn : p.valor,
+                            observacion: 'Abono de alojamiento - Propietario',
+                          }));
+                        }}
+                        style={{ textAlign: 'left', padding: '0.45rem 0.65rem' }}
+                      >
+                        <div style={{ fontWeight: 700, fontSize: '0.78rem' }}>🏡 Alojamiento</div>
+                        <div style={{ fontSize: '0.68rem', opacity: 0.85 }}>Saldo: {formatCOP(desglose.saldoFincaCheckIn)}</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${destinoAbono === 'alimentacion' ? 'btn-primary' : ''}`}
+                        onClick={() => {
+                          setDestinoAbono('alimentacion');
+                          setPagoForm(p => ({
+                            ...p,
+                            valor: desglose.saldoAlimentacionAdmin > 0 ? desglose.saldoAlimentacionAdmin : p.valor,
+                            observacion: `Abono de alimentación (${metodoPagoAbono})`,
+                          }));
+                        }}
+                        style={{ textAlign: 'left', padding: '0.45rem 0.65rem' }}
+                      >
+                        <div style={{ fontWeight: 700, fontSize: '0.78rem' }}>🍽️ Alimentación</div>
+                        <div style={{ fontSize: '0.68rem', opacity: 0.85 }}>Saldo: {formatCOP(desglose.saldoAlimentacionAdmin)}</div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Si es Alojamiento */}
+                {destinoAbono === 'alojamiento' && (
+                  <div className="field">
+                    <label>Tipo de movimiento</label>
+                    <select value={pagoForm.tipo} onChange={e => setPagoForm(p => ({ ...p, tipo: e.target.value as PagoTipo }))}>
+                      {TIPOS_PAGO.map(t => <option key={t.valor} value={t.valor}>{t.label}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {/* Si es Alimentación */}
+                {destinoAbono === 'alimentacion' && (
+                  <div className="field">
+                    <label>Medio de pago / Cuenta de recepción</label>
+                    <select
+                      value={metodoPagoAbono}
+                      onChange={e => {
+                        setMetodoPagoAbono(e.target.value);
+                        setPagoForm(p => ({ ...p, observacion: `Abono de alimentación (${e.target.value})` }));
+                      }}
+                    >
+                      <option value="Transferencia Bancolombia / Nequi">Transferencia Bancolombia / Nequi (Admin)</option>
+                      <option value="Daviplata">Daviplata (Admin)</option>
+                      <option value="Efectivo recibido">Efectivo recibido</option>
+                      <option value="Consignación Bancaria">Consignación Bancaria</option>
+                      <option value="Otro medio de pago">Otro medio de pago</option>
+                    </select>
+                  </div>
+                )}
+
+                <div className="field">
+                  <label>Fecha de abono</label>
+                  <input type="date" value={pagoForm.fecha} onChange={e => setPagoForm(p => ({ ...p, fecha: e.target.value }))} />
+                </div>
+
+                <div className="field">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.2rem' }}>
+                    <label style={{ margin: 0 }}>Valor abonado (COP) *</label>
+                    {destinoAbono === 'alimentacion' && desglose.saldoAlimentacionAdmin > 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        style={{ fontSize: '0.68rem', padding: '0.1rem 0.4rem', color: 'var(--primary)' }}
+                        onClick={() => setPagoForm(p => ({ ...p, valor: desglose.saldoAlimentacionAdmin }))}
+                      >
+                        Saldar total ({formatCOP(desglose.saldoAlimentacionAdmin)})
+                      </button>
+                    )}
+                    {destinoAbono === 'alojamiento' && desglose.saldoFincaCheckIn > 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        style={{ fontSize: '0.68rem', padding: '0.1rem 0.4rem', color: 'var(--primary)' }}
+                        onClick={() => setPagoForm(p => ({ ...p, valor: desglose.saldoFincaCheckIn }))}
+                      >
+                        Saldar total ({formatCOP(desglose.saldoFincaCheckIn)})
+                      </button>
+                    )}
+                  </div>
+                  <CurrencyInput
+                    value={pagoForm.valor}
+                    onChange={val => setPagoForm(p => ({ ...p, valor: val }))}
+                    placeholder="0"
+                  />
+                  {destinoAbono === 'alimentacion' && (
+                    <div className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
+                      {pagoForm.valor >= desglose.saldoAlimentacionAdmin ? (
+                        <span style={{ color: '#16a34a', fontWeight: 600 }}>
+                          ✓ El servicio de alimentación quedará 100% pagado.
+                        </span>
+                      ) : (
+                        <span>
+                          Quedará un saldo de alimentación de <strong>{formatCOP(Math.max(0, desglose.saldoAlimentacionAdmin - pagoForm.valor))}</strong> para la administración.
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="field">
+                  <label>Observaciones / Referencia (opcional)</label>
+                  <input
+                    value={pagoForm.observacion || ''}
+                    onChange={e => setPagoForm(p => ({ ...p, observacion: e.target.value }))}
+                    placeholder="Ej: Aprobación #12345, Nequi, etc."
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.4rem' }}>
+                  <button type="button" className="btn" onClick={() => setPagoReservaId(null)}>Cancelar</button>
+                  <button type="submit" className="btn btn-primary" disabled={guardandoPago || pagoForm.valor <= 0}>
+                    <Save size={14} /> {guardandoPago ? 'Registrando…' : 'Confirmar Abono'}
+                  </button>
+                </div>
+              </form>
             </div>
-            <form onSubmit={handleRegistrarPago} style={{ display: 'grid', gap: '0.75rem', padding: '1.25rem' }}>
-              <div className="field">
-                <label>Tipo de pago</label>
-                <select value={pagoForm.tipo} onChange={e => setPagoForm(p => ({ ...p, tipo: e.target.value as PagoTipo }))}>
-                  {TIPOS_PAGO.map(t => <option key={t.valor} value={t.valor}>{t.label}</option>)}
-                </select>
-              </div>
-              <div className="field">
-                <label>Fecha</label>
-                <input type="date" value={pagoForm.fecha} onChange={e => setPagoForm(p => ({ ...p, fecha: e.target.value }))} />
-              </div>
-              <div className="field">
-                <label>Valor (COP)</label>
-                <CurrencyInput
-                  value={pagoForm.valor}
-                  onChange={val => setPagoForm(p => ({ ...p, valor: val }))}
-                  placeholder="0"
-                />
-              </div>
-              <div className="field">
-                <label>Observación</label>
-                <input value={pagoForm.observacion} onChange={e => setPagoForm(p => ({ ...p, observacion: e.target.value }))} placeholder="Referencia, banco, etc." />
-              </div>
-              <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn" onClick={() => setPagoReservaId(null)}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" disabled={guardandoPago}>
-                  <Save size={14} /> {guardandoPago ? 'Registrando…' : 'Registrar pago'}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Lista de reservas */}
       <div className="avail-table">
@@ -679,86 +849,19 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {/* ACCIONES INTELIGENTES DE LA RESERVA */}
-                    {/* Botones de Alimentación Independiente (Cuenta Admin) */}
-                    {((r.costo_alimentacion || 0) > 0 || (r.alimentacion && r.alimentacion !== 'Sin alimentación')) && r.estado !== 'cancelada' && (
-                      r.estado_alimentacion === 'pagada' ? (
-                        <span
-                          className="status-badge s-avail"
-                          style={{
-                            fontSize: '0.72rem',
-                            fontWeight: 600,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            padding: '0.25rem 0.55rem',
-                          }}
-                          title={`Servicio gastronómico liquidado ${r.metodo_pago_alimentacion ? 'vía ' + r.metodo_pago_alimentacion : ''}`}
-                        >
-                          <Utensils size={11} /> Menú Liquidado ✓
-                        </span>
-                      ) : (
-                        <>
-                          <button
-                            className="btn btn-sm"
-                            style={{
-                              fontSize: '0.74rem',
-                              fontWeight: 600,
-                              gap: '0.35rem',
-                              padding: '0.28rem 0.65rem',
-                              color: '#c2410c',
-                              background: 'rgba(234, 88, 12, 0.12)',
-                              borderColor: 'rgba(234, 88, 12, 0.35)',
-                            }}
-                            title="Solicitar por WhatsApp el pago de la alimentación para la cuenta de la administración"
-                            onClick={() => handleAbrirCobroAlimentacion(r)}
-                          >
-                            <Utensils size={13} /> Cobrar Alimentación
-                          </button>
-
-                          <button
-                            className="btn btn-sm"
-                            style={{
-                              fontSize: '0.74rem',
-                              fontWeight: 600,
-                              gap: '0.35rem',
-                              padding: '0.28rem 0.65rem',
-                              color: '#15803d',
-                              background: 'rgba(34, 197, 94, 0.12)',
-                              borderColor: 'rgba(34, 197, 94, 0.35)',
-                            }}
-                            title="Registrar pago recibido o abonar a la alimentación para la administración"
-                            onClick={() => {
-                              const f = desglosarFinanzasReserva(r);
-                              setModalCerrarAlimentacion({
-                                abierto: true,
-                                reserva: r,
-                                metodo: 'Transferencia Bancolombia / Nequi',
-                                notas: '',
-                                monto: f.saldoAlimentacionAdmin,
-                                guardando: false,
-                              });
-                            }}
-                          >
-                            <Check size={13} /> {r.estado_alimentacion === 'parcial' ? 'Abonar / Liquidar Alimentación' : 'Cerrar Alimentación'}
-                          </button>
-                        </>
-                      )
-                    )}
-
-                    {/* 1. Registrar Abono / Pago (Acción Primaria para reservas activas) */}
+                    {/* 1. Único Botón Principal de Pago / Abono */}
                     {r.estado === 'activa' && (
                       <button
                         className="btn btn-sm btn-primary"
-                        title="Registrar un abono o amortización de pago del alojamiento"
-                        style={{ fontSize: '0.74rem', fontWeight: 600, gap: '0.35rem', padding: '0.28rem 0.65rem' }}
-                        onClick={() => { setPagoReservaId(r.id); setPagoForm(PAGO_VACIO); }}
+                        title="Registrar abono de alojamiento o alimentación"
+                        style={{ fontSize: '0.74rem', fontWeight: 600, gap: '0.35rem', padding: '0.28rem 0.75rem' }}
+                        onClick={() => handleAbrirModalPago(r)}
                       >
                         <CreditCard size={13} /> Registrar Abono
                       </button>
                     )}
 
-                    {/* 2. Botón Destacado: Cerrar Reserva (Check-out guiado + Paz y Salvo) */}
+                    {/* 2. Botón de Check-out y Cierre */}
                     {r.estado === 'activa' && onCerrarReserva && (
                       <button
                         className="btn btn-sm"
@@ -778,37 +881,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                       </button>
                     )}
 
-                    {/* 3. Botón directo de Paz y Salvo (Habilitado si saldo es $0) */}
-                    {pazYSalvoHabilitado && (
-                      <button
-                        className="btn btn-sm"
-                        style={{
-                          fontSize: '0.74rem',
-                          fontWeight: 600,
-                          gap: '0.3rem',
-                          padding: '0.28rem 0.65rem',
-                          background: 'rgba(34, 197, 94, 0.12)',
-                          borderColor: 'rgba(34, 197, 94, 0.35)',
-                          color: '#15803d',
-                        }}
-                        title="Descargar o enviar por WhatsApp el Certificado Oficial de Paz y Salvo"
-                        onClick={() => {
-                          setModalWaReserva({
-                            abierto: true,
-                            reserva: r,
-                            titulo: `Certificado de Paz y Salvo · ${r.fincas?.nombre || 'Finca'}`,
-                            nombreDoc: 'Certificado de Paz y Salvo (PDF)',
-                            mensaje: plantillaPazYSalvo(r),
-                            onGenerarPdf: () => generarPazYSalvo(r),
-                            tipo: 'paz_salvo',
-                          });
-                        }}
-                      >
-                        <Award size={13} /> Paz y Salvo
-                      </button>
-                    )}
-
-                    {/* 2. Menú de Documentos Oficiales Unificado */}
+                    {/* 3. Menú de Documentos Oficiales en PDF */}
                     <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                       <select
                         defaultValue=""
@@ -849,8 +922,6 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                               onGenerarPdf: () => generarPazYSalvo(r),
                               tipo: 'paz_salvo',
                             });
-                          } else if (val === 'cierre') {
-                            setReservaParaCierre(r);
                           }
                         }}
                         className="btn btn-sm"
@@ -862,9 +933,6 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                         <option value="paz_salvo" disabled={!pazYSalvoHabilitado}>
                           🏆 Paz y Salvo {pazYSalvoHabilitado ? '✓' : `(Saldo: ${formatCOP(saldo)})`}
                         </option>
-                        {r.estado === 'activa' && onCerrarReserva && (
-                          <option value="cierre">🏁 Check-out y Cierre</option>
-                        )}
                       </select>
                       <ChevronDown size={11} style={{ position: 'absolute', right: '0.35rem', pointerEvents: 'none' }} />
                     </div>
@@ -1049,146 +1117,6 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
           showToast={showToast}
         />
       )}
-
-      {/* Modal para liquidar y registrar pago / abono de alimentación */}
-      {modalCerrarAlimentacion.abierto && modalCerrarAlimentacion.reserva && (() => {
-        const rModal = modalCerrarAlimentacion.reserva;
-        const desgModal = desglosarFinanzasReserva(rModal);
-        const montoIngresado = modalCerrarAlimentacion.monto;
-        const nuevoTotal = desgModal.pagadoAlimentacion + montoIngresado;
-        const esLiquidacionCompleta = nuevoTotal >= desgModal.costoAlimentacion;
-        const nuevoSaldoRestante = Math.max(0, desgModal.costoAlimentacion - nuevoTotal);
-
-        return (
-          <div className="modal-overlay" onClick={() => setModalCerrarAlimentacion(p => ({ ...p, abierto: false, reserva: null }))}>
-            <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-              <div className="modal-header">
-                <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#16a34a' }}>
-                  <Utensils size={18} /> Registrar Pago de Alimentación (Admin)
-                </div>
-                <button className="btn btn-sm" onClick={() => setModalCerrarAlimentacion(p => ({ ...p, abierto: false, reserva: null }))}>
-                  <X size={14} />
-                </button>
-              </div>
-
-              <div style={{ padding: '1.25rem', display: 'grid', gap: '0.9rem' }}>
-                <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem', borderRadius: '8px', display: 'grid', gap: '0.35rem', fontSize: '0.84rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span className="text-muted">Finca / Reserva:</span>
-                    <strong>{rModal.fincas?.nombre || 'Finca'} #{rModal.consecutivo || ''}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span className="text-muted">Cliente:</span>
-                    <strong>
-                      {rModal.clientes?.nombre
-                        ? `${rModal.clientes.nombre} ${rModal.clientes.apellido || ''}`.trim()
-                        : 'Cliente'}
-                    </strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span className="text-muted">Menú solicitado:</span>
-                    <span>{rModal.alimentacion || 'Plan de alimentación'}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span className="text-muted">Valor Total del Menú:</span>
-                    <span>{formatCOP(desgModal.costoAlimentacion)}</span>
-                  </div>
-                  {desgModal.pagadoAlimentacion > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a' }}>
-                      <span>Ya abonado previamente:</span>
-                      <strong>+{formatCOP(desgModal.pagadoAlimentacion)}</strong>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '0.35rem', fontWeight: 700, color: '#c2410c' }}>
-                    <span>Saldo pendiente actual de alimentación:</span>
-                    <span style={{ fontSize: '0.95rem' }}>
-                      {formatCOP(desgModal.saldoAlimentacionAdmin)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="field">
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Monto a registrar ahora ($) *</span>
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem', height: 'auto' }}
-                      onClick={() => setModalCerrarAlimentacion(p => ({ ...p, monto: desgModal.saldoAlimentacionAdmin }))}
-                    >
-                      Pagar saldo total ({formatCOP(desgModal.saldoAlimentacionAdmin)})
-                    </button>
-                  </label>
-                  <CurrencyInput
-                    value={modalCerrarAlimentacion.monto}
-                    onChange={(val) => setModalCerrarAlimentacion(p => ({ ...p, monto: Math.max(0, val) }))}
-                  />
-                  <div className="text-xs text-muted mt-1">
-                    {esLiquidacionCompleta ? (
-                      <span style={{ color: '#16a34a', fontWeight: 600 }}>
-                        ✓ Con este pago el servicio de alimentación quedará 100% liquidado.
-                      </span>
-                    ) : (
-                      <span>
-                        Quedará un saldo pendiente de <strong>{formatCOP(nuevoSaldoRestante)}</strong> para la administración.
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="field">
-                  <label>Método / Cuenta de recepción</label>
-                  <select
-                    value={modalCerrarAlimentacion.metodo}
-                    onChange={e => setModalCerrarAlimentacion(p => ({ ...p, metodo: e.target.value }))}
-                  >
-                    <option value="Transferencia Bancolombia / Nequi">Transferencia Bancolombia / Nequi (Admin)</option>
-                    <option value="Daviplata">Daviplata (Admin)</option>
-                    <option value="Efectivo recibido">Efectivo recibido</option>
-                    <option value="Consignación Bancaria">Consignación Bancaria</option>
-                    <option value="Otro medio de pago">Otro medio de pago</option>
-                  </select>
-                </div>
-
-                <div className="field">
-                  <label>Observaciones / Referencia de comprobante (opcional)</label>
-                  <input
-                    type="text"
-                    placeholder="Ej: Aprobación Nequi #849204"
-                    value={modalCerrarAlimentacion.notas}
-                    onChange={e => setModalCerrarAlimentacion(p => ({ ...p, notas: e.target.value }))}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={modalCerrarAlimentacion.guardando}
-                    onClick={() => setModalCerrarAlimentacion(p => ({ ...p, abierto: false }))}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-                    disabled={modalCerrarAlimentacion.guardando || modalCerrarAlimentacion.monto <= 0}
-                    onClick={handleConfirmarCierreAlimentacion}
-                  >
-                    <Check size={15} />
-                    {modalCerrarAlimentacion.guardando
-                      ? 'Registrando…'
-                      : esLiquidacionCompleta
-                      ? 'Liquidar Servicio Total 🍽️'
-                      : 'Registrar Abono Parcial 🍽️'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 };
