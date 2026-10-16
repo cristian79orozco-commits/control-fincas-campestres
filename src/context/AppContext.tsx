@@ -168,6 +168,55 @@ const guardarCache = (key: string, data: any) => {
   }
 };
 
+// -----------------------------------------------------------------------------
+// Helpers de Metadatos Extendidos de Fincas (Almacenamiento Híbrido Resiliente)
+// Garantiza que capacidad_minima y datos bancarios persistan inmediatamente,
+// tanto si las columnas existen en Supabase como si están pendientes de migración.
+// -----------------------------------------------------------------------------
+const KEY_FINCAS_EXTENDED = 'fc_fincas_extended_meta';
+
+const obtenerMetadatosFincas = (): Record<string, Partial<Finca>> => {
+  return leerCache<Record<string, Partial<Finca>>>(KEY_FINCAS_EXTENDED, {});
+};
+
+const guardarMetadatosFinca = (id: string, datos: Partial<Finca>) => {
+  try {
+    const todos = obtenerMetadatosFincas();
+    todos[id] = {
+      ...(todos[id] || {}),
+      capacidad_minima: (datos.capacidad_minima !== undefined && datos.capacidad_minima !== null)
+        ? Math.max(1, Number(datos.capacidad_minima))
+        : (todos[id]?.capacidad_minima || 1),
+      banco_nombre: datos.banco_nombre !== undefined ? datos.banco_nombre : todos[id]?.banco_nombre,
+      banco_tipo_cuenta: datos.banco_tipo_cuenta !== undefined ? datos.banco_tipo_cuenta : todos[id]?.banco_tipo_cuenta,
+      banco_cuenta: datos.banco_cuenta !== undefined ? datos.banco_cuenta : todos[id]?.banco_cuenta,
+      banco_titular: datos.banco_titular !== undefined ? datos.banco_titular : todos[id]?.banco_titular,
+      banco_identificacion: datos.banco_identificacion !== undefined ? datos.banco_identificacion : todos[id]?.banco_identificacion,
+    };
+    guardarCache(KEY_FINCAS_EXTENDED, todos);
+  } catch (e) {
+    console.warn('[guardarMetadatosFinca] Error:', e);
+  }
+};
+
+const enriquecerFincasConMetadatos = (listaFincas: Finca[]): Finca[] => {
+  const meta = obtenerMetadatosFincas();
+  return listaFincas.map(f => {
+    const m = meta[f.id] || {};
+    return {
+      ...f,
+      capacidad_minima: (f.capacidad_minima !== undefined && f.capacidad_minima !== null && Number(f.capacidad_minima) >= 1)
+        ? Number(f.capacidad_minima)
+        : (m.capacidad_minima !== undefined ? Number(m.capacidad_minima) : 1),
+      banco_nombre: f.banco_nombre || m.banco_nombre || 'Bancolombia',
+      banco_tipo_cuenta: f.banco_tipo_cuenta || m.banco_tipo_cuenta || 'Ahorros',
+      banco_cuenta: f.banco_cuenta || m.banco_cuenta || null,
+      banco_titular: f.banco_titular || m.banco_titular || null,
+      banco_identificacion: f.banco_identificacion || m.banco_identificacion || null,
+    };
+  });
+};
+
 const AppContext = createContext<AppContextValue | null>(null);
 
 // -----------------------------------------------------------------------------
@@ -175,8 +224,11 @@ const AppContext = createContext<AppContextValue | null>(null);
 // -----------------------------------------------------------------------------
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Estado local centralizado con rehidratación instantánea de caché local
-  const [fincas, setFincas] = useState<Finca[]>(() => leerCache('fc_cache_fincas', []));
+  // Estado local centralizado con rehidratación instantánea de caché local enriquecida
+  const [fincas, setFincas] = useState<Finca[]>(() => {
+    const raw = leerCache<Finca[]>('fc_cache_fincas', []);
+    return enriquecerFincasConMetadatos(raw);
+  });
   const [bloquesAdmin, setBloquesAdmin] = useState<BloqueoDisponibilidad[]>(() => leerCache('fc_cache_disponibilidad', []));
   const [clientes, setClientes] = useState<Cliente[]>(() => leerCache('fc_cache_clientes', []));
   const [cotizaciones, setCotizaciones] = useState<CotizacionDB[]>(() => leerCache('fc_cache_cotizaciones', []));
@@ -358,8 +410,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (error) throw error;
       const arr = (data as Finca[]) || [];
       if (arr.length > 0) {
-        setFincas(arr);
-        guardarCache('fc_cache_fincas', arr);
+        const enriquecidas = enriquecerFincasConMetadatos(arr);
+        setFincas(enriquecidas);
+        guardarCache('fc_cache_fincas', enriquecidas);
       }
     } catch (err) {
       console.warn('[AppContext] Error cargando fincas:', err);
@@ -1984,7 +2037,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         banco_titular: fincaData.banco_titular || null,
         banco_identificacion: fincaData.banco_identificacion || null,
       };
-      if (fincaData.id) payloadExtendido.id = fincaData.id;
+      // 1. Guardar metadatos extendidos inmediatamente en el almacén híbrido local para no perder ningún cambio
+      if (fincaData.id) {
+        guardarMetadatosFinca(fincaData.id, payloadExtendido);
+      }
 
       let fincaId: string;
 
@@ -2029,6 +2085,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         fincaId = res.data.id;
       }
+
+      // Persistir y consolidar metadatos extendidos con el ID de la finca
+      guardarMetadatosFinca(fincaId, payloadExtendido);
+
+      // Actualización optimista inmediata en memoria de la lista de fincas
+      setFincas(prev => {
+        const existe = prev.some(f => f.id === fincaId);
+        if (existe) {
+          return prev.map(f => f.id === fincaId ? { ...f, ...payloadExtendido, id: fincaId } : f);
+        } else {
+          return [{ ...payloadExtendido, id: fincaId } as Finca, ...prev];
+        }
+      });
 
       // Actualizar imágenes
       if (imagenesUrls && imagenesUrls.length > 0) {
@@ -2112,8 +2181,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { error } = await supabase.from('fincas').delete().eq('id', id);
       if (error) throw error;
 
-      // 3. Actualización de estado local optimista
+      // 3. Actualización de estado local optimista y limpieza de metadatos extendidos
       setFincas(prev => prev.filter(f => f.id !== id));
+      try {
+        const todos = obtenerMetadatosFincas();
+        delete todos[id];
+        guardarCache(KEY_FINCAS_EXTENDED, todos);
+      } catch {}
 
       await Promise.all([cargarFincas(), cargarDisponibilidad()]);
       return { success: true };
