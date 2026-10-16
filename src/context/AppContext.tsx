@@ -187,6 +187,9 @@ const guardarMetadatosFinca = (id: string, datos: Partial<Finca>) => {
       capacidad_minima: (datos.capacidad_minima !== undefined && datos.capacidad_minima !== null)
         ? Math.max(1, Number(datos.capacidad_minima))
         : (todos[id]?.capacidad_minima || 1),
+      valor_mascota: (datos.valor_mascota !== undefined && datos.valor_mascota !== null)
+        ? Number(datos.valor_mascota)
+        : (todos[id]?.valor_mascota || 0),
       banco_nombre: datos.banco_nombre !== undefined ? datos.banco_nombre : todos[id]?.banco_nombre,
       banco_tipo_cuenta: datos.banco_tipo_cuenta !== undefined ? datos.banco_tipo_cuenta : todos[id]?.banco_tipo_cuenta,
       banco_cuenta: datos.banco_cuenta !== undefined ? datos.banco_cuenta : todos[id]?.banco_cuenta,
@@ -208,6 +211,9 @@ const enriquecerFincasConMetadatos = (listaFincas: Finca[]): Finca[] => {
       capacidad_minima: (f.capacidad_minima !== undefined && f.capacidad_minima !== null && Number(f.capacidad_minima) >= 1)
         ? Number(f.capacidad_minima)
         : (m.capacidad_minima !== undefined ? Number(m.capacidad_minima) : 1),
+      valor_mascota: (f.valor_mascota !== undefined && f.valor_mascota !== null)
+        ? Number(f.valor_mascota)
+        : (m.valor_mascota !== undefined ? Number(m.valor_mascota) : 0),
       banco_nombre: f.banco_nombre || m.banco_nombre || 'Bancolombia',
       banco_tipo_cuenta: f.banco_tipo_cuenta || m.banco_tipo_cuenta || 'Ahorros',
       banco_cuenta: f.banco_cuenta || m.banco_cuenta || null,
@@ -2049,85 +2055,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let fincaId: string;
 
       if (isExisting && targetId) {
-        // ACTUALIZACIÓN DIRECTA DE FINCA EXISTENTE
-        let res = await supabase.from('fincas').update(payloadExtendido).eq('id', targetId).select('id').single();
+        // ACTUALIZACIÓN DIRECTA DE FINCA EXISTENTE CON REINTENTO INTELIGENTE
+        const payloadSeguro = { ...payloadExtendido };
+        delete payloadSeguro.id; // En un UPDATE por .eq('id', targetId), excluimos 'id' del cuerpo
 
-        if (res.error && (res.error.message?.includes('column') || res.error.message?.includes('schema cache'))) {
-          console.warn('[AppContext] Supabase reporta columna pendiente en UPDATE. Reintentando sin columnas recientes:', res.error.message);
-          const payloadSinRecientes = { ...payloadExtendido };
-          delete payloadSinRecientes.banco_nombre;
-          delete payloadSinRecientes.banco_tipo_cuenta;
-          delete payloadSinRecientes.banco_cuenta;
-          delete payloadSinRecientes.banco_titular;
-          delete payloadSinRecientes.banco_identificacion;
-          if (res.error.message?.includes('capacidad_minima')) {
-            delete payloadSinRecientes.capacidad_minima;
-          }
+        let intentos = 0;
+        let resUpdate: any;
+        while (intentos < 6) {
+          intentos++;
+          resUpdate = await supabase.from('fincas').update(payloadSeguro).eq('id', targetId).select('id').single();
+          if (!resUpdate.error) break;
 
-          const resSinRecientes = await supabase.from('fincas').update(payloadSinRecientes).eq('id', targetId).select('id').single();
-          if (!resSinRecientes.error) {
-            fincaId = resSinRecientes.data.id;
+          const matchCol = resUpdate.error.message?.match(/'(\w+)' column of 'fincas'/i);
+          if (matchCol && matchCol[1] && payloadSeguro[matchCol[1]] !== undefined) {
+            console.warn(`[AppContext] Columna '${matchCol[1]}' no presente en Supabase. Omitiendo y reintentando...`);
+            delete payloadSeguro[matchCol[1]];
           } else {
-            console.warn('[AppContext] Reintentando update con columnas base mínimas:', resSinRecientes.error.message);
-            const payloadBase: any = {
-              nombre: fincaData.nombre,
-              zona: fincaData.zona || 'Santa Elena, Valle',
-              capacidad: Number(fincaData.capacidad) || 10,
-              precio_pp: Number(fincaData.precio_pp) || 0,
-              descripcion: fincaData.descripcion || null,
-              estado: fincaData.estado || 'disponible',
-              whatsapp: fincaData.whatsapp || null,
-              activo: fincaData.activo !== undefined ? fincaData.activo : true,
-            };
-            const resBase = await supabase.from('fincas').update(payloadBase).eq('id', targetId).select('id').single();
-            if (resBase.error) throw resBase.error;
-            fincaId = resBase.data.id;
+            console.warn('[AppContext] Error no recuperable en update finca:', resUpdate.error);
+            break;
           }
-        } else if (res.error) {
-          throw res.error;
-        } else {
-          fincaId = res.data.id;
         }
+
+        if (resUpdate?.error) {
+          throw resUpdate.error;
+        }
+        fincaId = resUpdate?.data?.id || targetId;
       } else {
-        // CREACIÓN DIRECTA DE NUEVA FINCA
-        let res = await supabase.from('fincas').insert(payloadExtendido).select('id').single();
+        // CREACIÓN DIRECTA DE NUEVA FINCA CON REINTENTO INTELIGENTE
+        const payloadSeguro = { ...payloadExtendido };
+        delete payloadSeguro.id;
 
-        if (res.error && (res.error.message?.includes('column') || res.error.message?.includes('schema cache'))) {
-          console.warn('[AppContext] Supabase reporta columna pendiente en INSERT. Reintentando sin columnas recientes:', res.error.message);
-          const payloadSinRecientes = { ...payloadExtendido };
-          delete payloadSinRecientes.banco_nombre;
-          delete payloadSinRecientes.banco_tipo_cuenta;
-          delete payloadSinRecientes.banco_cuenta;
-          delete payloadSinRecientes.banco_titular;
-          delete payloadSinRecientes.banco_identificacion;
-          if (res.error.message?.includes('capacidad_minima')) {
-            delete payloadSinRecientes.capacidad_minima;
-          }
+        let intentos = 0;
+        let resInsert: any;
+        while (intentos < 6) {
+          intentos++;
+          resInsert = await supabase.from('fincas').insert(payloadSeguro).select('id').single();
+          if (!resInsert.error) break;
 
-          const resSinRecientes = await supabase.from('fincas').insert(payloadSinRecientes).select('id').single();
-          if (!resSinRecientes.error) {
-            fincaId = resSinRecientes.data.id;
+          const matchCol = resInsert.error.message?.match(/'(\w+)' column of 'fincas'/i);
+          if (matchCol && matchCol[1] && payloadSeguro[matchCol[1]] !== undefined) {
+            console.warn(`[AppContext] Columna '${matchCol[1]}' no presente en Supabase. Omitiendo y reintentando insert...`);
+            delete payloadSeguro[matchCol[1]];
           } else {
-            console.warn('[AppContext] Reintentando insert con columnas base mínimas:', resSinRecientes.error.message);
-            const payloadBase: any = {
-              nombre: fincaData.nombre,
-              zona: fincaData.zona || 'Santa Elena, Valle',
-              capacidad: Number(fincaData.capacidad) || 10,
-              precio_pp: Number(fincaData.precio_pp) || 0,
-              descripcion: fincaData.descripcion || null,
-              estado: fincaData.estado || 'disponible',
-              whatsapp: fincaData.whatsapp || null,
-              activo: fincaData.activo !== undefined ? fincaData.activo : true,
-            };
-            const resBase = await supabase.from('fincas').insert(payloadBase).select('id').single();
-            if (resBase.error) throw resBase.error;
-            fincaId = resBase.data.id;
+            console.warn('[AppContext] Error no recuperable en insert finca:', resInsert.error);
+            break;
           }
-        } else if (res.error) {
-          throw res.error;
-        } else {
-          fincaId = res.data.id;
         }
+
+        if (resInsert?.error) {
+          throw resInsert.error;
+        }
+        fincaId = resInsert?.data?.id;
       }
 
       // Persistir y consolidar metadatos extendidos con el ID de la finca
