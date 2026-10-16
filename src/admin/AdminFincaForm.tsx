@@ -62,8 +62,8 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
 }) => {
   const { previsualizarFinca, fincaParaEditarId, setFincaParaEditarId, eliminarFinca, desactivarFinca, reactivarFinca } = useApp();
 
-  // Estado de selección y lista contraída
-  const [selectedFincaId, setSelectedFincaId] = useState<string>('new');
+  // Estado de selección y lista contraída: por defecto cargar la primera finca existente para comodidad del administrador
+  const [selectedFincaId, setSelectedFincaId] = useState<string>(() => (fincas.length > 0 ? fincas[0].id : 'new'));
   const [listaDesplegada, setListaDesplegada] = useState<boolean>(false);
   const [busquedaFinca, setBusquedaFinca] = useState<string>('');
   const [activeTab, setActiveTab] = useState<TabId>('general');
@@ -72,11 +72,19 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
   // Si se solicita editar una finca específica desde el panel cliente
   useEffect(() => {
     if (fincaParaEditarId) {
+      lastLoadedFincaIdRef.current = null;
       setSelectedFincaId(fincaParaEditarId);
       setListaDesplegada(false);
       setFincaParaEditarId(null);
     }
   }, [fincaParaEditarId, setFincaParaEditarId]);
+
+  // Si las fincas cargan de forma asíncrona y selectedFincaId estaba en 'new' inicial
+  useEffect(() => {
+    if (fincas.length > 0 && selectedFincaId === 'new' && lastLoadedFincaIdRef.current === null) {
+      setSelectedFincaId(fincas[0].id);
+    }
+  }, [fincas, selectedFincaId]);
 
   // Campos del formulario
   const [nombre, setNombre] = useState('');
@@ -463,7 +471,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
         'success'
       );
       if (res.id) {
-        lastLoadedFincaIdRef.current = res.id;
+        lastLoadedFincaIdRef.current = null;
         setSelectedFincaId(res.id);
       }
     } else {
@@ -546,6 +554,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
               type="button"
               className={`btn btn-sm ${selectedFincaId === 'new' ? 'btn-primary' : ''}`}
               onClick={() => {
+                lastLoadedFincaIdRef.current = null;
                 setSelectedFincaId('new');
                 setListaDesplegada(false);
               }}
@@ -738,6 +747,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
               {/* Opción rápida: Nueva Finca */}
               <div
                 onClick={() => {
+                  lastLoadedFincaIdRef.current = null;
                   setSelectedFincaId('new');
                   setListaDesplegada(false);
                 }}
@@ -782,6 +792,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                   <div
                     key={f.id}
                     onClick={() => {
+                      lastLoadedFincaIdRef.current = null;
                       setSelectedFincaId(f.id);
                       setListaDesplegada(false);
                     }}

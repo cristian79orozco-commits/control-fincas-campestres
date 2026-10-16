@@ -2006,28 +2006,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     amenidadesArr?: { nombre: string; icono?: string }[]
   ): Promise<{ success: boolean; id?: string; error?: string }> => {
     try {
-      // 1. Preparar payload completo con campos extendidos
+      const isExisting = Boolean(fincaData.id && fincaData.id !== 'new');
+      const targetId = isExisting ? (fincaData.id as string) : undefined;
+
+      // 1. Preparar payload completo con campos extendidos y casteos numéricos seguros
       const payloadExtendido: any = {
         nombre: fincaData.nombre,
         zona: fincaData.zona || 'Santa Elena, Valle',
-        capacidad: fincaData.capacidad !== undefined && fincaData.capacidad !== null ? fincaData.capacidad : 10,
-        capacidad_minima: fincaData.capacidad_minima ? Math.max(1, Number(fincaData.capacidad_minima)) : 1,
-        precio_pp: fincaData.precio_pp !== undefined ? fincaData.precio_pp : 0,
+        capacidad: fincaData.capacidad !== undefined && fincaData.capacidad !== null ? Number(fincaData.capacidad) : 10,
+        capacidad_minima: Math.max(1, Number(fincaData.capacidad_minima) || 1),
+        precio_pp: fincaData.precio_pp !== undefined ? Number(fincaData.precio_pp) : 0,
         descripcion: fincaData.descripcion || null,
         estado: fincaData.estado || 'disponible',
         whatsapp: fincaData.whatsapp || null,
         activo: fincaData.activo !== undefined ? fincaData.activo : true,
         // Campos profesionales extendidos
-        habitaciones: fincaData.habitaciones !== undefined ? fincaData.habitaciones : 3,
-        camas: fincaData.camas !== undefined ? fincaData.camas : 5,
-        banos: fincaData.banos !== undefined ? fincaData.banos : 2,
+        habitaciones: fincaData.habitaciones !== undefined ? Number(fincaData.habitaciones) : 3,
+        camas: fincaData.camas !== undefined ? Number(fincaData.camas) : 5,
+        banos: fincaData.banos !== undefined ? Number(fincaData.banos) : 2,
         checkin_hora: fincaData.checkin_hora || '15:00',
         checkout_hora: fincaData.checkout_hora || '13:00',
         politica_mascotas: fincaData.politica_mascotas || 'permitido',
-        valor_mascota: fincaData.valor_mascota !== undefined ? fincaData.valor_mascota : 0,
+        valor_mascota: fincaData.valor_mascota !== undefined ? Number(fincaData.valor_mascota) : 0,
         politica_musica: fincaData.politica_musica || 'moderada',
-        precio_finca_completa: fincaData.precio_finca_completa || 0,
-        deposito_garantia: fincaData.deposito_garantia || 0,
+        precio_finca_completa: Number(fincaData.precio_finca_completa) || 0,
+        deposito_garantia: Number(fincaData.deposito_garantia) || 0,
         normas: fincaData.normas || null,
         indicaciones_llegada: fincaData.indicaciones_llegada || null,
         // Cuenta bancaria del propietario para separación / abono
@@ -2037,53 +2040,94 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         banco_titular: fincaData.banco_titular || null,
         banco_identificacion: fincaData.banco_identificacion || null,
       };
-      // 1. Guardar metadatos extendidos inmediatamente en el almacén híbrido local para no perder ningún cambio
-      if (fincaData.id) {
-        guardarMetadatosFinca(fincaData.id, payloadExtendido);
+
+      if (targetId) {
+        payloadExtendido.id = targetId;
+        guardarMetadatosFinca(targetId, payloadExtendido);
       }
 
       let fincaId: string;
 
-      // Intentar guardar con campos extendidos
-      let res = await supabase.from('fincas').upsert(payloadExtendido).select('id').single();
+      if (isExisting && targetId) {
+        // ACTUALIZACIÓN DIRECTA DE FINCA EXISTENTE
+        let res = await supabase.from('fincas').update(payloadExtendido).eq('id', targetId).select('id').single();
 
-      // Si falla por alguna columna no migrada en la base de datos remota, reintentar preservando campos existentes
-      if (res.error && (res.error.message?.includes('column') || res.error.message?.includes('schema cache'))) {
-        console.warn('[AppContext] Supabase reporta columna pendiente de migración. Reintentando sin columnas recientes:', res.error.message);
-        const payloadSinRecientes = { ...payloadExtendido };
-        delete payloadSinRecientes.banco_nombre;
-        delete payloadSinRecientes.banco_tipo_cuenta;
-        delete payloadSinRecientes.banco_cuenta;
-        delete payloadSinRecientes.banco_titular;
-        delete payloadSinRecientes.banco_identificacion;
-        if (res.error.message?.includes('capacidad_minima')) {
-          delete payloadSinRecientes.capacidad_minima;
-        }
+        if (res.error && (res.error.message?.includes('column') || res.error.message?.includes('schema cache'))) {
+          console.warn('[AppContext] Supabase reporta columna pendiente en UPDATE. Reintentando sin columnas recientes:', res.error.message);
+          const payloadSinRecientes = { ...payloadExtendido };
+          delete payloadSinRecientes.banco_nombre;
+          delete payloadSinRecientes.banco_tipo_cuenta;
+          delete payloadSinRecientes.banco_cuenta;
+          delete payloadSinRecientes.banco_titular;
+          delete payloadSinRecientes.banco_identificacion;
+          if (res.error.message?.includes('capacidad_minima')) {
+            delete payloadSinRecientes.capacidad_minima;
+          }
 
-        const resSinRecientes = await supabase.from('fincas').upsert(payloadSinRecientes).select('id').single();
-        if (!resSinRecientes.error) {
-          fincaId = resSinRecientes.data.id;
+          const resSinRecientes = await supabase.from('fincas').update(payloadSinRecientes).eq('id', targetId).select('id').single();
+          if (!resSinRecientes.error) {
+            fincaId = resSinRecientes.data.id;
+          } else {
+            console.warn('[AppContext] Reintentando update con columnas base mínimas:', resSinRecientes.error.message);
+            const payloadBase: any = {
+              nombre: fincaData.nombre,
+              zona: fincaData.zona || 'Santa Elena, Valle',
+              capacidad: Number(fincaData.capacidad) || 10,
+              precio_pp: Number(fincaData.precio_pp) || 0,
+              descripcion: fincaData.descripcion || null,
+              estado: fincaData.estado || 'disponible',
+              whatsapp: fincaData.whatsapp || null,
+              activo: fincaData.activo !== undefined ? fincaData.activo : true,
+            };
+            const resBase = await supabase.from('fincas').update(payloadBase).eq('id', targetId).select('id').single();
+            if (resBase.error) throw resBase.error;
+            fincaId = resBase.data.id;
+          }
+        } else if (res.error) {
+          throw res.error;
         } else {
-          console.warn('[AppContext] Reintentando con columnas base mínimas:', resSinRecientes.error.message);
-          const payloadBase: any = {
-            nombre: fincaData.nombre,
-            zona: fincaData.zona || 'Santa Elena, Valle',
-            capacidad: fincaData.capacidad || 10,
-            precio_pp: fincaData.precio_pp || 0,
-            descripcion: fincaData.descripcion || null,
-            estado: fincaData.estado || 'disponible',
-            whatsapp: fincaData.whatsapp || null,
-            activo: fincaData.activo !== undefined ? fincaData.activo : true,
-          };
-          if (fincaData.id) payloadBase.id = fincaData.id;
-          const resBase = await supabase.from('fincas').upsert(payloadBase).select('id').single();
-          if (resBase.error) throw resBase.error;
-          fincaId = resBase.data.id;
+          fincaId = res.data.id;
         }
-      } else if (res.error) {
-        throw res.error;
       } else {
-        fincaId = res.data.id;
+        // CREACIÓN DIRECTA DE NUEVA FINCA
+        let res = await supabase.from('fincas').insert(payloadExtendido).select('id').single();
+
+        if (res.error && (res.error.message?.includes('column') || res.error.message?.includes('schema cache'))) {
+          console.warn('[AppContext] Supabase reporta columna pendiente en INSERT. Reintentando sin columnas recientes:', res.error.message);
+          const payloadSinRecientes = { ...payloadExtendido };
+          delete payloadSinRecientes.banco_nombre;
+          delete payloadSinRecientes.banco_tipo_cuenta;
+          delete payloadSinRecientes.banco_cuenta;
+          delete payloadSinRecientes.banco_titular;
+          delete payloadSinRecientes.banco_identificacion;
+          if (res.error.message?.includes('capacidad_minima')) {
+            delete payloadSinRecientes.capacidad_minima;
+          }
+
+          const resSinRecientes = await supabase.from('fincas').insert(payloadSinRecientes).select('id').single();
+          if (!resSinRecientes.error) {
+            fincaId = resSinRecientes.data.id;
+          } else {
+            console.warn('[AppContext] Reintentando insert con columnas base mínimas:', resSinRecientes.error.message);
+            const payloadBase: any = {
+              nombre: fincaData.nombre,
+              zona: fincaData.zona || 'Santa Elena, Valle',
+              capacidad: Number(fincaData.capacidad) || 10,
+              precio_pp: Number(fincaData.precio_pp) || 0,
+              descripcion: fincaData.descripcion || null,
+              estado: fincaData.estado || 'disponible',
+              whatsapp: fincaData.whatsapp || null,
+              activo: fincaData.activo !== undefined ? fincaData.activo : true,
+            };
+            const resBase = await supabase.from('fincas').insert(payloadBase).select('id').single();
+            if (resBase.error) throw resBase.error;
+            fincaId = resBase.data.id;
+          }
+        } else if (res.error) {
+          throw res.error;
+        } else {
+          fincaId = res.data.id;
+        }
       }
 
       // Persistir y consolidar metadatos extendidos con el ID de la finca
