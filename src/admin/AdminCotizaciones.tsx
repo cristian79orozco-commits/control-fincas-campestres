@@ -235,10 +235,16 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
     }));
   };
 
-  // Al seleccionar finca, copiar precio_pp
+  // Al seleccionar finca, copiar precio_pp y validar capacidad mínima
   const handleFincaChange = (fincaId: string) => {
     const finca = fincas.find(f => f.id === fincaId);
-    setForm(prev => recalcular({ ...prev, finca_id: fincaId, precio_base_pp: finca?.precio_pp || 0 }));
+    const minPers = finca?.capacidad_minima || 1;
+    setForm(prev => recalcular({
+      ...prev,
+      finca_id: fincaId,
+      precio_base_pp: finca?.precio_pp || 0,
+      personas: Math.max(minPers, prev.personas || 1),
+    }));
   };
 
   // Descargar PDF de alimentación
@@ -566,7 +572,18 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
 
                 <div className="field">
                   <label><Users size={11} style={{ display:'inline', verticalAlign:'-1px' }} /> Personas</label>
-                  <input type="number" min={1} max={fincaSeleccionada?.capacidad || 100} value={form.personas || 1} onChange={e => updateField('personas', +e.target.value)} />
+                  <input
+                    type="number"
+                    min={fincaSeleccionada?.capacidad_minima || 1}
+                    max={fincaSeleccionada?.capacidad || 100}
+                    value={form.personas || 1}
+                    onChange={e => updateField('personas', +e.target.value)}
+                  />
+                  {fincaSeleccionada && (
+                    <span className="text-xs text-muted" style={{ display: 'block', marginTop: '0.2rem', fontSize: '0.68rem' }}>
+                      Capacidad: {fincaSeleccionada.capacidad_minima && fincaSeleccionada.capacidad_minima > 1 ? `${fincaSeleccionada.capacidad_minima} a ${fincaSeleccionada.capacidad}` : `Hasta ${fincaSeleccionada.capacidad}`} personas
+                    </span>
+                  )}
                 </div>
 
                 <div className="field">

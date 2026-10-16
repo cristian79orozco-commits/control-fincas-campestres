@@ -464,7 +464,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
                     <div className="admin-finca-menu-info">
                       <div className="admin-finca-menu-name">{f.nombre}</div>
                       <div className="admin-finca-menu-meta">
-                        {f.capacidad ? <span>👥 Hasta {f.capacidad} personas</span> : null}
+                        {f.capacidad ? <span>👥 {f.capacidad_minima && f.capacidad_minima > 1 ? `${f.capacidad_minima} a ${f.capacidad}` : `Hasta ${f.capacidad}`} personas</span> : null}
                         {f.zona ? <span>📍 {f.zona}</span> : null}
                       </div>
                     </div>

@@ -28,6 +28,7 @@ export interface Finca {
   nombre: string;
   zona: string;
   capacidad: number;
+  capacidad_minima?: number | null;
   precio_pp: number;
   descripcion?: string | null;
   estado: FincaEstado;
@@ -194,6 +195,7 @@ export interface Reserva {
     nombre: string;
     zona?: string | null;
     capacidad?: number | null;
+    capacidad_minima?: number | null;
     precio_pp?: number | null;
   } | null;
   cotizacion_snapshot?: Record<string, any> | null;

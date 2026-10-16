@@ -82,6 +82,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
   const [nombre, setNombre] = useState('');
   const [zona, setZona] = useState('Santa Elena, Valle');
   const [capacidad, setCapacidad] = useState<number>(10);
+  const [capacidadMinima, setCapacidadMinima] = useState<number>(1);
   const [habitaciones, setHabitaciones] = useState<number>(3);
   const [camas, setCamas] = useState<number>(5);
   const [banos, setBanos] = useState<number>(2);
@@ -152,6 +153,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
       setNombre('');
       setZona('Santa Elena, Valle');
       setCapacidad(10);
+      setCapacidadMinima(1);
       setHabitaciones(3);
       setCamas(5);
       setBanos(2);
@@ -192,6 +194,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
         setNombre(f.nombre || '');
         setZona(f.zona || 'Santa Elena, Valle');
         setCapacidad(f.capacidad || 10);
+        setCapacidadMinima(f.capacidad_minima || 1);
         setHabitaciones(f.habitaciones || 3);
         setCamas(f.camas || 5);
         setBanos(f.banos || 2);
@@ -407,12 +410,19 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
       return;
     }
 
+    if (Number(capacidadMinima) > Number(capacidad)) {
+      showToast('La capacidad mínima no puede ser mayor que la capacidad máxima', 'error');
+      setActiveTab('acomodacion');
+      return;
+    }
+
     setGuardando(true);
 
     const payload: Partial<Finca> = {
       nombre: nombre.trim(),
       zona: zona.trim() || 'Santa Elena, Valle',
       capacidad: Number(capacidad) || 10,
+      capacidad_minima: Math.max(1, Number(capacidadMinima) || 1),
       habitaciones: Number(habitaciones) || 3,
       camas: Number(camas) || 5,
       banos: Number(banos) || 2,
@@ -642,7 +652,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
               </div>
 
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
-                <span><Users size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> {capacidad} personas</span>
+                <span><Users size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> {capacidadMinima > 1 ? `${capacidadMinima} - ${capacidad}` : `Hasta ${capacidad}`} personas</span>
                 <span>•</span>
                 <span>${(precio || 0).toLocaleString('es-CO')} /pp</span>
                 <span>•</span>
@@ -837,7 +847,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                         )}
                       </div>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', gap: '0.45rem', marginTop: '0.1rem' }}>
-                        <span>Hasta {f.capacidad} pers.</span>
+                        <span>{f.capacidad_minima && f.capacidad_minima > 1 ? `${f.capacidad_minima} - ${f.capacidad}` : `Hasta ${f.capacidad}`} pers.</span>
                         <span>•</span>
                         <span>${Number(f.precio_pp || 0).toLocaleString('es-CO')}</span>
                       </div>
@@ -1072,18 +1082,36 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
             <div className="field">
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Users size={14} style={{ color: 'var(--primary)' }} />
+                <span>Capacidad mínima (personas) *</span>
+              </label>
+              <NumericInput
+                value={capacidadMinima}
+                onChange={val => setCapacidadMinima(val)}
+                min={1}
+                max={capacidad || 250}
+                suffix="personas"
+                placeholder="1"
+              />
+              <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
+                Mínimo de huéspedes requerido para reservar o cotizar
+              </span>
+            </div>
+
+            <div className="field">
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Users size={14} style={{ color: 'var(--primary)' }} />
                 <span>Capacidad máxima (personas) *</span>
               </label>
               <NumericInput
                 value={capacidad}
                 onChange={val => setCapacidad(val)}
-                min={1}
+                min={Math.max(1, capacidadMinima)}
                 max={250}
                 suffix="personas"
                 placeholder="10"
               />
               <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
-                Límite de huéspedes permitido en cotizaciones
+                Límite máximo de huéspedes permitido en cotizaciones
               </span>
             </div>
 

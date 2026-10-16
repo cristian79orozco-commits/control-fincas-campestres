@@ -133,7 +133,7 @@ export const FincaCard: React.FC<FincaCardProps> = ({ finca, onSelect, defaultEx
               <MapPin size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> {finca.zona || 'Santa Elena, Valle'}
             </span>
             <span>
-              <Users size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> Hasta {finca.capacidad} pers.
+              <Users size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> {finca.capacidad_minima && finca.capacidad_minima > 1 ? `${finca.capacidad_minima} - ${finca.capacidad}` : `Hasta ${finca.capacidad}`} pers.
             </span>
             {precioFormatted && (
               <span style={{ color: 'var(--primary)', fontWeight: 700 }}>

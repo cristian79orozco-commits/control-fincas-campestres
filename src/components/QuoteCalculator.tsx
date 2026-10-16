@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   MessageCircle, Calculator, Calendar, Users, Utensils,
   Check, User, Phone, Loader2, BadgeCheck, AlertCircle, Sparkles, ShieldCheck
@@ -46,6 +46,19 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
   // Selección múltiple de planes de alimentación complementaria
   const [planesSeleccionados, setPlanesSeleccionados] = useState<PlanAlimentacionSeleccionado[]>([]);
   const [soloAlojamiento, setSoloAlojamiento] = useState(true);
+
+  // Capacidad mínima y máxima permitida para esta propiedad
+  const minPersonas = Math.max(1, finca.capacidad_minima || 1);
+  const maxPersonas = Math.max(minPersonas, finca.capacidad || 20);
+
+  // Asegurar que el número de huéspedes cumpla con el rango permitido por la finca
+  useEffect(() => {
+    if (personas < minPersonas) {
+      onPersonasChange(minPersonas);
+    } else if (personas > maxPersonas) {
+      onPersonasChange(maxPersonas);
+    }
+  }, [minPersonas, maxPersonas, personas, onPersonasChange]);
 
   // Campos obligatorios de cliente
   const [clienteNombre, setClienteNombre] = useState('');
@@ -354,12 +367,20 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
             value={personas}
             onChange={e => onPersonasChange(Number(e.target.value))}
           >
-            {Array.from({ length: Math.min(finca.capacidad || 20, 60) }).map((_, i) => (
-              <option key={i + 1} value={i + 1}>
-                {i + 1} persona{i + 1 !== 1 ? 's' : ''}
-              </option>
-            ))}
+            {Array.from({ length: maxPersonas - minPersonas + 1 }).map((_, i) => {
+              const val = minPersonas + i;
+              return (
+                <option key={val} value={val}>
+                  {val} persona{val !== 1 ? 's' : ''}
+                </option>
+              );
+            })}
           </select>
+          {minPersonas > 1 && (
+            <span className="text-xs text-muted" style={{ display: 'block', marginTop: '0.2rem', fontSize: '0.68rem' }}>
+              Mínimo {minPersonas} personas requerido
+            </span>
+          )}
         </div>
       </div>
 

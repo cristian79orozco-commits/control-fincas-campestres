@@ -1957,7 +1957,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const payloadExtendido: any = {
         nombre: fincaData.nombre,
         zona: fincaData.zona || 'Santa Elena, Valle',
-        capacidad: fincaData.capacidad !== undefined ? fincaData.capacidad : 10,
+        capacidad: fincaData.capacidad !== undefined && fincaData.capacidad !== null ? fincaData.capacidad : 10,
+        capacidad_minima: fincaData.capacidad_minima ? Math.max(1, Number(fincaData.capacidad_minima)) : 1,
         precio_pp: fincaData.precio_pp !== undefined ? fincaData.precio_pp : 0,
         descripcion: fincaData.descripcion || null,
         estado: fincaData.estado || 'disponible',
@@ -1992,19 +1993,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Si falla por alguna columna no migrada en la base de datos remota, reintentar preservando campos existentes
       if (res.error && (res.error.message?.includes('column') || res.error.message?.includes('schema cache'))) {
-        console.warn('[AppContext] Supabase reporta columna pendiente de migración. Reintentando sin columnas bancarias:', res.error.message);
-        const payloadSinBancos = { ...payloadExtendido };
-        delete payloadSinBancos.banco_nombre;
-        delete payloadSinBancos.banco_tipo_cuenta;
-        delete payloadSinBancos.banco_cuenta;
-        delete payloadSinBancos.banco_titular;
-        delete payloadSinBancos.banco_identificacion;
+        console.warn('[AppContext] Supabase reporta columna pendiente de migración. Reintentando sin columnas recientes:', res.error.message);
+        const payloadSinRecientes = { ...payloadExtendido };
+        delete payloadSinRecientes.banco_nombre;
+        delete payloadSinRecientes.banco_tipo_cuenta;
+        delete payloadSinRecientes.banco_cuenta;
+        delete payloadSinRecientes.banco_titular;
+        delete payloadSinRecientes.banco_identificacion;
+        if (res.error.message?.includes('capacidad_minima')) {
+          delete payloadSinRecientes.capacidad_minima;
+        }
 
-        const resSinBancos = await supabase.from('fincas').upsert(payloadSinBancos).select('id').single();
-        if (!resSinBancos.error) {
-          fincaId = resSinBancos.data.id;
+        const resSinRecientes = await supabase.from('fincas').upsert(payloadSinRecientes).select('id').single();
+        if (!resSinRecientes.error) {
+          fincaId = resSinRecientes.data.id;
         } else {
-          console.warn('[AppContext] Reintentando con columnas base mínimas:', resSinBancos.error.message);
+          console.warn('[AppContext] Reintentando con columnas base mínimas:', resSinRecientes.error.message);
           const payloadBase: any = {
             nombre: fincaData.nombre,
             zona: fincaData.zona || 'Santa Elena, Valle',

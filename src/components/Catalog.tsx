@@ -92,10 +92,12 @@ export const Catalog: React.FC<CatalogProps> = ({
 
       // 2. Filtro por capacidad
       if (personasFiltro) {
-        if (personasFiltro === 'Hasta 10' && finca.capacidad > 10) return false;
-        if (personasFiltro === '10 – 20' && (finca.capacidad < 10 || finca.capacidad > 20)) return false;
-        if (personasFiltro === '20 – 40' && (finca.capacidad < 20 || finca.capacidad > 40)) return false;
-        if (personasFiltro === 'Más de 40' && finca.capacidad <= 40) return false;
+        const capMin = finca.capacidad_minima || 1;
+        const capMax = finca.capacidad || 10;
+        if (personasFiltro === 'Hasta 10' && (capMin > 10 || capMax < 1)) return false;
+        if (personasFiltro === '10 – 20' && (capMin > 20 || capMax < 10)) return false;
+        if (personasFiltro === '20 – 40' && (capMin > 40 || capMax < 20)) return false;
+        if (personasFiltro === 'Más de 40' && capMax <= 40) return false;
       }
 
       // 3. Filtro Pet Friendly
@@ -593,7 +595,7 @@ export const Catalog: React.FC<CatalogProps> = ({
                             {/* Ficha técnica esencial: Capacidad, Habitaciones, Baños y Pet Friendly */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                               <span style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'var(--surface-sunken)', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
-                                <Users size={12} style={{ color: 'var(--primary)' }} /> Hasta {f.capacidad} pers.
+                                <Users size={12} style={{ color: 'var(--primary)' }} /> {f.capacidad_minima && f.capacidad_minima > 1 ? `${f.capacidad_minima} - ${f.capacidad}` : `Hasta ${f.capacidad}`} pers.
                               </span>
 
                               {f.habitaciones && (

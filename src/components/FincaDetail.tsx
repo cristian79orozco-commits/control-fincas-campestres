@@ -48,7 +48,9 @@ export const FincaDetail: React.FC<FincaDetailProps> = ({
 }) => {
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
-  const [personas, setPersonas] = useState(Math.min(finca.capacidad || 10, 12));
+  const minCapacidad = Math.max(1, finca.capacidad_minima || 1);
+  const maxCapacidad = Math.max(minCapacidad, finca.capacidad || 10);
+  const [personas, setPersonas] = useState(Math.max(minCapacidad, Math.min(maxCapacidad, 10)));
   const [plan, setPlan] = useState('Todo incluido');
 
   // Detección responsive para dispositivos móviles
@@ -297,7 +299,7 @@ export const FincaDetail: React.FC<FincaDetailProps> = ({
                 <div className="mobile-spec-item">
                   <Users size={15} style={{ color: 'var(--primary)' }} />
                   <div>
-                    <div style={{ fontWeight: 700 }}>Hasta {finca.capacidad}</div>
+                    <div style={{ fontWeight: 700 }}>{finca.capacidad_minima && finca.capacidad_minima > 1 ? `${finca.capacidad_minima} a ${finca.capacidad}` : `Hasta ${finca.capacidad}`}</div>
                     <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>Personas</div>
                   </div>
                 </div>
@@ -643,7 +645,7 @@ export const FincaDetail: React.FC<FincaDetailProps> = ({
                 <div className="panel-title">{finca.nombre}</div>
                 <div className="text-muted text-sm mt-1" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   <span><MapPin size={13} style={{ display: 'inline', verticalAlign: '-1px' }} /> {finca.zona || 'Santa Elena, Valle'}</span>
-                  <span><Users size={13} style={{ display: 'inline', verticalAlign: '-1px' }} /> hasta {finca.capacidad} personas</span>
+                  <span><Users size={13} style={{ display: 'inline', verticalAlign: '-1px' }} /> {finca.capacidad_minima && finca.capacidad_minima > 1 ? `${finca.capacidad_minima} a ${finca.capacidad}` : `hasta ${finca.capacidad}`} personas</span>
                   {finca.habitaciones ? (
                     <span><Bed size={13} style={{ display: 'inline', verticalAlign: '-1px' }} /> {finca.habitaciones} habs</span>
                   ) : null}
