@@ -809,7 +809,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
   };
 
   const copiarCuentaAdmin = async () => {
-    const iden = (configuracion as any)?.banco_identificacion || configuracion?.nit;
+    const iden = (configuracion as any)?.banco_identificacion;
     const texto = `${configuracion?.banco_nombre || 'Bancolombia'} ${configuracion?.banco_tipo_cuenta || 'Ahorros'} N° ${configuracion?.banco_cuenta || ''} a nombre de ${configuracion?.banco_titular || 'Administración Paraíso Terrenal'}${iden ? ` (NIT: ${iden})` : ''}`.trim();
     if (!configuracion?.banco_cuenta) {
       showToast('No se ha configurado la cuenta bancaria de la administración', 'info');

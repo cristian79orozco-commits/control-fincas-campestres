@@ -51,7 +51,7 @@ export const CONFIGURACION_DEFAULT: ConfiguracionGeneral = {
   banco_tipo_cuenta: 'Ahorros',
   banco_cuenta: '',
   banco_titular: 'Paraíso Terrenal - Fincas de Alquiler',
-  banco_identificacion: '900.123.456-7',
+  banco_identificacion: '',
 
   // 5. Regla Operativa de Alimentación Mínima por Tamaño de Grupo
   regla_alimentacion_activa: true,

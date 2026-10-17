@@ -291,7 +291,7 @@ _Nota: El servicio de alimentación es suministrado y coordinado de forma direct
   const bancoFinal = bancosAdmin?.banco || cfg?.banco_nombre || 'Bancolombia';
   const tipoCuentaFinal = bancosAdmin?.tipoCuenta || cfg?.banco_tipo_cuenta || 'Ahorros';
   const titularFinal = bancosAdmin?.titular || cfg?.banco_titular || 'Administración Paraíso Terrenal';
-  const nitFinal = bancosAdmin?.nit || (cfg as any)?.banco_identificacion || cfg?.nit || '';
+  const nitFinal = bancosAdmin?.nit !== undefined ? bancosAdmin.nit : ((cfg as any)?.banco_identificacion || '');
 
   if (cuentaFinal) {
     msg += `
@@ -939,7 +939,7 @@ export function obtenerTokensParaMensaje(params: {
   const admTipo = configuracion?.banco_tipo_cuenta || 'Ahorros';
   const admCuenta = configuracion?.banco_cuenta || '';
   const admTitular = configuracion?.banco_titular || 'Administración Paraíso Terrenal';
-  const admNit = (configuracion as any)?.banco_identificacion || configuracion?.nit || '';
+  const admNit = (configuracion as any)?.banco_identificacion || '';
 
   return {
     cliente: cNombre,

@@ -105,7 +105,7 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
   const [bancoTipoCuenta, setBancoTipoCuenta] = useState(configuracion?.banco_tipo_cuenta || 'Ahorros');
   const [bancoCuenta, setBancoCuenta] = useState(configuracion?.banco_cuenta || '');
   const [bancoTitular, setBancoTitular] = useState(configuracion?.banco_titular || 'Administración Paraíso Terrenal');
-  const [bancoIdentificacion, setBancoIdentificacion] = useState((configuracion as any)?.banco_identificacion || configuracion?.nit || '');
+  const [bancoIdentificacion, setBancoIdentificacion] = useState((configuracion as any)?.banco_identificacion ?? '');
   const [copiadoCuenta, setCopiadoCuenta] = useState(false);
   const [guardandoBanco, setGuardandoBanco] = useState(false);
   const [bancoExpandido, setBancoExpandido] = useState(Boolean(!configuracion?.banco_cuenta));
@@ -117,8 +117,9 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
       if (configuracion.banco_tipo_cuenta) setBancoTipoCuenta(configuracion.banco_tipo_cuenta);
       if (configuracion.banco_cuenta !== undefined) setBancoCuenta(configuracion.banco_cuenta || '');
       if (configuracion.banco_titular) setBancoTitular(configuracion.banco_titular);
-      const iden = (configuracion as any)?.banco_identificacion || configuracion?.nit;
-      if (iden) setBancoIdentificacion(iden);
+      if (configuracion.banco_identificacion !== undefined) {
+        setBancoIdentificacion(configuracion.banco_identificacion || '');
+      }
       if (configuracion.regla_alimentacion_activa !== undefined) setReglaActiva(configuracion.regla_alimentacion_activa);
       if (configuracion.regla_alimentacion_max_personas !== undefined) setReglaMaxPersonas(configuracion.regla_alimentacion_max_personas);
       if (configuracion.regla_alimentacion_min_servicios !== undefined) setReglaMinServicios(configuracion.regla_alimentacion_min_servicios);
@@ -138,7 +139,6 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
       banco_cuenta: bancoCuenta.trim(),
       banco_titular: bancoTitular.trim() || 'Administración Paraíso Terrenal',
       banco_identificacion: bancoIdentificacion.trim(),
-      nit: bancoIdentificacion.trim() || configuracion?.nit || '900.123.456-7',
     });
     setGuardandoBanco(false);
     if (res.success) {

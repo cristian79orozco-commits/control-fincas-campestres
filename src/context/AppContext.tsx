@@ -650,7 +650,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             banco_tipo_cuenta: bancoAdminEnPlantillas.banco_tipo_cuenta || dAny.banco_tipo_cuenta || 'Ahorros',
             banco_cuenta: bancoAdminEnPlantillas.banco_cuenta || dAny.banco_cuenta || '',
             banco_titular: bancoAdminEnPlantillas.banco_titular || dAny.banco_titular || 'Paraíso Terrenal - Fincas de Alquiler',
-            banco_identificacion: bancoAdminEnPlantillas.banco_identificacion || dAny.banco_identificacion || dAny.nit || '',
+            banco_identificacion: bancoAdminEnPlantillas?.banco_identificacion !== undefined
+              ? bancoAdminEnPlantillas.banco_identificacion
+              : (dAny.banco_identificacion || ''),
           } : {}),
         };
         setConfiguracion(configCombinada);
@@ -2401,7 +2403,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         banco_tipo_cuenta: actualizado.banco_tipo_cuenta,
         banco_cuenta: actualizado.banco_cuenta,
         banco_titular: actualizado.banco_titular,
-        banco_identificacion: actualizado.banco_identificacion || actualizado.nit,
+        banco_identificacion: actualizado.banco_identificacion !== undefined ? actualizado.banco_identificacion : '',
       };
 
       const plantillasActualizadas = {
@@ -2415,10 +2417,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...datos,
         plantillas_comunicacion: plantillasActualizadas,
       };
-
-      if (datos.banco_identificacion && !datos.nit) {
-        payloadParaSupabase.nit = datos.banco_identificacion;
-      }
 
       let { error } = await supabase
         .from('configuracion_general')
