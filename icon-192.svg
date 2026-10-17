@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a6b5e"/>
+      <stop offset="100%" stop-color="#0b3830"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5e6c8"/>
+      <stop offset="100%" stop-color="#d4af37"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="42" fill="url(#bgGrad)"/>
+  <circle cx="96" cy="96" r="76" stroke="rgba(255,255,255,0.12)" stroke-width="2" fill="none"/>
+  <!-- Finca Campestre Icon -->
+  <g transform="translate(36, 36) scale(5)" stroke="#ffffff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 20h18"/>
+    <path d="M5 20V10l7-5 7 5v10"/>
+    <path d="M9 20v-5h6v5"/>
+  </g>
+  <!-- Bell / Notification Sparkle -->
+  <circle cx="138" cy="54" r="14" fill="url(#goldGrad)"/>
+  <path d="M138 48v12M132 54h12" stroke="#0b3830" stroke-width="2" stroke-linecap="round"/>
+</svg>
