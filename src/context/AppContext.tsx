@@ -646,11 +646,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             regla_alimentacion_mensaje: reglaEnPlantillas.mensaje ?? dAny.regla_alimentacion_mensaje,
           } : {}),
           ...(bancoAdminEnPlantillas ? {
-            banco_nombre: dAny.banco_nombre || bancoAdminEnPlantillas.banco_nombre || 'Bancolombia',
-            banco_tipo_cuenta: dAny.banco_tipo_cuenta || bancoAdminEnPlantillas.banco_tipo_cuenta || 'Ahorros',
-            banco_cuenta: dAny.banco_cuenta || bancoAdminEnPlantillas.banco_cuenta || '',
-            banco_titular: dAny.banco_titular || bancoAdminEnPlantillas.banco_titular || 'Paraíso Terrenal - Fincas de Alquiler',
-            banco_identificacion: dAny.banco_identificacion || bancoAdminEnPlantillas.banco_identificacion || dAny.nit || '',
+            banco_nombre: bancoAdminEnPlantillas.banco_nombre || dAny.banco_nombre || 'Bancolombia',
+            banco_tipo_cuenta: bancoAdminEnPlantillas.banco_tipo_cuenta || dAny.banco_tipo_cuenta || 'Ahorros',
+            banco_cuenta: bancoAdminEnPlantillas.banco_cuenta || dAny.banco_cuenta || '',
+            banco_titular: bancoAdminEnPlantillas.banco_titular || dAny.banco_titular || 'Paraíso Terrenal - Fincas de Alquiler',
+            banco_identificacion: bancoAdminEnPlantillas.banco_identificacion || dAny.banco_identificacion || dAny.nit || '',
           } : {}),
         };
         setConfiguracion(configCombinada);
@@ -2410,7 +2410,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         _banco_admin: bancoAdminObjeto,
       };
 
-      const payloadParaSupabase: Record<string, any> = {
+      let payloadParaSupabase: Record<string, any> = {
         id: 'general',
         ...datos,
         plantillas_comunicacion: plantillasActualizadas,
@@ -2424,18 +2424,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .from('configuracion_general')
         .upsert(payloadParaSupabase, { onConflict: 'id' });
 
-      // Si falla porque las columnas directas regla_alimentacion_* o banco_identificacion aún no se han migrado en PostgreSQL
-      if (error && error.message && error.message.includes('column of \'configuracion_general\' in the schema cache')) {
-        const payloadSeguro = { ...payloadParaSupabase };
-        delete payloadSeguro.regla_alimentacion_activa;
-        delete payloadSeguro.regla_alimentacion_max_personas;
-        delete payloadSeguro.regla_alimentacion_min_servicios;
-        delete payloadSeguro.regla_alimentacion_mensaje;
-        delete payloadSeguro.banco_identificacion;
+      // Si falla porque alguna columna directa aún no se ha migrado en PostgreSQL (schema cache)
+      let intentos = 0;
+      while (error && error.message && error.message.includes('in the schema cache') && intentos < 8) {
+        intentos++;
+        const match = error.message.match(/Could not find the '([^']+)' column/i) || error.message.match(/'([^']+)' column/i);
+        if (match && match[1]) {
+          delete payloadParaSupabase[match[1]];
+        } else {
+          delete payloadParaSupabase.banco_nombre;
+          delete payloadParaSupabase.banco_tipo_cuenta;
+          delete payloadParaSupabase.banco_cuenta;
+          delete payloadParaSupabase.banco_titular;
+          delete payloadParaSupabase.banco_identificacion;
+          delete payloadParaSupabase.regla_alimentacion_activa;
+          delete payloadParaSupabase.regla_alimentacion_max_personas;
+          delete payloadParaSupabase.regla_alimentacion_min_servicios;
+          delete payloadParaSupabase.regla_alimentacion_mensaje;
+        }
 
         const resReintento = await supabase
           .from('configuracion_general')
-          .upsert(payloadSeguro, { onConflict: 'id' });
+          .upsert(payloadParaSupabase, { onConflict: 'id' });
         error = resReintento.error;
       }
 
