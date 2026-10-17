@@ -105,6 +105,120 @@ async function urlABase64(url: string): Promise<string | null> {
 }
 
 // ---------------------------------------------------------------
+// Sanitizador de texto y adaptadores vectoriales para jsPDF
+// ---------------------------------------------------------------
+
+/**
+ * Normaliza y sanea cualquier texto que vaya a ser impreso en jsPDF con fuentes estándar (Helvetica).
+ * Reemplaza viñetas complejas, caracteres fuera de norma WinAnsi y emojis que corrompen el PDF.
+ */
+export function sanearTextoParaPdf(texto?: string | null): string {
+  if (!texto) return '';
+  return texto
+    // Normalizar viñetas que inician línea a "- "
+    .replace(/(^|\n)\s*[•\u2022\u2023\u25E6\u2043\u2219]\s*/g, '$1- ')
+    // Cualquier otra viñeta intermedia cambiarla a separador limpio " | "
+    .replace(/[•\u2022\u2023\u25E6\u2043\u2219]/g, ' | ')
+    // Eliminar checkmarks Unicode directos (los checkmarks se dibujan vectorialmente)
+    .replace(/[\u2713\u2714\u2611\u2705]/g, '')
+    // Eliminar emojis (2 a 4 bytes de surrogates) que corrompen el flujo PostScript de jsPDF
+    .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
+    // Normalizar comillas y guiones tipográficos
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u2013\u2014]/g, '-');
+}
+
+/**
+ * Dibuja un chulo (check / marca de verificación) vectorial nítido en el PDF.
+ * Evita cualquier corrupción de fuentes o caracteres no legibles.
+ */
+export function dibujarChuloVector(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  tamano: number = 3.5,
+  color: [number, number, number] = [26, 107, 94],
+  grosor: number = 0.8
+) {
+  doc.setDrawColor(...color);
+  doc.setLineWidth(grosor);
+  const esc = tamano / 4;
+  doc.line(x - 2 * esc, y, x - 0.6 * esc, y + 1.8 * esc);
+  doc.line(x - 0.6 * esc, y + 1.8 * esc, x + 2.4 * esc, y - 2 * esc);
+}
+
+/**
+ * Dibuja un distintivo circular con chulo blanco en su interior (Checkmark Badge)
+ */
+export function dibujarInsigniaChulo(
+  doc: jsPDF,
+  cx: number,
+  cy: number,
+  radio: number = 4.5,
+  colorFondo: [number, number, number] = [26, 107, 94]
+) {
+  doc.setFillColor(...colorFondo);
+  doc.circle(cx, cy, radio, 'F');
+  dibujarChuloVector(doc, cx, cy, radio * 0.9, [255, 255, 255], radio * 0.22);
+}
+
+/**
+ * Estampa de manera elegante el bloque de firma de la Administración Paraíso Terrenal.
+ * Si se ha subido una firma digital (imagen recortada con fondo transparente), se
+ * posiciona suavemente sobre la línea de firma manuscrita.
+ */
+function dibujarBloqueFirmaAdmin(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  anchoLinea: number = 75,
+  tituloEncabezado: string = 'Por la Administración:',
+  pieTexto?: string,
+  configParam?: ConfiguracionGeneral
+): number {
+  const config = configParam || getConfiguracionGlobal();
+  const plantillas = config.plantillas_pdf || {};
+  const firmaUrl = config.firma_digital_url || plantillas.firma_digital_url;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(30, 27, 19);
+  doc.text(sanearTextoParaPdf(tituloEncabezado), x, y);
+
+  const yLinea = y + 16;
+
+  // Si existe firma digital manuscrita, estamparla sobre la línea
+  if (firmaUrl && typeof firmaUrl === 'string' && firmaUrl.trim().length > 0) {
+    try {
+      const anchoFirma = 42;
+      const altoFirma = 16;
+      // Centrada sobre la línea o con margen izquierdo
+      const xFirma = x + Math.max(0, (anchoLinea - anchoFirma) / 2);
+      const yFirma = yLinea - altoFirma + 1.2; // se apoya directamente sobre la línea
+      const formato = firmaUrl.includes('image/jpeg') || firmaUrl.includes('image/jpg') ? 'JPEG' : 'PNG';
+      doc.addImage(firmaUrl, formato, xFirma, yFirma, anchoFirma, altoFirma);
+    } catch (err) {
+      console.warn('[documentos] Aviso al incrustar firma digital en PDF:', err);
+    }
+  }
+
+  // Línea de firma
+  doc.setDrawColor(30, 27, 19);
+  doc.setLineWidth(0.5);
+  doc.line(x, yLinea, x + anchoLinea, yLinea);
+
+  // Leyenda o cargo de la firma
+  const textoFirma = pieTexto || plantillas.pie_firma_admin || (config.nombre_empresa ? `Administración • ${config.nombre_empresa}` : 'Administración Paraíso Terrenal');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(30, 27, 19);
+  doc.text(sanearTextoParaPdf(textoFirma), x, yLinea + 4.5);
+
+  return yLinea + 8;
+}
+
+// ---------------------------------------------------------------
 // Encabezado corporativo adaptable (Fase 4 - Logo Paraíso Terrenal)
 // ---------------------------------------------------------------
 function encabezado(doc: jsPDF, titulo: string, numero?: string, configParam?: ConfiguracionGeneral) {
@@ -140,20 +254,20 @@ function encabezado(doc: jsPDF, titulo: string, numero?: string, configParam?: C
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12.5);
   doc.setTextColor(255, 255, 255);
-  doc.text(config.nombre_empresa || 'Paraíso Terrenal', xTexto, 13);
+  doc.text(sanearTextoParaPdf(config.nombre_empresa || 'Paraíso Terrenal'), xTexto, 13);
 
   // Eslogan o Encabezado institucional
   const esloganTxt = config.eslogan || 'Fincas de Alquiler · Experiencias exclusivas y descanso en la naturaleza';
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(7.5);
   doc.setTextColor(215, 238, 225);
-  doc.text(esloganTxt.slice(0, 75), xTexto, 19);
+  doc.text(sanearTextoParaPdf(esloganTxt.slice(0, 75)), xTexto, 19);
 
   // Título del documento
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
-  doc.text(titulo, xTexto, 28);
+  doc.text(sanearTextoParaPdf(titulo), xTexto, 28);
 
   // Información de contacto rápida (teléfono / NIT / ubicación)
   doc.setFontSize(7.5);
@@ -163,9 +277,9 @@ function encabezado(doc: jsPDF, titulo: string, numero?: string, configParam?: C
     config.nit ? `NIT: ${config.nit}` : '',
     config.telefono || '+57 317 682 7093',
     config.ciudad || 'Santa Elena, Valle',
-  ].filter(Boolean).join(' • ');
+  ].filter(Boolean).join(' | ');
   if (infoExtra) {
-    doc.text(infoExtra, xTexto, 35);
+    doc.text(sanearTextoParaPdf(infoExtra), xTexto, 35);
   }
 
   // Bloque derecho: Número de documento y fecha de emisión
@@ -264,14 +378,14 @@ function pie(doc: jsPDF, configParam?: ConfiguracionGeneral) {
   doc.setFontSize(7.2);
   doc.setTextColor(255, 255, 255);
 
-  const textoPie = config.doc_pie_pagina || 'Paraíso Terrenal • Fincas de Alquiler • Documento oficial generado automáticamente';
-  doc.text(textoPie, ancho / 2, alto - 8.5, { align: 'center' });
+  const textoPie = config.doc_pie_pagina || 'Paraíso Terrenal | Fincas de Alquiler | Documento oficial generado automáticamente';
+  doc.text(sanearTextoParaPdf(textoPie), ancho / 2, alto - 8.5, { align: 'center' });
 
-  const textoContacto = config.doc_contacto_info || `${config.whatsapp ? `WhatsApp: +${config.whatsapp}` : ''} • ${config.correo || ''}`;
+  const textoContacto = config.doc_contacto_info || `${config.whatsapp ? `WhatsApp: +${config.whatsapp}` : ''} | ${config.correo || ''}`;
   if (textoContacto.trim()) {
     doc.setFontSize(6.5);
     doc.setTextColor(209, 234, 217);
-    doc.text(textoContacto.trim(), ancho / 2, alto - 4, { align: 'center' });
+    doc.text(sanearTextoParaPdf(textoContacto.trim()), ancho / 2, alto - 4, { align: 'center' });
   }
 
   doc.setTextColor(30, 27, 19);
@@ -415,7 +529,7 @@ export function generarDocSeparacion(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.8);
 
-  const terminosTexto = plantillasPdf.clausulas_separacion || config.terminos_condiciones || `• La separación garantiza la disponibilidad de la finca para las fechas indicadas.\n• El saldo restante de alojamiento debe cancelarse al momento del check-in directamente al propietario.\n• En caso de cancelación, la separación no es reembolsable salvo acuerdo previo.\n• Este documento no es una factura comercial.`;
+  const terminosTexto = sanearTextoParaPdf(plantillasPdf.clausulas_separacion || config.terminos_condiciones || `• La separación garantiza la disponibilidad de la finca para las fechas indicadas.\n• El saldo restante de alojamiento debe cancelarse al momento del check-in directamente al propietario.\n• En caso de cancelación, la separación no es reembolsable salvo acuerdo previo.\n• Este documento no es una factura comercial.`);
   const lineasCondiciones = terminosTexto.split('\n');
 
   for (const c of lineasCondiciones) {
@@ -426,20 +540,9 @@ export function generarDocSeparacion(
     }
   }
 
-  // Firma
+  // Firma Oficial de Administración (Firma del cliente eliminada por directriz)
   y += 6;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.text('Recibido conforme:', 14, y);
-  doc.text('Por la administración:', doc.internal.pageSize.getWidth() / 2 + 10, y);
-  y += 13;
-  doc.setDrawColor(30, 27, 19);
-  doc.line(14, y, 80, y);
-  doc.line(doc.internal.pageSize.getWidth() / 2 + 10, y, doc.internal.pageSize.getWidth() - 20, y);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.text(plantillasPdf.pie_firma_cliente || 'Firma del cliente', 14, y + 4.5);
-  doc.text(plantillasPdf.pie_firma_admin || (config.nombre_empresa || 'Administración Paraíso Terrenal'), doc.internal.pageSize.getWidth() / 2 + 10, y + 4.5);
+  y = dibujarBloqueFirmaAdmin(doc, 14, y, 75, 'Por la Administración:', plantillasPdf.pie_firma_admin, config);
 
   pie(doc, config);
   const nombreArchivo = `Separacion_${num}.pdf`;
@@ -510,7 +613,11 @@ export function generarComprobantePago(reserva: Reserva, pago: Pago, configParam
   doc.setFontSize(8);
   doc.setTextColor(107, 100, 87);
   const textoLegal = config.textos_legales || 'Este comprobante es válido como recibo de pago parcial o total de la reserva indicada.';
-  doc.text(textoLegal, 14, y, { maxWidth: 182 });
+  doc.text(sanearTextoParaPdf(textoLegal), 14, y, { maxWidth: 182 });
+
+  // Firma y sello oficial de recaudos
+  y += 8;
+  y = dibujarBloqueFirmaAdmin(doc, 14, y, 75, 'Firma y Sello de Recibido:', plantillasPdf.pie_firma_admin || `Tesorería • ${config.nombre_empresa || 'Paraíso Terrenal'}`, config);
 
   pie(doc, config);
   const nombreArchivo = `Abono_${num}.pdf`;
@@ -633,13 +740,16 @@ export function generarEstadoCuenta(reserva: Reserva, configParam?: Configuracio
     y = fila(doc, y, 'SALDO PENDIENTE:', formatCOP(saldo), true);
   }
 
-  // Texto legal
   const textoLegal = config.textos_legales || 'Documento expedido de conformidad con las disposiciones turísticas y comerciales colombianas vigentes.';
   y += 6;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(110, 105, 95);
-  doc.text(textoLegal, 14, y, { maxWidth: 182 });
+  doc.text(sanearTextoParaPdf(textoLegal), 14, y, { maxWidth: 182 });
+
+  // Firma y certificación administrativa
+  y += 8;
+  y = dibujarBloqueFirmaAdmin(doc, 14, y, 75, 'Auditoría y Aprobación:', plantillasPdf.pie_firma_admin || `Auditoría • ${config.nombre_empresa || 'Paraíso Terrenal'}`, config);
 
   pie(doc, config);
   const nombreArchivo = `EstadoCuenta_${num}.pdf`;
@@ -674,13 +784,14 @@ export function generarPazYSalvo(reserva: Reserva, configParam?: ConfiguracionGe
 
   let y = 56;
 
-  // Sello visual
+  // Sello visual con insignia de chulo vectorial (sin caracteres unicode no soportados)
   doc.setFillColor(209, 234, 217);
-  doc.roundedRect(ancho / 2 - 45, y, 90, 22, 4, 4, 'F');
+  doc.roundedRect(ancho / 2 - 52, y, 104, 22, 4, 4, 'F');
+  dibujarInsigniaChulo(doc, ancho / 2 - 36, y + 11, 4.8, [26, 107, 94]);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12.5);
+  doc.setFontSize(11.5);
   doc.setTextColor(26, 107, 94);
-  doc.text('✓ PAGADO EN SU TOTALIDAD', ancho / 2, y + 14, { align: 'center' });
+  doc.text('PAGADO EN SU TOTALIDAD', ancho / 2 + 6, y + 12.8, { align: 'center' });
   doc.setTextColor(30, 27, 19);
 
   y += 32;
@@ -706,22 +817,15 @@ export function generarPazYSalvo(reserva: Reserva, configParam?: ConfiguracionGe
     `Valor total cancelado: ${formatCOP(reserva.valor_total)}`,
     `Saldo pendiente: ${formatCOP(0)}`,
     '',
-    plantillasPdf.texto_paz_salvo || config.textos_legales || 'En consecuencia, se expide el presente paz y salvo a plena conformidad de las partes.',
+    sanearTextoParaPdf(plantillasPdf.texto_paz_salvo || config.textos_legales || 'En consecuencia, se expide el presente paz y salvo a plena conformidad de las partes.'),
   ];
   for (const lineaTexto of texto) {
     doc.text(lineaTexto, 14, y, { maxWidth: 182 });
     y += lineaTexto === '' ? 4 : 6.5;
   }
 
-  y += 18;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.text('Firma y autorización administrativa:', 14, y);
-  y += 14;
-  doc.line(14, y, 90, y);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.text(plantillasPdf.pie_firma_admin || `Administración • ${config.nombre_empresa}`, 14, y + 5);
+  y += 12;
+  y = dibujarBloqueFirmaAdmin(doc, 14, y, 80, 'Firma y autorización administrativa:', plantillasPdf.pie_firma_admin, config);
 
   pie(doc, config);
   const nombreArchivo = `PazYSalvo_${num}.pdf`;
@@ -966,9 +1070,9 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
     const titular = config.banco_titular || 'Administración Paraíso Terrenal';
     const iden = (config as any)?.banco_identificacion?.trim();
 
-    let lineaBanco = `Banco: ${bancoNombre}  •  ${tipoCta} N°: ${numCta}  •  Titular: ${titular}`;
+    let lineaBanco = `Banco: ${bancoNombre} | ${tipoCta} N°: ${numCta} | Titular: ${titular}`;
     if (iden) {
-      lineaBanco += `  •  Identificación / NIT: ${iden}`;
+      lineaBanco += ` | Identificación / NIT: ${iden}`;
     }
     doc.text(lineaBanco, 18, y + 9.5);
     y += 18;
@@ -976,20 +1080,9 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
     y += 4;
   }
 
-  // Firmas
+  // Firma Oficial de Coordinación Gastronómica (Firma del cliente removida según requerimiento)
   y += 6;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.text('Atentamente,', 14, y);
-  doc.text('Aceptado por el cliente:', col2, y);
-  y += 14;
-  doc.setDrawColor(30, 27, 19);
-  doc.line(14, y, 80, y);
-  doc.line(col2, y, col2 + 66, y);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.text(plantillasPdf.pie_firma_admin || `Coordinación • ${config.nombre_empresa}`, 14, y + 4.5);
-  doc.text(nombreCli, col2, y + 4.5);
+  y = dibujarBloqueFirmaAdmin(doc, 14, y, 75, 'Atentamente / Coordinación Gastronómica:', plantillasPdf.pie_firma_admin || `Coordinación • ${config.nombre_empresa || 'Paraíso Terrenal'}`, config);
 
   pie(doc, config);
 
@@ -1168,7 +1261,7 @@ export function generarDocCotizacion(
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  const terminos = plantillasPdf.vigencia_cotizacion || config.terminos_condiciones || `• Esta cotización tiene una vigencia de 5 días hábiles a partir de su emisión.\n• Para formalizar y bloquear la disponibilidad de las fechas se requiere un anticipo del 50%.\n• Los precios pactados se respetan únicamente con la confirmación oportuna de la reserva.`;
+  const terminos = sanearTextoParaPdf(plantillasPdf.vigencia_cotizacion || config.terminos_condiciones || `• Esta cotización tiene una vigencia de 5 días hábiles a partir de su emisión.\n• Para formalizar y bloquear la disponibilidad de las fechas se requiere un anticipo del 50%.\n• Los precios pactados se respetan únicamente con la confirmación oportuna de la reserva.`);
   const lineas = terminos.split('\n');
   for (const l of lineas) {
     if (l.trim()) {
@@ -1178,20 +1271,9 @@ export function generarDocCotizacion(
     }
   }
 
-  // Firmas
-  y += 12;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.text('Elaborado por:', 14, y);
-  doc.text('Aceptación de cotización:', col2, y);
-  y += 14;
-  doc.setDrawColor(30, 27, 19);
-  doc.line(14, y, 80, y);
-  doc.line(col2, y, col2 + 66, y);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.text(plantillasPdf.pie_firma_admin || `Asesor Comercial • ${config.nombre_empresa}`, 14, y + 4.5);
-  doc.text(cliNombre, col2, y + 4.5);
+  // Firma Oficial de Asesoría Comercial (Firma del cliente removida según requerimiento)
+  y += 10;
+  y = dibujarBloqueFirmaAdmin(doc, 14, y, 75, 'Elaborado por / Asesor Comercial:', plantillasPdf.pie_firma_admin || `Asesor Comercial • ${config.nombre_empresa || 'Paraíso Terrenal'}`, config);
 
   pie(doc, config);
   const nombreArchivo = `Cotizacion_${num}.pdf`;
@@ -1408,19 +1490,8 @@ export function generarExpedienteCompleto(
   doc.text(`Observaciones de Cierre: ${notasFinales.slice(0, 110)}`, 18, y + 23);
   y += 30;
 
-  // Firmas institucionales
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.text('Por la Empresa Administradora:', 14, y);
-  doc.text('Por el Cliente / Huésped Titular:', col2, y);
-  y += 12;
-  doc.setDrawColor(30, 27, 19);
-  doc.line(14, y, 80, y);
-  doc.line(col2, y, col2 + 66, y);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.text(`${responsableCierre} • ${config.nombre_empresa}`, 14, y + 4);
-  doc.text(`${cliNombre}`, col2, y + 4);
+  // Firma institucional administrativa (Firma de cliente removida)
+  y = dibujarBloqueFirmaAdmin(doc, 14, y, 80, 'Por la Empresa Administradora:', `${responsableCierre} • ${config.nombre_empresa || 'Paraíso Terrenal'}`, config);
 
   pie(doc, config);
   const nombreArchivo = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8);

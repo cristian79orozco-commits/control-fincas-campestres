@@ -7,6 +7,7 @@ export const CONFIGURACION_DEFAULT: ConfiguracionGeneral = {
   nit: '',
   eslogan: 'Fincas de Alquiler · Experiencias exclusivas y descanso en la naturaleza',
   logo_url: '/logo.png',
+  firma_digital_url: null,
   telefono: '+57 317 682 7093',
   whatsapp: '573176827093',
   correo: 'reservas@fincascampestres.com',
@@ -83,6 +84,8 @@ export const CONFIGURACION_DEFAULT: ConfiguracionGeneral = {
 • Toda modificación en el número de comensales debe notificarse con al menos 48 horas de anticipación.
 • Incluye menaje estándar, vajilla campestre y atención durante el horario pactado del servicio.`,
     pie_firma_admin: 'Administración • Paraíso Terrenal',
+    pie_firma_cargo: 'Administración General',
+    firma_digital_url: '',
     pie_firma_cliente: 'Firma del Cliente',
   },
 };

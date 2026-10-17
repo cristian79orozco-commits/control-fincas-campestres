@@ -397,6 +397,8 @@ export interface PlantillasPdfPersonalizadas {
   texto_paz_salvo?: string;
   condiciones_gastronomicas?: string;
   pie_firma_admin?: string;
+  pie_firma_cargo?: string;
+  firma_digital_url?: string | null;
   pie_firma_cliente?: string;
 }
 
@@ -407,6 +409,7 @@ export interface ConfiguracionGeneral {
   nit?: string | null;
   eslogan?: string | null;
   logo_url?: string | null;
+  firma_digital_url?: string | null;
   telefono?: string | null;
   whatsapp: string;
   correo?: string | null;

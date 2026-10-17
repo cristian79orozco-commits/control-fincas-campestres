@@ -4,7 +4,8 @@ import {
   Building2, FileText, CreditCard, Check, Save, RotateCcw,
   Download, Eye, Globe, Phone, Mail, MapPin, Share2, Sparkles,
   ShieldCheck, AlertCircle, Info, ExternalLink, UtensilsCrossed,
-  CheckCircle2, HelpCircle, ArrowRight, Layers, Sliders, Hash
+  CheckCircle2, HelpCircle, ArrowRight, Layers, Sliders, Hash,
+  Upload, Trash2, PenTool, Image as ImageIcon
 } from 'lucide-react';
 import type { ConfiguracionGeneral, PlantillasPdfPersonalizadas } from '../types';
 import {
@@ -47,6 +48,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
   // Estado del formulario reactivo local
   const [formData, setFormData] = useState<ConfiguracionGeneral>(() => ({
     ...config,
+    firma_digital_url: config.firma_digital_url || config.plantillas_pdf?.firma_digital_url || '',
     plantillas_pdf: {
       titulo_cotizacion: 'COTIZACIÓN FORMAL DE SERVICIOS',
       titulo_separacion: 'DOCUMENTO DE SEPARACIÓN',
@@ -55,33 +57,27 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
       titulo_paz_salvo: 'CERTIFICADO DE PAZ Y SALVO',
       titulo_propuesta_menu: 'PROPUESTA DE SERVICIO GASTRONÓMICO',
       instruccion_abono_cotizacion: 'ABONO REQUERIDO (50% ALOJAMIENTO PARA BLOQUEAR DISPONIBILIDAD):',
-      vigencia_cotizacion: `• Esta cotización tiene una vigencia de 5 días hábiles a partir de su emisión.
-• Para formalizar y bloquear la disponibilidad de las fechas se requiere un anticipo del 50%.
-• Los precios pactados se respetan únicamente con la confirmación oportuna de la reserva.`,
-      clausulas_separacion: `• La separación garantiza la reserva y bloquea la disponibilidad para las fechas pactadas.
-• El saldo restante de alojamiento debe cancelarse al momento del check-in directamente al propietario.
-• En caso de cancelación por el cliente, el anticipo no será reembolsable salvo acuerdo formal previo.
-• El huésped es responsable del cuidado del inmueble, enseres e inventario entregados.
-• La capacidad máxima de personas pactada en este documento debe respetarse estrictamente.`,
+      vigencia_cotizacion: `- Esta cotización tiene una vigencia de 5 días hábiles a partir de su emisión.\n- Para formalizar y bloquear la disponibilidad de las fechas se requiere un anticipo del 50%.\n- Los precios pactados se respetan únicamente con la confirmación oportuna de la reserva.`,
+      clausulas_separacion: `- La separación garantiza la disponibilidad de la finca para las fechas pactadas.\n- El saldo restante de alojamiento debe cancelarse al momento del check-in directamente al propietario.\n- En caso de cancelación por el cliente, el anticipo no será reembolsable salvo acuerdo formal previo.\n- El huésped es responsable del cuidado del inmueble, enseres e inventario entregados.\n- La capacidad máxima pactada debe respetarse estrictamente.`,
       politicas_cancelacion: 'Cancelaciones con más de 15 días calendario de anticipación permiten reprogramación sujeta a disponibilidad dentro del mismo año. Cancelaciones posteriores conllevan la pérdida de la suma de separación pactada.',
       texto_paz_salvo: 'En consecuencia, se expide el presente paz y salvo a plena conformidad de las partes.',
-      condiciones_gastronomicas: `• Preparación con ingredientes seleccionados y frescos de la región.
-• Para confirmar el servicio de alimentación se requiere el 50% de anticipo junto con la reserva.
-• Toda modificación en el número de comensales debe notificarse con al menos 48 horas de anticipación.
-• Incluye menaje estándar, vajilla campestre y atención durante el horario pactado del servicio.`,
+      condiciones_gastronomicas: `- Preparación artesanal con ingredientes frescos de la región.\n- Se requiere anticipo del 50% de alimentación para garantizar compras e insumos.\n- Modificaciones en número de comensales deben avisarse con 48 horas de anticipación.\n- Incluye menaje campestre y servicio en mesa durante los horarios acordados.`,
       pie_firma_admin: 'Administración • Paraíso Terrenal',
-      pie_firma_cliente: 'Firma del Cliente',
+      pie_firma_cargo: 'Administración General',
+      firma_digital_url: config.firma_digital_url || config.plantillas_pdf?.firma_digital_url || '',
       ...(config.plantillas_pdf || {}),
     },
   }));
 
   const [hayCambios, setHayCambios] = useState(false);
   const [descargandoPrueba, setDescargandoPrueba] = useState(false);
+  const [subiendoFirma, setSubiendoFirma] = useState(false);
 
   // Sincronizar si cambian los datos externos
   useEffect(() => {
     setFormData({
       ...config,
+      firma_digital_url: config.firma_digital_url || config.plantillas_pdf?.firma_digital_url || '',
       plantillas_pdf: {
         titulo_cotizacion: 'COTIZACIÓN FORMAL DE SERVICIOS',
         titulo_separacion: 'DOCUMENTO DE SEPARACIÓN',
@@ -90,22 +86,14 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
         titulo_paz_salvo: 'CERTIFICADO DE PAZ Y SALVO',
         titulo_propuesta_menu: 'PROPUESTA DE SERVICIO GASTRONÓMICO',
         instruccion_abono_cotizacion: 'ABONO REQUERIDO (50% ALOJAMIENTO PARA BLOQUEAR DISPONIBILIDAD):',
-        vigencia_cotizacion: `• Esta cotización tiene una vigencia de 5 días hábiles a partir de su emisión.
-• Para formalizar y bloquear la disponibilidad de las fechas se requiere un anticipo del 50%.
-• Los precios pactados se respetan únicamente con la confirmación oportuna de la reserva.`,
-        clausulas_separacion: `• La separación garantiza la reserva y bloquea la disponibilidad para las fechas pactadas.
-• El saldo restante de alojamiento debe cancelarse al momento del check-in directamente al propietario.
-• En caso de cancelación por el cliente, el anticipo no será reembolsable salvo acuerdo formal previo.
-• El huésped es responsable del cuidado del inmueble, enseres e inventario entregados.
-• La capacidad máxima de personas pactada en este documento debe respetarse estrictamente.`,
+        vigencia_cotizacion: `- Esta cotización tiene una vigencia de 5 días hábiles a partir de su emisión.\n- Para formalizar y bloquear la disponibilidad de las fechas se requiere un anticipo del 50%.\n- Los precios pactados se respetan únicamente con la confirmación oportuna de la reserva.`,
+        clausulas_separacion: `- La separación garantiza la disponibilidad de la finca para las fechas pactadas.\n- El saldo restante de alojamiento debe cancelarse al momento del check-in directamente al propietario.\n- En caso de cancelación por el cliente, el anticipo no será reembolsable salvo acuerdo formal previo.\n- El huésped es responsable del cuidado del inmueble, enseres e inventario entregados.\n- La capacidad máxima pactada debe respetarse estrictamente.`,
         politicas_cancelacion: 'Cancelaciones con más de 15 días calendario de anticipación permiten reprogramación sujeta a disponibilidad dentro del mismo año. Cancelaciones posteriores conllevan la pérdida de la suma de separación pactada.',
         texto_paz_salvo: 'En consecuencia, se expide el presente paz y salvo a plena conformidad de las partes.',
-        condiciones_gastronomicas: `• Preparación con ingredientes seleccionados y frescos de la región.
-• Para confirmar el servicio de alimentación se requiere el 50% de anticipo junto con la reserva.
-• Toda modificación en el número de comensales debe notificarse con al menos 48 horas de anticipación.
-• Incluye menaje estándar, vajilla campestre y atención durante el horario pactado del servicio.`,
+        condiciones_gastronomicas: `- Preparación artesanal con ingredientes frescos de la región.\n- Se requiere anticipo del 50% de alimentación para garantizar compras e insumos.\n- Modificaciones en número de comensales deben avisarse con 48 horas de anticipación.\n- Incluye menaje campestre y servicio en mesa durante los horarios acordados.`,
         pie_firma_admin: 'Administración • Paraíso Terrenal',
-        pie_firma_cliente: 'Firma del Cliente',
+        pie_firma_cargo: 'Administración General',
+        firma_digital_url: config.firma_digital_url || config.plantillas_pdf?.firma_digital_url || '',
         ...(config.plantillas_pdf || {}),
       },
     });
@@ -146,6 +134,76 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
       setHayCambios(true);
       return updated;
     });
+  };
+
+  const handleSubirFirmaDigital = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Por favor selecciona una imagen válida (PNG, JPG o WebP)', 'error');
+      return;
+    }
+
+    setSubiendoFirma(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUrl = reader.result as string;
+        let finalUrl = dataUrl;
+
+        try {
+          const { supabase } = await import('../services/supabase');
+          const ext = file.name.split('.').pop() || 'png';
+          const path = `firmas/firma_admin_${Date.now()}.${ext}`;
+          const { error } = await supabase.storage
+            .from('finca-imagenes')
+            .upload(path, file, { upsert: true, contentType: file.type || 'image/png' });
+
+          if (!error) {
+            const { data } = supabase.storage.from('finca-imagenes').getPublicUrl(path);
+            if (data?.publicUrl) {
+              // Si se subió con éxito a storage, mantenemos dataUrl como respaldo instantáneo o publicUrl
+              finalUrl = dataUrl;
+            }
+          }
+        } catch (uploadErr) {
+          console.warn('Aviso: guardando firma como DataURL embebida:', uploadErr);
+        }
+
+        setFormData(prev => ({
+          ...prev,
+          firma_digital_url: finalUrl,
+          plantillas_pdf: {
+            ...(prev.plantillas_pdf || {}),
+            firma_digital_url: finalUrl,
+          },
+        }));
+        setHayCambios(true);
+        showToast('Firma digital cargada con éxito. Recuerda pulsar Guardar.', 'success');
+        setSubiendoFirma(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Error al procesar la imagen de firma:', err);
+      showToast('No se pudo procesar la firma seleccionada', 'error');
+      setSubiendoFirma(false);
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const handleEliminarFirmaDigital = () => {
+    setFormData(prev => ({
+      ...prev,
+      firma_digital_url: '',
+      plantillas_pdf: {
+        ...(prev.plantillas_pdf || {}),
+        firma_digital_url: '',
+      },
+    }));
+    setHayCambios(true);
+    showToast('Firma digital retirada. Pulsa Guardar para aplicar en el sistema.', 'info');
   };
 
   const handleGuardar = async (e?: React.FormEvent) => {
@@ -1024,13 +1082,136 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                 )}
 
                 {/* 7. MEMBRETE Y PIE GENERAL */}
+                {/* 7. MEMBRETE Y PIE GENERAL (INCLUYE FIRMA DIGITAL) */}
                 {docSubTab === 'membrete' && (
                   <>
                     <div className="panel-header">
                       <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Building2 size={17} style={{ color: 'var(--primary)' }} /> Membrete & Pie Unificado
+                        <Building2 size={17} style={{ color: 'var(--primary)' }} /> Membrete, Logo Oficial & Firma Digital
                       </div>
                       <span className="badge s-avail" style={{ fontSize: '0.68rem' }}>Aplica a Todos los Documentos</span>
+                    </div>
+
+                    {/* BLOQUE PRINCIPAL: FIRMA DIGITAL DE ADMINISTRACIÓN */}
+                    <div style={{
+                      border: '1.5px dashed var(--border)',
+                      borderRadius: '12px',
+                      padding: '1.15rem',
+                      background: 'var(--surface)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.85rem'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <PenTool size={16} style={{ color: 'var(--primary)' }} />
+                          Firma Digital de la Administración (Paraíso Terrenal)
+                        </div>
+                        <span className="badge s-avail" style={{ fontSize: '0.68rem' }}>
+                          Fondo Transparente Recomendado (PNG)
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-muted" style={{ margin: 0, lineHeight: 1.45 }}>
+                        Sube una imagen de tu firma manuscrita (preferiblemente PNG sin fondo o fondo blanco recortado). 
+                        El sistema la insertará de manera automática y ajustada sobre la línea de firma autorizada en todos los documentos PDF 
+                        (Cotizaciones, Separaciones, Comprobantes de Abono, Estados de Cuenta, Paz y Salvo y Menús). La firma del cliente ha sido 
+                        removida según la directriz operativa.
+                      </p>
+
+                      {/* Recuadro con patrón de transparencia tipo tablero para apreciar el PNG transparente */}
+                      <div style={{
+                        width: '100%',
+                        minHeight: '120px',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border)',
+                        backgroundImage: `
+                          linear-gradient(45deg, #f1f5f9 25%, transparent 25%), 
+                          linear-gradient(-45deg, #f1f5f9 25%, transparent 25%), 
+                          linear-gradient(45deg, transparent 75%, #f1f5f9 75%), 
+                          linear-gradient(-45deg, transparent 75%, #f1f5f9 75%)
+                        `,
+                        backgroundSize: '16px 16px',
+                        backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
+                        backgroundColor: '#ffffff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '1.25rem',
+                        position: 'relative',
+                        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.04)'
+                      }}>
+                        {formData.firma_digital_url || plantillas.firma_digital_url ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                            <img
+                              src={formData.firma_digital_url || plantillas.firma_digital_url || ''}
+                              alt="Firma Digital Oficial"
+                              style={{
+                                maxHeight: '80px',
+                                maxWidth: '240px',
+                                objectFit: 'contain',
+                                filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.15))'
+                              }}
+                            />
+                            <div style={{
+                              width: '180px',
+                              borderBottom: '1.5px solid #1e1b13',
+                              marginTop: '0.2rem'
+                            }} />
+                            <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#1e1b13', textAlign: 'center' }}>
+                              {plantillas.pie_firma_admin || 'Administración • Paraíso Terrenal'}
+                            </span>
+                            <span style={{ fontSize: '0.62rem', color: '#64748b' }}>Firma Autorizada Paraíso Terrenal</span>
+                          </div>
+                        ) : (
+                          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '0.85rem' }}>
+                            <Upload size={26} style={{ margin: '0 auto 0.4rem', opacity: 0.5, color: 'var(--primary)' }} />
+                            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>Sin firma digital configurada</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                              Haz clic en el botón inferior para cargar tu firma manuscrita
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Botones de acción */}
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <label className="btn btn-primary btn-sm" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', margin: 0 }}>
+                          <Upload size={14} />
+                          {subiendoFirma ? 'Procesando firma...' : (formData.firma_digital_url || plantillas.firma_digital_url ? 'Cambiar Imagen de Firma' : 'Subir Firma Digital (PNG / JPG)')}
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            onChange={handleSubirFirmaDigital}
+                            style={{ display: 'none' }}
+                            disabled={subiendoFirma}
+                          />
+                        </label>
+
+                        {(formData.firma_digital_url || plantillas.firma_digital_url) && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={handleEliminarFirmaDigital}
+                            style={{ color: '#dc2626', borderColor: '#fca5a5' }}
+                          >
+                            <Trash2 size={14} /> Eliminar Firma
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Cargo o Nombre de quien firma */}
+                      <div className="field" style={{ marginTop: '0.4rem' }}>
+                        <label>Nombre y Cargo bajo la Línea de Firma</label>
+                        <input
+                          type="text"
+                          value={plantillas.pie_firma_admin || 'Administración • Paraíso Terrenal'}
+                          onChange={e => handlePlantillaPdfChange('pie_firma_admin', e.target.value)}
+                          placeholder="Ej: Administración • Paraíso Terrenal o Representante Legal"
+                        />
+                        <span className="text-xs text-muted">Texto impreso directamente debajo de la línea de firma en todos los documentos.</span>
+                      </div>
                     </div>
 
                     <div className="field">
@@ -1261,15 +1442,41 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                         {docSubTab === 'membrete' && 'Encabezado y pie aplicables a todos los documentos del sistema.'}
                       </div>
 
-                      {/* Firmas simuladas */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.4rem', borderTop: '1px solid #eee', paddingTop: '0.35rem', fontSize: '0.65rem' }}>
-                        <div>
-                          <div style={{ width: '70px', borderBottom: '1px solid #333', marginBottom: '2px' }} />
-                          <span>{plantillas.pie_firma_cliente || 'Firma Cliente'}</span>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ width: '85px', borderBottom: '1px solid #333', marginBottom: '2px', marginLeft: 'auto' }} />
-                          <span>{plantillas.pie_firma_admin || 'Paraíso Terrenal'}</span>
+                      {/* Firma Oficial de Administración Simulada (Sin firma de cliente) */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        marginTop: '0.6rem',
+                        borderTop: '1px solid #f1f5f9',
+                        paddingTop: '0.5rem',
+                        fontSize: '0.65rem'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          textAlign: 'center'
+                        }}>
+                          {(formData.firma_digital_url || plantillas.firma_digital_url) ? (
+                            <img
+                              src={formData.firma_digital_url || plantillas.firma_digital_url || ''}
+                              alt="Firma Digital"
+                              style={{
+                                maxHeight: '38px',
+                                maxWidth: '130px',
+                                objectFit: 'contain',
+                                marginBottom: '-4px',
+                                filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.1))'
+                              }}
+                            />
+                          ) : (
+                            <div style={{ height: '24px' }} />
+                          )}
+                          <div style={{ width: '130px', borderBottom: '1.5px solid #1e1b13', marginBottom: '2px' }} />
+                          <span style={{ fontWeight: 700, color: '#1a6b5e', fontSize: '0.68rem' }}>
+                            {plantillas.pie_firma_admin || 'Administración • Paraíso Terrenal'}
+                          </span>
+                          <span style={{ fontSize: '0.55rem', color: '#64748b' }}>Firma Autorizada Paraíso Terrenal</span>
                         </div>
                       </div>
                     </div>

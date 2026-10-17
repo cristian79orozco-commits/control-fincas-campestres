@@ -4,11 +4,13 @@
 -- Archivo: supabase/configuracion_pdf_quirurgica.sql
 -- =============================================================================
 
--- 1. Asegurar columna plantillas_pdf en configuracion_general
+-- 1. Asegurar columna plantillas_pdf y firma_digital_url en configuracion_general
 ALTER TABLE IF EXISTS public.configuracion_general
-  ADD COLUMN IF NOT EXISTS plantillas_pdf JSONB DEFAULT '{}'::jsonb;
+  ADD COLUMN IF NOT EXISTS plantillas_pdf JSONB DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS firma_digital_url TEXT DEFAULT '';
 
 COMMENT ON COLUMN public.configuracion_general.plantillas_pdf IS 'Configuraciones y textos personalizados por tipo de documento PDF (títulos, vigencia, cláusulas, políticas, firmas)';
+COMMENT ON COLUMN public.configuracion_general.firma_digital_url IS 'Imagen de firma digital manuscrita para estampar en documentos PDF';
 
 -- 2. Asegurar columnas bancarias de la administración Paraíso Terrenal (Cobro de Alimentación / Menús)
 ALTER TABLE IF EXISTS public.configuracion_general
@@ -42,6 +44,7 @@ INSERT INTO public.configuracion_general (
   banco_cuenta,
   banco_titular,
   banco_identificacion,
+  firma_digital_url,
   plantillas_pdf
 ) VALUES (
   'general',
@@ -59,6 +62,7 @@ INSERT INTO public.configuracion_general (
   '',
   'Paraíso Terrenal - Fincas de Alquiler',
   '',
+  '',
   '{
     "titulo_cotizacion": "COTIZACIÓN FORMAL DE SERVICIOS",
     "titulo_separacion": "DOCUMENTO DE SEPARACIÓN",
@@ -67,19 +71,21 @@ INSERT INTO public.configuracion_general (
     "titulo_paz_salvo": "CERTIFICADO DE PAZ Y SALVO",
     "titulo_propuesta_menu": "PROPUESTA DE SERVICIO GASTRONÓMICO",
     "instruccion_abono_cotizacion": "ABONO REQUERIDO (50% ALOJAMIENTO PARA BLOQUEAR DISPONIBILIDAD)",
-    "vigencia_cotizacion": "• Esta cotización tiene una vigencia de 5 días hábiles a partir de su emisión.\n• Para formalizar y bloquear la disponibilidad de las fechas se requiere un anticipo del 50%.\n• Los precios pactados se respetan únicamente con la confirmación oportuna de la reserva.",
-    "clausulas_separacion": "• La separación garantiza la disponibilidad de la finca para las fechas pactadas.\n• El saldo restante de alojamiento debe cancelarse al momento del check-in directamente al propietario.\n• En caso de cancelación por el cliente, el anticipo no será reembolsable salvo acuerdo formal previo.\n• El huésped es responsable del cuidado del inmueble, enseres e inventario entregados.",
+    "vigencia_cotizacion": "- Esta cotización tiene una vigencia de 5 días hábiles a partir de su emisión.\n- Para formalizar y bloquear la disponibilidad de las fechas se requiere un anticipo del 50%.\n- Los precios pactados se respetan únicamente con la confirmación oportuna de la reserva.",
+    "clausulas_separacion": "- La separación garantiza la disponibilidad de la finca para las fechas pactadas.\n- El saldo restante de alojamiento debe cancelarse al momento del check-in directamente al propietario.\n- En caso de cancelación por el cliente, el anticipo no será reembolsable salvo acuerdo formal previo.\n- El huésped es responsable del cuidado del inmueble, enseres e inventario entregados.",
     "politicas_cancelacion": "Cancelaciones con más de 15 días calendario de anticipación permiten reprogramación sujeta a disponibilidad dentro del mismo año. Cancelaciones posteriores conllevan la pérdida de la suma de separación pactada.",
     "texto_paz_salvo": "En consecuencia, se expide el presente paz y salvo a plena conformidad de las partes.",
-    "condiciones_gastronomicas": "• Preparación artesanal con ingredientes frescos seleccionados.\n• Se requiere anticipo del 50% de alimentación para garantizar compras e insumos.\n• Modificaciones en número de comensales deben avisarse con 48 horas de anticipación.\n• Incluye menaje campestre y servicio en mesa durante los horarios acordados.",
+    "condiciones_gastronomicas": "- Preparación artesanal con ingredientes frescos seleccionados.\n- Se requiere anticipo del 50% de alimentación para garantizar compras e insumos.\n- Modificaciones en número de comensales deben avisarse con 48 horas de anticipación.\n- Incluye menaje campestre y servicio en mesa durante los horarios acordados.",
     "pie_firma_admin": "Administración • Paraíso Terrenal",
-    "pie_firma_cliente": "Firma del Cliente"
+    "pie_firma_cargo": "Administración General",
+    "firma_digital_url": ""
   }'::jsonb
 )
 ON CONFLICT (id) DO UPDATE SET
   banco_nombre = COALESCE(public.configuracion_general.banco_nombre, EXCLUDED.banco_nombre),
   banco_tipo_cuenta = COALESCE(public.configuracion_general.banco_tipo_cuenta, EXCLUDED.banco_tipo_cuenta),
   banco_titular = COALESCE(public.configuracion_general.banco_titular, EXCLUDED.banco_titular),
+  firma_digital_url = COALESCE(NULLIF(public.configuracion_general.firma_digital_url, ''), EXCLUDED.firma_digital_url),
   plantillas_pdf = COALESCE(public.configuracion_general.plantillas_pdf, EXCLUDED.plantillas_pdf);
 
 -- 5. Garantizar Políticas de Seguridad Row Level Security (RLS)

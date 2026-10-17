@@ -641,10 +641,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const configCombinada: ConfiguracionGeneral = {
           ...CONFIGURACION_DEFAULT,
           ...dAny,
+          firma_digital_url: dAny.firma_digital_url || dAny.plantillas_pdf?.firma_digital_url || plantillasPdfEnPlantillas?.firma_digital_url || CONFIGURACION_DEFAULT.firma_digital_url || null,
           plantillas_pdf: {
             ...(CONFIGURACION_DEFAULT.plantillas_pdf || {}),
             ...(plantillasPdfEnPlantillas || {}),
             ...(dAny.plantillas_pdf || {}),
+            firma_digital_url: dAny.firma_digital_url || dAny.plantillas_pdf?.firma_digital_url || plantillasPdfEnPlantillas?.firma_digital_url || '',
           },
           ...(reglaEnPlantillas ? {
             regla_alimentacion_activa: reglaEnPlantillas.activa ?? dAny.regla_alimentacion_activa ?? true,
@@ -2413,7 +2415,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         banco_identificacion: actualizado.banco_identificacion !== undefined ? actualizado.banco_identificacion : '',
       };
 
-      const plantillasPdfObjeto = actualizado.plantillas_pdf || {};
+      const plantillasPdfObjeto = {
+        ...(actualizado.plantillas_pdf || {}),
+        firma_digital_url: actualizado.firma_digital_url || actualizado.plantillas_pdf?.firma_digital_url || '',
+      };
 
       const plantillasActualizadas = {
         ...(actualizado.plantillas_comunicacion || {}),
@@ -2425,6 +2430,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let payloadParaSupabase: Record<string, any> = {
         id: 'general',
         ...datos,
+        firma_digital_url: actualizado.firma_digital_url || '',
         plantillas_comunicacion: plantillasActualizadas,
         plantillas_pdf: plantillasPdfObjeto,
       };
@@ -2450,6 +2456,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           delete payloadParaSupabase.regla_alimentacion_max_personas;
           delete payloadParaSupabase.regla_alimentacion_min_servicios;
           delete payloadParaSupabase.regla_alimentacion_mensaje;
+          delete payloadParaSupabase.firma_digital_url;
           delete payloadParaSupabase.plantillas_pdf;
         }
 
