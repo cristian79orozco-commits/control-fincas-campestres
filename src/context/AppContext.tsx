@@ -636,9 +636,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const dAny = data as any;
         const reglaEnPlantillas = dAny.plantillas_comunicacion?._regla_alimentacion;
         const bancoAdminEnPlantillas = dAny.plantillas_comunicacion?._banco_admin;
+        const plantillasPdfEnPlantillas = dAny.plantillas_comunicacion?._plantillas_pdf;
+
         const configCombinada: ConfiguracionGeneral = {
           ...CONFIGURACION_DEFAULT,
           ...dAny,
+          plantillas_pdf: {
+            ...(CONFIGURACION_DEFAULT.plantillas_pdf || {}),
+            ...(plantillasPdfEnPlantillas || {}),
+            ...(dAny.plantillas_pdf || {}),
+          },
           ...(reglaEnPlantillas ? {
             regla_alimentacion_activa: reglaEnPlantillas.activa ?? dAny.regla_alimentacion_activa ?? true,
             regla_alimentacion_max_personas: reglaEnPlantillas.maxPersonas ?? dAny.regla_alimentacion_max_personas ?? 10,
@@ -2390,7 +2397,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setConfiguracion(actualizado);
       setConfiguracionGlobal(actualizado);
 
-      // Empaquetar regla y banco admin en plantillas_comunicacion para persistencia garantizada
+      // Empaquetar regla, banco admin y plantillas_pdf en plantillas_comunicacion para persistencia garantizada
       const reglaObjeto = {
         activa: actualizado.regla_alimentacion_activa,
         maxPersonas: actualizado.regla_alimentacion_max_personas,
@@ -2406,16 +2413,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         banco_identificacion: actualizado.banco_identificacion !== undefined ? actualizado.banco_identificacion : '',
       };
 
+      const plantillasPdfObjeto = actualizado.plantillas_pdf || {};
+
       const plantillasActualizadas = {
         ...(actualizado.plantillas_comunicacion || {}),
         _regla_alimentacion: reglaObjeto,
         _banco_admin: bancoAdminObjeto,
+        _plantillas_pdf: plantillasPdfObjeto,
       };
 
       let payloadParaSupabase: Record<string, any> = {
         id: 'general',
         ...datos,
         plantillas_comunicacion: plantillasActualizadas,
+        plantillas_pdf: plantillasPdfObjeto,
       };
 
       let { error } = await supabase
@@ -2439,6 +2450,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           delete payloadParaSupabase.regla_alimentacion_max_personas;
           delete payloadParaSupabase.regla_alimentacion_min_servicios;
           delete payloadParaSupabase.regla_alimentacion_mensaje;
+          delete payloadParaSupabase.plantillas_pdf;
         }
 
         const resReintento = await supabase

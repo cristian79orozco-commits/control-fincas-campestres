@@ -58,6 +58,33 @@ export const CONFIGURACION_DEFAULT: ConfiguracionGeneral = {
   regla_alimentacion_max_personas: 10,
   regla_alimentacion_min_servicios: 2,
   regla_alimentacion_mensaje: 'Para grupos de hasta 10 personas, como mínimo se debe contratar servicio de desayuno y almuerzo (mínimo 2 servicios de alimentación complementaria).',
+
+  // 6. Plantillas PDF Personalizadas (Títulos, cláusulas, vigencia y firmas)
+  plantillas_pdf: {
+    titulo_cotizacion: 'COTIZACIÓN FORMAL DE SERVICIOS',
+    titulo_separacion: 'DOCUMENTO DE SEPARACIÓN',
+    titulo_abono: 'COMPROBANTE DE ABONO / PAGO',
+    titulo_estado_cuenta: 'ESTADO DE CUENTA CONSOLIDADO',
+    titulo_paz_salvo: 'CERTIFICADO DE PAZ Y SALVO',
+    titulo_propuesta_menu: 'PROPUESTA DE SERVICIO GASTRONÓMICO',
+    instruccion_abono_cotizacion: 'ABONO REQUERIDO (50% ALOJAMIENTO PARA BLOQUEAR DISPONIBILIDAD):',
+    vigencia_cotizacion: `• Esta cotización tiene una vigencia de 5 días hábiles a partir de su emisión.
+• Para formalizar y bloquear la disponibilidad de las fechas se requiere un anticipo del 50%.
+• Los precios pactados se respetan únicamente con la confirmación oportuna de la reserva.`,
+    clausulas_separacion: `• La separación garantiza la reserva y bloquea la disponibilidad para las fechas pactadas.
+• El saldo restante de alojamiento debe cancelarse al momento del check-in directamente al propietario.
+• En caso de cancelación por el cliente, el anticipo no será reembolsable salvo acuerdo formal previo.
+• El huésped es responsable del cuidado del inmueble, enseres e inventario entregados.
+• La capacidad máxima de personas pactada en este documento debe respetarse estrictamente.`,
+    politicas_cancelacion: 'Cancelaciones con más de 15 días calendario de anticipación permiten reprogramación sujeta a disponibilidad dentro del mismo año. Cancelaciones posteriores conllevan la pérdida de la suma de separación pactada.',
+    texto_paz_salvo: 'En consecuencia, se expide el presente paz y salvo a plena conformidad de las partes.',
+    condiciones_gastronomicas: `• Preparación con ingredientes seleccionados y frescos de la región.
+• Para confirmar el servicio de alimentación se requiere el 50% de anticipo junto con la reserva.
+• Toda modificación en el número de comensales debe notificarse con al menos 48 horas de anticipación.
+• Incluye menaje estándar, vajilla campestre y atención durante el horario pactado del servicio.`,
+    pie_firma_admin: 'Administración • Paraíso Terrenal',
+    pie_firma_cliente: 'Firma del Cliente',
+  },
 };
 
 // Variable en memoria global para sincronización inmediata

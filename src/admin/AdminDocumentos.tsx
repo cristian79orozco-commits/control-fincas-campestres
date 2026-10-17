@@ -15,6 +15,7 @@ import {
   plantillaPazYSalvo,
 } from '../services/whatsapp';
 import { WhatsAppModal } from '../components/WhatsAppModal';
+import { useApp } from '../context/AppContext';
 
 interface AdminDocumentosProps {
   reserva: Reserva;
@@ -27,8 +28,11 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
   onRegistrarEnvio,
   showToast,
 }) => {
+  const { configuracion, fincas } = useApp();
   const [generando, setGenerando] = useState<string | null>(null);
   const [pagoSeleccionado, setPagoSeleccionado] = useState<string>('');
+
+  const fincaActual = fincas.find(f => f.id === reserva.finca_id) || reserva.fincas;
 
   // Estado del modal de WhatsApp
   const [modalWa, setModalWa] = useState<{
@@ -72,7 +76,7 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
       titulo: 'Enviar Separación por WhatsApp',
       nombreDoc: 'Documento Oficial de Separación (PDF)',
       mensaje: plantillaSeparacion(reserva),
-      onGenerarPdf: () => { generarDocSeparacion(reserva); },
+      onGenerarPdf: () => { generarDocSeparacion(reserva, configuracion, fincaActual); },
       tipoComunicacion: 'separacion',
     });
   };
@@ -83,7 +87,7 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
       titulo: 'Enviar Estado de Cuenta por WhatsApp',
       nombreDoc: 'Estado de Cuenta Consolidado (PDF)',
       mensaje: plantillaEstadoCuenta(reserva),
-      onGenerarPdf: () => { generarEstadoCuenta(reserva); },
+      onGenerarPdf: () => { generarEstadoCuenta(reserva, configuracion); },
       tipoComunicacion: 'estado_cuenta',
     });
   };
@@ -94,7 +98,7 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
       titulo: 'Enviar Paz y Salvo por WhatsApp',
       nombreDoc: 'Certificado de Paz y Salvo (PDF)',
       mensaje: plantillaPazYSalvo(reserva),
-      onGenerarPdf: () => { generarPazYSalvo(reserva); },
+      onGenerarPdf: () => { generarPazYSalvo(reserva, configuracion); },
       tipoComunicacion: 'paz_salvo',
     });
   };
@@ -112,7 +116,7 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
       titulo: 'Enviar Comprobante de Abono por WhatsApp',
       nombreDoc: `Comprobante de Pago (${pago.tipo})`,
       mensaje: plantillaComprobantePago(reserva, pago),
-      onGenerarPdf: () => { generarComprobantePago(reserva, pago); },
+      onGenerarPdf: () => { generarComprobantePago(reserva, pago, configuracion); },
       tipoComunicacion: 'abono',
     });
   };
@@ -173,7 +177,7 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
           <div style={{ display: 'flex', gap: '0.3rem' }}>
             <button
               className="btn btn-sm"
-              onClick={() => ejecutarDescarga('separacion', () => generarDocSeparacion(reserva))}
+              onClick={() => ejecutarDescarga('separacion', () => generarDocSeparacion(reserva, configuracion, fincaActual))}
               disabled={generando === 'separacion'}
               title="Descargar PDF de Separación"
               style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
@@ -197,7 +201,7 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
           <div style={{ display: 'flex', gap: '0.3rem' }}>
             <button
               className="btn btn-sm"
-              onClick={() => ejecutarDescarga('estado_cuenta', () => generarEstadoCuenta(reserva))}
+              onClick={() => ejecutarDescarga('estado_cuenta', () => generarEstadoCuenta(reserva, configuracion))}
               disabled={generando === 'estado_cuenta'}
               title="Descargar PDF de Estado de Cuenta"
               style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
@@ -236,7 +240,7 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
           <div style={{ display: 'flex', gap: '0.3rem' }}>
             <button
               className="btn btn-sm"
-              onClick={pazYSalvoDisponible ? () => ejecutarDescarga('paz_salvo', () => generarPazYSalvo(reserva)) : undefined}
+              onClick={pazYSalvoDisponible ? () => ejecutarDescarga('paz_salvo', () => generarPazYSalvo(reserva, configuracion)) : undefined}
               disabled={!pazYSalvoDisponible || generando === 'paz_salvo'}
               title={pazYSalvoDisponible ? "Descargar Paz y Salvo" : "Requiere saldo = 0"}
               style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
@@ -285,7 +289,7 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
             style={{ fontSize: '0.72rem', gap: '0.3rem', padding: '0.25rem 0.5rem' }}
             onClick={() => {
               const p = pagos.find(x => x.id === pagoSeleccionado);
-              if (p) ejecutarDescarga('abono_' + p.id, () => generarComprobantePago(reserva, p));
+              if (p) ejecutarDescarga('abono_' + p.id, () => generarComprobantePago(reserva, p, configuracion));
             }}
             disabled={!pagoSeleccionado || generando?.startsWith('abono_')}
           >

@@ -287,6 +287,7 @@ export function generarDocSeparacion(
   fincaParam?: Finca | Pick<Finca, 'id' | 'nombre'> | any | null
 ): ResultadoDocumentoPdf {
   const config = configParam || getConfiguracionGlobal();
+  const plantillasPdf = config.plantillas_pdf || {};
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const num = formatearConsecutivoConPrefijo(
     reserva.consecutivo,
@@ -295,7 +296,8 @@ export function generarDocSeparacion(
     { separacion: config.prefijo_separacion }
   );
 
-  encabezado(doc, 'DOCUMENTO DE SEPARACIÓN', num, config);
+  const tituloDoc = plantillasPdf.titulo_separacion || 'DOCUMENTO DE SEPARACIÓN';
+  encabezado(doc, tituloDoc, num, config);
 
   let y = 48;
   y = datosClienteFinca(doc, reserva, y);
@@ -313,35 +315,64 @@ export function generarDocSeparacion(
   y = fila(doc, y, 'Fecha de llegada:', formatFecha(reserva.fecha_inicio));
   y = fila(doc, y, 'Fecha de salida:', formatFecha(reserva.fecha_fin));
   y = fila(doc, y, 'Personas:', String(reserva.personas));
+  if (reserva.alimentacion && reserva.alimentacion !== 'Sin alimentación') {
+    y = fila(doc, y, 'Servicio gastronómico:', reserva.alimentacion);
+  }
   y += 4;
   y = linea(doc, y);
 
-  // Valores
+  // Valores y Desglose Financiero
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(26, 107, 94);
-  doc.text('VALORES', 14, y);
+  doc.text('DESGLOSE ECONÓMICO Y ESTADO DE PAGOS', 14, y);
   doc.setTextColor(30, 27, 19);
   y += 8;
 
-  y = fila(doc, y, 'Valor total de la reserva:', formatCOP(reserva.valor_total));
-  y = fila(doc, y, 'Valor de separación pagado:', formatCOP(reserva.separacion), true);
+  const finanzas = desglosarFinanzasReserva(reserva);
+  const tieneAlimentacion = (reserva.costo_alimentacion || 0) > 0;
 
-  const saldo = calcularSaldo(reserva);
-  y = fila(doc, y, 'Saldo pendiente:', formatCOP(saldo), true);
-  y += 6;
+  if (tieneAlimentacion) {
+    // 1. Alojamiento
+    y = fila(doc, y, 'Alojamiento en Finca (Valor Total):', formatCOP(finanzas.subtotalAlojamiento));
+    y = fila(doc, y, 'Abono de Separación de Finca Pagado:', formatCOP(finanzas.pagadoFinca), true);
+    y = fila(doc, y, 'Saldo Restante de Alojamiento (al Check-in):', formatCOP(finanzas.saldoFincaCheckIn), true);
+    y += 2;
+
+    // 2. Alimentación
+    y = fila(doc, y, 'Alimentación · Admón Paraíso Terrenal:', formatCOP(finanzas.costoAlimentacion));
+    y = fila(doc, y, 'Abono de Alimentación Pagado:', formatCOP(finanzas.pagadoAlimentacion), true);
+    y = fila(doc, y, 'Saldo Restante de Alimentación:', formatCOP(finanzas.saldoAlimentacionAdmin), true);
+    y += 3;
+    y = linea(doc, y);
+    y += 1;
+
+    // Consolidado
+    y = fila(doc, y, 'VALOR TOTAL CONSOLIDADO:', formatCOP(reserva.valor_total), true);
+    y = fila(doc, y, 'SALDO TOTAL PENDIENTE:', formatCOP(finanzas.saldoConsolidado), true);
+  } else {
+    y = fila(doc, y, 'Valor total de la reserva:', formatCOP(reserva.valor_total));
+    y = fila(doc, y, 'Valor de separación pagado:', formatCOP(reserva.separacion), true);
+    const saldo = calcularSaldo(reserva);
+    y = fila(doc, y, 'Saldo pendiente:', formatCOP(saldo), true);
+  }
+
+  y += 5;
   y = linea(doc, y);
 
-  // Si la finca tiene cuenta bancaria registrada para liquidar el saldo al check-in
+  // CUENTAS BANCARIAS SEPARADAS
   const fInfo = fincaParam || (reserva.fincas as any);
-  if (saldo > 0 && fInfo?.banco_cuenta) {
+  const saldoAlojamiento = tieneAlimentacion ? finanzas.saldoFincaCheckIn : calcularSaldo(reserva);
+
+  // 1. Cuenta del Propietario para saldo de Alojamiento
+  if (saldoAlojamiento > 0 && fInfo?.banco_cuenta) {
     doc.setFillColor(248, 249, 248);
     doc.setDrawColor(219, 212, 195);
     doc.roundedRect(14, y, 182, 13, 1.5, 1.5, 'FD');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
     doc.setTextColor(26, 107, 94);
-    doc.text('CUENTA DEL PROPIETARIO PARA LIQUIDACIÓN DE SALDO EN CHECK-IN:', 18, y + 4.5);
+    doc.text('1. CUENTA DEL PROPIETARIO PARA LIQUIDACIÓN DE ALOJAMIENTO EN CHECK-IN:', 18, y + 4.5);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(30, 27, 19);
@@ -350,43 +381,65 @@ export function generarDocSeparacion(
       datosOwner += `  •  Identificación: ${fInfo.banco_identificacion.trim()}`;
     }
     doc.text(datosOwner, 18, y + 9);
-    y += 16;
+    y += 15;
+  }
+
+  // 2. Cuenta de la Administración Paraíso Terrenal para Alimentación
+  if (tieneAlimentacion && finanzas.saldoAlimentacionAdmin > 0 && config.banco_cuenta) {
+    doc.setFillColor(244, 248, 246);
+    doc.setDrawColor(26, 107, 94);
+    doc.roundedRect(14, y, 182, 13, 1.5, 1.5, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(26, 107, 94);
+    doc.text('2. CUENTA DE LA ADMINISTRACIÓN PARA PAGO DE ALIMENTACIÓN (PARAÍSO TERRENAL):', 18, y + 4.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(30, 27, 19);
+    let datosAdmin = `Banco: ${config.banco_nombre || 'Bancolombia'}  •  ${config.banco_tipo_cuenta || 'Ahorros'} N°: ${config.banco_cuenta}  •  Titular: ${config.banco_titular || 'Administración Paraíso Terrenal'}`;
+    if (config.banco_identificacion?.trim()) {
+      datosAdmin += `  •  NIT / Cédula: ${config.banco_identificacion.trim()}`;
+    }
+    doc.text(datosAdmin, 18, y + 9);
+    y += 15;
   }
 
   // Condiciones (Fase 4: extraídas de configuración)
-  y += 4;
+  y += 2;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
-  doc.text('TÉRMINOS Y CONDICIONES', 14, y);
-  y += 7;
+  doc.setTextColor(26, 107, 94);
+  doc.text('TÉRMINOS Y CONDICIONES DE RESERVA', 14, y);
+  doc.setTextColor(30, 27, 19);
+  y += 6;
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  doc.setFontSize(7.8);
 
-  const terminosTexto = config.terminos_condiciones || `• La separación garantiza la disponibilidad de la finca para las fechas indicadas.\n• El saldo restante debe cancelarse antes de la fecha de llegada.\n• En caso de cancelación, la separación no es reembolsable salvo acuerdo previo.\n• Este documento no es una factura comercial.`;
+  const terminosTexto = plantillasPdf.clausulas_separacion || config.terminos_condiciones || `• La separación garantiza la disponibilidad de la finca para las fechas indicadas.\n• El saldo restante de alojamiento debe cancelarse al momento del check-in directamente al propietario.\n• En caso de cancelación, la separación no es reembolsable salvo acuerdo previo.\n• Este documento no es una factura comercial.`;
   const lineasCondiciones = terminosTexto.split('\n');
 
   for (const c of lineasCondiciones) {
     if (c.trim()) {
       const split = doc.splitTextToSize(c.trim(), 182);
       doc.text(split, 14, y);
-      y += split.length * 4.5;
+      y += split.length * 4.2;
     }
   }
 
   // Firma
-  y += 8;
+  y += 6;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.text('Recibido conforme:', 14, y);
   doc.text('Por la administración:', doc.internal.pageSize.getWidth() / 2 + 10, y);
-  y += 14;
+  y += 13;
   doc.setDrawColor(30, 27, 19);
   doc.line(14, y, 80, y);
   doc.line(doc.internal.pageSize.getWidth() / 2 + 10, y, doc.internal.pageSize.getWidth() - 20, y);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  doc.text('Firma del cliente', 14, y + 4.5);
-  doc.text(config.nombre_empresa || 'Administración', doc.internal.pageSize.getWidth() / 2 + 10, y + 4.5);
+  doc.text(plantillasPdf.pie_firma_cliente || 'Firma del cliente', 14, y + 4.5);
+  doc.text(plantillasPdf.pie_firma_admin || (config.nombre_empresa || 'Administración Paraíso Terrenal'), doc.internal.pageSize.getWidth() / 2 + 10, y + 4.5);
 
   pie(doc, config);
   const nombreArchivo = `Separacion_${num}.pdf`;
@@ -400,6 +453,7 @@ export function generarDocSeparacion(
 // ================================================================
 export function generarComprobantePago(reserva: Reserva, pago: Pago, configParam?: ConfiguracionGeneral): ResultadoDocumentoPdf {
   const config = configParam || getConfiguracionGlobal();
+  const plantillasPdf = config.plantillas_pdf || {};
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const indexPago = (reserva.pagos || []).findIndex(p => p.id === pago.id);
   const sub = indexPago > 0 ? indexPago + 1 : undefined;
@@ -410,7 +464,8 @@ export function generarComprobantePago(reserva: Reserva, pago: Pago, configParam
     { abono: config.prefijo_abono }
   );
 
-  encabezado(doc, 'COMPROBANTE DE ABONO / PAGO', num, config);
+  const tituloDoc = plantillasPdf.titulo_abono || 'COMPROBANTE DE ABONO / PAGO';
+  encabezado(doc, tituloDoc, num, config);
 
   let y = 48;
   y = datosClienteFinca(doc, reserva, y);
@@ -469,6 +524,7 @@ export function generarComprobantePago(reserva: Reserva, pago: Pago, configParam
 // ================================================================
 export function generarEstadoCuenta(reserva: Reserva, configParam?: ConfiguracionGeneral): ResultadoDocumentoPdf {
   const config = configParam || getConfiguracionGlobal();
+  const plantillasPdf = config.plantillas_pdf || {};
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const num = formatearConsecutivoConPrefijo(
     reserva.consecutivo,
@@ -477,7 +533,8 @@ export function generarEstadoCuenta(reserva: Reserva, configParam?: Configuracio
     { estado_cuenta: config.prefijo_estado_cuenta }
   );
 
-  encabezado(doc, 'ESTADO DE CUENTA', num, config);
+  const tituloDoc = plantillasPdf.titulo_estado_cuenta || 'ESTADO DE CUENTA CONSOLIDADO';
+  encabezado(doc, tituloDoc, num, config);
 
   let y = 48;
   y = datosClienteFinca(doc, reserva, y);
@@ -577,13 +634,12 @@ export function generarEstadoCuenta(reserva: Reserva, configParam?: Configuracio
   }
 
   // Texto legal
-  if (config.textos_legales) {
-    y += 6;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(110, 105, 95);
-    doc.text(config.textos_legales, 14, y, { maxWidth: 182 });
-  }
+  const textoLegal = config.textos_legales || 'Documento expedido de conformidad con las disposiciones turísticas y comerciales colombianas vigentes.';
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(110, 105, 95);
+  doc.text(textoLegal, 14, y, { maxWidth: 182 });
 
   pie(doc, config);
   const nombreArchivo = `EstadoCuenta_${num}.pdf`;
@@ -597,6 +653,7 @@ export function generarEstadoCuenta(reserva: Reserva, configParam?: Configuracio
 // ================================================================
 export function generarPazYSalvo(reserva: Reserva, configParam?: ConfiguracionGeneral): ResultadoDocumentoPdf | null {
   const config = configParam || getConfiguracionGlobal();
+  const plantillasPdf = config.plantillas_pdf || {};
   const saldo = calcularSaldo(reserva);
   if (saldo > 0) {
     alert('No es posible generar el Paz y Salvo: la reserva tiene saldo pendiente.');
@@ -612,7 +669,8 @@ export function generarPazYSalvo(reserva: Reserva, configParam?: ConfiguracionGe
   );
   const ancho = doc.internal.pageSize.getWidth();
 
-  encabezado(doc, 'CERTIFICADO DE PAZ Y SALVO', num, config);
+  const tituloDoc = plantillasPdf.titulo_paz_salvo || 'CERTIFICADO DE PAZ Y SALVO';
+  encabezado(doc, tituloDoc, num, config);
 
   let y = 56;
 
@@ -648,7 +706,7 @@ export function generarPazYSalvo(reserva: Reserva, configParam?: ConfiguracionGe
     `Valor total cancelado: ${formatCOP(reserva.valor_total)}`,
     `Saldo pendiente: ${formatCOP(0)}`,
     '',
-    config.textos_legales || 'En consecuencia, se expide el presente paz y salvo a plena conformidad de las partes.',
+    plantillasPdf.texto_paz_salvo || config.textos_legales || 'En consecuencia, se expide el presente paz y salvo a plena conformidad de las partes.',
   ];
   for (const lineaTexto of texto) {
     doc.text(lineaTexto, 14, y, { maxWidth: 182 });
@@ -663,7 +721,7 @@ export function generarPazYSalvo(reserva: Reserva, configParam?: ConfiguracionGe
   doc.line(14, y, 90, y);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text(`Administración • ${config.nombre_empresa}`, 14, y + 5);
+  doc.text(plantillasPdf.pie_firma_admin || `Administración • ${config.nombre_empresa}`, 14, y + 5);
 
   pie(doc, config);
   const nombreArchivo = `PazYSalvo_${num}.pdf`;
@@ -709,7 +767,8 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
     { menu: prefijoMenu }
   );
 
-  const tituloDoc = datos.tituloDocumento || 'PROPUESTA DE SERVICIO GASTRONÓMICO';
+  const plantillasPdf = config.plantillas_pdf || {};
+  const tituloDoc = datos.tituloDocumento || plantillasPdf.titulo_propuesta_menu || 'PROPUESTA DE SERVICIO GASTRONÓMICO';
   encabezado(doc, tituloDoc, num, config);
 
   let y = 48;
@@ -854,7 +913,7 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
   doc.setTextColor(30, 27, 19);
   y += 14;
 
-  // CONDICIONES (Fase 4)
+  // CONDICIONES (Fase 4: desde plantillas_pdf)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(26, 107, 94);
@@ -864,21 +923,25 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.8);
-  const condicionesLista = [
-    menu.condiciones ? `• ${menu.condiciones}` : '• Preparación con ingredientes seleccionados y frescos de la región.',
-    '• Para confirmar el servicio de alimentación se requiere el 50% de anticipo junto con la reserva.',
-    '• Toda modificación en el número de comensales debe notificarse con al menos 48 horas de anticipación.',
-    '• Incluye menaje estándar, vajilla campestre y atención durante el horario pactado del servicio.',
-  ];
+  const textoCondicionesGastronomicas = plantillasPdf.condiciones_gastronomicas || `• Preparación con ingredientes seleccionados y frescos de la región.
+• Para confirmar el servicio de alimentación se requiere el 50% de anticipo junto con la reserva.
+• Toda modificación en el número de comensales debe notificarse con al menos 48 horas de anticipación.
+• Incluye menaje estándar, vajilla campestre y atención durante el horario pactado del servicio.`;
+
+  const condicionesLista = menu.condiciones
+    ? [`• ${menu.condiciones}`, ...textoCondicionesGastronomicas.split('\n')]
+    : textoCondicionesGastronomicas.split('\n');
 
   if (notasEspeciales) {
     condicionesLista.push(`• Observaciones particulares: ${notasEspeciales}`);
   }
 
   for (const cond of condicionesLista) {
-    const lines = doc.splitTextToSize(cond, 182);
-    doc.text(lines, 14, y);
-    y += lines.length * 4.2;
+    if (cond.trim()) {
+      const lines = doc.splitTextToSize(cond.trim(), 182);
+      doc.text(lines, 14, y);
+      y += lines.length * 4.2;
+    }
   }
 
   // Forma de Pago / Cuenta Bancaria de la Administración (Paraíso Terrenal)
@@ -925,7 +988,7 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
   doc.line(col2, y, col2 + 66, y);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  doc.text(`Coordinación • ${config.nombre_empresa}`, 14, y + 4.5);
+  doc.text(plantillasPdf.pie_firma_admin || `Coordinación • ${config.nombre_empresa}`, 14, y + 4.5);
   doc.text(nombreCli, col2, y + 4.5);
 
   pie(doc, config);
@@ -945,6 +1008,7 @@ export function generarDocCotizacion(
   fincaParam?: Finca | Pick<Finca, 'id' | 'nombre'> | any | null
 ): ResultadoDocumentoPdf {
   const config = configParam || getConfiguracionGlobal();
+  const plantillasPdf = config.plantillas_pdf || {};
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const num = formatearConsecutivoConPrefijo(
     cotizacion.consecutivo,
@@ -954,7 +1018,8 @@ export function generarDocCotizacion(
   );
   const ancho = doc.internal.pageSize.getWidth();
 
-  encabezado(doc, 'COTIZACIÓN FORMAL DE SERVICIOS', num, config);
+  const tituloDoc = plantillasPdf.titulo_cotizacion || 'COTIZACIÓN FORMAL DE SERVICIOS';
+  encabezado(doc, tituloDoc, num, config);
 
   let y = 48;
 
@@ -1043,12 +1108,14 @@ export function generarDocCotizacion(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(161, 98, 7);
-  doc.text('ABONO REQUERIDO (50% ALOJAMIENTO PARA BLOQUEAR):', 18, y + 5.5);
+  const textoInstruccionAbono = plantillasPdf.instruccion_abono_cotizacion || 'ABONO REQUERIDO (50% ALOJAMIENTO PARA BLOQUEAR):';
+  doc.text(textoInstruccionAbono, 18, y + 5.5);
   doc.text(formatCOP(abono50), 182, y + 5.5, { align: 'right' });
   doc.setTextColor(30, 27, 19);
   y += 12;
 
-  // Cuenta bancaria del Propietario de la Finca para transferencia del anticipo
+  // CUENTAS BANCARIAS SEPARADAS
+  // 1. Cuenta del Propietario de la Finca para transferencia del anticipo de alojamiento
   const fInfo = fincaParam || (cotizacion.fincas as any);
   if (fInfo?.banco_cuenta) {
     doc.setFillColor(248, 249, 248);
@@ -1057,7 +1124,7 @@ export function generarDocCotizacion(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
     doc.setTextColor(26, 107, 94);
-    doc.text('CUENTA DEL PROPIETARIO PARA TRANSFERENCIA DEL ABONO (50% FINCA):', 18, y + 4.5);
+    doc.text('1. CUENTA DEL PROPIETARIO PARA TRANSFERENCIA DEL ABONO (50% ALOJAMIENTO):', 18, y + 4.5);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(30, 27, 19);
@@ -1066,8 +1133,28 @@ export function generarDocCotizacion(
       datosOwner += `  •  Identificación: ${fInfo.banco_identificacion.trim()}`;
     }
     doc.text(datosOwner, 18, y + 9);
-    y += 16;
-  } else {
+    y += 15;
+  }
+
+  // 2. Cuenta de la Administración Paraíso Terrenal si incluye servicio gastronómico
+  if (cotizacion.costo_alimentacion > 0 && config.banco_cuenta) {
+    doc.setFillColor(244, 248, 246);
+    doc.setDrawColor(26, 107, 94);
+    doc.roundedRect(14, y, 182, 13, 1.5, 1.5, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(26, 107, 94);
+    doc.text('2. CUENTA DE LA ADMINISTRACIÓN PARA TRANSFERENCIA DE ALIMENTACIÓN (PARAÍSO TERRENAL):', 18, y + 4.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(30, 27, 19);
+    let datosAdmin = `Banco: ${config.banco_nombre || 'Bancolombia'}  •  ${config.banco_tipo_cuenta || 'Ahorros'} N°: ${config.banco_cuenta}  •  Titular: ${config.banco_titular || 'Administración Paraíso Terrenal'}`;
+    if (config.banco_identificacion?.trim()) {
+      datosAdmin += `  •  NIT / Cédula: ${config.banco_identificacion.trim()}`;
+    }
+    doc.text(datosAdmin, 18, y + 9);
+    y += 15;
+  } else if (!fInfo?.banco_cuenta) {
     y += 2;
   }
 
@@ -1081,7 +1168,7 @@ export function generarDocCotizacion(
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  const terminos = config.terminos_condiciones || `• Esta cotización tiene una vigencia de 5 días hábiles a partir de su emisión.\n• Para formalizar y bloquear la disponibilidad de las fechas se requiere un anticipo del 50%.\n• Los precios pactados se respetan únicamente con la confirmación oportuna de la reserva.`;
+  const terminos = plantillasPdf.vigencia_cotizacion || config.terminos_condiciones || `• Esta cotización tiene una vigencia de 5 días hábiles a partir de su emisión.\n• Para formalizar y bloquear la disponibilidad de las fechas se requiere un anticipo del 50%.\n• Los precios pactados se respetan únicamente con la confirmación oportuna de la reserva.`;
   const lineas = terminos.split('\n');
   for (const l of lineas) {
     if (l.trim()) {
@@ -1103,7 +1190,7 @@ export function generarDocCotizacion(
   doc.line(col2, y, col2 + 66, y);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  doc.text(`Asesor Comercial • ${config.nombre_empresa}`, 14, y + 4.5);
+  doc.text(plantillasPdf.pie_firma_admin || `Asesor Comercial • ${config.nombre_empresa}`, 14, y + 4.5);
   doc.text(cliNombre, col2, y + 4.5);
 
   pie(doc, config);

@@ -380,6 +380,26 @@ export interface RedesSociales {
   tiktok?: string;
 }
 
+export interface PlantillasPdfPersonalizadas {
+  // Títulos de documentos
+  titulo_cotizacion?: string;
+  titulo_separacion?: string;
+  titulo_abono?: string;
+  titulo_estado_cuenta?: string;
+  titulo_paz_salvo?: string;
+  titulo_propuesta_menu?: string;
+
+  // Textos, instrucciones y condiciones específicas
+  instruccion_abono_cotizacion?: string;
+  vigencia_cotizacion?: string;
+  clausulas_separacion?: string;
+  politicas_cancelacion?: string;
+  texto_paz_salvo?: string;
+  condiciones_gastronomicas?: string;
+  pie_firma_admin?: string;
+  pie_firma_cliente?: string;
+}
+
 export interface ConfiguracionGeneral {
   id: string; // 'general'
   // 1. Datos de Empresa
@@ -425,8 +445,9 @@ export interface ConfiguracionGeneral {
   banco_titular?: string | null;
   banco_identificacion?: string | null;
 
-  // 5. Plantillas de Mensajes de Comunicación Editables
+  // 5. Plantillas de Mensajes de Comunicación y PDF Editables
   plantillas_comunicacion?: Record<string, string>;
+  plantillas_pdf?: PlantillasPdfPersonalizadas;
 
   // 6. Regla Operativa de Alimentación Mínima por Tamaño de Grupo
   regla_alimentacion_activa?: boolean;
