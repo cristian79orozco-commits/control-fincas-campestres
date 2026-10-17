@@ -15,12 +15,15 @@ import {
 import { calcularCotizacion } from '../utils/calcularCotizacion';
 import { CurrencyInput } from '../components/CurrencyInput';
 import { useApp } from '../context/AppContext';
+import { getConfiguracionGlobal } from '../services/configuracion';
+import type { ConfiguracionGeneral } from '../types';
 
 interface AdminCotizacionesProps {
   cotizaciones: CotizacionDB[];
   clientes: Cliente[];
   fincas: Finca[];
   menus?: Menu[];
+  configuracion?: ConfiguracionGeneral;
   onGuardar: (datos: Partial<CotizacionDB>) => Promise<{ success: boolean; id?: string; error?: string }>;
   onCambiarEstado: (id: string, estado: CotizacionEstado) => Promise<{ success: boolean; error?: string }>;
   onEliminar: (id: string) => Promise<{ success: boolean; error?: string }>;
@@ -106,6 +109,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
   clientes,
   fincas,
   menus = [],
+  configuracion: configProp,
   onGuardar,
   onCambiarEstado,
   onEliminar,
@@ -114,7 +118,8 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
   showToast,
   openConfirm,
 }) => {
-  const { previsualizarFinca, configuracion, convertirCotizacionAReserva, navegarAAdmin, abrirComunicacionesConExpediente } = useApp();
+  const { previsualizarFinca, configuracion: configApp, convertirCotizacionAReserva, navegarAAdmin, abrirComunicacionesConExpediente } = useApp();
+  const configuracion = configProp || configApp;
   const [form, setForm] = useState<Partial<CotizacionDB>>(VACIO);
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -288,40 +293,38 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
 
   // 1. Pedir Abono Finca (50%) -> Cuenta del propietario
   const handleAbrirPedirAbono = (c: CotizacionDB) => {
-    const f = fincas.find(x => x.id === c.finca_id) || c.fincas;
+    const f = fincas.find(x => x.id === c.finca_id) || (c.fincas as any);
     const bancosInfo = f?.banco_cuenta ? {
       banco: f.banco_nombre || 'Bancolombia',
       tipoCuenta: f.banco_tipo_cuenta || 'Ahorros',
       cuenta: f.banco_cuenta,
       titular: f.banco_titular || 'Propietario de la Finca',
       nit: f.banco_identificacion || undefined,
-    } : {
-      banco: configuracion?.banco_nombre || 'Bancolombia',
-      tipoCuenta: configuracion?.banco_tipo_cuenta || 'Ahorros',
-      cuenta: configuracion?.banco_cuenta || '',
-      titular: configuracion?.banco_titular || configuracion?.nombre_empresa,
-      nit: configuracion?.nit || undefined,
-    };
+    } : null;
+
     setModalWaCotiz({
       abierto: true,
       cotizacion: c,
-      titulo: `Solicitud de Separación (50% Finca) · ${c.fincas?.nombre || 'Finca'}`,
-      mensaje: plantillaPedirAbonoCotizacion(c, c.fincas, c.clientes, bancosInfo, 50),
+      titulo: `Solicitud de Separación (50% Finca) · ${f?.nombre || c.fincas?.nombre || 'Finca'}`,
+      mensaje: plantillaPedirAbonoCotizacion(c, f, c.clientes, bancosInfo, 50),
       nombreDoc: 'Cotización Oficial y Separación (PDF)',
-      onGenerarPdf: () => generarDocCotizacion(c, configuracion),
+      onGenerarPdf: () => generarDocCotizacion(c, configuracion || getConfiguracionGlobal()),
       tipo: 'cotizacion',
     });
   };
 
   // 2. Cobrar Planes de Alimentación -> Cuenta de la Administración
   const handleAbrirCobroAlimentacion = (c: CotizacionDB) => {
-    const bancosAdmin = {
-      banco: configuracion?.banco_nombre || 'Bancolombia',
-      tipoCuenta: configuracion?.banco_tipo_cuenta || 'Ahorros',
-      cuenta: configuracion?.banco_cuenta || '',
-      titular: configuracion?.banco_titular || 'Administración Paraíso Terrenal',
-      nit: (configuracion as any)?.banco_identificacion || configuracion?.nit || undefined,
-    };
+    const cfg = configuracion || getConfiguracionGlobal();
+    const iden = (cfg as any)?.banco_identificacion ? (cfg as any).banco_identificacion.trim() : undefined;
+    const bancosAdmin = cfg?.banco_cuenta ? {
+      banco: cfg.banco_nombre || 'Bancolombia',
+      tipoCuenta: cfg.banco_tipo_cuenta || 'Ahorros',
+      cuenta: cfg.banco_cuenta,
+      titular: cfg.banco_titular || 'Administración Paraíso Terrenal',
+      nit: iden || undefined,
+    } : null;
+
     setModalWaCotiz({
       abierto: true,
       cotizacion: c,

@@ -45,6 +45,7 @@ import {
   formatearConsecutivoConPrefijo,
   type TipoDocumentoPrefijo
 } from '../utils/consecutivos';
+import { getConfiguracionGlobal } from '../services/configuracion';
 
 interface AdminComunicacionesProps {
   currentWaNumber: string;
@@ -314,15 +315,21 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
     const r = (rId && rId !== reservaId ? reservas.find(x => x.id === rId) : null) || reservaEfectiva;
     const cli = (cliId ? clientes.find(x => x.id === cliId) : null)
       || (expedienteTipo === 'cotizacion' ? c?.clientes : (r?.clientes || c?.clientes));
-    const f = (expedienteTipo === 'cotizacion' ? c?.fincas : (r?.fincas || c?.fincas))
-      || fincaActual;
+    
+    // Resolver la finca completa desde el catálogo para asegurar que traiga las cuentas bancarias del dueño
+    const fId = (expedienteTipo === 'cotizacion' ? c?.finca_id : (r?.finca_id || c?.finca_id))
+      || (c?.fincas as any)?.id || (r?.fincas as any)?.id;
+    const fincaCompleta = (fId ? fincas.find(x => x.id === fId) : null)
+      || fincaActual
+      || (expedienteTipo === 'cotizacion' ? c?.fincas : (r?.fincas || c?.fincas));
+    const f = fincaCompleta;
 
     if (cli) {
       nom = `${cli.nombre} ${cli.apellido || ''}`.trim();
       tel = cli.whatsapp || (cli as any).telefono || tel;
     }
 
-    // Caso A: Solicitud de Anticipo Finca (50% a cuenta de propietario)
+    // Caso A: Solicitud de Anticipo Finca (50% a cuenta exclusiva del propietario)
     if (subtipo === 'pedir_abono' && c) {
       const fObj: any = f;
       const bancosInfo = fObj?.banco_cuenta ? {
@@ -331,13 +338,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
         cuenta: fObj.banco_cuenta,
         titular: fObj.banco_titular || 'Propietario de la Finca',
         nit: fObj.banco_identificacion || undefined,
-      } : {
-        banco: configuracion?.banco_nombre || 'Bancolombia',
-        tipoCuenta: configuracion?.banco_tipo_cuenta || 'Ahorros',
-        cuenta: configuracion?.banco_cuenta || '',
-        titular: configuracion?.banco_titular || configuracion?.nombre_empresa,
-        nit: configuracion?.nit || undefined,
-      };
+      } : null;
       msg = plantillaPedirAbonoCotizacion(c, f, cli, bancosInfo, 50);
       return { msg, tel, nom };
     }
@@ -346,13 +347,15 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
     if (subtipo === 'cobrar_alimentacion') {
       const item = (expedienteTipo === 'cotizacion' && c) ? c : (r || c);
       if (item) {
-        const bancosAdmin = {
-          banco: configuracion?.banco_nombre || 'Bancolombia',
-          tipoCuenta: configuracion?.banco_tipo_cuenta || 'Ahorros',
-          cuenta: configuracion?.banco_cuenta || '',
-          titular: configuracion?.banco_titular || 'Administración Paraíso Terrenal',
-          nit: (configuracion as any)?.banco_identificacion || configuracion?.nit || undefined,
-        };
+        const cfg = configuracion || getConfiguracionGlobal();
+        const iden = (cfg as any)?.banco_identificacion ? (cfg as any).banco_identificacion.trim() : undefined;
+        const bancosAdmin = cfg?.banco_cuenta ? {
+          banco: cfg.banco_nombre || 'Bancolombia',
+          tipoCuenta: cfg.banco_tipo_cuenta || 'Ahorros',
+          cuenta: cfg.banco_cuenta,
+          titular: cfg.banco_titular || 'Administración Paraíso Terrenal',
+          nit: iden || undefined,
+        } : null;
         msg = plantillaCobroAlimentacion(item, f, cli, bancosAdmin);
         return { msg, tel, nom };
       }

@@ -21,6 +21,7 @@ import {
 import { generarDocSeparacion, generarPazYSalvo, generarEstadoCuenta, generarPropuestaAlimentacion } from '../services/documentos';
 import { CurrencyInput } from '../components/CurrencyInput';
 import { useApp } from '../context/AppContext';
+import { getConfiguracionGlobal } from '../services/configuracion';
 
 interface AdminReservasProps {
   reservas: Reserva[];
@@ -171,13 +172,17 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
 
   // Abrir WhatsApp para cobrar alimentación (cuando aplica)
   const handleAbrirCobroAlimentacion = (r: Reserva) => {
-    const bancosAdmin = configuracion?.banco_cuenta ? {
-      banco: configuracion.banco_nombre || 'Bancolombia',
-      tipoCuenta: configuracion.banco_tipo_cuenta || 'Ahorros',
-      cuenta: configuracion.banco_cuenta || undefined,
-      titular: configuracion.banco_titular || 'Administración Paraíso Terrenal',
-      nit: (configuracion as any)?.banco_identificacion || configuracion.nit || undefined,
+    const cfg = configuracion || getConfiguracionGlobal();
+    const iden = (cfg as any)?.banco_identificacion ? (cfg as any).banco_identificacion.trim() : undefined;
+    const bancosAdmin = cfg?.banco_cuenta ? {
+      banco: cfg.banco_nombre || 'Bancolombia',
+      tipoCuenta: cfg.banco_tipo_cuenta || 'Ahorros',
+      cuenta: cfg.banco_cuenta,
+      titular: cfg.banco_titular || 'Administración Paraíso Terrenal',
+      nit: iden || undefined,
     } : null;
+
+    const f = fincas.find(x => x.id === r.finca_id) || r.fincas;
 
     let cantPersonas = r.personas || 4;
     let cantServ = (r as any).cantidad_alimentacion || 1;
@@ -203,7 +208,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
         await generarPropuestaAlimentacion({
           menu: m,
           cliente: r.clientes,
-          finca: r.fincas,
+          finca: f,
           personas: cantPersonas,
           cantidadServicios: cantServ,
           config: configuracion,
@@ -217,8 +222,8 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
     setModalWaReserva({
       abierto: true,
       reserva: r,
-      titulo: `Cobro de Alimentación (Paraíso Terrenal) · ${r.fincas?.nombre || 'Finca'}`,
-      mensaje: plantillaCobroAlimentacion(r, r.fincas, r.clientes, bancosAdmin),
+      titulo: `Cobro de Alimentación (Paraíso Terrenal) · ${f?.nombre || r.fincas?.nombre || 'Finca'}`,
+      mensaje: plantillaCobroAlimentacion(r, f, r.clientes, bancosAdmin),
       nombreDoc: 'Detalle de Alimentación (PDF)',
       onGenerarPdf: onGenPdf,
       tipo: 'cobro_alimentacion',
