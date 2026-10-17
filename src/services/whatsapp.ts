@@ -27,6 +27,7 @@ import {
 } from './documentos';
 import { DEFAULT_WA_NUMBER } from './supabase';
 import { formatearConsecutivoConPrefijo, formatearConsecutivoSimple, type TipoDocumentoPrefijo } from '../utils/consecutivos';
+import { getConfiguracionGlobal } from './configuracion';
 
 // ---------------------------------------------------------------
 // Utilidades de formateo
@@ -285,13 +286,20 @@ _Nota: El servicio de alimentación es suministrado y coordinado de forma direct
 
 💳 *DATOS BANCARIOS DE LA ADMINISTRACIÓN:*`;
 
-  if (bancosAdmin && bancosAdmin.cuenta) {
+  const cfg = getConfiguracionGlobal();
+  const cuentaFinal = bancosAdmin?.cuenta || cfg?.banco_cuenta || '';
+  const bancoFinal = bancosAdmin?.banco || cfg?.banco_nombre || 'Bancolombia';
+  const tipoCuentaFinal = bancosAdmin?.tipoCuenta || cfg?.banco_tipo_cuenta || 'Ahorros';
+  const titularFinal = bancosAdmin?.titular || cfg?.banco_titular || 'Administración Paraíso Terrenal';
+  const nitFinal = bancosAdmin?.nit || (cfg as any)?.banco_identificacion || cfg?.nit || '';
+
+  if (cuentaFinal) {
     msg += `
-• *Banco:* ${bancosAdmin.banco || 'Bancolombia'}
-• *Tipo de Cuenta:* ${bancosAdmin.tipoCuenta || 'Ahorros'}
-• *Número de Cuenta:* ${bancosAdmin.cuenta}
-• *Titular:* ${bancosAdmin.titular || 'Administración Paraíso Terrenal'}
-${bancosAdmin.nit ? `• *Identificación / NIT:* ${bancosAdmin.nit}` : ''}`;
+• *Banco:* ${bancoFinal}
+• *Tipo de Cuenta:* ${tipoCuentaFinal}
+• *Número de Cuenta:* ${cuentaFinal}
+• *Titular:* ${titularFinal}
+${nitFinal ? `• *Identificación / NIT:* ${nitFinal}` : ''}`;
   } else {
     msg += `
 • Por favor consúltanos por este medio los datos de transferencia directa (Bancolombia, Nequi o Daviplata).`;
@@ -931,7 +939,7 @@ export function obtenerTokensParaMensaje(params: {
   const admTipo = configuracion?.banco_tipo_cuenta || 'Ahorros';
   const admCuenta = configuracion?.banco_cuenta || '';
   const admTitular = configuracion?.banco_titular || 'Administración Paraíso Terrenal';
-  const admNit = configuracion?.nit || '';
+  const admNit = (configuracion as any)?.banco_identificacion || configuracion?.nit || '';
 
   return {
     cliente: cNombre,

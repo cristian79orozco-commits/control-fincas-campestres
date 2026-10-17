@@ -351,7 +351,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
           tipoCuenta: configuracion?.banco_tipo_cuenta || 'Ahorros',
           cuenta: configuracion?.banco_cuenta || '',
           titular: configuracion?.banco_titular || 'Administración Paraíso Terrenal',
-          nit: configuracion?.nit || undefined,
+          nit: (configuracion as any)?.banco_identificacion || configuracion?.nit || undefined,
         };
         msg = plantillaCobroAlimentacion(item, f, cli, bancosAdmin);
         return { msg, tel, nom };
@@ -809,7 +809,8 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
   };
 
   const copiarCuentaAdmin = async () => {
-    const texto = `${configuracion?.banco_nombre || 'Bancolombia'} ${configuracion?.banco_tipo_cuenta || 'Ahorros'} N° ${configuracion?.banco_cuenta || ''} a nombre de ${configuracion?.banco_titular || 'Administración Paraíso Terrenal'}${configuracion?.nit ? ` (NIT: ${configuracion.nit})` : ''}`.trim();
+    const iden = (configuracion as any)?.banco_identificacion || configuracion?.nit;
+    const texto = `${configuracion?.banco_nombre || 'Bancolombia'} ${configuracion?.banco_tipo_cuenta || 'Ahorros'} N° ${configuracion?.banco_cuenta || ''} a nombre de ${configuracion?.banco_titular || 'Administración Paraíso Terrenal'}${iden ? ` (NIT: ${iden})` : ''}`.trim();
     if (!configuracion?.banco_cuenta) {
       showToast('No se ha configurado la cuenta bancaria de la administración', 'info');
       return;

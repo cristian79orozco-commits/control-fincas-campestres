@@ -319,8 +319,8 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
       banco: configuracion?.banco_nombre || 'Bancolombia',
       tipoCuenta: configuracion?.banco_tipo_cuenta || 'Ahorros',
       cuenta: configuracion?.banco_cuenta || '',
-      titular: configuracion?.banco_titular || 'Administración de Fincas',
-      nit: configuracion?.nit || undefined,
+      titular: configuracion?.banco_titular || 'Administración Paraíso Terrenal',
+      nit: (configuracion as any)?.banco_identificacion || configuracion?.nit || undefined,
     };
     setModalWaCotiz({
       abierto: true,

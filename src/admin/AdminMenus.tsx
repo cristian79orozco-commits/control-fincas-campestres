@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import {
   UtensilsCrossed, Plus, Edit3, Trash2, X, Save, Image as ImageIcon,
   Upload, FileText, CheckCircle, Eye, EyeOff, Search, DollarSign,
-  Coffee, Flame, Sunset, Apple, Sparkles, Package, Download, UserCheck
+  Coffee, Flame, Sunset, Apple, Sparkles, Package, Download, UserCheck,
+  CreditCard, Building, Copy, Check
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { generarPropuestaAlimentacion } from '../services/documentos';
@@ -98,6 +99,54 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
   );
   const [guardandoRegla, setGuardandoRegla] = useState(false);
   const [reglaExpandida, setReglaExpandida] = useState(false);
+
+  // Datos bancarios de la administración de Paraíso Terrenal para cobro de menús / alimentación
+  const [bancoNombre, setBancoNombre] = useState(configuracion?.banco_nombre || 'Bancolombia');
+  const [bancoTipoCuenta, setBancoTipoCuenta] = useState(configuracion?.banco_tipo_cuenta || 'Ahorros');
+  const [bancoCuenta, setBancoCuenta] = useState(configuracion?.banco_cuenta || '');
+  const [bancoTitular, setBancoTitular] = useState(configuracion?.banco_titular || 'Administración Paraíso Terrenal');
+  const [bancoIdentificacion, setBancoIdentificacion] = useState((configuracion as any)?.banco_identificacion || configuracion?.nit || '');
+  const [copiadoCuenta, setCopiadoCuenta] = useState(false);
+  const [guardandoBanco, setGuardandoBanco] = useState(false);
+  const [bancoExpandido, setBancoExpandido] = useState(Boolean(!configuracion?.banco_cuenta));
+
+  // Sincronizar reactivamente si cambia la configuración global o desde Supabase
+  React.useEffect(() => {
+    if (configuracion) {
+      if (configuracion.banco_nombre) setBancoNombre(configuracion.banco_nombre);
+      if (configuracion.banco_tipo_cuenta) setBancoTipoCuenta(configuracion.banco_tipo_cuenta);
+      if (configuracion.banco_cuenta !== undefined) setBancoCuenta(configuracion.banco_cuenta || '');
+      if (configuracion.banco_titular) setBancoTitular(configuracion.banco_titular);
+      const iden = (configuracion as any)?.banco_identificacion || configuracion?.nit;
+      if (iden) setBancoIdentificacion(iden);
+      if (configuracion.regla_alimentacion_activa !== undefined) setReglaActiva(configuracion.regla_alimentacion_activa);
+      if (configuracion.regla_alimentacion_max_personas !== undefined) setReglaMaxPersonas(configuracion.regla_alimentacion_max_personas);
+      if (configuracion.regla_alimentacion_min_servicios !== undefined) setReglaMinServicios(configuracion.regla_alimentacion_min_servicios);
+      if (configuracion.regla_alimentacion_mensaje) setReglaMensaje(configuracion.regla_alimentacion_mensaje);
+    }
+  }, [configuracion]);
+
+  const handleGuardarDatosBancarios = async () => {
+    if (!onGuardarConfiguracion) {
+      showToast('No se dispone de permisos para guardar configuración', 'error');
+      return;
+    }
+    setGuardandoBanco(true);
+    const res = await onGuardarConfiguracion({
+      banco_nombre: bancoNombre.trim() || 'Bancolombia',
+      banco_tipo_cuenta: bancoTipoCuenta || 'Ahorros',
+      banco_cuenta: bancoCuenta.trim(),
+      banco_titular: bancoTitular.trim() || 'Administración Paraíso Terrenal',
+      banco_identificacion: bancoIdentificacion.trim(),
+      nit: bancoIdentificacion.trim() || configuracion?.nit || '900.123.456-7',
+    });
+    setGuardandoBanco(false);
+    if (res.success) {
+      showToast('Datos bancarios de Paraíso Terrenal guardados y centralizados con éxito ✅', 'success');
+    } else {
+      showToast(res.error || 'Error al guardar los datos bancarios', 'error');
+    }
+  };
 
   const handleGuardarRegla = async () => {
     if (!onGuardarConfiguracion) {
@@ -521,6 +570,306 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
                 style={{ fontSize: '0.78rem', padding: '0.35rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
               >
                 <Save size={13} /> {guardandoRegla ? 'Guardando regla...' : 'Guardar regla de servicio en Supabase'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ===== CUENTA BANCARIA PARA COBRO DE ALIMENTACIÓN (ADMINISTRACIÓN) ===== */}
+      <div
+        style={{
+          background: 'var(--surface-sunken)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: 'var(--rad-sm, 8px)',
+          padding: '0.85rem 1rem',
+          display: 'grid',
+          gap: '0.75rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: 'color-mix(in srgb, var(--primary) 15%, transparent)',
+                color: 'var(--primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <CreditCard size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                <span>Cuenta Bancaria de Paraíso Terrenal (Cobro de Alimentación y Menús)</span>
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '999px',
+                    background: 'color-mix(in srgb, #25d366 15%, transparent)',
+                    color: '#16a34a',
+                    fontWeight: 700,
+                  }}
+                >
+                  Centralizado en WhatsApp
+                </span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                🔒 Esta cuenta se utiliza de forma exclusiva para cobrar los planes gastronómicos en Cotizaciones, Reservas y Comunicaciones.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span className={`status-badge ${bancoCuenta ? 's-avail' : 's-busy'}`} style={{ fontSize: '0.72rem' }}>
+              {bancoCuenta ? `${bancoNombre} (${bancoCuenta})` : 'Sin cuenta registrada'}
+            </span>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setBancoExpandido(v => !v)}
+              style={{ fontSize: '0.74rem', padding: '0.25rem 0.6rem' }}
+            >
+              {bancoExpandido ? 'Ocultar cuenta ▴' : 'Configurar cuenta ▾'}
+            </button>
+          </div>
+        </div>
+
+        {bancoExpandido && (
+          <div
+            style={{
+              paddingTop: '0.75rem',
+              borderTop: '1px solid var(--border-subtle)',
+              display: 'grid',
+              gap: '0.75rem',
+              animation: 'fadeIn 0.15s ease',
+            }}
+          >
+            {/* Chips rápidos de entidades financieras comunes en Colombia */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.3rem' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                  Selecciona una entidad financiera rápida o escribe el nombre:
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                {[
+                  { nombre: 'Bancolombia', tipo: 'Ahorros' },
+                  { nombre: 'Nequi', tipo: 'Billetera Digital / Celular' },
+                  { nombre: 'Daviplata', tipo: 'Billetera Digital / Celular' },
+                  { nombre: 'Davivienda', tipo: 'Ahorros' },
+                  { nombre: 'Banco de Bogotá', tipo: 'Ahorros' },
+                  { nombre: 'BBVA', tipo: 'Ahorros' },
+                  { nombre: 'Nu Colombia', tipo: 'Cuenta de Ahorros' },
+                  { nombre: 'Lulo Bank', tipo: 'Cuenta de Ahorros' },
+                  { nombre: 'Dale!', tipo: 'Billetera Digital / Celular' },
+                ].map(b => {
+                  const isSelected = bancoNombre.toLowerCase() === b.nombre.toLowerCase();
+                  return (
+                    <button
+                      key={b.nombre}
+                      type="button"
+                      onClick={() => {
+                        setBancoNombre(b.nombre);
+                        if (b.nombre === 'Nequi' || b.nombre === 'Daviplata' || b.nombre === 'Dale!') {
+                          setBancoTipoCuenta('Billetera Digital / Celular');
+                        } else if (!bancoTipoCuenta || bancoTipoCuenta === 'Billetera Digital / Celular') {
+                          setBancoTipoCuenta('Ahorros');
+                        }
+                      }}
+                      style={{
+                        padding: '0.3rem 0.65rem',
+                        borderRadius: '999px',
+                        fontSize: '0.75rem',
+                        fontWeight: isSelected ? 700 : 500,
+                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                        background: isSelected ? 'var(--primary)' : 'var(--surface-2)',
+                        color: isSelected ? '#fff' : 'var(--text)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {b.nombre} {isSelected && '✓'}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '0.75rem' }}>
+              {/* Entidad Financiera / Banco */}
+              <div className="field" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <Building size={13} style={{ color: 'var(--primary)' }} />
+                  Banco o Entidad Financiera *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Bancolombia, Nequi, etc."
+                  value={bancoNombre}
+                  onChange={e => setBancoNombre(e.target.value)}
+                  style={{ height: '34px', fontSize: '0.82rem' }}
+                />
+              </div>
+
+              {/* Tipo de Cuenta */}
+              <div className="field" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Tipo de Cuenta</label>
+                <select
+                  value={bancoTipoCuenta}
+                  onChange={e => setBancoTipoCuenta(e.target.value)}
+                  style={{ height: '34px', fontSize: '0.82rem' }}
+                >
+                  <option value="Ahorros">Cuenta de Ahorros</option>
+                  <option value="Corriente">Cuenta Corriente</option>
+                  <option value="Billetera Digital / Celular">Billetera Digital / Celular (Nequi / Daviplata)</option>
+                  <option value="Llave Transfiya / Bre-B">Llave Transfiya / Bre-B</option>
+                </select>
+              </div>
+
+              {/* Número de Cuenta / Celular */}
+              <div className="field" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Número de Cuenta o Celular *</span>
+                  {bancoCuenta && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(bancoCuenta);
+                        setCopiadoCuenta(true);
+                        setTimeout(() => setCopiadoCuenta(false), 2000);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: copiadoCuenta ? 'var(--success)' : 'var(--primary)',
+                        fontSize: '0.72rem',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.2rem',
+                        fontWeight: 600,
+                        padding: 0,
+                      }}
+                    >
+                      {copiadoCuenta ? <Check size={11} /> : <Copy size={11} />}
+                      {copiadoCuenta ? 'Copiado' : 'Copiar'}
+                    </button>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: 123-456789-01 o 3176827093"
+                  value={bancoCuenta}
+                  onChange={e => setBancoCuenta(e.target.value)}
+                  style={{ height: '34px', fontSize: '0.82rem', letterSpacing: '0.5px' }}
+                />
+              </div>
+
+              {/* Nombre del Titular */}
+              <div className="field" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Nombre del Titular / Beneficiario (Administración)</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Paraíso Terrenal o Carlos Gómez"
+                  value={bancoTitular}
+                  onChange={e => setBancoTitular(e.target.value)}
+                  style={{ height: '34px', fontSize: '0.82rem' }}
+                />
+              </div>
+
+              {/* Identificación / Cédula / NIT */}
+              <div className="field" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Cédula o NIT del Titular (Opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ej: NIT 900.123.456-7 o CC"
+                  value={bancoIdentificacion}
+                  onChange={e => setBancoIdentificacion(e.target.value)}
+                  style={{ height: '34px', fontSize: '0.82rem' }}
+                />
+              </div>
+            </div>
+
+            {/* LIVE PREVIEW: CÓMO LO RECIBIRÁ EL CLIENTE EN WHATSAPP */}
+            <div
+              style={{
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--rad-xs, 8px)',
+                padding: '0.75rem 1rem',
+                marginTop: '0.25rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)' }}>
+                  <span>📲</span>
+                  <span>Previsualización exacta en el texto de cobro de alimentación:</span>
+                </div>
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '999px',
+                    background: 'color-mix(in srgb, #25d366 15%, transparent)',
+                    color: '#16a34a',
+                    fontWeight: 700,
+                  }}
+                >
+                  Formato WhatsApp Oficial
+                </span>
+              </div>
+
+              <div
+                style={{
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  padding: '0.75rem 0.9rem',
+                  fontFamily: 'monospace, -apple-system, sans-serif',
+                  fontSize: '0.78rem',
+                  lineHeight: '1.55',
+                  color: 'var(--text)',
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                <strong>💳 *DATOS BANCARIOS DE LA ADMINISTRACIÓN:*</strong>{'\n'}
+                {bancoCuenta ? (
+                  <>
+                    • *Banco:* {bancoNombre || 'Bancolombia'}{'\n'}
+                    • *Tipo de Cuenta:* {bancoTipoCuenta || 'Ahorros'}{'\n'}
+                    • *Número de Cuenta:* {bancoCuenta}{'\n'}
+                    • *Titular:* {bancoTitular || 'Administración Paraíso Terrenal'}
+                    {bancoIdentificacion ? `\n• *Identificación / NIT:* ${bancoIdentificacion}` : ''}
+                  </>
+                ) : (
+                  <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    (No has definido un número de cuenta todavía. Al completar los campos arriba, aparecerán automáticamente aquí.)
+                  </span>
+                )}
+              </div>
+
+              <div className="text-xs text-muted" style={{ marginTop: '0.4rem', fontSize: '0.72rem' }}>
+                💡 Este fragmento se inserta automáticamente al pulsar <strong>"Cobro de Alimentación"</strong> en los módulos de <strong>Cotizaciones</strong>, <strong>Reservas</strong> y en las fases de <strong>Comunicaciones</strong>.
+              </div>
+            </div>
+
+            {/* Botón guardar datos bancarios */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={handleGuardarDatosBancarios}
+                disabled={guardandoBanco}
+                style={{ fontSize: '0.78rem', padding: '0.35rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <Save size={13} /> {guardandoBanco ? 'Guardando datos bancarios...' : 'Guardar Datos Bancarios de Alimentación'}
               </button>
             </div>
           </div>

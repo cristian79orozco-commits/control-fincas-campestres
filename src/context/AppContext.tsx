@@ -635,6 +635,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!error && data) {
         const dAny = data as any;
         const reglaEnPlantillas = dAny.plantillas_comunicacion?._regla_alimentacion;
+        const bancoAdminEnPlantillas = dAny.plantillas_comunicacion?._banco_admin;
         const configCombinada: ConfiguracionGeneral = {
           ...CONFIGURACION_DEFAULT,
           ...dAny,
@@ -643,6 +644,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             regla_alimentacion_max_personas: reglaEnPlantillas.maxPersonas ?? dAny.regla_alimentacion_max_personas ?? 10,
             regla_alimentacion_min_servicios: reglaEnPlantillas.minServicios ?? dAny.regla_alimentacion_min_servicios ?? 2,
             regla_alimentacion_mensaje: reglaEnPlantillas.mensaje ?? dAny.regla_alimentacion_mensaje,
+          } : {}),
+          ...(bancoAdminEnPlantillas ? {
+            banco_nombre: dAny.banco_nombre || bancoAdminEnPlantillas.banco_nombre || 'Bancolombia',
+            banco_tipo_cuenta: dAny.banco_tipo_cuenta || bancoAdminEnPlantillas.banco_tipo_cuenta || 'Ahorros',
+            banco_cuenta: dAny.banco_cuenta || bancoAdminEnPlantillas.banco_cuenta || '',
+            banco_titular: dAny.banco_titular || bancoAdminEnPlantillas.banco_titular || 'Paraíso Terrenal - Fincas de Alquiler',
+            banco_identificacion: dAny.banco_identificacion || bancoAdminEnPlantillas.banco_identificacion || dAny.nit || '',
           } : {}),
         };
         setConfiguracion(configCombinada);
@@ -2380,7 +2388,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setConfiguracion(actualizado);
       setConfiguracionGlobal(actualizado);
 
-      // Empaquetar regla en plantillas_comunicacion para persistencia garantizada
+      // Empaquetar regla y banco admin en plantillas_comunicacion para persistencia garantizada
       const reglaObjeto = {
         activa: actualizado.regla_alimentacion_activa,
         maxPersonas: actualizado.regla_alimentacion_max_personas,
@@ -2388,9 +2396,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         mensaje: actualizado.regla_alimentacion_mensaje,
       };
 
+      const bancoAdminObjeto = {
+        banco_nombre: actualizado.banco_nombre,
+        banco_tipo_cuenta: actualizado.banco_tipo_cuenta,
+        banco_cuenta: actualizado.banco_cuenta,
+        banco_titular: actualizado.banco_titular,
+        banco_identificacion: actualizado.banco_identificacion || actualizado.nit,
+      };
+
       const plantillasActualizadas = {
         ...(actualizado.plantillas_comunicacion || {}),
         _regla_alimentacion: reglaObjeto,
+        _banco_admin: bancoAdminObjeto,
       };
 
       const payloadParaSupabase: Record<string, any> = {
@@ -2399,17 +2416,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         plantillas_comunicacion: plantillasActualizadas,
       };
 
+      if (datos.banco_identificacion && !datos.nit) {
+        payloadParaSupabase.nit = datos.banco_identificacion;
+      }
+
       let { error } = await supabase
         .from('configuracion_general')
         .upsert(payloadParaSupabase, { onConflict: 'id' });
 
-      // Si falla porque las columnas directas regla_alimentacion_* aún no se han migrado en PostgreSQL
+      // Si falla porque las columnas directas regla_alimentacion_* o banco_identificacion aún no se han migrado en PostgreSQL
       if (error && error.message && error.message.includes('column of \'configuracion_general\' in the schema cache')) {
         const payloadSeguro = { ...payloadParaSupabase };
         delete payloadSeguro.regla_alimentacion_activa;
         delete payloadSeguro.regla_alimentacion_max_personas;
         delete payloadSeguro.regla_alimentacion_min_servicios;
         delete payloadSeguro.regla_alimentacion_mensaje;
+        delete payloadSeguro.banco_identificacion;
 
         const resReintento = await supabase
           .from('configuracion_general')

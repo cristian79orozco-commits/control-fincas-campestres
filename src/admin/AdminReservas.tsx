@@ -172,11 +172,11 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
   // Abrir WhatsApp para cobrar alimentación (cuando aplica)
   const handleAbrirCobroAlimentacion = (r: Reserva) => {
     const bancosAdmin = configuracion?.banco_cuenta ? {
-      banco: configuracion.banco_nombre || undefined,
-      tipoCuenta: configuracion.banco_tipo_cuenta || undefined,
+      banco: configuracion.banco_nombre || 'Bancolombia',
+      tipoCuenta: configuracion.banco_tipo_cuenta || 'Ahorros',
       cuenta: configuracion.banco_cuenta || undefined,
-      titular: configuracion.banco_titular || undefined,
-      nit: configuracion.nit || undefined,
+      titular: configuracion.banco_titular || 'Administración Paraíso Terrenal',
+      nit: (configuracion as any)?.banco_identificacion || configuracion.nit || undefined,
     } : null;
 
     let cantPersonas = r.personas || 4;
