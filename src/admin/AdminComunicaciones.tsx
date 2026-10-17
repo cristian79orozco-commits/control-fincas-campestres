@@ -27,6 +27,7 @@ import {
   formatearTelefonoWhatsApp,
   formatCOP,
   formatFecha,
+  calcularNoches,
   renderizarPlantillaPersonalizada,
   PLANTILLAS_PREDETERMINADAS,
   obtenerTokensParaMensaje,
@@ -140,39 +141,141 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
   const reservaActual = useMemo(() => reservas.find(r => r.id === reservaId) || null, [reservas, reservaId]);
   const cotizacionActual = useMemo(() => cotizaciones.find(c => c.id === cotizacionId) || null, [cotizaciones, cotizacionId]);
 
-  const fincaActual = useMemo(() => {
+  // Cotización efectiva vinculada o sintética para garantizar que NUNCA salte a otro cliente
+  const cotizacionEfectiva = useMemo(() => {
+    if (cotizacionActual) return cotizacionActual;
     if (reservaActual) {
-      return fincas.find(f => f.id === reservaActual.finca_id) || reservaActual.fincas || null;
+      const cVinculada = cotizaciones.find(c => (reservaActual.cotizacion_id && c.id === reservaActual.cotizacion_id) || (reservaActual.consecutivo && c.consecutivo === reservaActual.consecutivo));
+      if (cVinculada) return cVinculada;
+      return {
+        id: reservaActual.cotizacion_id || reservaActual.id,
+        cliente_id: reservaActual.cliente_id,
+        finca_id: reservaActual.finca_id,
+        fecha_inicio: reservaActual.fecha_inicio,
+        fecha_fin: reservaActual.fecha_fin,
+        personas: reservaActual.personas,
+        noches: calcularNoches(reservaActual.fecha_inicio, reservaActual.fecha_fin),
+        total: reservaActual.valor_total,
+        costo_alimentacion: reservaActual.costo_alimentacion || 0,
+        subtotal_alojamiento: (reservaActual as any).subtotal_alojamiento || Math.max(0, (reservaActual.valor_total || 0) - (reservaActual.costo_alimentacion || 0)),
+        consecutivo: reservaActual.consecutivo,
+        estado: 'confirmada' as const,
+        clientes: reservaActual.clientes,
+        fincas: reservaActual.fincas,
+        alimentacion: reservaActual.alimentacion,
+        precio_base_pp: 0,
+        descuento: 0,
+        recargo: 0,
+      } as CotizacionDB;
     }
+    return cotizaciones[0] || null;
+  }, [cotizacionActual, reservaActual, cotizaciones]);
+
+  // Reserva efectiva vinculada o sintética para garantizar que NUNCA salte a otro cliente
+  const reservaEfectiva = useMemo(() => {
+    if (reservaActual) return reservaActual;
     if (cotizacionActual) {
-      return fincas.find(f => f.id === cotizacionActual.finca_id) || cotizacionActual.fincas || null;
+      const rVinculada = reservas.find(r => r.cotizacion_id === cotizacionActual.id || (cotizacionActual.consecutivo && r.consecutivo === cotizacionActual.consecutivo));
+      if (rVinculada) return rVinculada;
+      const subAloja = cotizacionActual.subtotal_alojamiento || Math.max(0, (cotizacionActual.total || 0) - (cotizacionActual.costo_alimentacion || 0));
+      return {
+        id: cotizacionActual.id,
+        cotizacion_id: cotizacionActual.id,
+        consecutivo: cotizacionActual.consecutivo,
+        cliente_id: cotizacionActual.cliente_id || '',
+        finca_id: cotizacionActual.finca_id,
+        fecha_inicio: cotizacionActual.fecha_inicio,
+        fecha_fin: cotizacionActual.fecha_fin,
+        personas: cotizacionActual.personas,
+        noches: cotizacionActual.noches,
+        valor_total: cotizacionActual.total,
+        costo_alimentacion: cotizacionActual.costo_alimentacion || 0,
+        subtotal_alojamiento: subAloja,
+        separacion: Math.round(subAloja * 0.5),
+        estado: 'activa' as const,
+        clientes: cotizacionActual.clientes,
+        fincas: cotizacionActual.fincas,
+        alimentacion: cotizacionActual.alimentacion,
+        pagos: [
+          {
+            id: 'abono-inicial',
+            reserva_id: cotizacionActual.id,
+            tipo: 'abono' as const,
+            fecha: new Date().toISOString().split('T')[0],
+            valor: Math.round(subAloja * 0.5),
+            observacion: 'Abono de separación (50% Finca)'
+          }
+        ]
+      } as Reserva;
+    }
+    return reservas[0] || null;
+  }, [reservaActual, cotizacionActual, reservas]);
+
+  const fincaActual = useMemo(() => {
+    if (expedienteTipo === 'cotizacion' && cotizacionEfectiva) {
+      return fincas.find(f => f.id === cotizacionEfectiva.finca_id) || cotizacionEfectiva.fincas || null;
+    }
+    if (reservaEfectiva) {
+      return fincas.find(f => f.id === reservaEfectiva.finca_id) || reservaEfectiva.fincas || null;
+    }
+    if (cotizacionEfectiva) {
+      return fincas.find(f => f.id === cotizacionEfectiva.finca_id) || cotizacionEfectiva.fincas || null;
     }
     return fincas[0] || null;
-  }, [reservaActual, cotizacionActual, fincas]);
+  }, [expedienteTipo, reservaEfectiva, cotizacionEfectiva, fincas]);
 
   const clienteActual = useMemo(() => {
+    if (expedienteTipo === 'cotizacion' && cotizacionEfectiva?.clientes) {
+      return cotizacionEfectiva.clientes;
+    }
     if (clienteId) {
       const cli = clientes.find(c => c.id === clienteId);
       if (cli) return cli;
     }
-    if (reservaActual?.clientes) return reservaActual.clientes;
-    if (cotizacionActual?.clientes) return cotizacionActual.clientes;
+    if (reservaEfectiva?.clientes) return reservaEfectiva.clientes;
+    if (cotizacionEfectiva?.clientes) return cotizacionEfectiva.clientes;
     return null;
-  }, [clienteId, clientes, reservaActual, cotizacionActual]);
+  }, [expedienteTipo, clienteId, clientes, reservaEfectiva, cotizacionEfectiva]);
 
-  // Consecutivo numérico base unificado (ej: '1001')
+  // Consecutivo numérico base unificado siempre fiel al expediente activo
   const consecutivoBase = useMemo(() => {
-    if (reservaActual?.consecutivo) return formatearConsecutivoSimple(reservaActual.consecutivo);
-    if (cotizacionActual?.consecutivo) return formatearConsecutivoSimple(cotizacionActual.consecutivo);
+    if (expedienteTipo === 'cotizacion' && cotizacionEfectiva?.consecutivo) {
+      return formatearConsecutivoSimple(cotizacionEfectiva.consecutivo);
+    }
+    if (expedienteTipo === 'reserva' && reservaEfectiva?.consecutivo) {
+      return formatearConsecutivoSimple(reservaEfectiva.consecutivo);
+    }
+    if (cotizacionEfectiva?.consecutivo) return formatearConsecutivoSimple(cotizacionEfectiva.consecutivo);
+    if (reservaEfectiva?.consecutivo) return formatearConsecutivoSimple(reservaEfectiva.consecutivo);
     return '1001';
-  }, [reservaActual, cotizacionActual]);
+  }, [expedienteTipo, cotizacionEfectiva, reservaEfectiva]);
 
   // ---------------------------------------------------------------------------
   // Desglose Financiero Doble (Finca/Dueño vs Alimentación/Paraíso Terrenal)
   // ---------------------------------------------------------------------------
   const finanzasDoble = useMemo(() => {
-    if (reservaActual) {
-      const desglose = desglosarFinanzasReserva(reservaActual);
+    if (expedienteTipo === 'cotizacion' && cotizacionEfectiva) {
+      const costoAlim = cotizacionEfectiva.costo_alimentacion || 0;
+      const subtotalFinca = cotizacionEfectiva.subtotal_alojamiento || Math.max(0, (cotizacionEfectiva.total || 0) - costoAlim);
+      const anticipoFinca50 = Math.round(subtotalFinca * 0.5);
+
+      return {
+        esReserva: false,
+        subtotalFinca,
+        pagadoFinca: 0,
+        saldoFincaCheckIn: subtotalFinca,
+        anticipoFinca50,
+        costoAlimentacion: costoAlim,
+        pagadoAlimentacion: 0,
+        saldoAlimentacionAdmin: costoAlim,
+        totalConsolidado: cotizacionEfectiva.total || 0,
+        totalRecaudado: 0,
+        saldoConsolidado: cotizacionEfectiva.total || 0,
+      };
+    }
+
+    if (reservaEfectiva) {
+      const desglose = desglosarFinanzasReserva(reservaEfectiva);
       return {
         esReserva: true,
         // Finca
@@ -190,28 +293,8 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
       };
     }
 
-    if (cotizacionActual) {
-      const costoAlim = cotizacionActual.costo_alimentacion || 0;
-      const subtotalFinca = cotizacionActual.subtotal_alojamiento || Math.max(0, (cotizacionActual.total || 0) - costoAlim);
-      const anticipoFinca50 = Math.round(subtotalFinca * 0.5);
-
-      return {
-        esReserva: false,
-        subtotalFinca,
-        pagadoFinca: 0,
-        saldoFincaCheckIn: subtotalFinca,
-        anticipoFinca50,
-        costoAlimentacion: costoAlim,
-        pagadoAlimentacion: 0,
-        saldoAlimentacionAdmin: costoAlim,
-        totalConsolidado: cotizacionActual.total || 0,
-        totalRecaudado: 0,
-        saldoConsolidado: cotizacionActual.total || 0,
-      };
-    }
-
     return null;
-  }, [reservaActual, cotizacionActual]);
+  }, [expedienteTipo, reservaEfectiva, cotizacionEfectiva]);
 
   // ---------------------------------------------------------------------------
   // Generador de Mensajes según el tipo y subtipo
@@ -227,10 +310,12 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
     let tel = telefonoInput;
     let nom = destinatarioNombre;
 
-    const r = reservas.find(x => x.id === rId) || null;
-    const c = cotizaciones.find(x => x.id === cId) || null;
-    const cli = (cliId ? clientes.find(x => x.id === cliId) : null) || r?.clientes || c?.clientes;
-    const f = (r ? fincas.find(x => x.id === r.finca_id) : null) || (c ? fincas.find(x => x.id === c.finca_id) : null) || r?.fincas || c?.fincas;
+    const c = (cId && cId !== cotizacionId ? cotizaciones.find(x => x.id === cId) : null) || cotizacionEfectiva;
+    const r = (rId && rId !== reservaId ? reservas.find(x => x.id === rId) : null) || reservaEfectiva;
+    const cli = (cliId ? clientes.find(x => x.id === cliId) : null)
+      || (expedienteTipo === 'cotizacion' ? c?.clientes : (r?.clientes || c?.clientes));
+    const f = (expedienteTipo === 'cotizacion' ? c?.fincas : (r?.fincas || c?.fincas))
+      || fincaActual;
 
     if (cli) {
       nom = `${cli.nombre} ${cli.apellido || ''}`.trim();
@@ -258,17 +343,19 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
     }
 
     // Caso B: Cobro de Alimentación (a cuenta de la administración Paraíso Terrenal)
-    if (subtipo === 'cobrar_alimentacion' && (c || r)) {
-      const item = (expedienteTipo === 'cotizacion' && c) ? c : (r || c)!;
-      const bancosAdmin = {
-        banco: configuracion?.banco_nombre || 'Bancolombia',
-        tipoCuenta: configuracion?.banco_tipo_cuenta || 'Ahorros',
-        cuenta: configuracion?.banco_cuenta || '',
-        titular: configuracion?.banco_titular || 'Administración de Fincas',
-        nit: configuracion?.nit || undefined,
-      };
-      msg = plantillaCobroAlimentacion(item, f, cli, bancosAdmin);
-      return { msg, tel, nom };
+    if (subtipo === 'cobrar_alimentacion') {
+      const item = (expedienteTipo === 'cotizacion' && c) ? c : (r || c);
+      if (item) {
+        const bancosAdmin = {
+          banco: configuracion?.banco_nombre || 'Bancolombia',
+          tipoCuenta: configuracion?.banco_tipo_cuenta || 'Ahorros',
+          cuenta: configuracion?.banco_cuenta || '',
+          titular: configuracion?.banco_titular || 'Administración Paraíso Terrenal',
+          nit: configuracion?.nit || undefined,
+        };
+        msg = plantillaCobroAlimentacion(item, f, cli, bancosAdmin);
+        return { msg, tel, nom };
+      }
     }
 
     // Caso C: Verificar plantilla personalizada en Supabase
@@ -290,73 +377,67 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
     // Caso D: Plantillas oficiales del sistema
     switch (tipo) {
       case 'cotizacion': {
-        const target = c || cotizaciones[0];
-        if (target) {
-          msg = plantillaCotizacion(target, target.fincas, target.clientes);
+        if (c) {
+          msg = plantillaCotizacion(c, f, cli);
         }
         break;
       }
       case 'separacion': {
-        const target = r || reservas[0];
-        if (target) {
-          msg = plantillaSeparacion(target);
+        if (r) {
+          msg = plantillaSeparacion(r);
         }
         break;
       }
       case 'abono': {
-        const target = r || reservas[0];
-        if (target) {
-          const pagoTarget = target.pagos?.find(p => p.id === pagoId) || target.pagos?.[0] || {
+        if (r) {
+          const pagoTarget = r.pagos?.find(p => p.id === pagoId) || r.pagos?.[0] || {
             id: 'temp',
-            reserva_id: target.id,
+            reserva_id: r.id,
             tipo: 'abono',
             fecha: new Date().toISOString().split('T')[0],
-            valor: target.separacion || 0,
+            valor: r.separacion || Math.round((r.valor_total || 0) * 0.5),
           } as Pago;
-          msg = plantillaComprobantePago(target, pagoTarget);
+          msg = plantillaComprobantePago(r, pagoTarget);
         }
         break;
       }
       case 'estado_cuenta': {
-        const target = r || reservas[0];
-        if (target) {
-          msg = plantillaEstadoCuenta(target);
+        if (r) {
+          msg = plantillaEstadoCuenta(r);
         }
         break;
       }
       case 'paz_salvo': {
-        const target = r || reservas[0];
-        if (target) {
-          msg = plantillaPazYSalvo(target);
+        if (r) {
+          msg = plantillaPazYSalvo(r);
         }
         break;
       }
       case 'menu': {
-        const target = c || cotizaciones[0];
-        const m = (target && menus.find(x => x.id === target.menu_id)) || menus[0];
-        if (m) {
-          msg = plantillaPropuestaAlimentacion({
-            menu: m,
-            cliente: target?.clientes,
-            finca: target?.fincas,
-            personas: target?.personas || 4,
-            cantidadServicios: target?.cantidad_alimentacion || 1,
-            config: configuracion,
-          });
+        if (c) {
+          const m = (c.menu_id && menus.find(x => x.id === c.menu_id)) || menus[0];
+          if (m) {
+            msg = plantillaPropuestaAlimentacion({
+              menu: m,
+              cliente: cli,
+              finca: f,
+              personas: c.personas || 4,
+              cantidadServicios: (c as any)?.cantidad_alimentacion || 1,
+              config: configuracion,
+            });
+          }
         }
         break;
       }
       case 'recordatorio_pago': {
-        const target = r || reservas[0];
-        if (target) {
-          msg = plantillaRecordatorioPago(target);
+        if (r) {
+          msg = plantillaRecordatorioPago(r);
         }
         break;
       }
       case 'bienvenida': {
-        const target = r || reservas[0];
-        if (target) {
-          msg = plantillaBienvenida(target);
+        if (r) {
+          msg = plantillaBienvenida(r);
         }
         break;
       }
@@ -392,11 +473,13 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
         if (c) {
           setExpedienteTipo('cotizacion');
           setCotizacionId(c.id);
-          setReservaId('');
+          const rAsociada = reservas.find(x => x.cotizacion_id === c.id || (c.consecutivo && x.consecutivo === c.consecutivo));
+          setReservaId(rAsociada ? rAsociada.id : '');
+          setClienteId(c.cliente_id || (c.clientes as any)?.id || '');
           setFaseFiltro('fase_1_cotizacion');
           setTipoSeleccionado('cotizacion');
           setSubTipoAccion('normal');
-          aplicarMensaje('cotizacion', 'normal', '', c.id, c.cliente_id || '');
+          aplicarMensaje('cotizacion', 'normal', rAsociada ? rAsociada.id : '', c.id, c.cliente_id || '');
           showToast(`Cotización #${formatearConsecutivoSimple(c.consecutivo)} cargada en Comunicaciones ✅`, 'success');
         }
       } else if (expedienteInicial.tipo === 'reserva') {
@@ -404,13 +487,15 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
         if (r) {
           setExpedienteTipo('reserva');
           setReservaId(r.id);
-          if (r.cotizacion_id) setCotizacionId(r.cotizacion_id);
+          const cAsociada = cotizaciones.find(x => (r.cotizacion_id && x.id === r.cotizacion_id) || (r.consecutivo && x.consecutivo === r.consecutivo));
+          setCotizacionId(cAsociada ? cAsociada.id : (r.cotizacion_id || ''));
+          setClienteId(r.cliente_id || (r.clientes as any)?.id || '');
           const saldo = calcularSaldo(r);
           const sugerido: TipoComunicacion = saldo <= 0 ? 'paz_salvo' : 'estado_cuenta';
           setFaseFiltro('fase_3_saldos');
           setTipoSeleccionado(sugerido);
           setSubTipoAccion('normal');
-          aplicarMensaje(sugerido, 'normal', r.id, r.cotizacion_id || '', r.cliente_id || '');
+          aplicarMensaje(sugerido, 'normal', r.id, cAsociada ? cAsociada.id : (r.cotizacion_id || ''), r.cliente_id || '');
           showToast(`Reserva #${formatearConsecutivoSimple(r.consecutivo)} cargada en Comunicaciones ✅`, 'success');
         }
       }
@@ -425,13 +510,18 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
         const r = reservas[0];
         setExpedienteTipo('reserva');
         setReservaId(r.id);
-        if (r.cotizacion_id) setCotizacionId(r.cotizacion_id);
-        aplicarMensaje('estado_cuenta', 'normal', r.id, r.cotizacion_id || '', r.cliente_id || '');
+        const cAsociada = cotizaciones.find(x => (r.cotizacion_id && x.id === r.cotizacion_id) || (r.consecutivo && x.consecutivo === r.consecutivo));
+        setCotizacionId(cAsociada ? cAsociada.id : (r.cotizacion_id || ''));
+        setClienteId(r.cliente_id || (r.clientes as any)?.id || '');
+        aplicarMensaje('estado_cuenta', 'normal', r.id, cAsociada ? cAsociada.id : (r.cotizacion_id || ''), r.cliente_id || '');
       } else if (cotizaciones.length > 0) {
         const c = cotizaciones[0];
         setExpedienteTipo('cotizacion');
         setCotizacionId(c.id);
-        aplicarMensaje('cotizacion', 'normal', '', c.id, c.cliente_id || '');
+        const rAsociada = reservas.find(x => x.cotizacion_id === c.id || (c.consecutivo && x.consecutivo === c.consecutivo));
+        setReservaId(rAsociada ? rAsociada.id : '');
+        setClienteId(c.cliente_id || (c.clientes as any)?.id || '');
+        aplicarMensaje('cotizacion', 'normal', rAsociada ? rAsociada.id : '', c.id, c.cliente_id || '');
       }
     }
   }, []);
@@ -587,6 +677,24 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
     }
   };
 
+  // Cambio de pestaña comercial con persistencia y actualización instantánea del expediente
+  const handleCambiarFaseTab = (nuevaFase: FaseMensaje) => {
+    setFaseFiltro(nuevaFase);
+    const tarjetasDeNuevaFase = CATALOGO_MENSAJES.filter(m => m.fase === nuevaFase);
+    const tarjetaCoincidente = tarjetasDeNuevaFase.find(
+      t => t.tipoReal === tipoSeleccionado &&
+        ((subTipoAccion === 'pedir_abono' && t.id === 'pedir_abono') ||
+         (subTipoAccion === 'cobrar_alimentacion' && (t.id === 'cobrar_alimentacion' || t.id === 'cobrar_alimentacion_cotiz')) ||
+         (subTipoAccion === 'normal' && t.id !== 'pedir_abono' && t.id !== 'cobrar_alimentacion' && t.id !== 'cobrar_alimentacion_cotiz'))
+    );
+
+    if (tarjetaCoincidente) {
+      handleSeleccionarMensajeCard(tarjetaCoincidente);
+    } else if (tarjetasDeNuevaFase.length > 0) {
+      handleSeleccionarMensajeCard(tarjetasDeNuevaFase[0]);
+    }
+  };
+
   // ---------------------------------------------------------------------------
   // Selección de expediente desde el Smart Finder
   // ---------------------------------------------------------------------------
@@ -653,24 +761,28 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
       if (c) {
         setExpedienteTipo('cotizacion');
         setCotizacionId(c.id);
-        setReservaId('');
+        const rAsociada = reservas.find(x => x.cotizacion_id === c.id || (c.consecutivo && x.consecutivo === c.consecutivo));
+        setReservaId(rAsociada ? rAsociada.id : '');
+        setClienteId(c.cliente_id || (c.clientes as any)?.id || '');
         setFaseFiltro('fase_1_cotizacion');
         setTipoSeleccionado('cotizacion');
         setSubTipoAccion('normal');
-        aplicarMensaje('cotizacion', 'normal', '', c.id, c.cliente_id || '');
+        aplicarMensaje('cotizacion', 'normal', rAsociada ? rAsociada.id : '', c.id, c.cliente_id || '');
       }
     } else {
       const r = reservas.find(x => x.id === item.id);
       if (r) {
         setExpedienteTipo('reserva');
         setReservaId(r.id);
-        if (r.cotizacion_id) setCotizacionId(r.cotizacion_id);
+        const cAsociada = cotizaciones.find(x => (r.cotizacion_id && x.id === r.cotizacion_id) || (r.consecutivo && x.consecutivo === r.consecutivo));
+        setCotizacionId(cAsociada ? cAsociada.id : (r.cotizacion_id || ''));
+        setClienteId(r.cliente_id || (r.clientes as any)?.id || '');
         const saldo = calcularSaldo(r);
         const sugerido: TipoComunicacion = saldo <= 0 ? 'paz_salvo' : 'estado_cuenta';
         setFaseFiltro('fase_3_saldos');
         setTipoSeleccionado(sugerido);
         setSubTipoAccion('normal');
-        aplicarMensaje(sugerido, 'normal', r.id, r.cotizacion_id || '', r.cliente_id || '');
+        aplicarMensaje(sugerido, 'normal', r.id, cAsociada ? cAsociada.id : (r.cotizacion_id || ''), r.cliente_id || '');
       }
     }
     setBusquedaExpediente('');
@@ -720,7 +832,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
   const ejecutarDescargaPdf = async (): Promise<boolean> => {
     try {
       if (subTipoAccion === 'cobrar_alimentacion') {
-        const itemActual = (expedienteTipo === 'cotizacion' && cotizacionActual) ? cotizacionActual : (reservaActual || cotizacionActual);
+        const itemActual = (expedienteTipo === 'cotizacion' && cotizacionEfectiva) ? cotizacionEfectiva : (reservaEfectiva || cotizacionEfectiva);
         if (!itemActual) {
           showToast('No hay expediente cargado para generar el documento de alimentación', 'error');
           return false;
@@ -757,46 +869,47 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
         }
         return false;
       }
-      if (tipoSeleccionado === 'cotizacion' && cotizacionActual) {
-        generarDocCotizacion(cotizacionActual, configuracion);
+      if (tipoSeleccionado === 'cotizacion' && cotizacionEfectiva) {
+        generarDocCotizacion(cotizacionEfectiva, configuracion);
         return true;
       }
-      if (tipoSeleccionado === 'separacion' && reservaActual) {
-        generarDocSeparacion(reservaActual, configuracion);
+      if (tipoSeleccionado === 'separacion' && reservaEfectiva) {
+        generarDocSeparacion(reservaEfectiva, configuracion);
         return true;
       }
-      if (tipoSeleccionado === 'abono' && reservaActual) {
-        const p = reservaActual.pagos?.find(x => x.id === pagoId) || reservaActual.pagos?.[0] || {
+      if (tipoSeleccionado === 'abono' && reservaEfectiva) {
+        const p = reservaEfectiva.pagos?.find(x => x.id === pagoId) || reservaEfectiva.pagos?.[0] || {
           id: 'temp',
-          reserva_id: reservaActual.id,
+          reserva_id: reservaEfectiva.id,
           tipo: 'abono',
           fecha: new Date().toISOString().split('T')[0],
-          valor: reservaActual.separacion || 0,
+          valor: reservaEfectiva.separacion || Math.round((reservaEfectiva.valor_total || 0) * 0.5),
         } as Pago;
-        generarComprobantePago(reservaActual, p, configuracion);
+        generarComprobantePago(reservaEfectiva, p, configuracion);
         return true;
       }
-      if (tipoSeleccionado === 'estado_cuenta' && reservaActual) {
-        generarEstadoCuenta(reservaActual, configuracion);
+      if (tipoSeleccionado === 'estado_cuenta' && reservaEfectiva) {
+        generarEstadoCuenta(reservaEfectiva, configuracion);
         return true;
       }
-      if (tipoSeleccionado === 'paz_salvo' && reservaActual) {
-        if (calcularSaldo(reservaActual) > 0) {
+      if (tipoSeleccionado === 'paz_salvo' && reservaEfectiva) {
+        if (calcularSaldo(reservaEfectiva) > 0) {
           showToast('El saldo debe ser $0 COP para emitir el Paz y Salvo', 'error');
           return false;
         }
-        generarPazYSalvo(reservaActual, configuracion);
+        generarPazYSalvo(reservaEfectiva, configuracion);
         return true;
       }
       if (tipoSeleccionado === 'menu') {
-        const m = (cotizacionActual && menus.find(x => x.id === cotizacionActual.menu_id)) || menus[0];
+        const target = cotizacionEfectiva;
+        const m = (target && menus.find(x => x.id === target.menu_id)) || menus[0];
         if (m) {
           await generarPropuestaAlimentacion({
             menu: m,
-            cliente: cotizacionActual?.clientes,
-            finca: cotizacionActual?.fincas,
-            personas: cotizacionActual?.personas || 4,
-            cantidadServicios: cotizacionActual?.cantidad_alimentacion || 1,
+            cliente: target?.clientes,
+            finca: target?.fincas,
+            personas: target?.personas || 4,
+            cantidadServicios: (target as any)?.cantidad_alimentacion || 1,
             config: configuracion,
           });
           return true;
@@ -1425,7 +1538,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
                   <button
                     key={f.id}
                     type="button"
-                    onClick={() => setFaseFiltro(f.id as FaseMensaje)}
+                    onClick={() => handleCambiarFaseTab(f.id as FaseMensaje)}
                     className={`btn btn-sm${faseFiltro === f.id ? ' btn-primary' : ''}`}
                     style={{
                       fontSize: '0.72rem',
