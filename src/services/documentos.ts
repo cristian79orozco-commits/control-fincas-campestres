@@ -163,6 +163,16 @@ export function dibujarInsigniaChulo(
   dibujarChuloVector(doc, cx, cy, radio * 0.9, [255, 255, 255], radio * 0.22);
 }
 
+const firmaImageCache = new Map<string, HTMLImageElement>();
+
+export function predescargarFirma(url?: string | null) {
+  if (!url || typeof url !== 'string' || url.startsWith('data:image') || firmaImageCache.has(url)) return;
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => firmaImageCache.set(url, img);
+  img.src = url;
+}
+
 /**
  * Estampa de manera elegante el bloque de firma de la Administración Paraíso Terrenal.
  * Si se ha subido una firma digital (imagen recortada con fondo transparente), se
@@ -196,8 +206,18 @@ function dibujarBloqueFirmaAdmin(
       // Centrada sobre la línea o con margen izquierdo
       const xFirma = x + Math.max(0, (anchoLinea - anchoFirma) / 2);
       const yFirma = yLinea - altoFirma + 1.2; // se apoya directamente sobre la línea
-      const formato = firmaUrl.includes('image/jpeg') || firmaUrl.includes('image/jpg') ? 'JPEG' : 'PNG';
-      doc.addImage(firmaUrl, formato, xFirma, yFirma, anchoFirma, altoFirma);
+
+      if (firmaUrl.startsWith('data:image')) {
+        const formato = firmaUrl.includes('image/jpeg') || firmaUrl.includes('image/jpg') ? 'JPEG' : 'PNG';
+        doc.addImage(firmaUrl, formato, xFirma, yFirma, anchoFirma, altoFirma);
+      } else {
+        const cached = firmaImageCache.get(firmaUrl);
+        if (cached && cached.complete && cached.naturalWidth > 0) {
+          doc.addImage(cached, 'PNG', xFirma, yFirma, anchoFirma, altoFirma);
+        } else {
+          predescargarFirma(firmaUrl);
+        }
+      }
     } catch (err) {
       console.warn('[documentos] Aviso al incrustar firma digital en PDF:', err);
     }

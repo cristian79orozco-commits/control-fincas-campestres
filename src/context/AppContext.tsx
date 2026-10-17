@@ -2439,11 +2439,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .from('configuracion_general')
         .upsert(payloadParaSupabase, { onConflict: 'id' });
 
-      // Si falla porque alguna columna directa aún no se ha migrado en PostgreSQL (schema cache)
+      // Si falla porque alguna columna directa aún no se ha migrado en PostgreSQL (schema cache / column not found)
       let intentos = 0;
-      while (error && error.message && error.message.includes('in the schema cache') && intentos < 8) {
+      while (error && error.message && intentos < 8) {
+        const msg = error.message.toLowerCase();
+        const esErrorColumna = msg.includes('column') || msg.includes('schema cache') || error.code === 'PGRST204';
+        if (!esErrorColumna) break;
+
         intentos++;
-        const match = error.message.match(/Could not find the '([^']+)' column/i) || error.message.match(/'([^']+)' column/i);
+        console.warn(`[AppContext] Reintento ${intentos}/8 sin columna no existente:`, error.message);
+        const match = error.message.match(/Could not find the '([^']+)' column/i) ||
+                      error.message.match(/'([^']+)' column/i) ||
+                      error.message.match(/column "([^"]+)" of relation/i);
         if (match && match[1]) {
           delete payloadParaSupabase[match[1]];
         } else {
@@ -2466,10 +2473,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         error = resReintento.error;
       }
 
-      if (error) throw error;
+      if (error) {
+        console.error('[AppContext] Error persistiendo configuracion en Supabase:', error);
+        throw error;
+      }
+
+      guardarCache('fc_cache_configuracion', actualizado);
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message };
+      console.error('[AppContext] Excepción en guardarConfiguracion:', err);
+      return { success: false, error: err.message || 'Error inesperado al guardar' };
     } finally {
       setGuardandoConfig(false);
     }
