@@ -4,7 +4,7 @@ export const CONFIGURACION_DEFAULT: ConfiguracionGeneral = {
   id: 'general',
   // 1. Empresa
   nombre_empresa: 'Paraíso Terrenal',
-  nit: '900.123.456-7',
+  nit: '',
   eslogan: 'Fincas de Alquiler · Experiencias exclusivas y descanso en la naturaleza',
   logo_url: '/logo.png',
   telefono: '+57 317 682 7093',

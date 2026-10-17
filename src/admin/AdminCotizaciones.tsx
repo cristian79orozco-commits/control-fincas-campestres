@@ -264,6 +264,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
       }
     }
 
+    const f = fincas.find(x => x.id === c.finca_id) || (c.fincas as any);
     const m = menus.find(x => x.id === c.menu_id) || (c.alimentacion && c.alimentacion !== 'Sin alimentación' ? {
       id: c.menu_id || 'cotiz-menu',
       nombre: c.alimentacion,
@@ -281,9 +282,12 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
       await generarPropuestaAlimentacion({
         menu: m,
         cliente: c.clientes,
-        finca: c.fincas,
+        finca: f,
         personas: cantPersonas,
         cantidadServicios: cantServ,
+        consecutivo: c.consecutivo,
+        tituloDocumento: 'DETALLE Y COBRO DE ALIMENTACIÓN',
+        config: configuracion || getConfiguracionGlobal(),
       });
       showToast('Detalle de alimentación descargado en PDF ✅', 'success');
     } catch {
@@ -308,7 +312,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
       titulo: `Solicitud de Separación (50% Finca) · ${f?.nombre || c.fincas?.nombre || 'Finca'}`,
       mensaje: plantillaPedirAbonoCotizacion(c, f, c.clientes, bancosInfo, 50),
       nombreDoc: 'Cotización Oficial y Separación (PDF)',
-      onGenerarPdf: () => generarDocCotizacion(c, configuracion || getConfiguracionGlobal()),
+      onGenerarPdf: () => generarDocCotizacion(c, configuracion || getConfiguracionGlobal(), f),
       tipo: 'cotizacion',
     });
   };
@@ -895,7 +899,8 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
                     style={{ fontSize: '0.72rem', gap: '0.25rem', padding: '0.3rem 0.55rem' }}
                     title="Descargar Cotización Formal en PDF"
                     onClick={() => {
-                      generarDocCotizacion(c, configuracion);
+                      const f = fincas.find(x => x.id === c.finca_id) || (c.fincas as any);
+                      generarDocCotizacion(c, configuracion, f);
                       showToast('Cotización descargada en PDF ✅', 'success');
                     }}
                   >

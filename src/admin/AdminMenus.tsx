@@ -382,6 +382,9 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
         personas: pdfPersonas,
         cantidadServicios: pdfServicios,
         notasEspeciales: pdfNotas,
+        consecutivo: configuracion?.siguiente_propuesta_menu || 1001,
+        tituloDocumento: 'PROPUESTA DE SERVICIO GASTRONÓMICO',
+        config: configuracion,
       });
 
       showToast('Propuesta en PDF generada y descargada ✅', 'success');

@@ -860,13 +860,16 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
           activo: true,
         } : menus[0]);
 
+        const f = fincas.find(x => x.id === itemActual.finca_id) || itemActual.fincas;
         if (m) {
           await generarPropuestaAlimentacion({
             menu: m,
             cliente: itemActual.clientes,
-            finca: itemActual.fincas,
+            finca: f,
             personas: cantPersonas,
             cantidadServicios: cantServ,
+            consecutivo: itemActual.consecutivo,
+            tituloDocumento: 'DETALLE Y COBRO DE ALIMENTACIÓN',
             config: configuracion,
           });
           return true;
@@ -874,11 +877,13 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
         return false;
       }
       if (tipoSeleccionado === 'cotizacion' && cotizacionEfectiva) {
-        generarDocCotizacion(cotizacionEfectiva, configuracion);
+        const f = fincas.find(x => x.id === cotizacionEfectiva.finca_id) || (cotizacionEfectiva.fincas as any);
+        generarDocCotizacion(cotizacionEfectiva, configuracion, f);
         return true;
       }
       if (tipoSeleccionado === 'separacion' && reservaEfectiva) {
-        generarDocSeparacion(reservaEfectiva, configuracion);
+        const f = fincas.find(x => x.id === reservaEfectiva.finca_id) || (reservaEfectiva.fincas as any);
+        generarDocSeparacion(reservaEfectiva, configuracion, f);
         return true;
       }
       if (tipoSeleccionado === 'abono' && reservaEfectiva) {
@@ -906,14 +911,17 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
       }
       if (tipoSeleccionado === 'menu') {
         const target = cotizacionEfectiva;
+        const f = target ? (fincas.find(x => x.id === target.finca_id) || target.fincas) : null;
         const m = (target && menus.find(x => x.id === target.menu_id)) || menus[0];
         if (m) {
           await generarPropuestaAlimentacion({
             menu: m,
             cliente: target?.clientes,
-            finca: target?.fincas,
+            finca: f,
             personas: target?.personas || 4,
             cantidadServicios: (target as any)?.cantidad_alimentacion || 1,
+            consecutivo: target?.consecutivo || configuracion?.siguiente_propuesta_menu || 1001,
+            tituloDocumento: 'PROPUESTA DE SERVICIO GASTRONÓMICO',
             config: configuracion,
           });
           return true;

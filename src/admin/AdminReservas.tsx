@@ -211,6 +211,8 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
           finca: f,
           personas: cantPersonas,
           cantidadServicios: cantServ,
+          consecutivo: r.consecutivo,
+          tituloDocumento: 'DETALLE Y COBRO DE ALIMENTACIÓN',
           config: configuracion,
         });
         showToast('Detalle de alimentación descargado en PDF ✅', 'success');
@@ -1126,13 +1128,14 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                           const val = e.target.value;
                           e.target.value = '';
                           if (val === 'separacion') {
+                            const f = fincas.find(x => x.id === r.finca_id) || r.fincas;
                             setModalWaReserva({
                               abierto: true,
                               reserva: r,
-                              titulo: `Documento de Separación · ${r.fincas?.nombre || 'Finca'}`,
+                              titulo: `Documento de Separación · ${f?.nombre || r.fincas?.nombre || 'Finca'}`,
                               nombreDoc: 'Documento Oficial de Separación (PDF)',
                               mensaje: plantillaSeparacion(r),
-                              onGenerarPdf: () => generarDocSeparacion(r),
+                              onGenerarPdf: () => generarDocSeparacion(r, configuracion, f),
                               tipo: 'separacion',
                             });
                           } else if (val === 'estado_cuenta') {

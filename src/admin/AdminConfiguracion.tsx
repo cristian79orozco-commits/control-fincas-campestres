@@ -10,6 +10,7 @@ import {
   generarDocCotizacion,
   generarEstadoCuenta,
   generarPazYSalvo,
+  generarPropuestaAlimentacion,
 } from '../services/documentos';
 
 interface AdminConfiguracionProps {
@@ -106,7 +107,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
   };
 
   // Muestra de prueba en vivo
-  const emitirPrueba = (tipo: 'separacion' | 'cotizacion' | 'estado_cuenta' | 'paz_salvo') => {
+  const emitirPrueba = async (tipo: 'separacion' | 'cotizacion' | 'estado_cuenta' | 'paz_salvo' | 'propuesta_menu') => {
     try {
       const demoCliente = {
         id: 'demo-cli',
@@ -195,6 +196,26 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
         };
         generarPazYSalvo(reservaPagada, formData);
         showToast('Paz y Salvo de prueba generado ✅', 'success');
+      } else if (tipo === 'propuesta_menu') {
+        const demoMenu: any = {
+          id: 'demo-menu-1',
+          nombre: 'Sancocho Tradicional de Gallina en Leña',
+          categoria: 'Almuerzo',
+          precio_pp: 35000,
+          descripcion: 'Cocido tradicional en leña de gallina criolla con plátano verde, yuca suave, papa pastusa y mazorca tierna. Acompañado de arroz blanco, ensalada campesina y limonada natural con panela.',
+          activo: true,
+        };
+        await generarPropuestaAlimentacion({
+          menu: demoMenu,
+          cliente: demoCliente,
+          finca: demoFinca,
+          personas: 12,
+          cantidadServicios: 1,
+          consecutivo: formData.siguiente_propuesta_menu || 1001,
+          tituloDocumento: 'PROPUESTA DE SERVICIO GASTRONÓMICO',
+          config: formData,
+        });
+        showToast('Propuesta de Menú de prueba generada ✅', 'success');
       }
     } catch (err) {
       console.error('Error generando prueba:', err);
@@ -1067,6 +1088,33 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                   style={{ alignSelf: 'flex-start' }}
                 >
                   <Download size={14} /> Descargar Paz y Salvo PDF
+                </button>
+              </div>
+
+              <div style={{
+                background: 'var(--bg-main)',
+                padding: '1.25rem',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+              }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+                    Propuesta de Menú / Alimentación
+                  </div>
+                  <p className="text-xs text-muted" style={{ margin: 0 }}>
+                    Detalle gastronómico, aspecto destacado, liquidación y cuenta de Paraíso Terrenal.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary text-xs mt-3"
+                  onClick={() => emitirPrueba('propuesta_menu')}
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  <Download size={14} /> Descargar Propuesta Menú PDF
                 </button>
               </div>
             </div>

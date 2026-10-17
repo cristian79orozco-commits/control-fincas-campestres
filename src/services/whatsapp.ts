@@ -649,7 +649,11 @@ export async function ejecutarEnvioWhatsAppConDocumento(
           break;
         case 'menu':
           if (menuDatos) {
-            await generarPropuestaAlimentacion(menuDatos);
+            await generarPropuestaAlimentacion({
+              ...menuDatos,
+              consecutivo: menuDatos.consecutivo || (cotizacion?.consecutivo ?? reserva?.consecutivo),
+              tituloDocumento: menuDatos.tituloDocumento || 'PROPUESTA DE SERVICIO GASTRONÓMICO',
+            });
           }
           break;
       }
