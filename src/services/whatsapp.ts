@@ -26,7 +26,7 @@ import {
   type PropuestaAlimentacionDatos,
 } from './documentos';
 import { DEFAULT_WA_NUMBER } from './supabase';
-import { formatearConsecutivoConPrefijo, type TipoDocumentoPrefijo } from '../utils/consecutivos';
+import { formatearConsecutivoConPrefijo, formatearConsecutivoSimple, type TipoDocumentoPrefijo } from '../utils/consecutivos';
 
 // ---------------------------------------------------------------
 // Utilidades de formateo
@@ -248,11 +248,10 @@ export function plantillaCobroAlimentacion(
   const fNombre = finca?.nombre || item.fincas?.nombre || 'Finca Campestre';
   const costoAlim = item.costo_alimentacion || 0;
   const planNombre = item.alimentacion || 'Plan de Alimentación';
-  const personas = item.personas || 1;
-  const noches = calcularNoches(item.fecha_inicio, item.fecha_fin);
-  const cantServ = ('cantidad_alimentacion' in item ? item.cantidad_alimentacion : null) || noches;
   const esReserva = 'cotizacion_id' in item || 'valor_total' in item;
-  let desgloseAlimTexto = `💰 *TOTAL ALIMENTACIÓN:* *${formatCOP(costoAlim)}*`;
+  const numConsec = item.consecutivo ? formatearConsecutivoSimple(item.consecutivo) : '';
+
+  let desgloseAlimTexto = `💰 *TOTAL A PAGAR (ALIMENTACIÓN):* *${formatCOP(costoAlim)}*`;
   if (esReserva) {
     const res = item as Reserva;
     const pagadoAlim = typeof res.monto_pagado_alimentacion === 'number'
@@ -269,21 +268,20 @@ export function plantillaCobroAlimentacion(
     }
   }
 
-  let msg = `🍽️ *SOLICITUD DE PAGO · PLANES DE ALIMENTACIÓN Y MENÚS*
-*Administración Fincas Campestres*
+  let msg = `🍽️ *SOLICITUD DE PAGO · SERVICIO DE ALIMENTACIÓN*
+*Paraíso Terrenal · Administración*
 
 Hola, *${cNombre}* 👋
-Te compartimos el detalle para la confirmación de tu servicio gastronómico para tu estadía en *${fNombre}*.
+Te compartimos el detalle para la confirmación y pago de tu servicio gastronómico para tu estadía en *${fNombre}*.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📋 *DETALLE DEL SERVICIO GASTRONÓMICO:*
-• *Menú / Plan:* ${planNombre}
-• *Personas:* ${personas} personas
-• *Cantidad de servicios:* ${cantServ}
-${item.consecutivo ? `• *${esReserva ? 'Reserva' : 'Cotización'} N°:* ${item.consecutivo}\n` : ''}${desgloseAlimTexto}
+• *Plan / Menú Contratado:* ${planNombre}
+${numConsec ? `• *Código de Seguimiento:* #${numConsec}\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━
+${desgloseAlimTexto}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-_Nota: El servicio de alimentación es suministrado y coordinado de forma directa por la Administración de Fincas Campestres, garantizando compras de insumos frescos y personal de cocina en la finca._
+_Nota: El servicio de alimentación es suministrado y coordinado de forma directa por la Administración de Paraíso Terrenal, garantizando compras de insumos frescos y personal de cocina en la finca._
 
 💳 *DATOS BANCARIOS DE LA ADMINISTRACIÓN:*`;
 
@@ -292,16 +290,16 @@ _Nota: El servicio de alimentación es suministrado y coordinado de forma direct
 • *Banco:* ${bancosAdmin.banco || 'Bancolombia'}
 • *Tipo de Cuenta:* ${bancosAdmin.tipoCuenta || 'Ahorros'}
 • *Número de Cuenta:* ${bancosAdmin.cuenta}
-• *Titular:* ${bancosAdmin.titular || 'Administración de Fincas'}
+• *Titular:* ${bancosAdmin.titular || 'Administración Paraíso Terrenal'}
 ${bancosAdmin.nit ? `• *Identificación / NIT:* ${bancosAdmin.nit}` : ''}`;
   } else {
     msg += `
-• Consúltanos por este medio los datos de transferencia directa (Bancolombia, Nequi o Daviplata).`;
+• Por favor consúltanos por este medio los datos de transferencia directa (Bancolombia, Nequi o Daviplata).`;
   }
 
   msg += `
 
-📲 Por favor envíanos el comprobante de transferencia para programar los insumos y el personal de cocina para tu llegada. ¡Muchas gracias! ✨`;
+📲 Por favor envíanos el comprobante de transferencia por este medio para programar oportunamente los insumos y el personal de cocina para tu llegada. ¡Muchas gracias! ✨`;
 
   return msg;
 }

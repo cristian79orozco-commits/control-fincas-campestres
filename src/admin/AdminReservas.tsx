@@ -18,7 +18,7 @@ import {
   plantillaEstadoCuenta,
   plantillaCobroAlimentacion,
 } from '../services/whatsapp';
-import { generarDocSeparacion, generarPazYSalvo, generarEstadoCuenta } from '../services/documentos';
+import { generarDocSeparacion, generarPazYSalvo, generarEstadoCuenta, generarPropuestaAlimentacion } from '../services/documentos';
 import { CurrencyInput } from '../components/CurrencyInput';
 import { useApp } from '../context/AppContext';
 
@@ -179,11 +179,48 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
       nit: configuracion.nit || undefined,
     } : null;
 
+    let cantPersonas = r.personas || 4;
+    let cantServ = (r as any).cantidad_alimentacion || 1;
+    if (r.alimentacion) {
+      const match = r.alimentacion.match(/(\d+)\s*serv(?:\.|\w*)\s*×\s*(\d+)\s*pers/i);
+      if (match) {
+        cantServ = parseInt(match[1], 10) || cantServ;
+        cantPersonas = parseInt(match[2], 10) || cantPersonas;
+      }
+    }
+
+    const onGenPdf = async () => {
+      const m = (r.alimentacion && r.alimentacion !== 'Sin alimentación' ? {
+        id: 'res-menu',
+        nombre: r.alimentacion,
+        categoria: 'Almuerzo' as const,
+        precio_pp: (r.costo_alimentacion || 0) / Math.max(1, cantPersonas * cantServ),
+        activo: true,
+      } : null);
+
+      if (!m) return;
+      try {
+        await generarPropuestaAlimentacion({
+          menu: m,
+          cliente: r.clientes,
+          finca: r.fincas,
+          personas: cantPersonas,
+          cantidadServicios: cantServ,
+          config: configuracion,
+        });
+        showToast('Detalle de alimentación descargado en PDF ✅', 'success');
+      } catch {
+        showToast('Error generando PDF de alimentación', 'error');
+      }
+    };
+
     setModalWaReserva({
       abierto: true,
       reserva: r,
-      titulo: `Solicitud de Pago · Alimentación · ${r.fincas?.nombre || 'Finca'}`,
+      titulo: `Cobro de Alimentación (Paraíso Terrenal) · ${r.fincas?.nombre || 'Finca'}`,
       mensaje: plantillaCobroAlimentacion(r, r.fincas, r.clientes, bancosAdmin),
+      nombreDoc: 'Detalle de Alimentación (PDF)',
+      onGenerarPdf: onGenPdf,
       tipo: 'cobro_alimentacion',
     });
   };

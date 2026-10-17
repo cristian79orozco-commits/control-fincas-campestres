@@ -249,11 +249,21 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
 
   // Descargar PDF de alimentación
   const handleDescargarPdfAlimentacion = async (c: CotizacionDB) => {
+    let cantPersonas = c.personas || 4;
+    let cantServ = c.cantidad_alimentacion || c.noches || 1;
+    if (c.alimentacion) {
+      const match = c.alimentacion.match(/(\d+)\s*serv(?:\.|\w*)\s*×\s*(\d+)\s*pers/i);
+      if (match) {
+        cantServ = parseInt(match[1], 10) || cantServ;
+        cantPersonas = parseInt(match[2], 10) || cantPersonas;
+      }
+    }
+
     const m = menus.find(x => x.id === c.menu_id) || (c.alimentacion && c.alimentacion !== 'Sin alimentación' ? {
       id: c.menu_id || 'cotiz-menu',
       nombre: c.alimentacion,
       categoria: 'Almuerzo' as const,
-      precio_pp: (c.costo_alimentacion || 0) / Math.max(1, (c.personas || 1) * (c.cantidad_alimentacion || c.noches || 1)),
+      precio_pp: (c.costo_alimentacion || 0) / Math.max(1, cantPersonas * cantServ),
       activo: true,
     } : null);
 
@@ -267,10 +277,10 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
         menu: m,
         cliente: c.clientes,
         finca: c.fincas,
-        personas: c.personas,
-        cantidadServicios: c.cantidad_alimentacion || c.noches || 1,
+        personas: cantPersonas,
+        cantidadServicios: cantServ,
       });
-      showToast('Propuesta de alimentación descargada en PDF ✅', 'success');
+      showToast('Detalle de alimentación descargado en PDF ✅', 'success');
     } catch {
       showToast('Error generando PDF de propuesta de alimentación', 'error');
     }
@@ -315,9 +325,9 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
     setModalWaCotiz({
       abierto: true,
       cotizacion: c,
-      titulo: `Cobro de Alimentación y Menú · ${c.fincas?.nombre || 'Finca'}`,
+      titulo: `Cobro de Alimentación (Paraíso Terrenal) · ${c.fincas?.nombre || 'Finca'}`,
       mensaje: plantillaCobroAlimentacion(c, c.fincas, c.clientes, bancosAdmin),
-      nombreDoc: 'Propuesta de Alimentación (PDF)',
+      nombreDoc: 'Detalle de Alimentación (PDF)',
       onGenerarPdf: () => handleDescargarPdfAlimentacion(c),
       tipo: 'menu',
     });

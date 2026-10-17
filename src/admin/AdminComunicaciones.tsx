@@ -68,7 +68,7 @@ type TabComunicaciones = 'envio' | 'plantillas' | 'historial' | 'config';
 type FaseMensaje = 'fase_1_cotizacion' | 'fase_2_reserva' | 'fase_3_saldos' | 'fase_4_llegada' | 'fase_5_libre';
 
 interface TarjetaTipoMensaje {
-  id: TipoComunicacion | 'pedir_abono' | 'cobrar_alimentacion';
+  id: TipoComunicacion | 'pedir_abono' | 'cobrar_alimentacion' | 'cobrar_alimentacion_cotiz';
   tipoReal: TipoComunicacion;
   titulo: string;
   subtitulo: string;
@@ -259,7 +259,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
 
     // Caso B: Cobro de Alimentación (a cuenta de la administración Paraíso Terrenal)
     if (subtipo === 'cobrar_alimentacion' && (c || r)) {
-      const item = (r || c)!;
+      const item = (expedienteTipo === 'cotizacion' && c) ? c : (r || c)!;
       const bancosAdmin = {
         banco: configuracion?.banco_nombre || 'Bancolombia',
         tipoCuenta: configuracion?.banco_tipo_cuenta || 'Ahorros',
@@ -462,10 +462,10 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
       icono: <Home size={18} />,
     },
     {
-      id: 'menu',
-      tipoReal: 'menu',
-      titulo: 'Propuesta Gastronómica de Menú',
-      subtitulo: 'Catálogo de platos y costos del servicio de alimentación campestre',
+      id: 'cobrar_alimentacion_cotiz',
+      tipoReal: 'cotizacion',
+      titulo: 'Cobro de Alimentación (Paraíso Terrenal)',
+      subtitulo: 'Solicitud anticipada del menú a la cuenta de la administración para insumos y cocina',
       fase: 'fase_1_cotizacion',
       destinatarioCobro: 'admin',
       prefijoDoc: 'menu',
@@ -487,7 +487,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
       id: 'cobrar_alimentacion',
       tipoReal: 'cotizacion',
       titulo: 'Cobro de Alimentación (Paraíso Terrenal)',
-      subtitulo: 'Solicitud de pago a la cuenta de la administración para insumos y chefs',
+      subtitulo: 'Solicitud de pago o saldo de menú a la cuenta de la administración',
       fase: 'fase_2_reserva',
       destinatarioCobro: 'admin',
       prefijoDoc: 'menu',
@@ -546,7 +546,17 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
       icono: <Sparkles size={18} />,
     },
 
-    // FASE 5: LIBRE
+    // FASE 5: LIBRE / BROCHURES
+    {
+      id: 'menu',
+      tipoReal: 'menu',
+      titulo: 'Catálogo de Menú y Propuesta Gastronómica',
+      subtitulo: 'Catálogo de platos y costos para clientes que aún no eligen menú',
+      fase: 'fase_5_libre',
+      destinatarioCobro: 'admin',
+      prefijoDoc: 'menu',
+      icono: <Utensils size={18} />,
+    },
     {
       id: 'personalizado',
       tipoReal: 'personalizado',
@@ -568,7 +578,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
     if (tarjeta.id === 'pedir_abono') {
       setSubTipoAccion('pedir_abono');
       aplicarMensaje('cotizacion', 'pedir_abono');
-    } else if (tarjeta.id === 'cobrar_alimentacion') {
+    } else if (tarjeta.id === 'cobrar_alimentacion' || tarjeta.id === 'cobrar_alimentacion_cotiz') {
       setSubTipoAccion('cobrar_alimentacion');
       aplicarMensaje('cotizacion', 'cobrar_alimentacion');
     } else {
@@ -709,6 +719,44 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
 
   const ejecutarDescargaPdf = async (): Promise<boolean> => {
     try {
+      if (subTipoAccion === 'cobrar_alimentacion') {
+        const itemActual = (expedienteTipo === 'cotizacion' && cotizacionActual) ? cotizacionActual : (reservaActual || cotizacionActual);
+        if (!itemActual) {
+          showToast('No hay expediente cargado para generar el documento de alimentación', 'error');
+          return false;
+        }
+
+        let cantPersonas = itemActual.personas || 4;
+        let cantServ = (itemActual as any).cantidad_alimentacion || 1;
+        if (itemActual.alimentacion) {
+          const match = itemActual.alimentacion.match(/(\d+)\s*serv(?:\.|\w*)\s*×\s*(\d+)\s*pers/i);
+          if (match) {
+            cantServ = parseInt(match[1], 10) || cantServ;
+            cantPersonas = parseInt(match[2], 10) || cantPersonas;
+          }
+        }
+
+        const m = (itemActual.menu_id && menus.find(x => x.id === itemActual.menu_id)) || (itemActual.alimentacion && itemActual.alimentacion !== 'Sin alimentación' ? {
+          id: itemActual.menu_id || 'cotiz-menu',
+          nombre: itemActual.alimentacion,
+          categoria: 'Almuerzo' as const,
+          precio_pp: (itemActual.costo_alimentacion || 0) / Math.max(1, cantPersonas * cantServ),
+          activo: true,
+        } : menus[0]);
+
+        if (m) {
+          await generarPropuestaAlimentacion({
+            menu: m,
+            cliente: itemActual.clientes,
+            finca: itemActual.fincas,
+            personas: cantPersonas,
+            cantidadServicios: cantServ,
+            config: configuracion,
+          });
+          return true;
+        }
+        return false;
+      }
       if (tipoSeleccionado === 'cotizacion' && cotizacionActual) {
         generarDocCotizacion(cotizacionActual, configuracion);
         return true;
@@ -1395,11 +1443,12 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
             {/* Grid animado de tarjetas de mensajes */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.65rem' }}>
               {mensajesFiltrados.map(tarjeta => {
+                const esCobrarAlim = tarjeta.id === 'cobrar_alimentacion' || tarjeta.id === 'cobrar_alimentacion_cotiz';
                 const esActivo =
                   tipoSeleccionado === tarjeta.tipoReal &&
                   ((tarjeta.id === 'pedir_abono' && subTipoAccion === 'pedir_abono') ||
-                   (tarjeta.id === 'cobrar_alimentacion' && subTipoAccion === 'cobrar_alimentacion') ||
-                   (tarjeta.id !== 'pedir_abono' && tarjeta.id !== 'cobrar_alimentacion' && subTipoAccion === 'normal'));
+                   (esCobrarAlim && subTipoAccion === 'cobrar_alimentacion') ||
+                   (!esCobrarAlim && tarjeta.id !== 'pedir_abono' && subTipoAccion === 'normal'));
 
                 return (
                   <motion.div
@@ -1513,7 +1562,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#15803d', fontWeight: 600 }}>
                       <Download size={14} />
-                      <span>Documento Oficial ({formatearConsecutivoConPrefijo(consecutivoBase, tipoSeleccionado as TipoDocumentoPrefijo)})</span>
+                      <span>Documento Oficial ({formatearConsecutivoConPrefijo(consecutivoBase, (subTipoAccion === 'cobrar_alimentacion' ? 'menu' : tipoSeleccionado) as TipoDocumentoPrefijo)})</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                       <button
