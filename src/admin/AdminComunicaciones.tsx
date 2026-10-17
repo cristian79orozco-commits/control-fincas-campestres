@@ -1,15 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   MessageCircle, Send, FileText, CheckCircle, Clock, Copy, Check,
   Download, Users, Trash2, Settings, Phone, BookOpen,
-  Search, RotateCcw, Save, Sparkles, Tag, ExternalLink
+  Search, RotateCcw, Save, Sparkles, Tag, ExternalLink,
+  CreditCard, Utensils, Home, AlertCircle, ChevronRight,
+  ShieldCheck, ArrowRight, CornerDownRight, X, Eye, Edit3
 } from 'lucide-react';
 import type {
   Cliente, Finca, Reserva, CotizacionDB, Menu, Pago, TipoComunicacion, Comunicacion, ConfiguracionGeneral
 } from '../types';
-import { calcularSaldo } from '../types';
+import { calcularSaldo, desglosarFinanzasReserva } from '../types';
 import {
   plantillaCotizacion,
+  plantillaPedirAbonoCotizacion,
+  plantillaCobroAlimentacion,
   plantillaSeparacion,
   plantillaComprobantePago,
   plantillaEstadoCuenta,
@@ -33,7 +38,6 @@ import {
   generarPazYSalvo,
   generarPropuestaAlimentacion,
   generarDocCotizacion,
-  subirDocumentoStorage,
 } from '../services/documentos';
 import {
   formatearConsecutivoSimple,
@@ -55,9 +59,24 @@ interface AdminComunicacionesProps {
   configuracion?: ConfiguracionGeneral;
   onGuardarConfiguracion?: (datos: Partial<ConfiguracionGeneral>) => Promise<{ success: boolean; error?: string }>;
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  expedienteInicial?: { tipo: 'cotizacion' | 'reserva'; id: string } | null;
+  onExpedienteInicialCargado?: () => void;
 }
 
-type TabComunicaciones = 'envio' | 'historial' | 'plantillas' | 'config';
+type TabComunicaciones = 'envio' | 'plantillas' | 'historial' | 'config';
+
+type FaseMensaje = 'fase_1_cotizacion' | 'fase_2_reserva' | 'fase_3_saldos' | 'fase_4_llegada' | 'fase_5_libre';
+
+interface TarjetaTipoMensaje {
+  id: TipoComunicacion | 'pedir_abono' | 'cobrar_alimentacion';
+  tipoReal: TipoComunicacion;
+  titulo: string;
+  subtitulo: string;
+  fase: FaseMensaje;
+  destinatarioCobro: 'dueno' | 'admin' | 'info';
+  icono: React.ReactNode;
+  prefijoDoc?: TipoDocumentoPrefijo;
+}
 
 export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
   currentWaNumber,
@@ -73,27 +92,38 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
   configuracion,
   onGuardarConfiguracion,
   showToast,
+  expedienteInicial,
+  onExpedienteInicialCargado,
 }) => {
   const [tabActiva, setTabActiva] = useState<TabComunicaciones>('envio');
 
-  // Estado del formulario de envío rápido
-  const [tipoSeleccionado, setTipoSeleccionado] = useState<TipoComunicacion>('cotizacion');
-  const [reservaId, setReservaId] = useState<string>('');
+  // Expediente seleccionado activo (Cotización o Reserva)
+  const [expedienteTipo, setExpedienteTipo] = useState<'cotizacion' | 'reserva' | null>('cotizacion');
   const [cotizacionId, setCotizacionId] = useState<string>('');
+  const [reservaId, setReservaId] = useState<string>('');
   const [clienteId, setClienteId] = useState<string>('');
   const [pagoId, setPagoId] = useState<string>('');
+
+  // Búsqueda inteligente de expedientes
+  const [busquedaExpediente, setBusquedaExpediente] = useState<string>('');
+  const [busquedaAbierta, setBusquedaAbierta] = useState<boolean>(false);
+
+  // Tipo de mensaje seleccionado
+  const [tipoSeleccionado, setTipoSeleccionado] = useState<TipoComunicacion>('cotizacion');
+  const [subTipoAccion, setSubTipoAccion] = useState<'normal' | 'pedir_abono' | 'cobrar_alimentacion'>('normal');
+  const [faseFiltro, setFaseFiltro] = useState<FaseMensaje>('fase_1_cotizacion');
+
+  // Formulario de envío
   const [telefonoInput, setTelefonoInput] = useState<string>('');
   const [destinatarioNombre, setDestinatarioNombre] = useState<string>('');
   const [mensajeTexto, setMensajeTexto] = useState<string>('');
   const [descargarPdf, setDescargarPdf] = useState<boolean>(true);
   const [copiado, setCopiado] = useState<boolean>(false);
   const [procesando, setProcesando] = useState<boolean>(false);
+  const [copiadoBancoDueno, setCopiadoBancoDueno] = useState<boolean>(false);
+  const [copiadoBancoAdmin, setCopiadoBancoAdmin] = useState<boolean>(false);
 
-  // Consecutivo Lookup
-  const [inputBusquedaConsecutivo, setInputBusquedaConsecutivo] = useState<string>('');
-  const [consecutivoBaseActivo, setConsecutivoBaseActivo] = useState<string>('');
-
-  // Editor de Plantillas
+  // Editor de Plantillas en Supabase
   const [plantillaSeleccionada, setPlantillaSeleccionada] = useState<string>('cotizacion');
   const [textoEditorPlantilla, setTextoEditorPlantilla] = useState<string>('');
   const [guardandoPlantilla, setGuardandoPlantilla] = useState<boolean>(false);
@@ -104,413 +134,662 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
   // Filtro historial
   const [filtroTipoHistorial, setFiltroTipoHistorial] = useState<string>('todos');
 
-  // -------------------------------------------------------------
-  // Inicialización del editor de plantillas
-  // -------------------------------------------------------------
-  useEffect(() => {
-    const custom = configuracion?.plantillas_comunicacion?.[plantillaSeleccionada];
-    setTextoEditorPlantilla(custom || PLANTILLAS_PREDETERMINADAS[plantillaSeleccionada] || '');
-  }, [plantillaSeleccionada, configuracion]);
+  // ---------------------------------------------------------------------------
+  // Referencias a los objetos activos actuales
+  // ---------------------------------------------------------------------------
+  const reservaActual = useMemo(() => reservas.find(r => r.id === reservaId) || null, [reservas, reservaId]);
+  const cotizacionActual = useMemo(() => cotizaciones.find(c => c.id === cotizacionId) || null, [cotizaciones, cotizacionId]);
 
-  // -------------------------------------------------------------
-  // Generador de Mensaje dinámico con soporte de Plantillas Personalizadas
-  // -------------------------------------------------------------
-  const generarTextoMensaje = (
-    nuevoTipo: TipoComunicacion,
-    resId = reservaId,
-    cotId = cotizacionId,
-    cliId = clienteId,
-    pId = pagoId,
-    consecBase = consecutivoBaseActivo
+  const fincaActual = useMemo(() => {
+    if (reservaActual) {
+      return fincas.find(f => f.id === reservaActual.finca_id) || reservaActual.fincas || null;
+    }
+    if (cotizacionActual) {
+      return fincas.find(f => f.id === cotizacionActual.finca_id) || cotizacionActual.fincas || null;
+    }
+    return fincas[0] || null;
+  }, [reservaActual, cotizacionActual, fincas]);
+
+  const clienteActual = useMemo(() => {
+    if (clienteId) {
+      const cli = clientes.find(c => c.id === clienteId);
+      if (cli) return cli;
+    }
+    if (reservaActual?.clientes) return reservaActual.clientes;
+    if (cotizacionActual?.clientes) return cotizacionActual.clientes;
+    return null;
+  }, [clienteId, clientes, reservaActual, cotizacionActual]);
+
+  // Consecutivo numérico base unificado (ej: '1001')
+  const consecutivoBase = useMemo(() => {
+    if (reservaActual?.consecutivo) return formatearConsecutivoSimple(reservaActual.consecutivo);
+    if (cotizacionActual?.consecutivo) return formatearConsecutivoSimple(cotizacionActual.consecutivo);
+    return '1001';
+  }, [reservaActual, cotizacionActual]);
+
+  // ---------------------------------------------------------------------------
+  // Desglose Financiero Doble (Finca/Dueño vs Alimentación/Paraíso Terrenal)
+  // ---------------------------------------------------------------------------
+  const finanzasDoble = useMemo(() => {
+    if (reservaActual) {
+      const desglose = desglosarFinanzasReserva(reservaActual);
+      return {
+        esReserva: true,
+        // Finca
+        subtotalFinca: desglose.subtotalAlojamiento,
+        pagadoFinca: desglose.pagadoFinca,
+        saldoFincaCheckIn: desglose.saldoFincaCheckIn,
+        // Alimentación
+        costoAlimentacion: desglose.costoAlimentacion,
+        pagadoAlimentacion: desglose.pagadoAlimentacion,
+        saldoAlimentacionAdmin: desglose.saldoAlimentacionAdmin,
+        // Totales
+        totalConsolidado: desglose.totalConsolidado,
+        totalRecaudado: desglose.totalRecaudado,
+        saldoConsolidado: desglose.saldoConsolidado,
+      };
+    }
+
+    if (cotizacionActual) {
+      const costoAlim = cotizacionActual.costo_alimentacion || 0;
+      const subtotalFinca = cotizacionActual.subtotal_alojamiento || Math.max(0, (cotizacionActual.total || 0) - costoAlim);
+      const anticipoFinca50 = Math.round(subtotalFinca * 0.5);
+
+      return {
+        esReserva: false,
+        subtotalFinca,
+        pagadoFinca: 0,
+        saldoFincaCheckIn: subtotalFinca,
+        anticipoFinca50,
+        costoAlimentacion: costoAlim,
+        pagadoAlimentacion: 0,
+        saldoAlimentacionAdmin: costoAlim,
+        totalConsolidado: cotizacionActual.total || 0,
+        totalRecaudado: 0,
+        saldoConsolidado: cotizacionActual.total || 0,
+      };
+    }
+
+    return null;
+  }, [reservaActual, cotizacionActual]);
+
+  // ---------------------------------------------------------------------------
+  // Generador de Mensajes según el tipo y subtipo
+  // ---------------------------------------------------------------------------
+  const construirMensaje = (
+    tipo: TipoComunicacion,
+    subtipo: 'normal' | 'pedir_abono' | 'cobrar_alimentacion' = subTipoAccion,
+    rId = reservaId,
+    cId = cotizacionId,
+    cliId = clienteId
   ): { msg: string; tel: string; nom: string } => {
     let msg = '';
     let tel = telefonoInput;
     let nom = destinatarioNombre;
 
-    const r = reservas.find(x => x.id === resId);
-    const c = cotizaciones.find(x => x.id === cotId);
-    const cli = clientes.find(x => x.id === cliId) || r?.clientes || c?.clientes;
-    const f = fincas.find(x => x.id === (r?.finca_id || c?.finca_id)) || r?.fincas || c?.fincas;
-    const p = r?.pagos?.find(x => x.id === pId) || r?.pagos?.[0];
+    const r = reservas.find(x => x.id === rId) || null;
+    const c = cotizaciones.find(x => x.id === cId) || null;
+    const cli = (cliId ? clientes.find(x => x.id === cliId) : null) || r?.clientes || c?.clientes;
+    const f = (r ? fincas.find(x => x.id === r.finca_id) : null) || (c ? fincas.find(x => x.id === c.finca_id) : null) || r?.fincas || c?.fincas;
 
-    // Verificar si el usuario tiene una plantilla personalizada en Supabase
-    const plantillaCustom = configuracion?.plantillas_comunicacion?.[nuevoTipo];
+    if (cli) {
+      nom = `${cli.nombre} ${cli.apellido || ''}`.trim();
+      tel = cli.whatsapp || (cli as any).telefono || tel;
+    }
 
-    if (plantillaCustom) {
-      const tokens = obtenerTokensParaMensaje({
-        tipo: nuevoTipo,
-        cotizacion: c,
-        reserva: r,
-        cliente: cli,
-        finca: f,
-        pago: p,
-        consecutivoBase: consecBase,
-      });
-      msg = renderizarPlantillaPersonalizada(plantillaCustom, tokens);
-
-      if (cli) {
-        tel = cli.whatsapp || (cli as any)?.telefono || tel;
-        nom = `${cli.nombre} ${cli.apellido || ''}`.trim();
-      }
+    // Caso A: Solicitud de Anticipo Finca (50% a cuenta de propietario)
+    if (subtipo === 'pedir_abono' && c) {
+      const fObj: any = f;
+      const bancosInfo = fObj?.banco_cuenta ? {
+        banco: fObj.banco_nombre || 'Bancolombia',
+        tipoCuenta: fObj.banco_tipo_cuenta || 'Ahorros',
+        cuenta: fObj.banco_cuenta,
+        titular: fObj.banco_titular || 'Propietario de la Finca',
+        nit: fObj.banco_identificacion || undefined,
+      } : {
+        banco: configuracion?.banco_nombre || 'Bancolombia',
+        tipoCuenta: configuracion?.banco_tipo_cuenta || 'Ahorros',
+        cuenta: configuracion?.banco_cuenta || '',
+        titular: configuracion?.banco_titular || configuracion?.nombre_empresa,
+        nit: configuracion?.nit || undefined,
+      };
+      msg = plantillaPedirAbonoCotizacion(c, f, cli, bancosInfo, 50);
       return { msg, tel, nom };
     }
 
-    // Si no hay plantilla personalizada, usar la plantilla oficial por defecto
-    if (nuevoTipo === 'cotizacion') {
-      const cotTarget = c || cotizaciones[0];
-      if (cotTarget) {
-        msg = plantillaCotizacion(cotTarget, cotTarget.fincas, cotTarget.clientes);
-        tel = cotTarget.clientes?.whatsapp || (cotTarget.clientes as any)?.telefono || tel;
-        nom = cotTarget.clientes ? `${cotTarget.clientes.nombre} ${cotTarget.clientes.apellido || ''}`.trim() : nom;
-      }
-    } else if (nuevoTipo === 'separacion') {
-      const resTarget = r || reservas[0];
-      if (resTarget) {
-        msg = plantillaSeparacion(resTarget);
-        tel = resTarget.clientes?.whatsapp || (resTarget.clientes as any)?.telefono || tel;
-        nom = resTarget.clientes ? `${resTarget.clientes.nombre} ${resTarget.clientes.apellido || ''}`.trim() : nom;
-      }
-    } else if (nuevoTipo === 'abono') {
-      const resTarget = r || reservas[0];
-      if (resTarget) {
-        const pagoTarget = p || {
-          id: 'pago-temp',
-          reserva_id: resTarget.id,
-          tipo: 'abono',
-          fecha: new Date().toISOString().split('T')[0],
-          valor: resTarget.separacion || 0,
-        } as Pago;
-        msg = plantillaComprobantePago(resTarget, pagoTarget);
-        tel = resTarget.clientes?.whatsapp || (resTarget.clientes as any)?.telefono || tel;
-        nom = resTarget.clientes ? `${resTarget.clientes.nombre} ${resTarget.clientes.apellido || ''}`.trim() : nom;
-      }
-    } else if (nuevoTipo === 'estado_cuenta') {
-      const resTarget = r || reservas[0];
-      if (resTarget) {
-        msg = plantillaEstadoCuenta(resTarget);
-        tel = resTarget.clientes?.whatsapp || (resTarget.clientes as any)?.telefono || tel;
-        nom = resTarget.clientes ? `${resTarget.clientes.nombre} ${resTarget.clientes.apellido || ''}`.trim() : nom;
-      }
-    } else if (nuevoTipo === 'paz_salvo') {
-      const resTarget = r || reservas[0];
-      if (resTarget) {
-        msg = plantillaPazYSalvo(resTarget);
-        tel = resTarget.clientes?.whatsapp || (resTarget.clientes as any)?.telefono || tel;
-        nom = resTarget.clientes ? `${resTarget.clientes.nombre} ${resTarget.clientes.apellido || ''}`.trim() : nom;
-      }
-    } else if (nuevoTipo === 'menu') {
-      const cotTarget = c || cotizaciones[0];
-      const m = (cotTarget && menus.find(x => x.id === cotTarget.menu_id)) || menus[0];
-      if (m) {
-        msg = plantillaPropuestaAlimentacion({
-          menu: m,
-          cliente: cotTarget?.clientes,
-          finca: cotTarget?.fincas,
-          personas: cotTarget?.personas || 4,
-          cantidadServicios: cotTarget?.cantidad_alimentacion || 1,
-        });
-        if (cotTarget?.clientes) {
-          tel = cotTarget.clientes.whatsapp || (cotTarget.clientes as any)?.telefono || tel;
-          nom = `${cotTarget.clientes.nombre} ${cotTarget.clientes.apellido || ''}`.trim();
+    // Caso B: Cobro de Alimentación (a cuenta de la administración Paraíso Terrenal)
+    if (subtipo === 'cobrar_alimentacion' && (c || r)) {
+      const item = (r || c)!;
+      const bancosAdmin = {
+        banco: configuracion?.banco_nombre || 'Bancolombia',
+        tipoCuenta: configuracion?.banco_tipo_cuenta || 'Ahorros',
+        cuenta: configuracion?.banco_cuenta || '',
+        titular: configuracion?.banco_titular || 'Administración de Fincas',
+        nit: configuracion?.nit || undefined,
+      };
+      msg = plantillaCobroAlimentacion(item, f, cli, bancosAdmin);
+      return { msg, tel, nom };
+    }
+
+    // Caso C: Verificar plantilla personalizada en Supabase
+    const plantillaCustom = configuracion?.plantillas_comunicacion?.[tipo];
+    if (plantillaCustom) {
+      const tokens = obtenerTokensParaMensaje({
+        tipo,
+        cotizacion: c || undefined,
+        reserva: r || undefined,
+        cliente: cli,
+        finca: f,
+        consecutivoBase,
+        configuracion,
+      });
+      msg = renderizarPlantillaPersonalizada(plantillaCustom, tokens);
+      return { msg, tel, nom };
+    }
+
+    // Caso D: Plantillas oficiales del sistema
+    switch (tipo) {
+      case 'cotizacion': {
+        const target = c || cotizaciones[0];
+        if (target) {
+          msg = plantillaCotizacion(target, target.fincas, target.clientes);
         }
+        break;
       }
-    } else if (nuevoTipo === 'recordatorio_pago') {
-      const resTarget = r || reservas[0];
-      if (resTarget) {
-        msg = plantillaRecordatorioPago(resTarget);
-        tel = resTarget.clientes?.whatsapp || (resTarget.clientes as any)?.telefono || tel;
-        nom = resTarget.clientes ? `${resTarget.clientes.nombre} ${resTarget.clientes.apellido || ''}`.trim() : nom;
+      case 'separacion': {
+        const target = r || reservas[0];
+        if (target) {
+          msg = plantillaSeparacion(target);
+        }
+        break;
       }
-    } else if (nuevoTipo === 'bienvenida') {
-      const resTarget = r || reservas[0];
-      if (resTarget) {
-        msg = plantillaBienvenida(resTarget);
-        tel = resTarget.clientes?.whatsapp || (resTarget.clientes as any)?.telefono || tel;
-        nom = resTarget.clientes ? `${resTarget.clientes.nombre} ${resTarget.clientes.apellido || ''}`.trim() : nom;
+      case 'abono': {
+        const target = r || reservas[0];
+        if (target) {
+          const pagoTarget = target.pagos?.find(p => p.id === pagoId) || target.pagos?.[0] || {
+            id: 'temp',
+            reserva_id: target.id,
+            tipo: 'abono',
+            fecha: new Date().toISOString().split('T')[0],
+            valor: target.separacion || 0,
+          } as Pago;
+          msg = plantillaComprobantePago(target, pagoTarget);
+        }
+        break;
       }
-    } else {
-      // Personalizado
-      if (cli) {
-        tel = cli.whatsapp || (cli as any)?.telefono || tel;
-        nom = `${cli.nombre} ${cli.apellido || ''}`.trim();
-        msg = `Hola, *${nom}* 👋\n\nTe escribimos de *Paraíso Terrenal*.`;
-      } else {
-        msg = `Hola 👋\n\nTe escribimos de *Paraíso Terrenal*.`;
+      case 'estado_cuenta': {
+        const target = r || reservas[0];
+        if (target) {
+          msg = plantillaEstadoCuenta(target);
+        }
+        break;
+      }
+      case 'paz_salvo': {
+        const target = r || reservas[0];
+        if (target) {
+          msg = plantillaPazYSalvo(target);
+        }
+        break;
+      }
+      case 'menu': {
+        const target = c || cotizaciones[0];
+        const m = (target && menus.find(x => x.id === target.menu_id)) || menus[0];
+        if (m) {
+          msg = plantillaPropuestaAlimentacion({
+            menu: m,
+            cliente: target?.clientes,
+            finca: target?.fincas,
+            personas: target?.personas || 4,
+            cantidadServicios: target?.cantidad_alimentacion || 1,
+            config: configuracion,
+          });
+        }
+        break;
+      }
+      case 'recordatorio_pago': {
+        const target = r || reservas[0];
+        if (target) {
+          msg = plantillaRecordatorioPago(target);
+        }
+        break;
+      }
+      case 'bienvenida': {
+        const target = r || reservas[0];
+        if (target) {
+          msg = plantillaBienvenida(target);
+        }
+        break;
+      }
+      case 'personalizado': {
+        msg = `Hola, *${nom || 'Estimado/a cliente'}* 👋\n\nTe escribimos de *Paraíso Terrenal*.`;
+        break;
       }
     }
 
     return { msg, tel, nom };
   };
 
-  const actualizarPlantilla = (
-    nuevoTipo: TipoComunicacion,
-    resId = reservaId,
-    cotId = cotizacionId,
-    cliId = clienteId,
-    pId = pagoId,
-    consecBase = consecutivoBaseActivo
+  const aplicarMensaje = (
+    tipo: TipoComunicacion,
+    subtipo: 'normal' | 'pedir_abono' | 'cobrar_alimentacion' = 'normal',
+    rId = reservaId,
+    cId = cotizacionId,
+    cliId = clienteId
   ) => {
-    const { msg, tel, nom } = generarTextoMensaje(nuevoTipo, resId, cotId, cliId, pId, consecBase);
+    const { msg, tel, nom } = construirMensaje(tipo, subtipo, rId, cId, cliId);
     setMensajeTexto(msg);
     if (tel) setTelefonoInput(formatearTelefonoWhatsApp(tel));
     if (nom) setDestinatarioNombre(nom);
   };
 
-  // Inicializar al cargar
+  // ---------------------------------------------------------------------------
+  // Selección de Expediente inicial si viene por navegación cruzada
+  // ---------------------------------------------------------------------------
   useEffect(() => {
-    actualizarPlantilla('cotizacion');
-  }, []);
-
-  // -------------------------------------------------------------
-  // Consecutivo Lookup
-  // -------------------------------------------------------------
-  const ejecutarBusquedaConsecutivo = (valorBuscar?: string) => {
-    const query = valorBuscar !== undefined ? valorBuscar : inputBusquedaConsecutivo;
-    const numLimpio = formatearConsecutivoSimple(query);
-    if (!numLimpio || numLimpio === '1001' && !query.includes('1001')) {
-      showToast('Ingresa un número de consecutivo válido (ej: 1001)', 'info');
-      return;
+    if (expedienteInicial) {
+      if (expedienteInicial.tipo === 'cotizacion') {
+        const c = cotizaciones.find(x => x.id === expedienteInicial.id);
+        if (c) {
+          setExpedienteTipo('cotizacion');
+          setCotizacionId(c.id);
+          setReservaId('');
+          setFaseFiltro('fase_1_cotizacion');
+          setTipoSeleccionado('cotizacion');
+          setSubTipoAccion('normal');
+          aplicarMensaje('cotizacion', 'normal', '', c.id, c.cliente_id || '');
+          showToast(`Cotización #${formatearConsecutivoSimple(c.consecutivo)} cargada en Comunicaciones ✅`, 'success');
+        }
+      } else if (expedienteInicial.tipo === 'reserva') {
+        const r = reservas.find(x => x.id === expedienteInicial.id);
+        if (r) {
+          setExpedienteTipo('reserva');
+          setReservaId(r.id);
+          if (r.cotizacion_id) setCotizacionId(r.cotizacion_id);
+          const saldo = calcularSaldo(r);
+          const sugerido: TipoComunicacion = saldo <= 0 ? 'paz_salvo' : 'estado_cuenta';
+          setFaseFiltro('fase_3_saldos');
+          setTipoSeleccionado(sugerido);
+          setSubTipoAccion('normal');
+          aplicarMensaje(sugerido, 'normal', r.id, r.cotizacion_id || '', r.cliente_id || '');
+          showToast(`Reserva #${formatearConsecutivoSimple(r.consecutivo)} cargada en Comunicaciones ✅`, 'success');
+        }
+      }
+      onExpedienteInicialCargado?.();
     }
+  }, [expedienteInicial]);
 
-    // Buscar coincidencia en reservas
-    const rMatch = reservas.find(r =>
-      formatearConsecutivoSimple(r.consecutivo) === numLimpio ||
-      (r.cotizacion_id && cotizaciones.some(c => c.id === r.cotizacion_id && formatearConsecutivoSimple(c.consecutivo) === numLimpio))
-    );
-
-    // Buscar coincidencia en cotizaciones
-    const cMatch = cotizaciones.find(c =>
-      formatearConsecutivoSimple(c.consecutivo) === numLimpio
-    );
-
-    if (!rMatch && !cMatch) {
-      showToast(`No se encontró ninguna reserva o cotización con el consecutivo #${numLimpio}`, 'error');
-      return;
-    }
-
-    setConsecutivoBaseActivo(numLimpio);
-
-    if (rMatch) {
-      setReservaId(rMatch.id);
-      if (rMatch.cotizacion_id) setCotizacionId(rMatch.cotizacion_id);
-      if (rMatch.cliente_id) setClienteId(rMatch.cliente_id);
-      const cliNom = rMatch.clientes ? `${rMatch.clientes.nombre} ${rMatch.clientes.apellido || ''}`.trim() : '';
-      const cliTel = rMatch.clientes?.whatsapp || (rMatch.clientes as any)?.telefono || '';
-      if (cliNom) setDestinatarioNombre(cliNom);
-      if (cliTel) setTelefonoInput(formatearTelefonoWhatsApp(cliTel));
-
-      // Determinar tipo sugerido
-      const saldo = calcularSaldo(rMatch);
-      const tipoSugerido: TipoComunicacion = saldo <= 0 ? 'paz_salvo' : (rMatch.pagos && rMatch.pagos.length > 1 ? 'abono' : 'separacion');
-      setTipoSeleccionado(tipoSugerido);
-      actualizarPlantilla(tipoSugerido, rMatch.id, rMatch.cotizacion_id || '', rMatch.cliente_id || '', '', numLimpio);
-      showToast(`¡Consecutivo #${numLimpio} cargado! Reserva de ${rMatch.fincas?.nombre || 'Finca'} (${cliNom})`, 'success');
-    } else if (cMatch) {
-      setCotizacionId(cMatch.id);
-      if (cMatch.cliente_id) setClienteId(cMatch.cliente_id);
-      const cliNom = cMatch.clientes ? `${cMatch.clientes.nombre} ${cMatch.clientes.apellido || ''}`.trim() : '';
-      const cliTel = cMatch.clientes?.whatsapp || (cMatch.clientes as any)?.telefono || '';
-      if (cliNom) setDestinatarioNombre(cliNom);
-      if (cliTel) setTelefonoInput(formatearTelefonoWhatsApp(cliTel));
-
-      setTipoSeleccionado('cotizacion');
-      actualizarPlantilla('cotizacion', '', cMatch.id, cMatch.cliente_id || '', '', numLimpio);
-      showToast(`¡Consecutivo #${numLimpio} cargado! Cotización para ${cMatch.fincas?.nombre || 'Finca'} (${cliNom})`, 'success');
-    }
-  };
-
-  const seleccionarTipoRapido = (tipo: TipoComunicacion) => {
-    setTipoSeleccionado(tipo);
-    actualizarPlantilla(tipo, reservaId, cotizacionId, clienteId, pagoId, consecutivoBaseActivo);
-  };
-
-  const handleTipoChange = (nuevo: TipoComunicacion) => {
-    setTipoSeleccionado(nuevo);
-    actualizarPlantilla(nuevo);
-  };
-
-  const handleCotizacionChange = (id: string) => {
-    setCotizacionId(id);
-    const c = cotizaciones.find(x => x.id === id);
-    if (c?.consecutivo) setConsecutivoBaseActivo(formatearConsecutivoSimple(c.consecutivo));
-    actualizarPlantilla(tipoSeleccionado, reservaId, id, clienteId, pagoId);
-  };
-
-  const handleReservaChange = (id: string) => {
-    setReservaId(id);
-    const r = reservas.find(x => x.id === id);
-    if (r?.consecutivo) setConsecutivoBaseActivo(formatearConsecutivoSimple(r.consecutivo));
-    const primerPago = r?.pagos?.[0]?.id || '';
-    setPagoId(primerPago);
-    actualizarPlantilla(tipoSeleccionado, id, cotizacionId, clienteId, primerPago);
-  };
-
-  const handlePagoChange = (id: string) => {
-    setPagoId(id);
-    actualizarPlantilla(tipoSeleccionado, reservaId, cotizacionId, clienteId, id);
-  };
-
-  const handleClienteChange = (id: string) => {
-    setClienteId(id);
-    const cli = clientes.find(x => x.id === id);
-    if (cli) {
-      setDestinatarioNombre(`${cli.nombre} ${cli.apellido || ''}`.trim());
-      if (cli.whatsapp || cli.telefono) {
-        setTelefonoInput(formatearTelefonoWhatsApp(cli.whatsapp || cli.telefono));
+  // Inicialización por defecto si no hay nada cargado
+  useEffect(() => {
+    if (!cotizacionId && !reservaId) {
+      if (reservas.length > 0) {
+        const r = reservas[0];
+        setExpedienteTipo('reserva');
+        setReservaId(r.id);
+        if (r.cotizacion_id) setCotizacionId(r.cotizacion_id);
+        aplicarMensaje('estado_cuenta', 'normal', r.id, r.cotizacion_id || '', r.cliente_id || '');
+      } else if (cotizaciones.length > 0) {
+        const c = cotizaciones[0];
+        setExpedienteTipo('cotizacion');
+        setCotizacionId(c.id);
+        aplicarMensaje('cotizacion', 'normal', '', c.id, c.cliente_id || '');
       }
     }
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Catálogo de Mensajes por Fases del Negocio (Estructura de Información)
+  // ---------------------------------------------------------------------------
+  const CATALOGO_MENSAJES: TarjetaTipoMensaje[] = [
+    // FASE 1: PROSPECCIÓN Y COTIZACIÓN
+    {
+      id: 'cotizacion',
+      tipoReal: 'cotizacion',
+      titulo: 'Cotización Formal de Estancia',
+      subtitulo: 'Propuesta completa con desglose de alojamiento y alimentación',
+      fase: 'fase_1_cotizacion',
+      destinatarioCobro: 'info',
+      prefijoDoc: 'cotizacion',
+      icono: <FileText size={18} />,
+    },
+    {
+      id: 'pedir_abono',
+      tipoReal: 'cotizacion',
+      titulo: 'Solicitud de Anticipo (50% Finca)',
+      subtitulo: 'Abono para bloquear fechas en la cuenta bancaria del Propietario',
+      fase: 'fase_1_cotizacion',
+      destinatarioCobro: 'dueno',
+      prefijoDoc: 'cotizacion',
+      icono: <Home size={18} />,
+    },
+    {
+      id: 'menu',
+      tipoReal: 'menu',
+      titulo: 'Propuesta Gastronómica de Menú',
+      subtitulo: 'Catálogo de platos y costos del servicio de alimentación campestre',
+      fase: 'fase_1_cotizacion',
+      destinatarioCobro: 'admin',
+      prefijoDoc: 'menu',
+      icono: <Utensils size={18} />,
+    },
+
+    // FASE 2: RESERVAS Y PAGOS
+    {
+      id: 'separacion',
+      tipoReal: 'separacion',
+      titulo: 'Confirmación Oficial de Separación',
+      subtitulo: 'Notifica reserva asegurada y saldo pendiente de finca al check-in',
+      fase: 'fase_2_reserva',
+      destinatarioCobro: 'dueno',
+      prefijoDoc: 'separacion',
+      icono: <CheckCircle size={18} />,
+    },
+    {
+      id: 'cobrar_alimentacion',
+      tipoReal: 'cotizacion',
+      titulo: 'Cobro de Alimentación (Paraíso Terrenal)',
+      subtitulo: 'Solicitud de pago a la cuenta de la administración para insumos y chefs',
+      fase: 'fase_2_reserva',
+      destinatarioCobro: 'admin',
+      prefijoDoc: 'menu',
+      icono: <Utensils size={18} />,
+    },
+    {
+      id: 'abono',
+      tipoReal: 'abono',
+      titulo: 'Comprobante de Abono / Pago',
+      subtitulo: 'Certifica la recepción de un pago y actualiza el saldo',
+      fase: 'fase_2_reserva',
+      destinatarioCobro: 'info',
+      prefijoDoc: 'abono',
+      icono: <CreditCard size={18} />,
+    },
+
+    // FASE 3: SALDOS Y LIQUIDACIÓN
+    {
+      id: 'estado_cuenta',
+      tipoReal: 'estado_cuenta',
+      titulo: 'Estado de Cuenta (Doble Balance)',
+      subtitulo: 'Desglose transparente: Saldo check-in (dueño) vs Saldo comida (Paraíso)',
+      fase: 'fase_3_saldos',
+      destinatarioCobro: 'info',
+      prefijoDoc: 'estado_cuenta',
+      icono: <Tag size={18} />,
+    },
+    {
+      id: 'recordatorio_pago',
+      tipoReal: 'recordatorio_pago',
+      titulo: 'Recordatorio Amistoso de Saldos',
+      subtitulo: 'Recordatorio previo a la llegada detallando qué pagar en finca y qué a Paraíso',
+      fase: 'fase_3_saldos',
+      destinatarioCobro: 'info',
+      icono: <Clock size={18} />,
+    },
+    {
+      id: 'paz_salvo',
+      tipoReal: 'paz_salvo',
+      titulo: 'Certificado de Paz y Salvo',
+      subtitulo: 'Emisión oficial cuando los saldos de finca y alimentación están en $0',
+      fase: 'fase_3_saldos',
+      destinatarioCobro: 'info',
+      prefijoDoc: 'paz_salvo',
+      icono: <ShieldCheck size={18} />,
+    },
+
+    // FASE 4: EXPERIENCIA Y LLEGADA
+    {
+      id: 'bienvenida',
+      tipoReal: 'bienvenida',
+      titulo: 'Instrucciones de Llegada y Bienvenida',
+      subtitulo: 'Ubicación, normas de la finca y contacto directo del anfitrión/mayordomo',
+      fase: 'fase_4_llegada',
+      destinatarioCobro: 'info',
+      icono: <Sparkles size={18} />,
+    },
+
+    // FASE 5: LIBRE
+    {
+      id: 'personalizado',
+      tipoReal: 'personalizado',
+      titulo: 'Mensaje Rápido Personalizado',
+      subtitulo: 'Texto libre con soporte de etiquetas y variables dinámicas',
+      fase: 'fase_5_libre',
+      destinatarioCobro: 'info',
+      icono: <MessageCircle size={18} />,
+    },
+  ];
+
+  const mensajesFiltrados = useMemo(() => {
+    return CATALOGO_MENSAJES.filter(m => m.fase === faseFiltro);
+  }, [faseFiltro]);
+
+  // Manejador al hacer clic en una tarjeta de tipo de mensaje
+  const handleSeleccionarMensajeCard = (tarjeta: TarjetaTipoMensaje) => {
+    setTipoSeleccionado(tarjeta.tipoReal);
+    if (tarjeta.id === 'pedir_abono') {
+      setSubTipoAccion('pedir_abono');
+      aplicarMensaje('cotizacion', 'pedir_abono');
+    } else if (tarjeta.id === 'cobrar_alimentacion') {
+      setSubTipoAccion('cobrar_alimentacion');
+      aplicarMensaje('cotizacion', 'cobrar_alimentacion');
+    } else {
+      setSubTipoAccion('normal');
+      aplicarMensaje(tarjeta.tipoReal, 'normal');
+    }
   };
 
-  // Determinar si el tipo actual requiere o admite documento PDF
+  // ---------------------------------------------------------------------------
+  // Selección de expediente desde el Smart Finder
+  // ---------------------------------------------------------------------------
+  const listaResultadosFinder = useMemo(() => {
+    const q = busquedaExpediente.toLowerCase().trim();
+    if (!q) return [];
+
+    const res: Array<{
+      tipo: 'cotizacion' | 'reserva';
+      id: string;
+      consecutivo: string;
+      clienteNombre: string;
+      fincaNombre: string;
+      fechas: string;
+      total: number;
+    }> = [];
+
+    // Buscar en cotizaciones
+    cotizaciones.forEach(c => {
+      const num = formatearConsecutivoSimple(c.consecutivo);
+      const cliNom = c.clientes ? `${c.clientes.nombre} ${c.clientes.apellido || ''}`.toLowerCase() : '';
+      const fNom = (c.fincas?.nombre || '').toLowerCase();
+      const tel = (c.clientes?.whatsapp || '').toLowerCase();
+
+      if (num.includes(q) || cliNom.includes(q) || fNom.includes(q) || tel.includes(q)) {
+        res.push({
+          tipo: 'cotizacion',
+          id: c.id,
+          consecutivo: num,
+          clienteNombre: c.clientes ? `${c.clientes.nombre} ${c.clientes.apellido || ''}`.trim() : 'Sin cliente',
+          fincaNombre: c.fincas?.nombre || 'Finca Campestre',
+          fechas: `${formatFecha(c.fecha_inicio)} al ${formatFecha(c.fecha_fin)}`,
+          total: c.total || 0,
+        });
+      }
+    });
+
+    // Buscar en reservas
+    reservas.forEach(r => {
+      const num = formatearConsecutivoSimple(r.consecutivo);
+      const cliNom = r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.toLowerCase() : '';
+      const fNom = (r.fincas?.nombre || '').toLowerCase();
+      const tel = (r.clientes?.whatsapp || '').toLowerCase();
+
+      if (num.includes(q) || cliNom.includes(q) || fNom.includes(q) || tel.includes(q)) {
+        res.push({
+          tipo: 'reserva',
+          id: r.id,
+          consecutivo: num,
+          clienteNombre: r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim() : 'Sin cliente',
+          fincaNombre: r.fincas?.nombre || 'Finca Campestre',
+          fechas: `${formatFecha(r.fecha_inicio)} al ${formatFecha(r.fecha_fin)}`,
+          total: r.valor_total || 0,
+        });
+      }
+    });
+
+    return res.slice(0, 8);
+  }, [busquedaExpediente, cotizaciones, reservas]);
+
+  const cargarExpedienteSeleccionado = (item: { tipo: 'cotizacion' | 'reserva'; id: string; consecutivo: string }) => {
+    if (item.tipo === 'cotizacion') {
+      const c = cotizaciones.find(x => x.id === item.id);
+      if (c) {
+        setExpedienteTipo('cotizacion');
+        setCotizacionId(c.id);
+        setReservaId('');
+        setFaseFiltro('fase_1_cotizacion');
+        setTipoSeleccionado('cotizacion');
+        setSubTipoAccion('normal');
+        aplicarMensaje('cotizacion', 'normal', '', c.id, c.cliente_id || '');
+      }
+    } else {
+      const r = reservas.find(x => x.id === item.id);
+      if (r) {
+        setExpedienteTipo('reserva');
+        setReservaId(r.id);
+        if (r.cotizacion_id) setCotizacionId(r.cotizacion_id);
+        const saldo = calcularSaldo(r);
+        const sugerido: TipoComunicacion = saldo <= 0 ? 'paz_salvo' : 'estado_cuenta';
+        setFaseFiltro('fase_3_saldos');
+        setTipoSeleccionado(sugerido);
+        setSubTipoAccion('normal');
+        aplicarMensaje(sugerido, 'normal', r.id, r.cotizacion_id || '', r.cliente_id || '');
+      }
+    }
+    setBusquedaExpediente('');
+    setBusquedaAbierta(false);
+    showToast(`Expediente #${item.consecutivo} vinculado con éxito ✅`, 'success');
+  };
+
+  // ---------------------------------------------------------------------------
+  // Copiado de cuentas bancarias
+  // ---------------------------------------------------------------------------
+  const copiarCuentaDueno = async () => {
+    const fObj: any = fincaActual;
+    const texto = `${fObj?.banco_nombre || 'Bancolombia'} ${fObj?.banco_tipo_cuenta || 'Ahorros'} N° ${fObj?.banco_cuenta || ''} a nombre de ${fObj?.banco_titular || 'Propietario'}${fObj?.banco_identificacion ? ` (ID: ${fObj.banco_identificacion})` : ''}`.trim();
+    if (!fObj?.banco_cuenta) {
+      showToast('Esta finca aún no tiene configurada una cuenta bancaria del propietario', 'info');
+      return;
+    }
+    const ok = await copiarAlPortapapeles(texto);
+    if (ok) {
+      setCopiadoBancoDueno(true);
+      setTimeout(() => setCopiadoBancoDueno(false), 2000);
+      showToast('Cuenta bancaria del propietario copiada al portapapeles 📋', 'success');
+    }
+  };
+
+  const copiarCuentaAdmin = async () => {
+    const texto = `${configuracion?.banco_nombre || 'Bancolombia'} ${configuracion?.banco_tipo_cuenta || 'Ahorros'} N° ${configuracion?.banco_cuenta || ''} a nombre de ${configuracion?.banco_titular || 'Administración Paraíso Terrenal'}${configuracion?.nit ? ` (NIT: ${configuracion.nit})` : ''}`.trim();
+    if (!configuracion?.banco_cuenta) {
+      showToast('No se ha configurado la cuenta bancaria de la administración', 'info');
+      return;
+    }
+    const ok = await copiarAlPortapapeles(texto);
+    if (ok) {
+      setCopiadoBancoAdmin(true);
+      setTimeout(() => setCopiadoBancoAdmin(false), 2000);
+      showToast('Cuenta bancaria de Paraíso Terrenal copiada al portapapeles 📋', 'success');
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Generación y descarga de PDF
+  // ---------------------------------------------------------------------------
   const tieneDocumentoPdf = [
     'cotizacion', 'separacion', 'abono', 'estado_cuenta', 'paz_salvo', 'menu'
   ].includes(tipoSeleccionado);
 
-  const nombreDocumento =
-    tipoSeleccionado === 'cotizacion' ? 'Cotización Formal de Servicios (PDF)' :
-    tipoSeleccionado === 'separacion' ? 'Documento Oficial de Separación (PDF)' :
-    tipoSeleccionado === 'abono' ? 'Comprobante de Abono / Pago (PDF)' :
-    tipoSeleccionado === 'estado_cuenta' ? 'Estado de Cuenta Consolidado (PDF)' :
-    tipoSeleccionado === 'paz_salvo' ? 'Certificado de Paz y Salvo (PDF)' :
-    tipoSeleccionado === 'menu' ? 'Propuesta Gastronómica de Menú (PDF)' : '';
-
-  // -------------------------------------------------------------
-  // Ejecución y generación de PDF
-  // -------------------------------------------------------------
-  const ejecutarGeneracionYDescargaPdf = async (): Promise<{ blob: Blob; nombreArchivo: string } | null> => {
-    const r = reservas.find(x => x.id === reservaId) || reservas[0];
-    const c = cotizaciones.find(x => x.id === cotizacionId) || cotizaciones[0];
-
+  const ejecutarDescargaPdf = async (): Promise<boolean> => {
     try {
-      switch (tipoSeleccionado) {
-        case 'cotizacion':
-          if (c) {
-            const res = generarDocCotizacion(c, configuracion);
-            return { blob: res.blob, nombreArchivo: res.nombreArchivo };
-          }
-          break;
-        case 'separacion':
-          if (r) {
-            const res = generarDocSeparacion(r, configuracion);
-            return { blob: res.blob, nombreArchivo: res.nombreArchivo };
-          }
-          break;
-        case 'abono':
-          if (r) {
-            const p = r.pagos?.find(x => x.id === pagoId) || r.pagos?.[0] || {
-              id: 'pago-temp',
-              reserva_id: r.id,
-              tipo: 'abono',
-              fecha: new Date().toISOString().split('T')[0],
-              valor: r.separacion || 0,
-            } as Pago;
-            const res = generarComprobantePago(r, p, configuracion);
-            return { blob: res.blob, nombreArchivo: res.nombreArchivo };
-          }
-          break;
-        case 'estado_cuenta':
-          if (r) {
-            const res = generarEstadoCuenta(r, configuracion);
-            return { blob: res.blob, nombreArchivo: res.nombreArchivo };
-          }
-          break;
-        case 'paz_salvo':
-          if (r) {
-            if (calcularSaldo(r) > 0) {
-              showToast('El saldo debe ser $0 COP para emitir el Paz y Salvo', 'error');
-              return null;
-            }
-            const res = generarPazYSalvo(r, configuracion);
-            if (res) {
-              return { blob: res.blob, nombreArchivo: res.nombreArchivo };
-            }
-            return null;
-          }
-          break;
-        case 'menu': {
-          const m = (c && menus.find(x => x.id === c.menu_id)) || menus[0];
-          if (m) {
-            const res = await generarPropuestaAlimentacion({
-              menu: m,
-              cliente: c?.clientes,
-              finca: c?.fincas,
-              personas: c?.personas || 4,
-              cantidadServicios: c?.cantidad_alimentacion || 1,
-              config: configuracion,
-            });
-            if (res) {
-              return { blob: res.blob, nombreArchivo: res.nombreArchivo };
-            }
-            return null;
-          }
-          break;
+      if (tipoSeleccionado === 'cotizacion' && cotizacionActual) {
+        generarDocCotizacion(cotizacionActual, configuracion);
+        return true;
+      }
+      if (tipoSeleccionado === 'separacion' && reservaActual) {
+        generarDocSeparacion(reservaActual, configuracion);
+        return true;
+      }
+      if (tipoSeleccionado === 'abono' && reservaActual) {
+        const p = reservaActual.pagos?.find(x => x.id === pagoId) || reservaActual.pagos?.[0] || {
+          id: 'temp',
+          reserva_id: reservaActual.id,
+          tipo: 'abono',
+          fecha: new Date().toISOString().split('T')[0],
+          valor: reservaActual.separacion || 0,
+        } as Pago;
+        generarComprobantePago(reservaActual, p, configuracion);
+        return true;
+      }
+      if (tipoSeleccionado === 'estado_cuenta' && reservaActual) {
+        generarEstadoCuenta(reservaActual, configuracion);
+        return true;
+      }
+      if (tipoSeleccionado === 'paz_salvo' && reservaActual) {
+        if (calcularSaldo(reservaActual) > 0) {
+          showToast('El saldo debe ser $0 COP para emitir el Paz y Salvo', 'error');
+          return false;
+        }
+        generarPazYSalvo(reservaActual, configuracion);
+        return true;
+      }
+      if (tipoSeleccionado === 'menu') {
+        const m = (cotizacionActual && menus.find(x => x.id === cotizacionActual.menu_id)) || menus[0];
+        if (m) {
+          await generarPropuestaAlimentacion({
+            menu: m,
+            cliente: cotizacionActual?.clientes,
+            finca: cotizacionActual?.fincas,
+            personas: cotizacionActual?.personas || 4,
+            cantidadServicios: cotizacionActual?.cantidad_alimentacion || 1,
+            config: configuracion,
+          });
+          return true;
         }
       }
-      return null;
-    } catch (err: any) {
-      showToast(`Error al generar documento PDF: ${err.message}`, 'error');
-      return null;
+      return false;
+    } catch (e: any) {
+      showToast(`Error generando PDF: ${e.message}`, 'error');
+      return false;
     }
   };
 
-  const handleCopiar = async () => {
-    const ok = await copiarAlPortapapeles(mensajeTexto);
-    if (ok) {
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2000);
-      showToast('Mensaje copiado al portapapeles 📋', 'success');
-    }
-  };
-
-  // -------------------------------------------------------------
-  // Envío por WhatsApp con integración Storage
-  // -------------------------------------------------------------
-  const handleEnviar = async () => {
+  // ---------------------------------------------------------------------------
+  // Enviar mensaje a WhatsApp
+  // ---------------------------------------------------------------------------
+  const handleEnviarWhatsApp = async () => {
     const telLimpio = formatearTelefonoWhatsApp(telefonoInput);
-    if (!telLimpio) {
-      showToast('Ingresa un número de WhatsApp válido', 'error');
-      return;
-    }
-    if (!mensajeTexto.trim()) {
-      showToast('El contenido del mensaje no puede estar vacío', 'error');
+    if (!telLimpio || telLimpio.length < 10) {
+      showToast('Por favor introduce un número de WhatsApp válido (ej: 573176827093)', 'error');
       return;
     }
 
     setProcesando(true);
-    let textoFinalParaEnviar = mensajeTexto;
-
     try {
-      // 1. Si está activo descargar PDF y aplica, generarlo y subirlo a Storage
+      // 1. Si está activo descargar PDF, generarlo
       if (tieneDocumentoPdf && descargarPdf) {
-        showToast('Generando documento PDF y preparando enlace seguro…', 'info');
-        const resultadoPdf = await ejecutarGeneracionYDescargaPdf();
-        if (resultadoPdf) {
-          const enlacePublico = await subirDocumentoStorage(resultadoPdf.blob, resultadoPdf.nombreArchivo);
-          if (enlacePublico) {
-            if (textoFinalParaEnviar.includes('{{enlace_pdf}}')) {
-              textoFinalParaEnviar = textoFinalParaEnviar.replace(/\{\{enlace_pdf\}\}/gi, `📎 *Documento oficial adjunto (PDF):*\n${enlacePublico}`);
-            } else if (!textoFinalParaEnviar.includes(enlacePublico)) {
-              textoFinalParaEnviar += `\n\n📎 *Documento oficial adjunto (PDF):*\n${enlacePublico}`;
-            }
-            setMensajeTexto(textoFinalParaEnviar);
-          }
-        }
+        await ejecutarDescargaPdf();
       }
 
       // 2. Abrir WhatsApp
-      abrirWhatsApp(telLimpio, textoFinalParaEnviar);
+      abrirWhatsApp(telLimpio, mensajeTexto);
 
       // 3. Registrar en historial de auditoría
-      const r = reservas.find(x => x.id === reservaId);
-      const c = cotizaciones.find(x => x.id === cotizacionId);
       await onRegistrarComunicacion({
-        cliente_id: r?.cliente_id || c?.cliente_id || clienteId || null,
-        reserva_id: r?.id || null,
-        cotizacion_id: c?.id || null,
+        cliente_id: clienteActual?.id || clienteId || null,
+        reserva_id: reservaActual?.id || null,
+        cotizacion_id: cotizacionActual?.id || null,
         tipo: tipoSeleccionado,
-        destinatario: destinatarioNombre || 'Cliente',
+        destinatario: destinatarioNombre || clienteActual?.nombre || 'Cliente',
         telefono: telLimpio,
-        mensaje: textoFinalParaEnviar,
+        mensaje: mensajeTexto,
         estado: 'enviado',
       });
 
@@ -522,9 +801,28 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
     }
   };
 
-  // -------------------------------------------------------------
-  // Gestión de Plantillas Personalizadas en Supabase
-  // -------------------------------------------------------------
+  const handleCopiarMensaje = async () => {
+    const ok = await copiarAlPortapapeles(mensajeTexto);
+    if (ok) {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+      showToast('Texto del mensaje copiado al portapapeles 📋', 'success');
+    }
+  };
+
+  const insertarTokenEnMensaje = (token: string) => {
+    setMensajeTexto(prev => `${prev} {{${token}}}`);
+    showToast(`Etiqueta {{${token}}} agregada al mensaje`, 'info');
+  };
+
+  // ---------------------------------------------------------------------------
+  // Gestión de Plantillas en Supabase
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const custom = configuracion?.plantillas_comunicacion?.[plantillaSeleccionada];
+    setTextoEditorPlantilla(custom || PLANTILLAS_PREDETERMINADAS[plantillaSeleccionada] || '');
+  }, [plantillaSeleccionada, configuracion]);
+
   const handleGuardarPlantilla = async () => {
     if (!onGuardarConfiguracion) {
       showToast('No se dispone de permisos para guardar la configuración', 'error');
@@ -561,15 +859,10 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
     setGuardandoPlantilla(false);
 
     if (res.success) {
-      showToast(`Plantilla de ${plantillaSeleccionada} restablecida a la versión oficial predeterminada 🔄`, 'info');
+      showToast(`Plantilla de ${plantillaSeleccionada} restablecida a la predeterminada 🔄`, 'info');
     } else {
       showToast(`Error: ${res.error}`, 'error');
     }
-  };
-
-  const insertarEtiquetaEnEditor = (etiqueta: string) => {
-    setTextoEditorPlantilla(prev => `${prev} {{${etiqueta}}}`);
-    showToast(`Etiqueta {{${etiqueta}}} insertada`, 'info');
   };
 
   const handleGuardarWaGlobal = () => {
@@ -579,509 +872,891 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
       return;
     }
     onSaveWaNumber(cleanNum);
-    showToast('Número de WhatsApp global actualizado ✅', 'success');
+    showToast('Número de WhatsApp corporativo actualizado ✅', 'success');
   };
 
   const comunicacionesFiltradas = comunicaciones.filter(c =>
     filtroTipoHistorial === 'todos' || c.tipo === filtroTipoHistorial
   );
 
-  const reservaActual = reservas.find(x => x.id === reservaId);
-  const cotizacionActual = cotizaciones.find(x => x.id === cotizacionId);
-  const baseNum = consecutivoBaseActivo || (reservaActual?.consecutivo ? formatearConsecutivoSimple(reservaActual.consecutivo) : (cotizacionActual?.consecutivo ? formatearConsecutivoSimple(cotizacionActual.consecutivo) : '1001'));
-
   return (
-    <div className="panel">
-      {/* Encabezado */}
-      <div className="panel-header" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
+    <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      
+      {/* =====================================================================
+          1. HEADER DEL MÓDULO CON MICRO-NAVEGACIÓN
+          ===================================================================== */}
+      <div className="panel-header" style={{ flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
         <div>
-          <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#25d366' }}>
-            <MessageCircle size={20} />
-            <span>Comunicaciones, Consecutivos y WhatsApp</span>
+          <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#16a34a' }}>
+            <MessageCircle size={22} />
+            <span>Centro Inteligente de Comunicaciones & WhatsApp</span>
           </div>
           <div className="text-xs text-muted mt-1">
-            Sinergia completa con Cotizaciones y Reservas: gestión de consecutivos dinámicos, documentos PDF, almacenamiento y plantillas personalizadas.
+            Gestión centralizada con Cotizaciones y Reservas · Doble balance financiero transparente (Finca / Propietario vs Menús / Administración).
           </div>
         </div>
 
-        {/* Pestañas de navegación */}
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-          <button
-            className={`btn btn-sm${tabActiva === 'envio' ? ' btn-primary' : ''}`}
-            onClick={() => setTabActiva('envio')}
-            style={{ fontSize: '0.76rem', gap: '0.35rem' }}
-          >
-            <Send size={13} /> Enviar Mensaje
-          </button>
-          <button
-            className={`btn btn-sm${tabActiva === 'plantillas' ? ' btn-primary' : ''}`}
-            onClick={() => setTabActiva('plantillas')}
-            style={{ fontSize: '0.76rem', gap: '0.35rem' }}
-          >
-            <BookOpen size={13} /> Editor de Plantillas
-          </button>
-          <button
-            className={`btn btn-sm${tabActiva === 'historial' ? ' btn-primary' : ''}`}
-            onClick={() => setTabActiva('historial')}
-            style={{ fontSize: '0.76rem', gap: '0.35rem' }}
-          >
-            <Clock size={13} /> Historial ({comunicaciones.length})
-          </button>
-          <button
-            className={`btn btn-sm${tabActiva === 'config' ? ' btn-primary' : ''}`}
-            onClick={() => setTabActiva('config')}
-            style={{ fontSize: '0.76rem', gap: '0.35rem' }}
-          >
-            <Settings size={13} /> Configuración
-          </button>
+        {/* Pestañas animadas */}
+        <div style={{ display: 'flex', gap: '0.4rem', background: 'var(--surface-2)', padding: '0.25rem', borderRadius: '10px' }}>
+          {[
+            { id: 'envio', label: 'Centro de Envíos', icon: <Send size={13} /> },
+            { id: 'plantillas', label: 'Editor de Plantillas', icon: <BookOpen size={13} /> },
+            { id: 'historial', label: `Historial (${comunicaciones.length})`, icon: <Clock size={13} /> },
+            { id: 'config', label: 'Configuración', icon: <Settings size={13} /> },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setTabActiva(tab.id as TabComunicaciones)}
+              className={`btn btn-sm${tabActiva === tab.id ? ' btn-primary' : ''}`}
+              style={{
+                fontSize: '0.78rem',
+                gap: '0.35rem',
+                border: 'none',
+                background: tabActiva === tab.id ? 'var(--primary)' : 'transparent',
+                color: tabActiva === tab.id ? '#ffffff' : 'var(--text-muted)',
+                fontWeight: tabActiva === tab.id ? 600 : 500,
+                borderRadius: '8px',
+                padding: '0.35rem 0.75rem',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {tab.icon} {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* ========================================================
-          PESTAÑA 1: CENTRO DE ENVÍOS RÁPIDOS & CONSECUTIVOS
-          ======================================================== */}
+      {/* =====================================================================
+          PESTAÑA 1: CENTRO DE ENVÍOS INTELIGENTE
+          ===================================================================== */}
       {tabActiva === 'envio' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingTop: '0.5rem' }}>
-          
-          {/* BARRA SUPERIOR: LOOKUP RÁPIDO POR CONSECUTIVO */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+          {/* ─────────────────────────────────────────────────────────────
+              A. SMART EXPEDIENTE FINDER & BARRA DE MICROINFORMACIÓN
+              ───────────────────────────────────────────────────────────── */}
           <div
             style={{
-              background: 'linear-gradient(135deg, rgba(26, 107, 94, 0.08) 0%, rgba(37, 211, 102, 0.06) 100%)',
-              border: '1px solid rgba(26, 107, 94, 0.25)',
-              borderRadius: 'var(--rad-sm)',
-              padding: '0.85rem 1rem',
+              background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary) 7%, var(--surface)) 0%, color-mix(in srgb, var(--accent) 5%, var(--surface)) 100%)',
+              border: '1px solid color-mix(in srgb, var(--primary) 20%, transparent)',
+              borderRadius: '16px',
+              padding: '1.1rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.65rem',
+              gap: '1rem',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.84rem', color: 'var(--primary)' }}>
-                <Search size={16} />
-                <span>Cargar por N° Consecutivo de Cotización o Reserva:</span>
-              </div>
-              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+            {/* Fila de Búsqueda y Chips de Expedientes Recientes */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', position: 'relative', flex: 1, minWidth: '280px' }}>
+                <Search size={16} style={{ color: 'var(--primary)', position: 'absolute', left: '0.75rem' }} />
                 <input
                   type="text"
-                  placeholder="Ej: 1001 o COT-1001"
-                  value={inputBusquedaConsecutivo}
-                  onChange={e => setInputBusquedaConsecutivo(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') ejecutarBusquedaConsecutivo(); }}
+                  placeholder="Buscar por Consecutivo (#1001), Cliente, Finca o Teléfono…"
+                  value={busquedaExpediente}
+                  onChange={e => {
+                    setBusquedaExpediente(e.target.value);
+                    setBusquedaAbierta(true);
+                  }}
+                  onFocus={() => setBusquedaAbierta(true)}
                   style={{
-                    fontSize: '0.82rem',
-                    padding: '0.35rem 0.65rem',
-                    width: '160px',
-                    fontWeight: 600,
+                    paddingLeft: '2.3rem',
+                    fontSize: '0.84rem',
+                    borderRadius: '10px',
+                    width: '100%',
+                    fontWeight: 500,
+                    background: 'var(--surface)',
                   }}
                 />
-                <button
-                  type="button"
-                  className="btn btn-sm btn-primary"
-                  onClick={() => ejecutarBusquedaConsecutivo()}
-                  style={{ fontSize: '0.76rem', padding: '0.35rem 0.75rem' }}
+
+                {/* Dropdown flotante con resultados predictivos */}
+                <AnimatePresence>
+                  {busquedaAbierta && listaResultadosFinder.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -5 }}
+                      style={{
+                        position: 'absolute',
+                        top: '110%',
+                        left: 0,
+                        right: 0,
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '12px',
+                        boxShadow: '0 12px 30px rgba(0,0,0,0.15)',
+                        zIndex: 50,
+                        maxHeight: '260px',
+                        overflowY: 'auto',
+                        padding: '0.4rem',
+                      }}
+                    >
+                      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', padding: '0.35rem 0.6rem', textTransform: 'uppercase' }}>
+                        Expedientes Coincidentes:
+                      </div>
+                      {listaResultadosFinder.map(item => (
+                        <div
+                          key={`${item.tipo}-${item.id}`}
+                          onClick={() => cargarExpedienteSeleccionado(item)}
+                          style={{
+                            padding: '0.55rem 0.75rem',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '0.5rem',
+                            fontSize: '0.8rem',
+                            transition: 'background 0.15s ease',
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'color-mix(in srgb, var(--primary) 10%, transparent)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span
+                              style={{
+                                fontFamily: 'monospace',
+                                fontWeight: 700,
+                                fontSize: '0.74rem',
+                                padding: '0.15rem 0.45rem',
+                                borderRadius: '4px',
+                                background: item.tipo === 'reserva' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 88, 12, 0.15)',
+                                color: item.tipo === 'reserva' ? '#15803d' : '#c2410c',
+                              }}
+                            >
+                              #{item.consecutivo}
+                            </span>
+                            <strong>{item.clienteNombre}</strong>
+                            <span className="text-muted">· {item.fincaNombre}</span>
+                          </div>
+                          <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{formatCOP(item.total)}</span>
+                        </div>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Botón modo libre */}
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => {
+                  setExpedienteTipo(null);
+                  setCotizacionId('');
+                  setReservaId('');
+                  setTipoSeleccionado('personalizado');
+                  setFaseFiltro('fase_5_libre');
+                  aplicarMensaje('personalizado');
+                  showToast('Modo chat libre activado (sin vincular a expediente)', 'info');
+                }}
+                style={{ fontSize: '0.74rem', padding: '0.4rem 0.75rem', borderRadius: '8px' }}
+                title="Escribir mensaje libre sin vincular a ningún expediente"
+              >
+                💬 Modo Libre / Chat Rápido
+              </button>
+            </div>
+
+            {/* Chips de acceso directo a últimos expedientes */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.76rem' }}>
+              <span className="text-muted" style={{ fontWeight: 600 }}>Cargar reciente:</span>
+              {cotizaciones.slice(0, 3).map(c => {
+                const num = formatearConsecutivoSimple(c.consecutivo);
+                const activo = cotizacionId === c.id && expedienteTipo === 'cotizacion';
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => cargarExpedienteSeleccionado({ tipo: 'cotizacion', id: c.id, consecutivo: num })}
+                    style={{
+                      border: activo ? '1px solid var(--primary)' : '1px solid var(--border)',
+                      background: activo ? 'var(--primary)' : 'var(--surface)',
+                      color: activo ? '#ffffff' : 'var(--text)',
+                      borderRadius: '6px',
+                      padding: '0.2rem 0.55rem',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    COT #{num} ({c.clientes?.nombre || 'Cliente'})
+                  </button>
+                );
+              })}
+              {reservas.slice(0, 3).map(r => {
+                const num = formatearConsecutivoSimple(r.consecutivo);
+                const activo = reservaId === r.id && expedienteTipo === 'reserva';
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => cargarExpedienteSeleccionado({ tipo: 'reserva', id: r.id, consecutivo: num })}
+                    style={{
+                      border: activo ? '1px solid #16a34a' : '1px solid var(--border)',
+                      background: activo ? '#16a34a' : 'var(--surface)',
+                      color: activo ? '#ffffff' : 'var(--text)',
+                      borderRadius: '6px',
+                      padding: '0.2rem 0.55rem',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    RES #{num} ({r.clientes?.nombre || 'Cliente'})
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* ─────────────────────────────────────────────────────────
+                B. RADIOGRAFÍA FINANCIERA DOBLE (MICROINFORMACIÓN EN VIVO)
+                ───────────────────────────────────────────────────────── */}
+            {finanzasDoble ? (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(310px, 1fr))',
+                  gap: '0.85rem',
+                  paddingTop: '0.75rem',
+                  borderTop: '1px solid color-mix(in srgb, var(--primary) 15%, transparent)',
+                }}
+              >
+                {/* TARJETA 1: ALOJAMIENTO · PROPIETARIO DE LA FINCA */}
+                <div
+                  style={{
+                    background: 'var(--surface)',
+                    border: '1px solid rgba(22, 163, 74, 0.25)',
+                    borderRadius: '12px',
+                    padding: '0.85rem 1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.45rem',
+                    position: 'relative',
+                  }}
                 >
-                  Cargar
-                </button>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#15803d', fontWeight: 700, fontSize: '0.82rem' }}>
+                      <Home size={16} />
+                      <span>1. ALOJAMIENTO (PROPIETARIO DE LA FINCA)</span>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        padding: '0.15rem 0.45rem',
+                        borderRadius: '4px',
+                        background: 'rgba(22, 163, 74, 0.12)',
+                        color: '#15803d',
+                      }}
+                    >
+                      Paga al Dueño
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                    <span className="text-muted">Valor Finca:</span>
+                    <strong>{formatCOP(finanzasDoble.subtotalFinca)}</strong>
+                  </div>
+
+                  {finanzasDoble.esReserva ? (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
+                        <span className="text-muted">Abonado al Propietario:</span>
+                        <span style={{ color: '#16a34a', fontWeight: 600 }}>{formatCOP(finanzasDoble.pagadoFinca)}</span>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '0.85rem',
+                          padding: '0.35rem 0.55rem',
+                          borderRadius: '6px',
+                          background: finanzasDoble.saldoFincaCheckIn > 0 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(34, 197, 94, 0.1)',
+                          border: finanzasDoble.saldoFincaCheckIn > 0 ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(34, 197, 94, 0.3)',
+                        }}
+                      >
+                        <strong style={{ color: finanzasDoble.saldoFincaCheckIn > 0 ? '#b91c1c' : '#15803d' }}>
+                          Saldo Check-in (al Dueño):
+                        </strong>
+                        <strong style={{ color: finanzasDoble.saldoFincaCheckIn > 0 ? '#b91c1c' : '#15803d' }}>
+                          {formatCOP(finanzasDoble.saldoFincaCheckIn)}
+                        </strong>
+                      </div>
+                    </>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: '0.82rem',
+                        padding: '0.35rem 0.55rem',
+                        borderRadius: '6px',
+                        background: 'rgba(22, 163, 74, 0.08)',
+                        border: '1px solid rgba(22, 163, 74, 0.2)',
+                      }}
+                    >
+                      <span style={{ color: '#15803d', fontWeight: 600 }}>Anticipo Requerido (50% Finca):</span>
+                      <strong style={{ color: '#15803d' }}>{formatCOP(finanzasDoble.anticipoFinca50 || 0)}</strong>
+                    </div>
+                  )}
+
+                  {/* Datos bancarios del Propietario con botón de copiado */}
+                  <div
+                    style={{
+                      marginTop: '0.2rem',
+                      paddingTop: '0.4rem',
+                      borderTop: '1px dashed var(--border)',
+                      fontSize: '0.74rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span className="text-muted">Cuenta Dueño: </span>
+                      <strong>{(fincaActual as any)?.banco_cuenta ? `${(fincaActual as any)?.banco_nombre || 'Bancolombia'} (${(fincaActual as any)?.banco_cuenta})` : 'Sin cuenta registrada'}</strong>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={copiarCuentaDueno}
+                      className="btn btn-sm"
+                      style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem', gap: '0.25rem', flexShrink: 0 }}
+                      title="Copiar datos bancarios del propietario"
+                    >
+                      {copiadoBancoDueno ? <Check size={10} style={{ color: '#16a34a' }} /> : <Copy size={10} />}
+                      {copiadoBancoDueno ? 'Copiada' : 'Copiar'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* TARJETA 2: ALIMENTACIÓN · ADMINISTRACIÓN PARAÍSO TERRENAL */}
+                <div
+                  style={{
+                    background: 'var(--surface)',
+                    border: '1px solid rgba(194, 65, 12, 0.25)',
+                    borderRadius: '12px',
+                    padding: '0.85rem 1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.45rem',
+                    position: 'relative',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#c2410c', fontWeight: 700, fontSize: '0.82rem' }}>
+                      <Utensils size={16} />
+                      <span>2. MENÚS / ALIMENTACIÓN (PARAÍSO TERRENAL)</span>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        padding: '0.15rem 0.45rem',
+                        borderRadius: '4px',
+                        background: 'rgba(194, 65, 12, 0.12)',
+                        color: '#c2410c',
+                      }}
+                    >
+                      Paga a Paraíso
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                    <span className="text-muted">Valor Total Menú:</span>
+                    <strong>{formatCOP(finanzasDoble.costoAlimentacion)}</strong>
+                  </div>
+
+                  {finanzasDoble.esReserva ? (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
+                        <span className="text-muted">Abonado a Paraíso Terrenal:</span>
+                        <span style={{ color: '#ea580c', fontWeight: 600 }}>{formatCOP(finanzasDoble.pagadoAlimentacion)}</span>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '0.85rem',
+                          padding: '0.35rem 0.55rem',
+                          borderRadius: '6px',
+                          background: finanzasDoble.saldoAlimentacionAdmin > 0 ? 'rgba(234, 88, 12, 0.08)' : 'rgba(34, 197, 94, 0.1)',
+                          border: finanzasDoble.saldoAlimentacionAdmin > 0 ? '1px solid rgba(234, 88, 12, 0.25)' : '1px solid rgba(34, 197, 94, 0.3)',
+                        }}
+                      >
+                        <strong style={{ color: finanzasDoble.saldoAlimentacionAdmin > 0 ? '#c2410c' : '#15803d' }}>
+                          Saldo Menú (a Paraíso Terrenal):
+                        </strong>
+                        <strong style={{ color: finanzasDoble.saldoAlimentacionAdmin > 0 ? '#c2410c' : '#15803d' }}>
+                          {formatCOP(finanzasDoble.saldoAlimentacionAdmin)}
+                        </strong>
+                      </div>
+                    </>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: '0.82rem',
+                        padding: '0.35rem 0.55rem',
+                        borderRadius: '6px',
+                        background: 'rgba(194, 65, 12, 0.08)',
+                        border: '1px solid rgba(194, 65, 12, 0.2)',
+                      }}
+                    >
+                      <span style={{ color: '#c2410c', fontWeight: 600 }}>Cobro de Menú (Paraíso):</span>
+                      <strong style={{ color: '#c2410c' }}>{formatCOP(finanzasDoble.costoAlimentacion)}</strong>
+                    </div>
+                  )}
+
+                  {/* Datos bancarios de Paraíso Terrenal con botón de copiado */}
+                  <div
+                    style={{
+                      marginTop: '0.2rem',
+                      paddingTop: '0.4rem',
+                      borderTop: '1px dashed var(--border)',
+                      fontSize: '0.74rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span className="text-muted">Cuenta Paraíso: </span>
+                      <strong>{configuracion?.banco_cuenta ? `${configuracion.banco_nombre || 'Bancolombia'} (${configuracion.banco_cuenta})` : 'Por definir'}</strong>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={copiarCuentaAdmin}
+                      className="btn btn-sm"
+                      style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem', gap: '0.25rem', flexShrink: 0 }}
+                      title="Copiar datos bancarios de la administración Paraíso Terrenal"
+                    >
+                      {copiadoBancoAdmin ? <Check size={10} style={{ color: '#16a34a' }} /> : <Copy size={10} />}
+                      {copiadoBancoAdmin ? 'Copiada' : 'Copiar'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem' }}>
+                💡 Puedes buscar o seleccionar un expediente de Cotización o Reserva arriba para ver su desglose financiero doble.
+              </div>
+            )}
+          </div>
+
+          {/* ─────────────────────────────────────────────────────────────
+              C. ARQUITECTURA DE MENSAJES POR ETAPAS (CARDS INTERACTIVAS)
+              ───────────────────────────────────────────────────────────── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ fontSize: '0.84rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Sparkles size={16} style={{ color: '#16a34a' }} />
+                <span>Seleccionar Tipo Lógico de Mensaje para el Cliente:</span>
+              </div>
+
+              {/* Selector de fase comercial */}
+              <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'fase_1_cotizacion', label: '1. Cotización & Finca' },
+                  { id: 'fase_2_reserva', label: '2. Reserva & Abonos' },
+                  { id: 'fase_3_saldos', label: '3. Saldos & Paz y Salvo' },
+                  { id: 'fase_4_llegada', label: '4. Llegada & Bienvenida' },
+                  { id: 'fase_5_libre', label: '5. Libre' },
+                ].map(f => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setFaseFiltro(f.id as FaseMensaje)}
+                    className={`btn btn-sm${faseFiltro === f.id ? ' btn-primary' : ''}`}
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '6px',
+                      fontWeight: faseFiltro === f.id ? 700 : 500,
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Ficha de Consecutivo Activo y Selector Dinámico de Documentos */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '0.6rem',
-                paddingTop: '0.4rem',
-                borderTop: '1px solid rgba(26, 107, 94, 0.15)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', fontSize: '0.78rem' }}>
-                <span style={{ background: 'var(--primary)', color: '#fff', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 700 }}>
-                  N° Base: #{baseNum}
-                </span>
-                {destinatarioNombre && (
-                  <span><strong>Cliente:</strong> {destinatarioNombre}</span>
-                )}
-                {reservaActual && (
-                  <span><strong>Finca:</strong> {reservaActual.fincas?.nombre || 'Finca'}</span>
-                )}
-                {reservaActual && (
-                  <span><strong>Saldo:</strong> {formatCOP(calcularSaldo(reservaActual))}</span>
-                )}
-              </div>
+            {/* Grid animado de tarjetas de mensajes */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.65rem' }}>
+              {mensajesFiltrados.map(tarjeta => {
+                const esActivo =
+                  tipoSeleccionado === tarjeta.tipoReal &&
+                  ((tarjeta.id === 'pedir_abono' && subTipoAccion === 'pedir_abono') ||
+                   (tarjeta.id === 'cobrar_alimentacion' && subTipoAccion === 'cobrar_alimentacion') ||
+                   (tarjeta.id !== 'pedir_abono' && tarjeta.id !== 'cobrar_alimentacion' && subTipoAccion === 'normal'));
 
-              {/* Botones rápidos de Documentos con Prefijo Dinámico sobre el mismo Consecutivo */}
-              <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  className={`btn btn-sm${tipoSeleccionado === 'cotizacion' ? ' btn-primary' : ''}`}
-                  onClick={() => seleccionarTipoRapido('cotizacion')}
-                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
-                  title="Cotización oficial"
-                >
-                  COT-{baseNum}
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm${tipoSeleccionado === 'separacion' ? ' btn-primary' : ''}`}
-                  onClick={() => seleccionarTipoRapido('separacion')}
-                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
-                  title="Documento de separación"
-                >
-                  SEP-{baseNum}
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm${tipoSeleccionado === 'abono' ? ' btn-primary' : ''}`}
-                  onClick={() => seleccionarTipoRapido('abono')}
-                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
-                  title="Comprobante de abono"
-                >
-                  ABO-{baseNum}
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm${tipoSeleccionado === 'estado_cuenta' ? ' btn-primary' : ''}`}
-                  onClick={() => seleccionarTipoRapido('estado_cuenta')}
-                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
-                  title="Estado de cuenta consolidado"
-                >
-                  SAL-{baseNum}
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm${tipoSeleccionado === 'paz_salvo' ? ' btn-primary' : ''}`}
-                  onClick={() => seleccionarTipoRapido('paz_salvo')}
-                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
-                  title="Certificado de paz y salvo"
-                >
-                  PAZ-{baseNum}
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm${tipoSeleccionado === 'menu' ? ' btn-primary' : ''}`}
-                  onClick={() => seleccionarTipoRapido('menu')}
-                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
-                  title="Propuesta de menú gastronómico"
-                >
-                  MEN-{baseNum}
-                </button>
-              </div>
+                return (
+                  <motion.div
+                    key={tarjeta.id}
+                    whileHover={{ scale: 1.015 }}
+                    whileTap={{ scale: 0.985 }}
+                    onClick={() => handleSeleccionarMensajeCard(tarjeta)}
+                    style={{
+                      border: esActivo ? '2px solid var(--primary)' : '1px solid var(--border)',
+                      background: esActivo ? 'color-mix(in srgb, var(--primary) 7%, var(--surface))' : 'var(--surface)',
+                      borderRadius: '12px',
+                      padding: '0.75rem 0.9rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.35rem',
+                      boxShadow: esActivo ? '0 4px 14px color-mix(in srgb, var(--primary) 20%, transparent)' : 'none',
+                      transition: 'border 0.2s ease, box-shadow 0.2s ease',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700, fontSize: '0.82rem', color: esActivo ? 'var(--primary)' : 'var(--text)' }}>
+                        {tarjeta.icono}
+                        <span>{tarjeta.titulo}</span>
+                      </div>
+                      {tarjeta.destinatarioCobro === 'dueno' && (
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', background: 'rgba(34, 197, 94, 0.15)', color: '#15803d' }}>
+                          Dueño
+                        </span>
+                      )}
+                      {tarjeta.destinatarioCobro === 'admin' && (
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', background: 'rgba(234, 88, 12, 0.15)', color: '#c2410c' }}>
+                          Paraíso
+                        </span>
+                      )}
+                      {tarjeta.destinatarioCobro === 'info' && (
+                        <span style={{ fontSize: '0.65rem', fontWeight: 600, padding: '0.1rem 0.4rem', borderRadius: '4px', background: 'rgba(0,0,0,0.06)', color: 'var(--text-muted)' }}>
+                          Info
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-muted" style={{ fontSize: '0.72rem', lineHeight: '1.35' }}>
+                      {tarjeta.subtitulo}
+                    </div>
+                    {tarjeta.prefijoDoc && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.68rem', color: 'var(--primary)', fontWeight: 600, marginTop: '0.2rem' }}>
+                        <span>PDF:</span>
+                        <code>{formatearConsecutivoConPrefijo(consecutivoBase, tarjeta.prefijoDoc)}</code>
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
             </div>
           </div>
 
-          {/* CUERPO PRINCIPAL DEL FORMULARIO DE ENVÍO */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
-            {/* Columna Izquierda: Parámetros del Documento y Destinatario */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-              {/* 1. Selector de Plantilla */}
-              <div className="field">
-                <label style={{ fontWeight: 600, fontSize: '0.8rem' }}>1. Tipo de Comunicación / Documento</label>
-                <select
-                  value={tipoSeleccionado}
-                  onChange={e => handleTipoChange(e.target.value as TipoComunicacion)}
-                  style={{ fontSize: '0.85rem', fontWeight: 500 }}
-                >
-                  <option value="cotizacion">📄 Cotización Oficial ({formatearConsecutivoConPrefijo(baseNum, 'cotizacion')})</option>
-                  <option value="separacion">🎉 Documento de Separación ({formatearConsecutivoConPrefijo(baseNum, 'separacion')})</option>
-                  <option value="abono">💳 Comprobante de Abono / Pago ({formatearConsecutivoConPrefijo(baseNum, 'abono')})</option>
-                  <option value="estado_cuenta">📊 Estado de Cuenta ({formatearConsecutivoConPrefijo(baseNum, 'estado_cuenta')})</option>
-                  <option value="paz_salvo">🏅 Certificado de Paz y Salvo ({formatearConsecutivoConPrefijo(baseNum, 'paz_salvo')})</option>
-                  <option value="menu">🍽️ Propuesta de Menú ({formatearConsecutivoConPrefijo(baseNum, 'menu')})</option>
-                  <option value="recordatorio_pago">⏰ Recordatorio Amistoso de Saldo</option>
-                  <option value="bienvenida">👋 Bienvenida e Instrucciones de Llegada</option>
-                  <option value="personalizado">💬 Mensaje Personalizado Libre</option>
-                </select>
-              </div>
-
-              {/* 2. Selectores dependientes */}
-              {tipoSeleccionado === 'cotizacion' && (
-                <div className="field">
-                  <label style={{ fontSize: '0.78rem' }}>Seleccionar Cotización Registrada</label>
-                  <select
-                    value={cotizacionId}
-                    onChange={e => handleCotizacionChange(e.target.value)}
-                    style={{ fontSize: '0.82rem' }}
-                  >
-                    <option value="">— Seleccionar cotización —</option>
-                    {cotizaciones.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.consecutivo ? `[#${formatearConsecutivoSimple(c.consecutivo)}] ` : ''}{c.fincas?.nombre} · {c.clientes ? `${c.clientes.nombre} ${c.clientes.apellido || ''}` : 'Sin cliente'} · {formatCOP(c.total)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {['separacion', 'estado_cuenta', 'paz_salvo', 'recordatorio_pago', 'bienvenida'].includes(tipoSeleccionado) && (
-                <div className="field">
-                  <label style={{ fontSize: '0.78rem' }}>Seleccionar Reserva Registrada</label>
-                  <select
-                    value={reservaId}
-                    onChange={e => handleReservaChange(e.target.value)}
-                    style={{ fontSize: '0.82rem' }}
-                  >
-                    <option value="">— Seleccionar reserva registrada —</option>
-                    {reservas.map(r => (
-                      <option key={r.id} value={r.id}>
-                        {r.consecutivo ? `[#${formatearConsecutivoSimple(r.consecutivo)}] ` : ''}{r.fincas?.nombre} · {r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}` : 'Cliente'} ({formatFecha(r.fecha_inicio)})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {tipoSeleccionado === 'abono' && (
-                <>
-                  <div className="field">
-                    <label style={{ fontSize: '0.78rem' }}>Seleccionar Reserva</label>
-                    <select
-                      value={reservaId}
-                      onChange={e => handleReservaChange(e.target.value)}
+          {/* ─────────────────────────────────────────────────────────────
+              D. SIMULADOR INTERACTIVO TIPO WHATSAPP & EDITOR EN VIVO
+              ───────────────────────────────────────────────────────────── */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+              gap: '1.25rem',
+              alignItems: 'start',
+            }}
+          >
+            {/* COLUMNA 1: EDITOR DE PARÁMETROS Y TEXTO */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              
+              {/* Destinatario y Celular */}
+              <div style={{ background: 'var(--surface)', padding: '0.85rem', borderRadius: '12px', border: '1px solid var(--border)', display: 'grid', gap: '0.6rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                  <div className="field" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Destinatario:</label>
+                    <input
+                      type="text"
+                      value={destinatarioNombre}
+                      onChange={e => setDestinatarioNombre(e.target.value)}
+                      placeholder="Nombre del cliente"
                       style={{ fontSize: '0.82rem' }}
-                    >
-                      <option value="">— Seleccionar reserva —</option>
-                      {reservas.map(r => (
-                        <option key={r.id} value={r.id}>
-                          {r.consecutivo ? `[#${formatearConsecutivoSimple(r.consecutivo)}] ` : ''}{r.fincas?.nombre} · {r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}` : 'Cliente'}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
+                  <div className="field" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>WhatsApp (con indicativo):</label>
+                    <input
+                      type="tel"
+                      value={telefonoInput}
+                      onChange={e => setTelefonoInput(e.target.value)}
+                      placeholder="573176827093"
+                      style={{ fontSize: '0.82rem', fontWeight: 600 }}
+                    />
+                  </div>
+                </div>
 
-                  {reservaActual && (reservaActual.pagos || []).length > 0 && (
-                    <div className="field">
-                      <label style={{ fontSize: '0.78rem' }}>Seleccionar Pago a Certificar</label>
-                      <select
-                        value={pagoId}
-                        onChange={e => handlePagoChange(e.target.value)}
-                        style={{ fontSize: '0.82rem' }}
-                      >
-                        {(reservaActual.pagos || []).map(p => (
-                          <option key={p.id} value={p.id}>
-                            {p.tipo} · {formatFecha(p.fecha)} · {formatCOP(p.valor)}
-                          </option>
-                        ))}
-                      </select>
+                {/* Banner PDF adjunto */}
+                {tieneDocumentoPdf && (
+                  <div
+                    style={{
+                      background: 'rgba(22, 163, 74, 0.08)',
+                      border: '1px solid rgba(22, 163, 74, 0.25)',
+                      borderRadius: '8px',
+                      padding: '0.65rem 0.85rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem',
+                      fontSize: '0.76rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#15803d', fontWeight: 600 }}>
+                      <Download size={14} />
+                      <span>Documento Oficial ({formatearConsecutivoConPrefijo(consecutivoBase, tipoSeleccionado as TipoDocumentoPrefijo)})</span>
                     </div>
-                  )}
-                </>
-              )}
-
-              {tipoSeleccionado === 'menu' && (
-                <div className="field">
-                  <label style={{ fontSize: '0.78rem' }}>Cotización con menú asociado</label>
-                  <select
-                    value={cotizacionId}
-                    onChange={e => handleCotizacionChange(e.target.value)}
-                    style={{ fontSize: '0.82rem' }}
-                  >
-                    <option value="">— Seleccionar cotización —</option>
-                    {cotizaciones.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.consecutivo ? `[#${formatearConsecutivoSimple(c.consecutivo)}] ` : ''}{c.fincas?.nombre} · {c.alimentacion || 'Menú'} · {c.clientes?.nombre || 'Cliente'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {tipoSeleccionado === 'personalizado' && (
-                <div className="field">
-                  <label style={{ fontSize: '0.78rem' }}>Vincular a cliente registrado (opcional)</label>
-                  <select
-                    value={clienteId}
-                    onChange={e => handleClienteChange(e.target.value)}
-                    style={{ fontSize: '0.82rem' }}
-                  >
-                    <option value="">— Ninguno / Ingreso manual —</option>
-                    {clientes.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre} {c.apellido || ''} {c.whatsapp ? `(${c.whatsapp})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* 3. Datos del Destinatario */}
-              <div style={{ background: 'var(--surface-alt, #f7f9f8)', padding: '0.85rem', borderRadius: 'var(--rad-sm)', border: '1px solid var(--border)' }}>
-                <div className="field" style={{ marginBottom: '0.6rem' }}>
-                  <label style={{ fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <Users size={12} /> Nombre del Destinatario:
-                  </label>
-                  <input
-                    type="text"
-                    value={destinatarioNombre}
-                    onChange={e => setDestinatarioNombre(e.target.value)}
-                    placeholder="Ej. Juan Pérez"
-                    style={{ fontSize: '0.82rem' }}
-                  />
-                </div>
-
-                <div className="field" style={{ margin: 0 }}>
-                  <label style={{ fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <Phone size={12} /> WhatsApp (indicativo + celular):
-                  </label>
-                  <input
-                    type="tel"
-                    value={telefonoInput}
-                    onChange={e => setTelefonoInput(e.target.value)}
-                    placeholder="Ej. 573176827093"
-                    style={{ fontSize: '0.85rem', fontWeight: 600 }}
-                  />
-                </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <button
+                        type="button"
+                        onClick={ejecutarDescargaPdf}
+                        className="btn btn-sm"
+                        style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                      >
+                        <Download size={11} /> Descargar ahora
+                      </button>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', margin: 0 }}>
+                        <input
+                          type="checkbox"
+                          checked={descargarPdf}
+                          onChange={e => setDescargarPdf(e.target.checked)}
+                        />
+                        <span>Descargar al enviar</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* 4. Banner de Documento PDF */}
-              {tieneDocumentoPdf && (
-                <div
-                  style={{
-                    background: 'rgba(26, 107, 94, 0.08)',
-                    border: '1px solid rgba(26, 107, 94, 0.25)',
-                    padding: '0.75rem',
-                    borderRadius: 'var(--rad-sm)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.5rem',
-                    fontSize: '0.78rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: 'var(--primary)', fontWeight: 600 }}>
-                    <Download size={15} /> {nombreDocumento}
-                  </div>
-                  <div className="text-muted" style={{ fontSize: '0.74rem' }}>
-                    El PDF se generará con el código <strong>{formatearConsecutivoConPrefijo(baseNum, tipoSeleccionado as TipoDocumentoPrefijo)}</strong>, se guardará en tu equipo y se subirá automáticamente a la nube para adjuntar el enlace directo en WhatsApp.
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.2rem' }}>
+              {/* Editor del mensaje editable con inserción de tokens */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Edit3 size={13} style={{ color: 'var(--primary)' }} />
+                    <span>Contenido del mensaje (editable):</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.3rem' }}>
                     <button
                       type="button"
                       className="btn btn-sm"
-                      onClick={ejecutarGeneracionYDescargaPdf}
-                      style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
+                      onClick={() => aplicarMensaje(tipoSeleccionado, subTipoAccion)}
+                      title="Regenerar texto desde la plantilla oficial"
+                      style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem' }}
                     >
-                      <Download size={11} /> Descargar PDF ahora
+                      <RotateCcw size={11} /> Restablecer
                     </button>
-                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.74rem', margin: 0 }}>
-                      <input
-                        type="checkbox"
-                        checked={descargarPdf}
-                        onChange={e => setDescargarPdf(e.target.checked)}
-                      />
-                      <span>Generar y subir al enviar</span>
-                    </label>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={handleCopiarMensaje}
+                      style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem' }}
+                    >
+                      {copiado ? <><Check size={11} style={{ color: '#16a34a' }} /> Copiado</> : <><Copy size={11} /> Copiar</>}
+                    </button>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Columna Derecha: Vista previa y acción de envío */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label style={{ fontWeight: 600, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <MessageCircle size={14} style={{ color: '#25d366' }} /> Mensaje a enviar por WhatsApp (editable)
-                </label>
-                <div style={{ display: 'flex', gap: '0.35rem' }}>
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    onClick={() => actualizarPlantilla(tipoSeleccionado)}
-                    title="Regenerar texto con plantilla actual"
-                    style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
-                  >
-                    <RotateCcw size={11} /> Regenerar
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    onClick={handleCopiar}
-                    style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
-                  >
-                    {copiado ? <><Check size={11} style={{ color: 'var(--success)' }} /> Copiado</> : <><Copy size={11} /> Copiar</>}
-                  </button>
+                <textarea
+                  rows={14}
+                  value={mensajeTexto}
+                  onChange={e => setMensajeTexto(e.target.value)}
+                  placeholder="El mensaje redactado aparecerá aquí…"
+                  style={{
+                    fontSize: '0.82rem',
+                    lineHeight: '1.45',
+                    padding: '0.75rem',
+                    borderRadius: '10px',
+                    fontFamily: 'inherit',
+                    whiteSpace: 'pre-wrap',
+                    minHeight: '260px',
+                  }}
+                />
+
+                {/* Tokens rápidos */}
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    Insertar variables dinámicas con 1 clic:
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                    {[
+                      'cliente', 'finca', 'consecutivo', 'fechas', 'noches', 'personas',
+                      'saldo_finca', 'saldo_alimentacion', 'total', 'cuenta_dueno', 'cuenta_admin'
+                    ].map(tk => (
+                      <button
+                        key={tk}
+                        type="button"
+                        onClick={() => insertarTokenEnMensaje(tk)}
+                        style={{
+                          fontSize: '0.68rem',
+                          padding: '0.15rem 0.45rem',
+                          borderRadius: '4px',
+                          border: '1px solid var(--border)',
+                          background: 'var(--surface-2)',
+                          color: 'var(--text)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        + {`{{${tk}}}`}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <textarea
-                rows={16}
-                value={mensajeTexto}
-                onChange={e => setMensajeTexto(e.target.value)}
-                placeholder="Escribe o previsualiza aquí el mensaje que recibirá el cliente…"
+            {/* COLUMNA 2: PREVIEW INTERACTIVO TIPO WHATSAPP REAL */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#15803d' }}>
+                <Eye size={14} />
+                <span>Simulador en Tiempo Real (Vista del Huésped en WhatsApp):</span>
+              </div>
+
+              {/* Mockup de teléfono / chat */}
+              <div
                 style={{
-                  fontFamily: 'inherit',
-                  fontSize: '0.82rem',
-                  lineHeight: '1.45',
-                  padding: '0.85rem',
-                  borderRadius: 'var(--rad-sm)',
-                  whiteSpace: 'pre-wrap',
-                  flex: 1,
-                  minHeight: '280px',
+                  background: '#efeae2',
+                  borderRadius: '16px',
+                  border: '1px solid #d1d7db',
+                  overflow: 'hidden',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minHeight: '440px',
                 }}
-              />
-
-              <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.4rem' }}>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleEnviar}
-                  disabled={procesando || !telefonoInput.trim()}
+              >
+                {/* Header de WhatsApp */}
+                <div
                   style={{
-                    flex: 1,
-                    backgroundColor: '#25d366',
-                    borderColor: '#25d366',
+                    background: '#075e54',
                     color: '#ffffff',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    gap: '0.45rem',
-                    justifyContent: 'center',
-                    padding: '0.65rem 1rem',
+                    padding: '0.75rem 1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
                   }}
                 >
-                  <Send size={16} />
-                  {procesando
-                    ? 'Generando PDF y abriendo WhatsApp…'
-                    : (tieneDocumentoPdf && descargarPdf ? 'Descargar PDF y Enviar por WhatsApp' : 'Abrir chat de WhatsApp')}
-                </button>
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '50%',
+                      background: '#128c7e',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    PT
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {destinatarioNombre || 'Cliente Paraíso Terrenal'}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', opacity: 0.85 }}>
+                      {telefonoInput ? `+${telefonoInput}` : 'En línea'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contenedor del mensaje estilo WhatsApp */}
+                <div
+                  style={{
+                    padding: '1rem',
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'flex-start',
+                    backgroundImage: 'radial-gradient(rgba(0,0,0,0.04) 1px, transparent 0)',
+                    backgroundSize: '16px 16px',
+                  }}
+                >
+                  <div
+                    style={{
+                      alignSelf: 'flex-start',
+                      maxWidth: '92%',
+                      background: '#ffffff',
+                      borderRadius: '8px 8px 8px 0px',
+                      padding: '0.75rem 0.95rem',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                      fontSize: '0.8rem',
+                      lineHeight: '1.45',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      color: '#111b21',
+                    }}
+                  >
+                    {mensajeTexto || 'El mensaje redactado aparecerá aquí en tiempo real…'}
+                    <div style={{ textAlign: 'right', fontSize: '0.65rem', color: '#667781', marginTop: '0.35rem' }}>
+                      {new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })} ✓✓
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botón Gigante de Envío */}
+                <div style={{ padding: '0.85rem', background: '#f0f2f5', borderTop: '1px solid #d1d7db' }}>
+                  <button
+                    type="button"
+                    onClick={handleEnviarWhatsApp}
+                    disabled={procesando || !telefonoInput.trim()}
+                    style={{
+                      width: '100%',
+                      background: '#25d366',
+                      borderColor: '#25d366',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                      fontSize: '0.9rem',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 14px rgba(37, 211, 102, 0.4)',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <Send size={18} />
+                    {procesando ? 'Procesando y abriendo WhatsApp…' : 'Abrir chat de WhatsApp Oficial'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ========================================================
+      {/* =====================================================================
           PESTAÑA 2: EDITOR DE PLANTILLAS EN SUPABASE
-          ======================================================== */}
+          ===================================================================== */}
       {tabActiva === 'plantillas' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingTop: '0.5rem' }}>
-          <div
-            style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--rad-sm)',
-              padding: '1rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem',
-            }}
-          >
-            {/* Selector de plantilla a editar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <BookOpen size={16} style={{ color: 'var(--primary)' }} />
-                <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>Seleccionar Plantilla a Personalizar:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.88rem' }}>
+                <BookOpen size={18} style={{ color: 'var(--primary)' }} />
+                <span>Personalizar Plantilla Oficial en Supabase:</span>
               </div>
               <select
                 value={plantillaSeleccionada}
                 onChange={e => setPlantillaSeleccionada(e.target.value)}
-                style={{ fontSize: '0.82rem', padding: '0.3rem 0.6rem', minWidth: '240px' }}
+                style={{ fontSize: '0.82rem', padding: '0.35rem 0.75rem', minWidth: '240px' }}
               >
                 <option value="cotizacion">📄 Cotización Oficial</option>
-                <option value="solicitud_cliente_publica">🌐 Solicitud Web de Cotización (Cliente → WhatsApp)</option>
                 <option value="separacion">🎉 Documento de Separación</option>
                 <option value="abono">💳 Comprobante de Abono / Pago</option>
-                <option value="estado_cuenta">📊 Estado de Cuenta Consolidado</option>
+                <option value="estado_cuenta">📊 Estado de Cuenta (Doble Balance)</option>
                 <option value="paz_salvo">🏅 Certificado de Paz y Salvo</option>
                 <option value="menu">🍽️ Propuesta de Menú / Alimentación</option>
                 <option value="recordatorio_pago">⏰ Recordatorio Amistoso de Saldo</option>
@@ -1089,64 +1764,6 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
               </select>
             </div>
 
-            {/* Estado actual de la plantilla */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem' }}>
-              <span className="text-muted">Estado actual:</span>
-              {configuracion?.plantillas_comunicacion?.[plantillaSeleccionada] ? (
-                <span className="status-badge s-avail" style={{ fontSize: '0.7rem' }}>
-                  ✓ Plantilla personalizada activa en Supabase
-                </span>
-              ) : (
-                <span className="status-badge" style={{ fontSize: '0.7rem', background: 'rgba(0,0,0,0.06)' }}>
-                  Predeterminada del sistema
-                </span>
-              )}
-            </div>
-
-            {/* Inserción rápida de etiquetas / tokens */}
-            <div>
-              <div style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <Tag size={12} /> Haz clic en cualquier etiqueta para insertarla en el texto del mensaje:
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                {[
-                  { tag: 'cliente', desc: 'Nombre del cliente' },
-                  { tag: 'celular', desc: 'Celular del cliente' },
-                  { tag: 'finca', desc: 'Nombre de la finca' },
-                  { tag: 'consecutivo', desc: 'N° consecutivo' },
-                  { tag: 'consecutivo_linea', desc: 'Línea de consecutivo formateada' },
-                  { tag: 'whatsapp_linea', desc: 'Línea con WhatsApp secundario' },
-                  { tag: 'fechas', desc: 'Rango de fechas' },
-                  { tag: 'fecha_inicio', desc: 'Día de llegada' },
-                  { tag: 'fecha_fin', desc: 'Día de salida' },
-                  { tag: 'fecha_llegada', desc: 'Día de llegada' },
-                  { tag: 'fecha_salida', desc: 'Día de salida' },
-                  { tag: 'noches', desc: 'Noches de estancia' },
-                  { tag: 'noches_plural', desc: 's o vacío' },
-                  { tag: 'personas', desc: 'N° comensales / huéspedes' },
-                  { tag: 'alimentacion_detalle', desc: 'Detalle de menús seleccionados' },
-                  { tag: 'alojamiento_total', desc: 'Subtotal alojamiento' },
-                  { tag: 'total', desc: 'Valor total' },
-                  { tag: 'anticipo', desc: 'Valor anticipo / separación' },
-                  { tag: 'saldo', desc: 'Saldo pendiente' },
-                  { tag: 'pago_valor', desc: 'Monto del pago' },
-                  { tag: 'enlace_pdf', desc: 'Enlace público del PDF' },
-                ].map(item => (
-                  <button
-                    key={item.tag}
-                    type="button"
-                    className="btn btn-sm"
-                    onClick={() => insertarEtiquetaEnEditor(item.tag)}
-                    style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', background: 'rgba(26, 107, 94, 0.06)', borderColor: 'rgba(26, 107, 94, 0.2)' }}
-                    title={item.desc}
-                  >
-                    + {`{{${item.tag}}}`}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Textarea de edición */}
             <div className="field">
               <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Cuerpo de la Plantilla:</label>
               <textarea
@@ -1158,12 +1775,11 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
                   fontSize: '0.82rem',
                   lineHeight: '1.45',
                   padding: '0.75rem',
-                  borderRadius: 'var(--rad-sm)',
+                  borderRadius: '8px',
                 }}
               />
             </div>
 
-            {/* Acciones de guardado */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
               <button
                 type="button"
@@ -1178,22 +1794,10 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
                   type="button"
-                  className="btn btn-sm"
-                  onClick={() => {
-                    setTipoSeleccionado(plantillaSeleccionada as TipoComunicacion);
-                    setTabActiva('envio');
-                    actualizarPlantilla(plantillaSeleccionada as TipoComunicacion);
-                  }}
-                  style={{ fontSize: '0.76rem' }}
-                >
-                  <Send size={12} /> Usar en Enviar Mensaje
-                </button>
-                <button
-                  type="button"
                   className="btn btn-sm btn-primary"
                   onClick={handleGuardarPlantilla}
                   disabled={guardandoPlantilla}
-                  style={{ fontSize: '0.76rem', gap: '0.35rem' }}
+                  style={{ fontSize: '0.78rem', gap: '0.35rem' }}
                 >
                   <Save size={13} /> {guardandoPlantilla ? 'Guardando en Supabase…' : 'Guardar en Supabase'}
                 </button>
@@ -1203,11 +1807,11 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
         </div>
       )}
 
-      {/* ========================================================
+      {/* =====================================================================
           PESTAÑA 3: HISTORIAL DE COMUNICACIONES
-          ======================================================== */}
+          ===================================================================== */}
       {tabActiva === 'historial' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', paddingTop: '0.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
               {['todos', 'cotizacion', 'separacion', 'abono', 'estado_cuenta', 'paz_salvo', 'menu', 'recordatorio_pago'].map(t => (
@@ -1227,7 +1831,6 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
                 className="btn btn-sm btn-danger"
                 onClick={onLimpiarHistorial}
                 style={{ fontSize: '0.72rem' }}
-                title="Limpiar registro de auditoría local"
               >
                 <Trash2 size={12} /> Limpiar registro
               </button>
@@ -1236,13 +1839,12 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
 
           <div className="avail-table">
             {comunicacionesFiltradas.length === 0 ? (
-              <p className="text-muted text-sm" style={{ textAlign: 'center', padding: '2rem' }}>
+              <p className="text-muted text-sm" style={{ textAlign: 'center', padding: '2.5rem' }}>
                 No hay comunicaciones registradas aún.
               </p>
             ) : (
               comunicacionesFiltradas.map(c => {
                 const fechaStr = c.created_at ? new Date(c.created_at).toLocaleString('es-CO') : '—';
-
                 return (
                   <div key={c.id} className="avail-row" style={{ alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.6rem' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -1251,37 +1853,33 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
                           {c.tipo}
                         </span>
                         <strong style={{ fontSize: '0.85rem' }}>{c.destinatario}</strong>
-                        <span style={{ fontSize: '0.76rem', color: '#25d366', fontWeight: 500 }}>
+                        <span style={{ fontSize: '0.76rem', color: '#16a34a', fontWeight: 600 }}>
                           +{c.telefono}
                         </span>
                         <span className="text-xs text-muted" style={{ marginLeft: 'auto' }}>
                           {fechaStr}
                         </span>
                       </div>
-
                       <div
                         style={{
                           fontSize: '0.78rem',
                           color: 'var(--text-muted)',
                           marginTop: '0.35rem',
-                          background: 'var(--surface-alt, #fafafa)',
+                          background: 'var(--surface-2)',
                           padding: '0.45rem 0.65rem',
-                          borderRadius: 'var(--rad-xs)',
+                          borderRadius: '6px',
                           maxHeight: '70px',
                           overflowY: 'hidden',
-                          textOverflow: 'ellipsis',
                           whiteSpace: 'pre-line',
                         }}
                       >
                         {c.mensaje}
                       </div>
                     </div>
-
                     <div style={{ display: 'flex', gap: '0.35rem' }}>
                       <button
                         className="btn btn-sm"
-                        style={{ fontSize: '0.72rem', gap: '0.3rem', color: '#25d366', borderColor: '#25d366' }}
-                        title="Reenviar este mensaje por WhatsApp"
+                        style={{ fontSize: '0.72rem', gap: '0.3rem', color: '#16a34a', borderColor: '#16a34a' }}
                         onClick={() => abrirWhatsApp(c.telefono, c.mensaje)}
                       >
                         <MessageCircle size={12} /> Reenviar
@@ -1289,7 +1887,6 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
                       <button
                         className="btn btn-sm"
                         style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
-                        title="Copiar mensaje"
                         onClick={() => copiarAlPortapapeles(c.mensaje)}
                       >
                         <Copy size={12} />
@@ -1303,14 +1900,14 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
         </div>
       )}
 
-      {/* ========================================================
-          PESTAÑA 4: CONFIGURACIÓN DE WHATSAPP GLOBAL
-          ======================================================== */}
+      {/* =====================================================================
+          PESTAÑA 4: CONFIGURACIÓN CORPORATIVA
+          ===================================================================== */}
       {tabActiva === 'config' && (
-        <div style={{ maxWidth: '540px', display: 'flex', flexDirection: 'column', gap: '1rem', paddingTop: '0.5rem' }}>
+        <div style={{ maxWidth: '560px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div className="wa-config-row">
             <div className="field" style={{ flex: 1 }}>
-              <label>Número WhatsApp de Contacto Principal (Predeterminado)</label>
+              <label>Número WhatsApp Corporativo (Predeterminado)</label>
               <input
                 type="tel"
                 placeholder="573176827093"
@@ -1324,15 +1921,15 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
           </div>
 
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <CheckCircle size={14} /> Número activo actual: +{currentWaNumber}
+            <CheckCircle size={14} /> Número corporativo activo: +{currentWaNumber}
           </div>
 
-          <div style={{ background: 'var(--surface-alt, #fafafa)', padding: '0.85rem', borderRadius: 'var(--rad-sm)', border: '1px solid var(--border)', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            <strong>Reglas de envío y consecutivos:</strong>
-            <ul style={{ margin: '0.4rem 0 0 1rem', padding: 0, lineHeight: '1.5' }}>
-              <li>El número secuencial inicial lo otorga la cotización (ej: <code>1001</code>).</li>
-              <li>A partir de ahí, todos los documentos vinculados (Separación, Abono, Estado de Cuenta, Paz y Salvo, Menú) conservan exactamente el mismo número base, modificando dinámicamente el prefijo (<code>COT-1001</code>, <code>SEP-1001</code>, <code>ABO-1001</code>, etc.).</li>
-              <li>Al hacer clic en "Descargar PDF y Enviar por WhatsApp", el documento se compila en tu equipo y se genera un enlace público directo que se inserta en el chat.</li>
+          <div style={{ background: 'var(--surface-2)', padding: '0.85rem', borderRadius: '10px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            <strong>Reglas del Doble Balance Financiero:</strong>
+            <ul style={{ margin: '0.4rem 0 0 1rem', padding: 0, lineHeight: '1.6' }}>
+              <li><strong>Finca / Alojamiento:</strong> El abono de separación (50%) y el saldo en el check-in se liquidan directamente con el <em>Propietario de la finca</em>.</li>
+              <li><strong>Alimentación / Menús:</strong> El valor total de los menús se liquida en la cuenta bancaria de la <em>Administración de Paraíso Terrenal</em> para suministro de insumos y chefs.</li>
+              <li><strong>Consecutivo Único:</strong> Se conserva el mismo número de seguimiento (ej: <code>#1001</code>) adaptando el prefijo del documento emitido (<code>COT-1001</code>, <code>SEP-1001</code>, <code>ABO-1001</code>, <code>SAL-1001</code>, <code>PAZ-1001</code>).</li>
             </ul>
           </div>
         </div>

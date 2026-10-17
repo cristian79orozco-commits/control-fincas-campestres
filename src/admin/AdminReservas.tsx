@@ -138,6 +138,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
   onCerrarReserva,
   onReabrirReserva,
 }) => {
+  const { abrirComunicacionesConExpediente } = useApp();
   const [form, setForm] = useState<Partial<Reserva>>(FORM_VACIO);
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -1135,7 +1136,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                     <button
                       className="btn btn-sm"
                       style={{ color: '#25d366', borderColor: '#25d366' }}
-                      title="Enviar mensaje de WhatsApp al cliente"
+                      title="Enviar mensaje rápido de WhatsApp al cliente"
                       onClick={() => {
                         if (saldo > 0) {
                           setModalWaReserva({
@@ -1157,6 +1158,24 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                       }}
                     >
                       <MessageCircle size={13} />
+                    </button>
+
+                    {/* 3.1 Abrir en Centro de Comunicaciones Completo */}
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{
+                        fontSize: '0.72rem',
+                        gap: '0.25rem',
+                        padding: '0.3rem 0.55rem',
+                        color: '#15803d',
+                        background: 'rgba(34, 197, 94, 0.08)',
+                        borderColor: 'rgba(34, 197, 94, 0.3)',
+                      }}
+                      title="Abrir esta reserva en el Centro Inteligente de Comunicaciones"
+                      onClick={() => abrirComunicacionesConExpediente('reserva', r.id)}
+                    >
+                      <MessageCircle size={12} /> Chat
                     </button>
 
                     {/* 4. Expediente Histórico */}

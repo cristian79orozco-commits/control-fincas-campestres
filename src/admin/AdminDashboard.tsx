@@ -163,7 +163,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   showToast,
   openConfirm,
 }) => {
-  const { adminActiveSection, setAdminActiveSection, navegarACliente } = useApp();
+  const { adminActiveSection, setAdminActiveSection, navegarACliente, expedienteComunicaciones, setExpedienteComunicaciones } = useApp();
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
@@ -831,6 +831,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               configuracion={configuracion}
               onGuardarConfiguracion={onGuardarConfiguracion}
               showToast={showToast}
+              expedienteInicial={expedienteComunicaciones}
+              onExpedienteInicialCargado={() => setExpedienteComunicaciones(null)}
             />
           )}
 

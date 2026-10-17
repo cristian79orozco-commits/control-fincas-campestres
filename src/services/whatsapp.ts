@@ -16,7 +16,7 @@
  */
 
 import type { Reserva, Pago, CotizacionDB, Cliente, Finca, TipoComunicacion } from '../types';
-import { calcularSaldo } from '../types';
+import { calcularSaldo, desglosarFinanzasReserva } from '../types';
 import {
   generarDocSeparacion,
   generarComprobantePago,
@@ -390,44 +390,72 @@ ${pago.observacion ? `• Observación / Ref: ${pago.observacion}\n` : ''}
 }
 
 /**
- * 4. Plantilla: Estado de Cuenta
+ * 4. Plantilla: Estado de Cuenta con Doble Balance Transparente
+ * Separa lo correspondiente al Propietario de la finca (Alojamiento / Check-in)
+ * de lo correspondiente a la Administración de Paraíso Terrenal (Alimentación).
  */
 export function plantillaEstadoCuenta(reserva: Reserva, enlacePdf?: string): string {
   const clienteNombre = reserva.clientes ? `${reserva.clientes.nombre} ${reserva.clientes.apellido || ''}`.trim() : 'Estimado/a cliente';
   const fincaNombre = reserva.fincas?.nombre || 'Finca Campestre';
-  const saldo = calcularSaldo(reserva);
-  const totalPagado = reserva.valor_total - saldo;
-  const pagos = reserva.pagos || [];
   const consecPrefijado = formatearConsecutivoConPrefijo(reserva.consecutivo, 'estado_cuenta');
 
+  const {
+    subtotalAlojamiento,
+    pagadoFinca,
+    saldoFincaCheckIn,
+    costoAlimentacion,
+    pagadoAlimentacion,
+    saldoAlimentacionAdmin,
+    totalConsolidado,
+    totalRecaudado,
+    saldoConsolidado,
+  } = desglosarFinanzasReserva(reserva);
+
+  const pagos = reserva.pagos || [];
   let historialTexto = '';
   if (pagos.length > 0) {
     historialTexto = pagos.map((p, idx) =>
-      `  ${idx + 1}. ${formatFecha(p.fecha)} | ${p.tipo.toUpperCase()}: ${formatCOP(p.valor)}`
+      `  ${idx + 1}. ${formatFecha(p.fecha)} | ${p.tipo.toUpperCase()}: ${formatCOP(p.valor)}${p.observacion ? ` (${p.observacion})` : ''}`
     ).join('\n');
   } else {
-    historialTexto = '  (Sin abonos registrados aún)';
+    historialTexto = `  • Anticipo inicial de separación registrado: ${formatCOP(reserva.separacion || 0)}`;
   }
 
-  let msg = `📊 *ESTADO DE CUENTA DE RESERVA*
+  let msg = `📊 *ESTADO DE CUENTA CONSOLIDADO*
 *Paraíso Terrenal*
 
-Hola, *${clienteNombre}* 📋 Te compartimos el balance financiero detallado de tu reserva:
+Hola, *${clienteNombre}* 📋 Te compartimos el balance financiero detallado y transparente de tu reserva:
 
 📍 *Finca:* ${fincaNombre}
 🆔 *Estado de Cuenta N°:* ${consecPrefijado}
 📅 *Estancia:* ${formatFecha(reserva.fecha_inicio)} al ${formatFecha(reserva.fecha_fin)}
 
-💳 *HISTORIAL DE ABONOS REGISTRADOS:*
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏡 *1. ALOJAMIENTO · PROPIETARIO DE LA FINCA*
+• Valor Total Finca: ${formatCOP(subtotalAlojamiento)}
+• Anticipo / Pagado al Propietario: ${formatCOP(pagadoFinca)}
+• *SALDO PENDIENTE CHECK-IN:* *${formatCOP(saldoFincaCheckIn)}* ${saldoFincaCheckIn <= 0 ? '🟢 (Al día)' : '⚠️ (Se liquida al ingresar a la finca)'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+  if (costoAlimentacion > 0) {
+    msg += `\n🍽️ *2. ALIMENTACIÓN · ADMINISTRACIÓN PARAÍSO TERRENAL*
+• Servicio de Menús: ${formatCOP(costoAlimentacion)} (${reserva.alimentacion || 'Menú seleccionado'})
+• Abonos a la Administración: ${formatCOP(pagadoAlimentacion)}
+• *SALDO PENDIENTE ALIMENTACIÓN:* *${formatCOP(saldoAlimentacionAdmin)}* ${saldoAlimentacionAdmin <= 0 ? '🟢 (Pagado a Paraíso Terrenal)' : '⚠️ (Pendiente de transferencia)'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  }
+
+  msg += `\n💳 *HISTORIAL DE MOVIMIENTOS REGISTRADOS:*
 ${historialTexto}
 
-━━━━━━━━━━━━━━━━━━━━
-• Valor Total Reserva: ${formatCOP(reserva.valor_total)}
-• Total Pagado a la Fecha: ${formatCOP(totalPagado)}
-• *SALDO PENDIENTE:* *${formatCOP(saldo)}* ${saldo <= 0 ? '🟢 (PAZ Y SALVO)' : '⚠️'}
-━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💰 *RESUMEN TOTAL DE LA ESTADÍA:*
+• Total de la Experiencia: ${formatCOP(totalConsolidado)}
+• Total Abonado a la Fecha: ${formatCOP(totalRecaudado)}
+• *SALDO TOTAL RESTANTE:* *${formatCOP(saldoConsolidado)}* ${saldoConsolidado <= 0 ? '🟢 (PAZ Y SALVO TOTAL)' : '⚠️'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📄 Hemos generado el Estado de Cuenta consolidado en PDF con la relación detallada de todos los movimientos.`;
+📄 Hemos adjuntado tu Estado de Cuenta formal en formato PDF emitido por el sistema.`;
 
   if (enlacePdf) {
     msg += `\n\n📎 *Descarga tu Estado de Cuenta en PDF aquí:*\n${enlacePdf}`;
@@ -511,18 +539,32 @@ ${datos.menu.condiciones ? `📌 *Condiciones:* ${datos.menu.condiciones}\n` : '
 export function plantillaRecordatorioPago(reserva: Reserva): string {
   const clienteNombre = reserva.clientes ? `${reserva.clientes.nombre} ${reserva.clientes.apellido || ''}`.trim() : 'Estimado/a cliente';
   const fincaNombre = reserva.fincas?.nombre || 'Finca Campestre';
-  const saldo = calcularSaldo(reserva);
+  const { saldoFincaCheckIn, saldoAlimentacionAdmin, saldoConsolidado } = desglosarFinanzasReserva(reserva);
 
-  return `⏰ *RECORDATORIO AMISTOSO DE SALDO*
+  let desglose = '';
+  if (saldoFincaCheckIn > 0 && saldoAlimentacionAdmin > 0) {
+    desglose = `\n• *Saldo Finca (a liquidar en el check-in al dueño/anfitrión):* ${formatCOP(saldoFincaCheckIn)}
+• *Saldo Alimentación (transferencia a Paraíso Terrenal):* ${formatCOP(saldoAlimentacionAdmin)}`;
+  } else if (saldoFincaCheckIn > 0) {
+    desglose = `\n• *Saldo Alojamiento (al ingresar a la finca):* ${formatCOP(saldoFincaCheckIn)}`;
+  } else if (saldoAlimentacionAdmin > 0) {
+    desglose = `\n• *Saldo Alimentación (transferencia a Paraíso Terrenal):* ${formatCOP(saldoAlimentacionAdmin)}`;
+  }
+
+  return `⏰ *RECORDATORIO AMISTOSO DE SALDO PREVIO AL CHECK-IN*
 *Paraíso Terrenal*
 
 Hola, *${clienteNombre}* 👋 Esperamos que te encuentres muy bien.
 
-Te recordamos que se acerca la fecha de tu estadía en *${fincaNombre}*${reserva.consecutivo ? ` (Reserva N° ${reserva.consecutivo})` : ''} (Llegada: ${formatFecha(reserva.fecha_inicio)}).
+Te recordamos que se acerca la fecha de tu estadía en *${fincaNombre}*${reserva.consecutivo ? ` (Reserva N° ${reserva.consecutivo})` : ''}.
+📅 *Llegada programada:* ${formatFecha(reserva.fecha_inicio)}
 
-📌 Tu saldo pendiente por liquidar es de *${formatCOP(saldo)}*.
+📌 *Detalle de saldos pendientes por liquidar:*${desglose}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💰 *SALDO TOTAL PENDIENTE:* *${formatCOP(saldoConsolidado)}*
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Por favor compártenos el comprobante una vez realices la consignación o transferencia para emitir tu Paz y Salvo oficial. ¡Muchas gracias! 🌿🏡`;
+Agradecemos que nos compartas el soporte de la transferencia de alimentación para asegurar tus insumos, y recuerda tener presente el saldo de la finca al momento de tu llegada. ¡Te esperamos para una experiencia campestre única! 🌿🏡`;
 }
 
 /**
@@ -828,8 +870,9 @@ export function obtenerTokensParaMensaje(params: {
   pago?: Pago;
   consecutivoBase?: string | number;
   enlacePdf?: string;
+  configuracion?: any;
 }): Record<string, string> {
-  const { tipo, cotizacion, reserva, cliente, finca, pago, consecutivoBase, enlacePdf } = params;
+  const { tipo, cotizacion, reserva, cliente, finca, pago, consecutivoBase, enlacePdf, configuracion } = params;
   const numBase = consecutivoBase || reserva?.consecutivo || cotizacion?.consecutivo || '1001';
   const tipoPrefijo = (tipo === 'recordatorio_pago' || tipo === 'bienvenida' || tipo === 'personalizado')
     ? 'separacion'
@@ -854,12 +897,43 @@ export function obtenerTokensParaMensaje(params: {
   const anticipo = reserva?.separacion || 0;
   const valorPago = pago?.valor || 0;
 
+  // Desglose de finca vs alimentación si es reserva
+  let saldoFinca = total;
+  let saldoAlimentacion = 0;
+  let costoFinca = total;
+  let costoAlimentacion = 0;
+  let pagadoFinca = 0;
+  let pagadoAlimentacion = 0;
+
+  if (reserva) {
+    const finanzas = desglosarFinanzasReserva(reserva);
+    saldoFinca = finanzas.saldoFincaCheckIn;
+    saldoAlimentacion = finanzas.saldoAlimentacionAdmin;
+    costoFinca = finanzas.subtotalAlojamiento;
+    costoAlimentacion = finanzas.costoAlimentacion;
+    pagadoFinca = finanzas.pagadoFinca;
+    pagadoAlimentacion = finanzas.pagadoAlimentacion;
+  } else if (cotizacion) {
+    costoAlimentacion = cotizacion.costo_alimentacion || 0;
+    costoFinca = cotizacion.subtotal_alojamiento || Math.max(0, total - costoAlimentacion);
+    saldoFinca = costoFinca;
+    saldoAlimentacion = costoAlimentacion;
+  }
+
+  // Datos bancarios del Propietario de la finca
   const fObj: any = finca || reserva?.fincas || cotizacion?.fincas || null;
   const bBanco = fObj?.banco_nombre || 'Bancolombia';
   const bTipo = fObj?.banco_tipo_cuenta || 'Ahorros';
   const bCuenta = fObj?.banco_cuenta || '';
   const bTitular = fObj?.banco_titular || 'Propietario de la Finca';
   const bId = fObj?.banco_identificacion || '';
+
+  // Datos bancarios de la Administración de Paraíso Terrenal
+  const admBanco = configuracion?.banco_nombre || 'Bancolombia';
+  const admTipo = configuracion?.banco_tipo_cuenta || 'Ahorros';
+  const admCuenta = configuracion?.banco_cuenta || '';
+  const admTitular = configuracion?.banco_titular || 'Administración Paraíso Terrenal';
+  const admNit = configuracion?.nit || '';
 
   return {
     cliente: cNombre,
@@ -876,13 +950,32 @@ export function obtenerTokensParaMensaje(params: {
     saldo: formatCOP(saldo),
     pago_valor: formatCOP(valorPago),
     enlace_pdf: enlacePdf ? `📎 *Documento oficial adjunto (PDF):*\n${enlacePdf}` : '',
+    // Cuentas del propietario de la finca
     banco: bBanco,
     tipo_cuenta: bTipo,
     cuenta: bCuenta,
     titular_cuenta: bTitular,
     identificacion_cuenta: bId,
+    banco_dueno: bBanco,
+    cuenta_dueno: bCuenta,
+    titular_dueno: bTitular,
+    // Cuentas de la administración
+    banco_admin: admBanco,
+    cuenta_admin: admCuenta,
+    titular_admin: admTitular,
+    nit_admin: admNit,
+    // Saldos y costos desglosados
+    saldo_finca: formatCOP(saldoFinca),
+    saldo_alimentacion: formatCOP(saldoAlimentacion),
+    costo_finca: formatCOP(costoFinca),
+    costo_alimentacion: formatCOP(costoAlimentacion),
+    pagado_finca: formatCOP(pagadoFinca),
+    pagado_alimentacion: formatCOP(pagadoAlimentacion),
     datos_bancarios: bCuenta
       ? `• *Banco:* ${bBanco}\n• *Tipo de Cuenta:* ${bTipo}\n• *Número de Cuenta:* ${bCuenta}\n• *Titular:* ${bTitular}${bId ? `\n• *Identificación / NIT:* ${bId}` : ''}`
+      : '',
+    datos_bancarios_admin: admCuenta
+      ? `• *Banco:* ${admBanco}\n• *Tipo de Cuenta:* ${admTipo}\n• *Número de Cuenta:* ${admCuenta}\n• *Titular:* ${admTitular}${admNit ? `\n• *NIT / ID:* ${admNit}` : ''}`
       : '',
   };
 }

@@ -50,6 +50,9 @@ interface AppContextValue {
   navegarACliente: (fincaId?: string) => void;
   navegarAAdmin: (seccion?: AdminSection, fincaIdParaEditar?: string) => void;
   previsualizarFinca: (fincaId: string) => void;
+  expedienteComunicaciones: { tipo: 'cotizacion' | 'reserva'; id: string } | null;
+  setExpedienteComunicaciones: (exp: { tipo: 'cotizacion' | 'reserva'; id: string } | null) => void;
+  abrirComunicacionesConExpediente: (tipo: 'cotizacion' | 'reserva', id: string) => void;
 
   // Notificaciones Toast y Confirmaciones Globales
   toasts: ToastMessage[];
@@ -387,6 +390,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (fincaIdParaEditar) setFincaParaEditarId(fincaIdParaEditar);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
+
+  const [expedienteComunicaciones, setExpedienteComunicaciones] = useState<{ tipo: 'cotizacion' | 'reserva'; id: string } | null>(null);
+
+  const abrirComunicacionesConExpediente = useCallback((tipo: 'cotizacion' | 'reserva', id: string) => {
+    setExpedienteComunicaciones({ tipo, id });
+    navegarAAdmin('whatsapp');
+  }, [navegarAAdmin]);
 
   const previsualizarFinca = useCallback((fincaId: string) => {
     setSelectedFincaId(fincaId);
@@ -2499,6 +2509,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     navegarACliente,
     navegarAAdmin,
     previsualizarFinca,
+    expedienteComunicaciones,
+    setExpedienteComunicaciones,
+    abrirComunicacionesConExpediente,
 
     // Notificaciones Toast y Confirmaciones Globales
     toasts,
@@ -2564,6 +2577,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     navegarACliente,
     navegarAAdmin,
     previsualizarFinca,
+    expedienteComunicaciones,
+    setExpedienteComunicaciones,
+    abrirComunicacionesConExpediente,
     toasts,
     showToast,
     dismissToast,

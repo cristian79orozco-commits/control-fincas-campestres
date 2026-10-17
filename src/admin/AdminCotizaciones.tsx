@@ -114,7 +114,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
   showToast,
   openConfirm,
 }) => {
-  const { previsualizarFinca, configuracion, convertirCotizacionAReserva, navegarAAdmin } = useApp();
+  const { previsualizarFinca, configuracion, convertirCotizacionAReserva, navegarAAdmin, abrirComunicacionesConExpediente } = useApp();
   const [form, setForm] = useState<Partial<CotizacionDB>>(VACIO);
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -857,6 +857,24 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
                       <ArrowRight size={13} /> Pasar a Reserva
                     </button>
                   )}
+
+                  {/* Botón: Abrir en Comunicaciones */}
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    style={{
+                      fontSize: '0.72rem',
+                      gap: '0.25rem',
+                      padding: '0.3rem 0.55rem',
+                      color: '#15803d',
+                      background: 'rgba(34, 197, 94, 0.08)',
+                      borderColor: 'rgba(34, 197, 94, 0.3)',
+                    }}
+                    title="Abrir esta cotización en el Centro Inteligente de Comunicaciones"
+                    onClick={() => abrirComunicacionesConExpediente('cotizacion', c.id)}
+                  >
+                    <MessageCircle size={12} /> Chat
+                  </button>
 
                   {/* Botón 4: Descargar PDF */}
                   <button
