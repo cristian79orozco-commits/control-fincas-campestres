@@ -13,6 +13,10 @@ import { BeneficiosSection } from './components/BeneficiosSection';
 import { MenusPublicosSection } from './components/MenusPublicosSection';
 import { FaqSection } from './components/FaqSection';
 import { FooterPublico } from './components/FooterPublico';
+import { VisualExplorer } from './components/VisualExplorer';
+import { FincaComparator } from './components/FincaComparator';
+import { ClientePortalModal } from './components/ClientePortalModal';
+import { useClientStore } from './store/useClientStore';
 import { useAuth } from './hooks/useAuth';
 import { useApp } from './context/AppContext';
 import { DEFAULT_WA_NUMBER } from './services/supabase';
@@ -21,6 +25,9 @@ import type { ViewType, SeccionClave } from './types';
 export const App: React.FC = () => {
   // Autenticación administrativa
   const { user, isAdminLoggedIn, login, logout } = useAuth();
+
+  // Estado del portal cliente con Zustand
+  const { modalConsultaOpen, setModalConsultaOpen } = useClientStore();
 
   // ESTADO Y ACCIONES CENTRALIZADAS EN TIEMPO REAL (Única fuente de la verdad para toda la app)
   const {
@@ -203,6 +210,20 @@ export const App: React.FC = () => {
             </div>
           );
 
+        case 'graficos':
+          if (contenidoSitio.graficos_visible === false) return null;
+          return (
+            <div key="graficos" className="main-content">
+              <VisualExplorer
+                fincas={fincas}
+                onSelectFinca={handleSelectFinca}
+                titulo={contenidoSitio.graficos_titulo}
+                subtitulo={contenidoSitio.graficos_subtitulo}
+                tipo={contenidoSitio.graficos_tipo}
+              />
+            </div>
+          );
+
         case 'estado':
         case 'filtros':
         case 'catalogo':
@@ -218,8 +239,22 @@ export const App: React.FC = () => {
                 onSelectFinca={handleSelectFinca}
                 contenido={contenidoSitio}
                 waNumber={waNumberGlobal}
+                onOpenPortalHuesped={() => setModalConsultaOpen(true)}
               />
             </main>
+          );
+
+        case 'comparador':
+          if (contenidoSitio.comparador_visible === false) return null;
+          return (
+            <div key="comparador" className="main-content">
+              <FincaComparator
+                fincas={fincas}
+                onSelectFinca={handleSelectFinca}
+                titulo={contenidoSitio.comparador_titulo}
+                subtitulo={contenidoSitio.comparador_subtitulo}
+              />
+            </div>
           );
 
         case 'menus':
@@ -393,6 +428,16 @@ export const App: React.FC = () => {
           return res;
         }}
         showToast={showToast}
+      />
+
+      {/* Modal del Portal del Huésped (Consulta de Cotizaciones y Reservas) */}
+      <ClientePortalModal
+        isOpen={modalConsultaOpen}
+        onClose={() => setModalConsultaOpen(false)}
+        reservas={reservas}
+        cotizaciones={cotizaciones}
+        fincas={todasLasFincas}
+        waNumber={waNumberGlobal}
       />
     </div>
   );

@@ -1,10 +1,14 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import {
   Filter, X, Search, Sparkles, Dog, Check, ChevronDown, ChevronUp,
   MapPin, Users, Bed, Bath, Calendar, MessageCircle, ArrowRight,
-  ShieldCheck, Image as ImageIcon, Home, CheckCircle2
+  ShieldCheck, Image as ImageIcon, Home, LayoutGrid, List, SlidersHorizontal,
+  FileCheck2, Scale
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { Finca, BloqueoDisponibilidad, ContenidoSitio } from '../types';
+import { useClientStore, filtrarFincasCliente } from '../store/useClientStore';
+import { FincaCard3D } from './FincaCard3D';
 
 interface CatalogProps {
   fincas: Finca[];
@@ -13,6 +17,7 @@ interface CatalogProps {
   onSelectFinca: (fincaId: string) => void;
   contenido?: ContenidoSitio;
   waNumber?: string;
+  onOpenPortalHuesped?: () => void;
 }
 
 function formatCOP(v: number) {
@@ -23,25 +28,24 @@ function formatCOP(v: number) {
 const SkeletonFincaItem: React.FC = () => (
   <div
     style={{
-      border: '1px solid var(--border-subtle)',
-      borderRadius: 'var(--rad-xs, 8px)',
-      padding: '0.65rem 0.8rem',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--rad-sm, 14px)',
+      padding: '1rem',
       display: 'flex',
-      gap: '0.75rem',
+      gap: '0.85rem',
       alignItems: 'center',
       background: 'var(--surface)',
     }}
   >
-    <div className="skeleton-box" style={{ width: '64px', height: '64px', borderRadius: '6px', flexShrink: 0 }} />
+    <div className="skeleton-box" style={{ width: '80px', height: '80px', borderRadius: '8px', flexShrink: 0 }} />
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', flexGrow: 1 }}>
-      <div className="skeleton-box" style={{ height: '14px', width: '60%' }} />
+      <div className="skeleton-box" style={{ height: '16px', width: '60%' }} />
       <div className="skeleton-box" style={{ height: '12px', width: '40%' }} />
       <div className="skeleton-box" style={{ height: '12px', width: '30%' }} />
     </div>
   </div>
 );
 
-// Amenidades frecuentes para filtros rápidos de interés del cliente
 const AMENIDADES_FILTRO = [
   'Piscina',
   'Jacuzzi',
@@ -58,104 +62,43 @@ export const Catalog: React.FC<CatalogProps> = ({
   onSelectFinca,
   contenido,
   waNumber,
+  onOpenPortalHuesped,
 }) => {
-  const [busquedaTexto, setBusquedaTexto] = useState('');
-  const [fechaEntrada, setFechaEntrada] = useState('');
-  const [fechaSalida, setFechaSalida] = useState('');
-  const [personasFiltro, setPersonasFiltro] = useState('');
-  const [amenidadesSeleccionadas, setAmenidadesSeleccionadas] = useState<string[]>([]);
-  const [soloPetFriendly, setSoloPetFriendly] = useState(false);
-  const [filtrosAvanzadosAbiertos, setFiltrosAvanzadosAbiertos] = useState(false);
+  const store = useClientStore();
+  const {
+    busquedaTexto, setBusquedaTexto,
+    fechaEntrada, setFechaEntrada,
+    fechaSalida, setFechaSalida,
+    personas, setPersonas,
+    amenidades, toggleAmenidad,
+    soloPetFriendly, setSoloPetFriendly,
+    ordenPor, setOrdenPor,
+    vistaModo, setVistaModo,
+    filtrosAvanzadosOpen, setFiltrosAvanzadosOpen,
+    limpiarFiltros,
+    fincasComparar,
+  } = store;
 
-  // Estado de la sección de fincas disponibles: DESPLEGADA por defecto según requerimiento
-  const [seccionFincasAbierta, setSeccionFincasAbierta] = useState(true);
+  // Sincronizar vista predeterminada según configuración del administrador
+  useEffect(() => {
+    if (contenido?.catalogo_vista_predeterminada) {
+      setVistaModo(contenido.catalogo_vista_predeterminada);
+    }
+  }, [contenido?.catalogo_vista_predeterminada, setVistaModo]);
 
-  const toggleAmenidad = (amenidad: string) => {
-    setAmenidadesSeleccionadas(prev =>
-      prev.includes(amenidad)
-        ? prev.filter(a => a !== amenidad)
-        : [...prev, amenidad]
-    );
-  };
-
-  // Filtrado de fincas inteligente con comprobación de fechas reales, capacidad y amenidades
+  // Filtrado reactivo optimizado con Lodash
   const fincasFiltradas = useMemo(() => {
-    return fincas.filter(finca => {
-      // 1. Filtro por texto (nombre, zona o descripción)
-      if (busquedaTexto.trim()) {
-        const q = busquedaTexto.toLowerCase();
-        const coincideNombre = (finca.nombre || '').toLowerCase().includes(q);
-        const coincideZona = (finca.zona || '').toLowerCase().includes(q);
-        const coincideDesc = (finca.descripcion || '').toLowerCase().includes(q);
-        if (!coincideNombre && !coincideZona && !coincideDesc) return false;
-      }
-
-      // 2. Filtro por capacidad
-      if (personasFiltro) {
-        const capMin = finca.capacidad_minima || 1;
-        const capMax = finca.capacidad || 10;
-        if (personasFiltro === 'Hasta 10' && (capMin > 10 || capMax < 1)) return false;
-        if (personasFiltro === '10 – 20' && (capMin > 20 || capMax < 10)) return false;
-        if (personasFiltro === '20 – 40' && (capMin > 40 || capMax < 20)) return false;
-        if (personasFiltro === 'Más de 40' && capMax <= 40) return false;
-      }
-
-      // 3. Filtro Pet Friendly
-      if (soloPetFriendly) {
-        if (!finca.politica_mascotas || finca.politica_mascotas === 'no_permitido') {
-          return false;
-        }
-      }
-
-      // 4. Filtro por amenidades seleccionadas
-      if (amenidadesSeleccionadas.length > 0) {
-        const amenidadesFinca = (finca.finca_amenidades || []).map(a => a.nombre.toLowerCase());
-        const cumpleTodas = amenidadesSeleccionadas.every(sel => {
-          const selLower = sel.toLowerCase();
-          return amenidadesFinca.some(af => af.includes(selLower) || selLower.includes(af));
-        });
-        if (!cumpleTodas) return false;
-      }
-
-      // 5. Filtro de disponibilidad real en fechas seleccionadas
-      // Se evalúa tanto si el cliente ingresa solo fecha de entrada como rango completo
-      if (fechaEntrada || fechaSalida) {
-        const rInicio = fechaEntrada || fechaSalida;
-        const rFin = fechaSalida || fechaEntrada;
-
-        if (rFin < rInicio) return false;
-
-        // Comprobar si esta finca tiene algún bloqueo ocupado en ese rango
-        const tieneBloqueo = bloquesAdmin.some(b => {
-          if (b.finca_id !== finca.id) return false;
-          if (b.estado !== 'ocupado') return false;
-          // Comparación robusta en formato ISO YYYY-MM-DD
-          return b.fecha_inicio <= rFin && b.fecha_fin >= rInicio;
-        });
-
-        if (tieneBloqueo) return false;
-      }
-
-      return true;
-    });
-  }, [fincas, busquedaTexto, personasFiltro, soloPetFriendly, amenidadesSeleccionadas, fechaEntrada, fechaSalida, bloquesAdmin]);
-
-  const handleLimpiarFiltros = () => {
-    setBusquedaTexto('');
-    setFechaEntrada('');
-    setFechaSalida('');
-    setPersonasFiltro('');
-    setAmenidadesSeleccionadas([]);
-    setSoloPetFriendly(false);
-  };
+    return filtrarFincasCliente(fincas, bloquesAdmin, store);
+  }, [fincas, bloquesAdmin, store]);
 
   const hayFiltrosActivos = !!(
     busquedaTexto ||
     fechaEntrada ||
     fechaSalida ||
-    personasFiltro ||
-    amenidadesSeleccionadas.length > 0 ||
-    soloPetFriendly
+    personas ||
+    amenidades.length > 0 ||
+    soloPetFriendly ||
+    ordenPor !== 'recomendado'
   );
 
   // Textos y visibilidad configurables
@@ -163,16 +106,18 @@ export const Catalog: React.FC<CatalogProps> = ({
   const filtrosTitulo = contenido?.filtros_titulo || 'Buscar disponibilidad y fincas';
   const filtrosSubtitulo = contenido?.filtros_subtitulo || 'Filtra por fechas de entrada, capacidad y comodidades para tu estancia';
   const catalogoVisible = contenido?.catalogo_visible ?? true;
-  const catalogoTitulo = contenido?.catalogo_titulo || 'Fincas disponibles';
+  const catalogoTitulo = contenido?.catalogo_titulo || 'Fincas campestres disponibles';
   const catalogoSubtitulo = contenido?.catalogo_subtitulo || 'Explora nuestras propiedades campestres con información y fotos de primera mano';
   const catalogoVacioTexto = contenido?.catalogo_vacio_texto || 'No se encontraron fincas disponibles para los criterios seleccionados.';
+  const mostrarBadges = contenido?.catalogo_mostrar_badges ?? true;
+  const mostrarPrecioTotal = contenido?.catalogo_mostrar_precio_total ?? true;
 
   return (
     <div className="cliente-flow">
       {/* 1. Panel de Búsqueda y Filtros Centralizados */}
       {filtrosVisible && (
-        <div className="filters-card" id="catalogo" style={{ borderRadius: 'var(--rad-sm, 10px)' }}>
-          <div className="sec-header" style={{ marginBottom: '0.85rem' }}>
+        <div className="filters-card" id="catalogo" style={{ borderRadius: 'var(--rad-md, 18px)' }}>
+          <div className="sec-header" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.6rem' }}>
             <div>
               <div className="sec-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Filter size={18} style={{ color: 'var(--primary)' }} /> {filtrosTitulo}
@@ -180,16 +125,29 @@ export const Catalog: React.FC<CatalogProps> = ({
               <div className="sec-sub">{filtrosSubtitulo}</div>
             </div>
 
-            {hayFiltrosActivos && (
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={handleLimpiarFiltros}
-                style={{ fontSize: '0.75rem', gap: '4px' }}
-              >
-                <X size={13} /> Limpiar filtros
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              {onOpenPortalHuesped && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={onOpenPortalHuesped}
+                  style={{ fontSize: '0.75rem', gap: '5px' }}
+                >
+                  <FileCheck2 size={13} style={{ color: 'var(--primary)' }} /> Consultar mi reserva
+                </button>
+              )}
+
+              {hayFiltrosActivos && (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={limpiarFiltros}
+                  style={{ fontSize: '0.75rem', gap: '4px' }}
+                >
+                  <X size={13} /> Limpiar filtros
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Fila principal: Búsqueda, Fechas y Capacidad */}
@@ -205,7 +163,7 @@ export const Catalog: React.FC<CatalogProps> = ({
               />
             </div>
 
-            {/* Fecha Llegada (Garantiza filtrado en tiempo real) */}
+            {/* Fecha Llegada */}
             <div className="field">
               <label>
                 <Calendar size={12} style={{ display: 'inline', verticalAlign: '-1px', color: 'var(--primary)' }} /> Fecha de llegada
@@ -243,8 +201,8 @@ export const Catalog: React.FC<CatalogProps> = ({
                 <Users size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> Capacidad de huéspedes
               </label>
               <select
-                value={personasFiltro}
-                onChange={e => setPersonasFiltro(e.target.value)}
+                value={personas}
+                onChange={e => setPersonas(e.target.value)}
               >
                 <option value="">Cualquier capacidad</option>
                 <option value="Hasta 10">Hasta 10 personas</option>
@@ -259,21 +217,21 @@ export const Catalog: React.FC<CatalogProps> = ({
           {(fechaEntrada || fechaSalida) && (
             <div
               style={{
-                marginTop: '0.5rem',
-                fontSize: '0.74rem',
+                marginTop: '0.65rem',
+                fontSize: '0.76rem',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.45rem',
+                gap: '0.5rem',
                 color: 'var(--primary)',
-                background: 'color-mix(in srgb, var(--primary) 8%, var(--surface))',
-                padding: '0.35rem 0.65rem',
-                borderRadius: 'var(--rad-xs, 6px)',
+                background: 'var(--primary-bg)',
+                padding: '0.45rem 0.85rem',
+                borderRadius: 'var(--rad-xs, 8px)',
                 width: 'fit-content',
               }}
             >
-              <Calendar size={13} />
+              <Calendar size={14} />
               <span>
-                Filtro de disponibilidad: <strong>{fechaEntrada ? `Entrada: ${fechaEntrada}` : ''}</strong>
+                Filtro en tiempo real: <strong>{fechaEntrada ? `Llegada: ${fechaEntrada}` : ''}</strong>
                 {fechaSalida ? ` | Salida: ${fechaSalida}` : ' (comprobando fecha exacta)'}
                 {' — '}
                 {fincasFiltradas.length} finca{fincasFiltradas.length !== 1 ? 's' : ''} disponible{fincasFiltradas.length !== 1 ? 's' : ''}
@@ -281,66 +239,90 @@ export const Catalog: React.FC<CatalogProps> = ({
             </div>
           )}
 
-          {/* Botón para desplegar más filtros de interés (Amenidades, Mascotas) */}
-          <div style={{ marginTop: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+          {/* Botón para desplegar más comodidades y ordenamiento */}
+          <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
             <button
               type="button"
-              onClick={() => setFiltrosAvanzadosAbiertos(v => !v)}
+              onClick={() => setFiltrosAvanzadosOpen(v => !v)}
               style={{
                 background: 'none',
                 border: 'none',
                 color: 'var(--primary)',
-                fontSize: '0.78rem',
-                fontWeight: 600,
+                fontSize: '0.8rem',
+                fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.3rem',
+                gap: '0.35rem',
                 padding: '0.2rem 0',
               }}
             >
-              <Sparkles size={13} />
-              {filtrosAvanzadosAbiertos ? 'Ocultar amenidades y comodidades' : 'Filtrar por comodidades (Piscina, Jacuzzi, Mascotas...)'}
-              {filtrosAvanzadosAbiertos ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              <Sparkles size={14} />
+              {filtrosAvanzadosOpen ? 'Ocultar comodidades y ordenamiento' : 'Filtrar por comodidades (Piscina, Jacuzzi, Mascotas, etc.)'}
+              {filtrosAvanzadosOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
+
+            {/* Selector de ordenamiento rápido */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Ordenar por:</span>
+              <select
+                value={ordenPor}
+                onChange={e => setOrdenPor(e.target.value as any)}
+                style={{
+                  padding: '0.25rem 0.6rem',
+                  fontSize: '0.76rem',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  color: 'var(--text)',
+                }}
+              >
+                <option value="recomendado">Recomendados</option>
+                <option value="precio_asc">Menor precio /pp</option>
+                <option value="precio_desc">Mayor precio /pp</option>
+                <option value="capacidad_desc">Mayor capacidad</option>
+              </select>
+            </div>
           </div>
 
           {/* Panel Desplegable de Comodidades y Mascotas */}
-          {filtrosAvanzadosAbiertos && (
-            <div
+          {filtrosAvanzadosOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
               style={{
                 marginTop: '0.75rem',
                 paddingTop: '0.75rem',
-                borderTop: '1px solid var(--border-subtle)',
+                borderTop: '1px solid var(--border)',
                 display: 'grid',
                 gap: '0.6rem',
-                animation: 'fadeIn 0.2s ease',
               }}
             >
-              <div style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                Comodidades imprescindibles para tu estadía:
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                Comodidades prioritarias para tu grupo:
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', alignItems: 'center' }}>
                 {AMENIDADES_FILTRO.map(am => {
-                  const activa = amenidadesSeleccionadas.includes(am);
+                  const activa = amenidades.includes(am);
                   return (
                     <button
                       key={am}
                       type="button"
                       onClick={() => toggleAmenidad(am)}
                       style={{
-                        padding: '0.3rem 0.65rem',
-                        borderRadius: '20px',
+                        padding: '0.35rem 0.75rem',
+                        borderRadius: '999px',
                         border: `1.5px solid ${activa ? 'var(--primary)' : 'var(--border)'}`,
-                        background: activa ? 'color-mix(in srgb, var(--primary) 12%, transparent)' : 'var(--surface)',
-                        color: activa ? 'var(--primary)' : 'var(--text-main)',
+                        background: activa ? 'var(--primary-bg)' : 'var(--surface)',
+                        color: activa ? 'var(--primary)' : 'var(--text)',
                         fontSize: '0.75rem',
                         fontWeight: activa ? 700 : 500,
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.3rem',
+                        gap: '0.35rem',
                         transition: 'all 0.15s ease',
                       }}
                     >
@@ -353,19 +335,19 @@ export const Catalog: React.FC<CatalogProps> = ({
                 {/* Chip Pet Friendly */}
                 <button
                   type="button"
-                  onClick={() => setSoloPetFriendly(v => !v)}
+                  onClick={() => setSoloPetFriendly(!soloPetFriendly)}
                   style={{
-                    padding: '0.3rem 0.65rem',
-                    borderRadius: '20px',
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '999px',
                     border: `1.5px solid ${soloPetFriendly ? 'var(--success)' : 'var(--border)'}`,
-                    background: soloPetFriendly ? 'color-mix(in srgb, var(--success) 12%, transparent)' : 'var(--surface)',
-                    color: soloPetFriendly ? 'var(--success)' : 'var(--text-main)',
+                    background: soloPetFriendly ? 'var(--success-bg)' : 'var(--surface)',
+                    color: soloPetFriendly ? 'var(--success)' : 'var(--text)',
                     fontSize: '0.75rem',
                     fontWeight: soloPetFriendly ? 700 : 500,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.3rem',
+                    gap: '0.35rem',
                     transition: 'all 0.15s ease',
                   }}
                 >
@@ -373,300 +355,283 @@ export const Catalog: React.FC<CatalogProps> = ({
                   Permite mascotas (Pet Friendly)
                 </button>
               </div>
-            </div>
+            </motion.div>
           )}
         </div>
       )}
 
-      {/* 2. Sección de Fincas Disponibles — Estructura Maestro-Detalle con Información de Primera Mano */}
+      {/* 2. Sección del Catálogo de Fincas Campestres */}
       {catalogoVisible && (
-        <section style={{ marginTop: '1.25rem' }}>
-          {/* Cabecera Interactiva Desplegada por Defecto */}
+        <section style={{ marginTop: '1.75rem' }}>
+          {/* Cabecera Interactiva con Selector de Vista (Grid vs Lista) */}
           <div
-            onClick={() => setSeccionFincasAbierta(v => !v)}
             style={{
-              background: 'var(--surface)',
-              border: `1.5px solid ${seccionFincasAbierta ? 'var(--primary)' : 'var(--border)'}`,
-              borderRadius: 'var(--rad-sm, 10px)',
-              padding: '0.85rem 1.1rem',
-              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '0.75rem',
+              gap: '1rem',
               flexWrap: 'wrap',
-              boxShadow: seccionFincasAbierta ? '0 3px 12px rgba(0,0,0,0.06)' : 'none',
-              transition: 'all 0.18s ease',
+              marginBottom: '1rem',
             }}
           >
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Home size={20} style={{ color: 'var(--primary)' }} />
-                <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>
+                <Home size={22} style={{ color: 'var(--primary)' }} />
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--text)' }}>
                   {catalogoTitulo}
                 </h2>
-                <span className="status-badge s-avail" style={{ fontSize: '0.7rem' }}>
-                  {fincasFiltradas.length} finca{fincasFiltradas.length !== 1 ? 's' : ''} disponible{fincasFiltradas.length !== 1 ? 's' : ''}
+                <span className="status-badge s-avail" style={{ fontSize: '0.72rem' }}>
+                  {fincasFiltradas.length} disponible{fincasFiltradas.length !== 1 ? 's' : ''}
                 </span>
               </div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.2rem 0 0 0' }}>
                 {catalogoSubtitulo}
-              </div>
+              </p>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {/* Selector de Modo de Vista (Grid 3D vs Lista) */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                padding: '0.25rem',
+              }}
+            >
               <button
                 type="button"
-                className="btn btn-sm btn-primary"
-                onClick={e => {
-                  e.stopPropagation();
-                  setSeccionFincasAbierta(v => !v);
-                }}
+                onClick={() => setVistaModo('grid')}
+                title="Vista cuadrícula 3D de lujo"
                 style={{
+                  padding: '0.35rem 0.65rem',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: vistaModo === 'grid' ? 'var(--primary)' : 'transparent',
+                  color: vistaModo === 'grid' ? '#ffffff' : 'var(--text-muted)',
+                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.35rem',
-                  fontSize: '0.78rem',
-                  padding: '0.4rem 0.85rem',
+                  gap: '4px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  transition: 'all 0.15s ease',
                 }}
               >
-                {seccionFincasAbierta ? (
-                  <>Ocultar fincas <ChevronUp size={14} /></>
-                ) : (
-                  <>Ver fincas y fotos <ChevronDown size={14} /></>
-                )}
+                <LayoutGrid size={14} /> Cuadrícula 3D
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setVistaModo('lista')}
+                title="Vista lista compacta"
+                style={{
+                  padding: '0.35rem 0.65rem',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: vistaModo === 'lista' ? 'var(--primary)' : 'transparent',
+                  color: vistaModo === 'lista' ? '#ffffff' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <List size={14} /> Lista
               </button>
             </div>
           </div>
 
-          {/* ─── Ventana Estática con Scroll Interno para Fincas Disponibles ─── */}
-          {seccionFincasAbierta && (
-            <div className="fincas-scroll-window" style={{ marginTop: '0.85rem', animation: 'fadeIn 0.2s ease' }}>
-              {loading ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                  {[1, 2, 3, 4].map(n => (
-                    <SkeletonFincaItem key={n} />
-                  ))}
-                </div>
-              ) : fincasFiltradas.length === 0 ? (
-                <div className="panel" style={{ textAlign: 'center', padding: '2.5rem' }}>
-                  <p className="text-muted" style={{ fontSize: 'var(--text-sm)', marginBottom: '0.75rem' }}>
-                    {catalogoVacioTexto}
-                  </p>
-                  <button className="btn btn-sm btn-primary" onClick={handleLimpiarFiltros}>
-                    Ver todas las fincas
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {/* Barra de estado interna de la ventana estática */}
+          {/* Renderizado de Fincas según vista seleccionada */}
+          {loading ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+              {[1, 2, 3, 4, 5, 6].map(n => (
+                <SkeletonFincaItem key={n} />
+              ))}
+            </div>
+          ) : fincasFiltradas.length === 0 ? (
+            <div className="panel" style={{ textAlign: 'center', padding: '3rem 1.5rem', background: 'var(--surface)' }}>
+              <p className="text-muted" style={{ fontSize: '0.95rem', marginBottom: '1rem' }}>
+                {catalogoVacioTexto}
+              </p>
+              <button className="btn btn-primary btn-sm" onClick={limpiarFiltros}>
+                Restablecer filtros y ver todas las fincas
+              </button>
+            </div>
+          ) : vistaModo === 'grid' ? (
+            /* ─── VISTA 1: GRID MODERNO DE TARJETAS 3D TILT ─── */
+            <motion.div
+              layout
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                gap: '1.5rem',
+              }}
+            >
+              {fincasFiltradas.map(f => (
+                <FincaCard3D
+                  key={f.id}
+                  finca={f}
+                  onSelect={onSelectFinca}
+                  mostrarPrecioTotal={mostrarPrecioTotal}
+                  mostrarBadges={mostrarBadges}
+                />
+              ))}
+            </motion.div>
+          ) : (
+            /* ─── VISTA 2: LISTA COMPACTA EJECUTIVA CON SCROLL ─── */
+            <div className="fincas-scroll-viewport" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {fincasFiltradas.map(f => {
+                const primeraFoto = f.finca_imagenes?.[0]?.url || '';
+                const totalFotos = f.finca_imagenes?.length || 0;
+                return (
                   <div
+                    key={f.id}
+                    onClick={() => onSelectFinca(f.id)}
+                    className="finca-list-interactive-item"
+                    role="button"
+                    tabIndex={0}
                     style={{
+                      background: 'var(--surface)',
+                      border: '1.5px solid var(--border)',
+                      borderRadius: 'var(--rad-sm, 12px)',
+                      padding: '0.85rem',
                       display: 'flex',
+                      gap: '1rem',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '0.2rem 0.35rem 0.65rem 0.35rem',
-                      borderBottom: '1px solid var(--border-subtle)',
-                      marginBottom: '0.65rem',
-                      fontSize: '0.76rem',
-                      color: 'var(--text-muted)',
-                      flexWrap: 'wrap',
-                      gap: '0.4rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
                     }}
                   >
-                    <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>
-                      {fincasFiltradas.length} propiedad{fincasFiltradas.length !== 1 ? 'es' : ''} disponible{fincasFiltradas.length !== 1 ? 's' : ''} para reservar
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 600 }}>
-                      ↕ Desliza para explorar la lista (toca para ver detalles)
-                    </span>
-                  </div>
-
-                  {/* Viewport estático con scroll interno */}
-                  <div className="fincas-scroll-viewport">
-                    {fincasFiltradas.map(f => {
-                      const primeraFoto = (f.finca_imagenes && f.finca_imagenes.length > 0)
-                        ? f.finca_imagenes[0].url
-                        : '';
-                      const totalFotos = f.finca_imagenes?.length || 0;
-
-                      return (
-                        <div
-                          key={f.id}
-                          onClick={() => onSelectFinca(f.id)}
-                          className="finca-list-interactive-item"
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              onSelectFinca(f.id);
-                            }
+                    {/* Miniatura */}
+                    <div
+                      style={{
+                        width: '90px',
+                        height: '90px',
+                        borderRadius: '10px',
+                        overflow: 'hidden',
+                        flexShrink: 0,
+                        position: 'relative',
+                        background: '#0f172a',
+                      }}
+                    >
+                      {primeraFoto ? (
+                        <img
+                          src={primeraFoto}
+                          alt={f.nombre}
+                          loading="lazy"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                          <Home size={26} />
+                        </div>
+                      )}
+                      {totalFotos > 1 && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            bottom: '3px',
+                            right: '3px',
+                            background: 'rgba(0,0,0,0.7)',
+                            color: '#fff',
+                            fontSize: '0.6rem',
+                            fontWeight: 700,
+                            padding: '0.1rem 0.35rem',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px',
                           }}
                         >
-                          {/* Miniatura cuadrada / rectangular cuidada con badges */}
-                          <div
-                            style={{
-                              width: '84px',
-                              height: '84px',
-                              borderRadius: '8px',
-                              overflow: 'hidden',
-                              flexShrink: 0,
-                              position: 'relative',
-                              background: '#0f172a',
-                            }}
-                          >
-                            {primeraFoto ? (
-                              <img
-                                src={primeraFoto}
-                                alt={f.nombre}
-                                loading="lazy"
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              />
-                            ) : (
-                              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)' }}>
-                                <Home size={26} />
-                              </div>
-                            )}
+                          <ImageIcon size={9} /> {totalFotos}
+                        </span>
+                      )}
+                    </div>
 
-                            {totalFotos > 1 && (
-                              <span
-                                style={{
-                                  position: 'absolute',
-                                  bottom: '3px',
-                                  right: '3px',
-                                  background: 'rgba(0, 0, 0, 0.72)',
-                                  backdropFilter: 'blur(3px)',
-                                  color: '#fff',
-                                  fontSize: '0.6rem',
-                                  fontWeight: 700,
-                                  padding: '0.08rem 0.3rem',
-                                  borderRadius: '4px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '2px',
-                                }}
-                              >
-                                <ImageIcon size={9} /> {totalFotos}
-                              </span>
-                            )}
-                          </div>
+                    {/* Información condensada */}
+                    <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem' }}>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, color: 'var(--text)' }}>
+                          {f.nombre}
+                        </h3>
+                        <span className="status-badge s-avail" style={{ fontSize: '0.64rem' }}>
+                          Disponible
+                        </span>
+                      </div>
 
-                          {/* Información condensada (Nombre, ubicación, specs clave sin exceso) */}
-                          <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem' }}>
-                              <h3
-                                style={{
-                                  fontSize: '0.96rem',
-                                  fontWeight: 800,
-                                  margin: 0,
-                                  color: 'var(--text-main)',
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  lineHeight: 1.25,
-                                }}
-                              >
-                                {f.nombre}
-                              </h3>
-                              <span
-                                style={{
-                                  fontSize: '0.64rem',
-                                  fontWeight: 700,
-                                  color: '#059669',
-                                  background: 'rgba(16, 185, 129, 0.1)',
-                                  padding: '0.1rem 0.45rem',
-                                  borderRadius: '10px',
-                                  flexShrink: 0,
-                                }}
-                              >
-                                Disponible
-                              </span>
-                            </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                        <MapPin size={12} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                        <span>{f.zona || 'Santa Elena, Valle'}</span>
+                      </div>
 
-                            {/* Ubicación y zona */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                              <MapPin size={12} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {f.zona || 'Santa Elena, Valle del Cauca'}
-                              </span>
-                            </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'var(--surface-2)', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
+                          <Users size={12} style={{ color: 'var(--primary)' }} /> {f.capacidad_minima ? `${f.capacidad_minima} - ${f.capacidad}` : `Hasta ${f.capacidad}`} pers.
+                        </span>
+                        {f.habitaciones && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'var(--surface-2)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                            <Bed size={12} style={{ color: 'var(--primary)' }} /> {f.habitaciones} habs
+                          </span>
+                        )}
+                        {f.politica_mascotas === 'permitido' && (
+                          <span style={{ color: 'var(--success)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <Dog size={12} /> Pet Friendly
+                          </span>
+                        )}
+                      </div>
+                    </div>
 
-                            {/* Ficha técnica esencial: Capacidad, Habitaciones, Baños y Pet Friendly */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'var(--surface-sunken)', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
-                                <Users size={12} style={{ color: 'var(--primary)' }} /> {f.capacidad_minima && f.capacidad_minima > 1 ? `${f.capacidad_minima} - ${f.capacidad}` : `Hasta ${f.capacidad}`} pers.
-                              </span>
-
-                              {f.habitaciones && (
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'var(--surface-sunken)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
-                                  <Bed size={12} style={{ color: 'var(--primary)' }} /> {f.habitaciones} habs
-                                </span>
-                              )}
-
-                              {f.banos && (
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'var(--surface-sunken)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
-                                  <Bath size={12} style={{ color: 'var(--primary)' }} /> {f.banos} baños
-                                </span>
-                              )}
-
-                              {f.politica_mascotas === 'permitido' && (
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'rgba(16, 185, 129, 0.08)', color: '#059669', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
-                                  <Dog size={12} /> Pet Friendly
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Tarifa destacada y Botón de Cotizar */}
-                          <div
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'flex-end',
-                              justifyContent: 'center',
-                              gap: '0.35rem',
-                              flexShrink: 0,
-                              paddingLeft: '0.5rem',
-                              borderLeft: '1px solid var(--border-subtle)',
-                            }}
-                          >
-                            <div style={{ textAlign: 'right' }}>
-                              <div style={{ fontSize: '0.62rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
-                                Tarifa /pp noche
-                              </div>
-                              <div style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--primary)', lineHeight: 1.1 }}>
-                                {formatCOP(Number(f.precio_pp) || 0)}
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              className="btn btn-primary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onSelectFinca(f.id);
-                              }}
-                              style={{
-                                padding: '0.4rem 0.75rem',
-                                fontSize: '0.74rem',
-                                fontWeight: 700,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.3rem',
-                                boxShadow: '0 2px 6px rgba(26, 107, 94, 0.25)',
-                              }}
-                            >
-                              <span>Cotizar</span>
-                              <ArrowRight size={13} />
-                            </button>
-                          </div>
+                    {/* Tarifa y Cotizar */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-end',
+                        justifyContent: 'center',
+                        gap: '0.35rem',
+                        flexShrink: 0,
+                        paddingLeft: '0.75rem',
+                        borderLeft: '1px solid var(--border)',
+                      }}
+                    >
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '0.62rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
+                          Tarifa /pp noche
                         </div>
-                      );
-                    })}
+                        <div style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--primary)' }}>
+                          {formatCOP(Number(f.precio_pp) || 0)}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectFinca(f.id);
+                        }}
+                        style={{
+                          padding: '0.4rem 0.8rem',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                        }}
+                      >
+                        <span>Cotizar</span>
+                        <ArrowRight size={13} />
+                      </button>
+                    </div>
                   </div>
-                </>
-              )}
+                );
+              })}
             </div>
           )}
         </section>

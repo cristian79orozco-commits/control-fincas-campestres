@@ -483,9 +483,12 @@ export type SeccionClave =
   | 'banner'
   | 'hero'
   | 'destacados'
+  | 'graficos'
   | 'estado'
   | 'filtros'
   | 'catalogo'
+  | 'comparador'
+  | 'portal_cliente'
   | 'menus'
   | 'faq';
 
@@ -523,43 +526,68 @@ export interface ContenidoSitio {
   destacados_subtitulo: string;
   destacados_items: BeneficioItem[];
 
-  // 4. Estado Actual (Resumen de fincas)
+  // 4. Visualización y Gráficos Interactivos (Chart.js / 3D)
+  graficos_visible?: boolean;
+  graficos_titulo?: string;
+  graficos_subtitulo?: string;
+  graficos_tipo?: 'ambos' | 'comparativa' | 'presupuesto';
+
+  // 5. Estado Actual (Resumen de fincas)
   estado_visible: boolean;
   estado_titulo: string;
   estado_subtitulo: string;
   estado_badge_texto: string;
   estado_ayuda_texto: string;
 
-  // 5. Filtros de Búsqueda
+  // 6. Filtros de Búsqueda
   filtros_visible: boolean;
   filtros_titulo: string;
   filtros_subtitulo: string;
   filtros_badge_titulo: string;
   filtros_badge_texto: string;
 
-  // 6. Catálogo de Fincas
+  // 7. Catálogo de Fincas y Opciones de Presentación
   catalogo_visible: boolean;
   catalogo_titulo: string;
   catalogo_subtitulo: string;
   catalogo_vacio_texto: string;
+  catalogo_vista_predeterminada?: 'grid' | 'lista';
+  catalogo_mostrar_badges?: boolean;
+  catalogo_mostrar_precio_total?: boolean;
 
-  // 7. Menús Campestres (Portal Público)
+  // 8. Comparador de Fincas Cara a Cara
+  comparador_visible?: boolean;
+  comparador_titulo?: string;
+  comparador_subtitulo?: string;
+
+  // 9. Portal de Autogestión del Huésped (Consultar Reserva / Cotización)
+  portal_cliente_visible?: boolean;
+  portal_cliente_titulo?: string;
+  portal_cliente_subtitulo?: string;
+
+  // 10. Menús Campestres (Portal Público)
   menus_visible: boolean;
   menus_titulo: string;
   menus_subtitulo: string;
   menus_badge_texto: string;
 
-  // 8. Preguntas Frecuentes (FAQ)
+  // 11. Preguntas Frecuentes (FAQ)
   faq_visible: boolean;
   faq_titulo: string;
   faq_subtitulo: string;
   faq_items: FaqItem[];
 
-  // 9. Pie de página (Footer)
+  // 12. Pie de página (Footer)
   footer_visible: boolean;
   footer_titulo: string;
   footer_subtitulo: string;
   footer_whatsapp_cta: string;
+
+  // 13. Opciones Visuales Avanzadas
+  personalizacion_visual?: {
+    estilo_tarjeta?: 'moderno_3d' | 'clasico';
+    tema_color?: 'esmeralda' | 'dorado' | 'bosque' | 'lujo_oscuro';
+  };
 
   created_at?: string;
   updated_at?: string;

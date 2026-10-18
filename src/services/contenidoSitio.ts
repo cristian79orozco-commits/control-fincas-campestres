@@ -8,9 +8,11 @@ export const CONTENIDO_SITIO_DEFAULT: ContenidoSitio = {
     'banner',
     'hero',
     'destacados',
+    'graficos',
     'estado',
     'filtros',
     'catalogo',
+    'comparador',
     'menus',
     'faq',
   ],
@@ -68,25 +70,50 @@ export const CONTENIDO_SITIO_DEFAULT: ContenidoSitio = {
     },
   ],
 
-  // 4. Estado Actual (Resumen de fincas)
+  // 4. Visualización y Gráficos Interactivos (Chart.js / 3D)
+  graficos_visible: true,
+  graficos_titulo: 'Análisis Visual & Calculadora de Presupuesto',
+  graficos_subtitulo: 'Compara capacidades, tarifas y simula tu inversión con ahorro directo en tiempo real',
+  graficos_tipo: 'ambos',
+
+  // 5. Estado Actual (Resumen de fincas)
   estado_visible: true,
   estado_titulo: 'Estado actual · Fincas disponibles',
   estado_subtitulo: 'propiedades registradas en Santa Elena, Valle',
   estado_badge_texto: 'Sistema operativo',
   estado_ayuda_texto: 'Toca Ver y cotizar en cualquier finca para consultar el calendario interactivo y obtener tu cotización directa para WhatsApp.',
 
-  // 5. Filtros de Búsqueda
+  // 6. Filtros de Búsqueda
   filtros_visible: true,
   filtros_titulo: 'Buscar disponibilidad',
   filtros_subtitulo: 'Filtra por fechas y capacidad para encontrar fincas libres',
   filtros_badge_titulo: '📍 Ubicación privilegiada',
   filtros_badge_texto: 'Todas nuestras fincas campestres están ubicadas en Santa Elena, El Cerrito, Valle del Cauca.',
 
-  // 6. Catálogo de Fincas
+  // 7. Catálogo de Fincas y Opciones de Presentación
   catalogo_visible: true,
   catalogo_titulo: 'Fincas disponibles',
   catalogo_subtitulo: 'Selecciona una propiedad para ver fotografías en alta calidad y cotizar',
   catalogo_vacio_texto: 'No se encontraron fincas disponibles para los criterios seleccionados.',
+  catalogo_vista_predeterminada: 'grid',
+  catalogo_mostrar_badges: true,
+  catalogo_mostrar_precio_total: true,
+
+  // 8. Comparador de Fincas Cara a Cara
+  comparador_visible: true,
+  comparador_titulo: 'Comparador de Fincas',
+  comparador_subtitulo: 'Analiza lado a lado las especificaciones, comodidades y capacidades de tus opciones favoritas',
+
+  // 9. Portal del Huésped
+  portal_cliente_visible: true,
+  portal_cliente_titulo: 'Consulta de Reserva & Cotización',
+  portal_cliente_subtitulo: 'Verifica el estado de tu reserva o cotización con tu número consecutivo o teléfono',
+
+  // 10. Opciones visuales
+  personalizacion_visual: {
+    estilo_tarjeta: 'moderno_3d',
+    tema_color: 'esmeralda',
+  },
 
   // 7. Menús Campestres (Portal Público)
   menus_visible: true,

@@ -3,7 +3,8 @@ import {
   Palette, Save, RotateCcw, Eye, ArrowUp, ArrowDown, Check,
   AlertCircle, Plus, Trash2, HelpCircle, Sparkles, Layout,
   Layers, MessageSquare, Utensils, HelpCircle as FaqIcon, Globe,
-  CheckCircle2, X
+  CheckCircle2, X, TrendingUp, Scale, FileCheck2, Smartphone, Monitor,
+  Sliders, LayoutGrid, List
 } from 'lucide-react';
 import type { ContenidoSitio, SeccionClave, BeneficioItem, FaqItem } from '../types';
 
@@ -36,6 +37,11 @@ const SECCIONES_INFO: Record<
     desc: 'Tarjetas destacando ventajas competitivas, tranquilidad y servicios.',
     icon: <Sparkles size={16} />,
   },
+  graficos: {
+    label: 'Visualización & Gráficos Interactivos (Chart.js)',
+    desc: 'Comparativa de fincas y simulador dinámico de inversión con ahorro directo.',
+    icon: <TrendingUp size={16} />,
+  },
   estado: {
     label: 'Resumen de Estado Actual',
     desc: 'Chips de disponibilidad en vivo con acceso directo a cada finca.',
@@ -43,13 +49,23 @@ const SECCIONES_INFO: Record<
   },
   filtros: {
     label: 'Filtros de Búsqueda',
-    desc: 'Selector de fechas, capacidad requerida y badge de ubicación.',
+    desc: 'Selector de fechas, capacidad requerida y amenidades.',
     icon: <Layers size={16} />,
   },
   catalogo: {
     label: 'Catálogo de Fincas Campestres',
-    desc: 'Tarjetas completas de fincas con fotos, amenidades y botón cotizar.',
+    desc: 'Fichas de propiedades con fotografías en alta calidad y botón cotizar.',
     icon: <Globe size={16} />,
+  },
+  comparador: {
+    label: 'Comparador de Fincas Cara a Cara',
+    desc: 'Matriz comparativa lado a lado entre fincas seleccionadas por el cliente.',
+    icon: <Scale size={16} />,
+  },
+  portal_cliente: {
+    label: 'Portal del Huésped (Consulta de Reserva)',
+    desc: 'Módulo de autogestión para verificar estado, saldo y comprobantes.',
+    icon: <FileCheck2 size={16} />,
   },
   menus: {
     label: 'Gastronomía y Menús Campestres',
@@ -72,17 +88,41 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = ({
   showToast,
   openConfirm,
 }) => {
-  // Estado local para edición antes de guardar
-  const [form, setForm] = useState<ContenidoSitio>(contenido);
+  // Asegurar que form tenga todas las secciones en orden_secciones
+  const asegurarOrdenCompleto = (c: ContenidoSitio): ContenidoSitio => {
+    const todas: SeccionClave[] = [
+      'banner', 'hero', 'destacados', 'graficos', 'estado',
+      'filtros', 'catalogo', 'comparador', 'menus', 'faq'
+    ];
+    const existentes = c.orden_secciones || [];
+    const faltantes = todas.filter(s => !existentes.includes(s));
+    return {
+      ...c,
+      orden_secciones: [...existentes, ...faltantes],
+      graficos_visible: c.graficos_visible ?? true,
+      graficos_titulo: c.graficos_titulo || 'Análisis Visual & Calculadora de Presupuesto',
+      graficos_subtitulo: c.graficos_subtitulo || 'Compara capacidades, tarifas y simula tu inversión con ahorro directo en tiempo real',
+      graficos_tipo: c.graficos_tipo || 'ambos',
+      comparador_visible: c.comparador_visible ?? true,
+      comparador_titulo: c.comparador_titulo || 'Comparador de Fincas',
+      comparador_subtitulo: c.comparador_subtitulo || 'Compara especificaciones, comodidades y tarifas lado a lado',
+      catalogo_vista_predeterminada: c.catalogo_vista_predeterminada || 'grid',
+      catalogo_mostrar_badges: c.catalogo_mostrar_badges ?? true,
+      catalogo_mostrar_precio_total: c.catalogo_mostrar_precio_total ?? true,
+    };
+  };
+
+  const [form, setForm] = useState<ContenidoSitio>(() => asegurarOrdenCompleto(contenido));
   const [tabActiva, setTabActiva] = useState<
-    'orden' | 'hero' | 'destacados' | 'busqueda' | 'menus' | 'faq' | 'footer'
+    'orden' | 'hero' | 'destacados' | 'graficos' | 'busqueda' | 'menus' | 'faq' | 'footer'
   >('orden');
   const [hayCambios, setHayCambios] = useState(false);
+  const [modalPreviewOpen, setModalPreviewOpen] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
 
-  // Sincronizar cuando cambien los datos externos (si no hay cambios locales en curso)
   useEffect(() => {
     if (!hayCambios) {
-      setForm(contenido);
+      setForm(asegurarOrdenCompleto(contenido));
     }
   }, [contenido, hayCambios]);
 
@@ -143,9 +183,12 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = ({
       case 'banner': campo = 'banner_visible'; break;
       case 'hero': campo = 'hero_visible'; break;
       case 'destacados': campo = 'destacados_visible'; break;
+      case 'graficos': campo = 'graficos_visible'; break;
       case 'estado': campo = 'estado_visible'; break;
       case 'filtros': campo = 'filtros_visible'; break;
       case 'catalogo': campo = 'catalogo_visible'; break;
+      case 'comparador': campo = 'comparador_visible'; break;
+      case 'portal_cliente': campo = 'portal_cliente_visible'; break;
       case 'menus': campo = 'menus_visible'; break;
       case 'faq': campo = 'faq_visible'; break;
       default: return;
@@ -159,11 +202,15 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = ({
       case 'banner': return form.banner_visible;
       case 'hero': return form.hero_visible;
       case 'destacados': return form.destacados_visible;
+      case 'graficos': return form.graficos_visible ?? true;
       case 'estado': return form.estado_visible;
       case 'filtros': return form.filtros_visible;
       case 'catalogo': return form.catalogo_visible;
+      case 'comparador': return form.comparador_visible ?? true;
+      case 'portal_cliente': return form.portal_cliente_visible ?? true;
       case 'menus': return form.menus_visible;
       case 'faq': return form.faq_visible;
+      default: return true;
     }
   };
 
@@ -228,7 +275,7 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <Palette size={22} style={{ color: 'var(--primary)' }} />
             <h2 className="panel-title" style={{ margin: 0 }}>
-              Personalización del Sitio Público
+              Personalización del Sitio Público & Panel del Cliente
             </h2>
             {hayCambios && (
               <span className="status-badge s-warn" style={{ fontSize: '0.72rem' }}>
@@ -237,11 +284,21 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = ({
             )}
           </div>
           <div className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
-            Controla qué secciones, textos, llamados a la acción y preguntas aparecen en la página para los clientes.
+            Controla integralmente qué secciones, gráficos interactivos, textos y vistas pueden visualizar tus clientes.
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline"
+            onClick={() => setModalPreviewOpen(true)}
+            title="Previsualizar cambios en simulador de pantalla"
+            style={{ gap: '5px' }}
+          >
+            <Monitor size={15} /> Simulador en Vivo
+          </button>
+
           <button
             type="button"
             className="btn btn-sm btn-outline"
@@ -305,17 +362,24 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = ({
         </button>
         <button
           type="button"
-          className={`btn btn-sm ${tabActiva === 'destacados' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() => setTabActiva('destacados')}
+          className={`btn btn-sm ${tabActiva === 'graficos' ? 'btn-primary' : 'btn-outline'}`}
+          onClick={() => setTabActiva('graficos')}
         >
-          <Sparkles size={14} /> Destacados ({form.destacados_items.length})
+          <TrendingUp size={14} /> Gráficos & Visualización
         </button>
         <button
           type="button"
           className={`btn btn-sm ${tabActiva === 'busqueda' ? 'btn-primary' : 'btn-outline'}`}
           onClick={() => setTabActiva('busqueda')}
         >
-          <Globe size={14} /> Búsqueda & Catálogo
+          <Globe size={14} /> Catálogo & Comparador
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${tabActiva === 'destacados' ? 'btn-primary' : 'btn-outline'}`}
+          onClick={() => setTabActiva('destacados')}
+        >
+          <Sparkles size={14} /> Destacados ({form.destacados_items.length})
         </button>
         <button
           type="button"
@@ -347,7 +411,7 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = ({
             <div>
               <div className="panel-title">Estructura y Orden del Sitio Público</div>
               <div className="text-xs text-muted mt-1">
-                Puedes encender/apagar cualquier sección o cambiar el orden en que los clientes la visualizan.
+                Enciende, apaga o reordena cualquier sección pública para controlar con total precisión la experiencia de tus clientes.
               </div>
             </div>
             <span className="status-badge s-info">
@@ -398,49 +462,48 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = ({
                       <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
                         {info?.label || secClave}
                       </div>
-                      <div className="text-xs text-muted">{info?.desc}</div>
+                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                        {info?.desc || ''}
+                      </div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    {/* Botones de orden */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <button
                       type="button"
-                      className="btn btn-sm"
-                      onClick={() => moverSeccion(secClave, 'arriba')}
+                      className="btn btn-sm btn-outline"
                       disabled={idx === 0}
-                      title="Subir posición"
-                      style={{ padding: '0.35rem 0.5rem' }}
+                      onClick={() => moverSeccion(secClave, 'arriba')}
+                      title="Mover hacia arriba"
                     >
                       <ArrowUp size={14} />
                     </button>
                     <button
                       type="button"
-                      className="btn btn-sm"
-                      onClick={() => moverSeccion(secClave, 'abajo')}
+                      className="btn btn-sm btn-outline"
                       disabled={idx === form.orden_secciones.length - 1}
-                      title="Bajar posición"
-                      style={{ padding: '0.35rem 0.5rem' }}
+                      onClick={() => moverSeccion(secClave, 'abajo')}
+                      title="Mover hacia abajo"
                     >
                       <ArrowDown size={14} />
                     </button>
 
-                    {/* Toggle visible / oculto */}
                     <button
                       type="button"
-                      className={`btn btn-sm ${visible ? 'btn-primary' : 'btn-outline'}`}
                       onClick={() => toggleVisibilidad(secClave)}
-                      style={{ minWidth: '95px', justifyContent: 'center' }}
+                      style={{
+                        padding: '0.35rem 0.75rem',
+                        borderRadius: 'var(--rad-full)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: 'var(--text-xs)',
+                        fontWeight: 600,
+                        background: visible ? 'var(--primary)' : 'var(--surface-3)',
+                        color: visible ? '#ffffff' : 'var(--text-muted)',
+                        transition: 'all 0.15s ease',
+                      }}
                     >
-                      {visible ? (
-                        <>
-                          <Check size={14} /> Visible
-                        </>
-                      ) : (
-                        <>
-                          <X size={14} /> Oculta
-                        </>
-                      )}
+                      {visible ? 'Visible' : 'Oculto'}
                     </button>
                   </div>
                 </div>
@@ -450,459 +513,283 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = ({
         </div>
       )}
 
-      {/* PESTAÑA 2: BANNER Y HERO */}
+      {/* PESTAÑA 2: HERO & BANNER */}
       {tabActiva === 'hero' && (
         <div style={{ display: 'grid', gap: '1.25rem' }}>
-          {/* Banner de Aviso */}
+          {/* Banner Superior */}
           <div className="panel" style={{ background: 'var(--surface)' }}>
             <div className="panel-header" style={{ marginBottom: '1rem' }}>
               <div>
-                <div className="panel-title">1. Banner Superior de Aviso</div>
-                <div className="text-xs text-muted">Aviso destacado sobre el menú de navegación para ofertas o alertas.</div>
+                <div className="panel-title">Banner Superior Promocional</div>
+                <div className="text-xs text-muted mt-1">Franja delgada superior para promociones directas.</div>
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
+              <label className="toggle-switch">
                 <input
                   type="checkbox"
                   checked={form.banner_visible}
                   onChange={e => handleChange('banner_visible', e.target.checked)}
                 />
-                <strong>Mostrar Banner</strong>
+                <span className="slider round"></span>
               </label>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.9rem' }}>
-              <div className="field" style={{ gridColumn: '1 / -1' }}>
-                <label>Texto del Banner</label>
+            <div style={{ display: 'grid', gap: '0.85rem' }}>
+              <div className="field">
+                <label>Texto del anuncio</label>
                 <input
                   type="text"
                   value={form.banner_texto}
-                  placeholder="Ej: 🌿 ¡Reserva directa sin comisiones! Consulta fechas libres..."
                   onChange={e => handleChange('banner_texto', e.target.value)}
+                  placeholder="Ej: ¡Reserva directa sin comisiones!"
                 />
               </div>
 
-              <div className="field">
-                <label>Texto del Enlace / Botón</label>
-                <input
-                  type="text"
-                  value={form.banner_link_texto}
-                  placeholder="Ver promociones"
-                  onChange={e => handleChange('banner_link_texto', e.target.value)}
-                />
-              </div>
-
-              <div className="field">
-                <label>Destino del Enlace (URL o ancla)</label>
-                <input
-                  type="text"
-                  value={form.banner_link_url}
-                  placeholder="#catalogo o enlace completo"
-                  onChange={e => handleChange('banner_link_url', e.target.value)}
-                />
-              </div>
-
-              <div className="field">
-                <label>Estilo visual del banner</label>
-                <select
-                  value={form.banner_tipo}
-                  onChange={e => handleChange('banner_tipo', e.target.value as any)}
-                >
-                  <option value="promo">Promocional (Verde bosque degradado con estrella)</option>
-                  <option value="aviso">Aviso Especial (Dorado / Terracota)</option>
-                  <option value="info">Informativo Suave (Gris cálido del tema)</option>
-                </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px', gap: '0.75rem' }}>
+                <div className="field">
+                  <label>Texto del enlace</label>
+                  <input
+                    type="text"
+                    value={form.banner_link_texto}
+                    onChange={e => handleChange('banner_link_texto', e.target.value)}
+                    placeholder="Ver disponibilidad"
+                  />
+                </div>
+                <div className="field">
+                  <label>Destino (#id o URL)</label>
+                  <input
+                    type="text"
+                    value={form.banner_link_url}
+                    onChange={e => handleChange('banner_link_url', e.target.value)}
+                    placeholder="#catalogo"
+                  />
+                </div>
+                <div className="field">
+                  <label>Estilo / Tipo</label>
+                  <select
+                    value={form.banner_tipo}
+                    onChange={e => handleChange('banner_tipo', e.target.value as any)}
+                  >
+                    <option value="promo">Promoción (Verde)</option>
+                    <option value="info">Informativo (Azul)</option>
+                    <option value="aviso">Aviso Especial (Dorado)</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Sección Hero Principal */}
+          {/* Encabezado Hero */}
           <div className="panel" style={{ background: 'var(--surface)' }}>
             <div className="panel-header" style={{ marginBottom: '1rem' }}>
               <div>
-                <div className="panel-title">2. Encabezado Hero Principal</div>
-                <div className="text-xs text-muted">Contenido de la primera pantalla que ve el cliente al ingresar.</div>
+                <div className="panel-title">Encabezado Hero Principal</div>
+                <div className="text-xs text-muted mt-1">Impacto visual inicial, títulos y llamadas a la acción.</div>
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
+              <label className="toggle-switch">
                 <input
                   type="checkbox"
                   checked={form.hero_visible}
                   onChange={e => handleChange('hero_visible', e.target.checked)}
                 />
-                <strong>Mostrar Hero</strong>
+                <span className="slider round"></span>
               </label>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.9rem' }}>
+            <div style={{ display: 'grid', gap: '0.85rem' }}>
               <div className="field">
-                <label>Etiqueta superior (Eyebrow)</label>
+                <label>Eyebrow / Sub-etiqueta superior</label>
                 <input
                   type="text"
                   value={form.hero_eyebrow}
-                  placeholder="Reserva directa sin comisiones"
                   onChange={e => handleChange('hero_eyebrow', e.target.value)}
+                  placeholder="Reserva directa sin comisiones"
                 />
               </div>
 
               <div className="field">
-                <label>Ubicación destacada en pie de Hero</label>
-                <input
-                  type="text"
-                  value={form.hero_badge_ubicacion || ''}
-                  placeholder="Santa Elena, El Cerrito, Valle"
-                  onChange={e => handleChange('hero_badge_ubicacion', e.target.value)}
-                />
-              </div>
-
-              <div className="field" style={{ gridColumn: '1 / -1' }}>
-                <label>Título Principal (H1)</label>
+                <label>Título Principal</label>
                 <input
                   type="text"
                   value={form.hero_titulo}
-                  placeholder="Tu escapada campestre empieza aquí"
                   onChange={e => handleChange('hero_titulo', e.target.value)}
+                  placeholder="Tu escapada campestre empieza aquí"
                 />
               </div>
 
-              <div className="field" style={{ gridColumn: '1 / -1' }}>
-                <label>Subtítulo / Descripción persuasiva</label>
+              <div className="field">
+                <label>Subtítulo o descripción persuasiva</label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={form.hero_subtitulo}
-                  placeholder="Elige la finca ideal en Santa Elena, consulta la disponibilidad..."
                   onChange={e => handleChange('hero_subtitulo', e.target.value)}
+                  placeholder="Describe la experiencia campestre para tus clientes..."
                 />
               </div>
 
-              <div className="field">
-                <label>Texto del Botón CTA Principal</label>
-                <input
-                  type="text"
-                  value={form.hero_cta_texto}
-                  placeholder="Explorar fincas disponibles"
-                  onChange={e => handleChange('hero_cta_texto', e.target.value)}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="field">
+                  <label>Texto Botón Primario</label>
+                  <input
+                    type="text"
+                    value={form.hero_cta_texto}
+                    onChange={e => handleChange('hero_cta_texto', e.target.value)}
+                    placeholder="Explorar fincas disponibles"
+                  />
+                </div>
+                <div className="field">
+                  <label>Texto Botón Secundario</label>
+                  <input
+                    type="text"
+                    value={form.hero_cta_secundario_texto}
+                    onChange={e => handleChange('hero_cta_secundario_texto', e.target.value)}
+                    placeholder="Conocer gastronomía"
+                  />
+                </div>
               </div>
 
-              <div className="field">
-                <label>Texto del Botón CTA Secundario (Opcional)</label>
-                <input
-                  type="text"
-                  value={form.hero_cta_secundario_texto || ''}
-                  placeholder="Conocer gastronomía"
-                  onChange={e => handleChange('hero_cta_secundario_texto', e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Ajustes de métricas y pasos */}
-            <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border)', display: 'grid', gap: '0.85rem' }}>
-              <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={form.hero_mostrar_metricas}
                     onChange={e => handleChange('hero_mostrar_metricas', e.target.checked)}
                   />
-                  <span>Mostrar panel de disponibilidad en vivo (fincas activas, ocupación)</span>
+                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Mostrar métricas en vivo (fincas disponibles / ocupación)</span>
                 </label>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={form.hero_mostrar_pasos}
                     onChange={e => handleChange('hero_mostrar_pasos', e.target.checked)}
                   />
-                  <span>Mostrar los 3 pasos guiados</span>
+                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Mostrar los 3 pasos de reserva fácil</span>
                 </label>
               </div>
-
-              {form.hero_mostrar_pasos && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
-                  <div className="field">
-                    <label>Paso 1</label>
-                    <input
-                      type="text"
-                      value={form.hero_paso_1}
-                      onChange={e => handleChange('hero_paso_1', e.target.value)}
-                    />
-                  </div>
-                  <div className="field">
-                    <label>Paso 2</label>
-                    <input
-                      type="text"
-                      value={form.hero_paso_2}
-                      onChange={e => handleChange('hero_paso_2', e.target.value)}
-                    />
-                  </div>
-                  <div className="field">
-                    <label>Paso 3</label>
-                    <input
-                      type="text"
-                      value={form.hero_paso_3}
-                      onChange={e => handleChange('hero_paso_3', e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* PESTAÑA 3: BENEFICIOS DESTACADOS */}
-      {tabActiva === 'destacados' && (
+      {/* PESTAÑA 3: GRÁFICOS & VISUALIZACIÓN INTERACTIVA (CHART.JS / 3D) */}
+      {tabActiva === 'graficos' && (
         <div className="panel" style={{ background: 'var(--surface)' }}>
-          <div className="panel-header" style={{ marginBottom: '1rem' }}>
+          <div className="panel-header" style={{ marginBottom: '1.25rem' }}>
             <div>
-              <div className="panel-title">Información Destacada y Beneficios</div>
-              <div className="text-xs text-muted">
-                Tarjetas que resaltan las ventajas de reservar con tu negocio campestre.
+              <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <TrendingUp size={20} style={{ color: 'var(--primary)' }} />
+                Visualización & Gráficos Interactivos (Chart.js)
+              </div>
+              <div className="text-xs text-muted mt-1">
+                Permite al cliente comparar gráficamente fincas y calcular presupuestos con desglose de ahorro directo.
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
-                <input
-                  type="checkbox"
-                  checked={form.destacados_visible}
-                  onChange={e => handleChange('destacados_visible', e.target.checked)}
-                />
-                <strong>Mostrar sección</strong>
-              </label>
-              <button
-                type="button"
-                className="btn btn-sm btn-primary"
-                onClick={handleAddBeneficio}
-              >
-                <Plus size={14} /> Agregar Tarjeta
-              </button>
-            </div>
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                checked={form.graficos_visible ?? true}
+                onChange={e => handleChange('graficos_visible', e.target.checked)}
+              />
+              <span className="slider round"></span>
+            </label>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.9rem', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'grid', gap: '1rem' }}>
             <div className="field">
-              <label>Título de la Sección</label>
+              <label>Título de la sección de gráficos</label>
               <input
                 type="text"
-                value={form.destacados_titulo}
-                placeholder="¿Por qué reservar con nosotros?"
-                onChange={e => handleChange('destacados_titulo', e.target.value)}
+                value={form.graficos_titulo || ''}
+                onChange={e => handleChange('graficos_titulo', e.target.value)}
+                placeholder="Análisis Visual & Calculadora de Presupuesto"
               />
             </div>
-            <div className="field">
-              <label>Subtítulo de la Sección</label>
-              <input
-                type="text"
-                value={form.destacados_subtitulo}
-                placeholder="Garantizamos tranquilidad, transparencia y el mejor descanso..."
-                onChange={e => handleChange('destacados_subtitulo', e.target.value)}
-              />
-            </div>
-          </div>
 
-          <div style={{ display: 'grid', gap: '0.85rem' }}>
-            {form.destacados_items.map((item, idx) => (
-              <div
-                key={item.id || idx}
-                style={{
-                  display: 'flex',
-                  gap: '0.75rem',
-                  alignItems: 'flex-start',
-                  padding: '1rem',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--rad-sm)',
-                  background: 'var(--surface-2)',
-                }}
+            <div className="field">
+              <label>Subtítulo descriptivo</label>
+              <input
+                type="text"
+                value={form.graficos_subtitulo || ''}
+                onChange={e => handleChange('graficos_subtitulo', e.target.value)}
+                placeholder="Compara capacidades, tarifas y simula tu inversión con ahorro directo en tiempo real"
+              />
+            </div>
+
+            <div className="field">
+              <label>Modalidad de Gráficos a mostrar al cliente</label>
+              <select
+                value={form.graficos_tipo || 'ambos'}
+                onChange={e => handleChange('graficos_tipo', e.target.value as any)}
               >
-                <div style={{ width: '65px' }}>
-                  <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>
-                    Emoji / Ícono
-                  </label>
-                  <input
-                    type="text"
-                    value={item.icono}
-                    style={{ textAlign: 'center', fontSize: '1.3rem', height: '38px', padding: '0.2rem' }}
-                    onChange={e => handleUpdateBeneficio(idx, 'icono', e.target.value)}
-                  />
-                </div>
+                <option value="ambos">Ambos (Pestañas con Comparativa de Barras + Simulador Doughnut)</option>
+                <option value="comparativa">Solo Comparativa de Fincas (Barras: Capacidad vs Tarifa)</option>
+                <option value="presupuesto">Solo Simulador de Presupuesto (Dona: Inversión + Ahorro Directo)</option>
+              </select>
+            </div>
 
-                <div style={{ flex: 1, display: 'grid', gap: '0.5rem' }}>
-                  <div className="field">
-                    <label>Título del Beneficio</label>
-                    <input
-                      type="text"
-                      value={item.titulo}
-                      onChange={e => handleUpdateBeneficio(idx, 'titulo', e.target.value)}
-                    />
-                  </div>
-                  <div className="field">
-                    <label>Descripción</label>
-                    <textarea
-                      rows={2}
-                      value={item.descripcion}
-                      onChange={e => handleUpdateBeneficio(idx, 'descripcion', e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline"
-                  onClick={() => handleRemoveBeneficio(idx)}
-                  title="Eliminar tarjeta"
-                  style={{ color: 'var(--danger)', borderColor: 'var(--danger-bg)', marginTop: '1.4rem' }}
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            ))}
+            <div
+              style={{
+                background: 'var(--surface-2)',
+                padding: '1rem',
+                borderRadius: 'var(--rad-sm, 12px)',
+                border: '1px solid var(--border)',
+                fontSize: '0.82rem',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <strong style={{ color: 'var(--text)', display: 'block', marginBottom: '0.25rem' }}>
+                💡 Impacto en el cliente:
+              </strong>
+              Los gráficos utilizan automáticamente los colores institucionales (esmeralda y dorado). El simulador resalta a los clientes el <strong>18% de ahorro directo</strong> al reservar contigo en lugar de usar plataformas externas con altas comisiones.
+            </div>
           </div>
         </div>
       )}
 
-      {/* PESTAÑA 4: BÚSQUEDA Y CATÁLOGO */}
+      {/* PESTAÑA 4: CATÁLOGO, COMPARADOR & PORTAL */}
       {tabActiva === 'busqueda' && (
         <div style={{ display: 'grid', gap: '1.25rem' }}>
-          {/* Panel Estado Actual */}
+          {/* Configuración de Catálogo */}
           <div className="panel" style={{ background: 'var(--surface)' }}>
             <div className="panel-header" style={{ marginBottom: '1rem' }}>
               <div>
-                <div className="panel-title">Resumen de Estado Actual</div>
-                <div className="text-xs text-muted">Chips que muestran cada finca y su estado de disponibilidad en tiempo real.</div>
+                <div className="panel-title">Catálogo de Fincas Campestres</div>
+                <div className="text-xs text-muted mt-1">Controla cómo se presentan las tarjetas y tarifas.</div>
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
-                <input
-                  type="checkbox"
-                  checked={form.estado_visible}
-                  onChange={e => handleChange('estado_visible', e.target.checked)}
-                />
-                <strong>Mostrar panel</strong>
-              </label>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.9rem' }}>
-              <div className="field">
-                <label>Título del Panel</label>
-                <input
-                  type="text"
-                  value={form.estado_titulo}
-                  onChange={e => handleChange('estado_titulo', e.target.value)}
-                />
-              </div>
-
-              <div className="field">
-                <label>Subtítulo</label>
-                <input
-                  type="text"
-                  value={form.estado_subtitulo}
-                  onChange={e => handleChange('estado_subtitulo', e.target.value)}
-                />
-              </div>
-
-              <div className="field">
-                <label>Texto del Badge</label>
-                <input
-                  type="text"
-                  value={form.estado_badge_texto}
-                  onChange={e => handleChange('estado_badge_texto', e.target.value)}
-                />
-              </div>
-
-              <div className="field" style={{ gridColumn: '1 / -1' }}>
-                <label>Texto de ayuda o instrucción al usuario</label>
-                <input
-                  type="text"
-                  value={form.estado_ayuda_texto}
-                  onChange={e => handleChange('estado_ayuda_texto', e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Filtros de Búsqueda */}
-          <div className="panel" style={{ background: 'var(--surface)' }}>
-            <div className="panel-header" style={{ marginBottom: '1rem' }}>
-              <div>
-                <div className="panel-title">Filtros de Búsqueda</div>
-                <div className="text-xs text-muted">Controles para filtrar por fechas y cantidad de personas.</div>
-              </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
-                <input
-                  type="checkbox"
-                  checked={form.filtros_visible}
-                  onChange={e => handleChange('filtros_visible', e.target.checked)}
-                />
-                <strong>Mostrar filtros</strong>
-              </label>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.9rem' }}>
-              <div className="field">
-                <label>Título de la sección de filtros</label>
-                <input
-                  type="text"
-                  value={form.filtros_titulo}
-                  onChange={e => handleChange('filtros_titulo', e.target.value)}
-                />
-              </div>
-
-              <div className="field">
-                <label>Subtítulo de filtros</label>
-                <input
-                  type="text"
-                  value={form.filtros_subtitulo}
-                  onChange={e => handleChange('filtros_subtitulo', e.target.value)}
-                />
-              </div>
-
-              <div className="field">
-                <label>Título de la tarjeta de ubicación</label>
-                <input
-                  type="text"
-                  value={form.filtros_badge_titulo}
-                  onChange={e => handleChange('filtros_badge_titulo', e.target.value)}
-                />
-              </div>
-
-              <div className="field">
-                <label>Texto descriptivo de ubicación</label>
-                <input
-                  type="text"
-                  value={form.filtros_badge_texto}
-                  onChange={e => handleChange('filtros_badge_texto', e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Catálogo de Fincas */}
-          <div className="panel" style={{ background: 'var(--surface)' }}>
-            <div className="panel-header" style={{ marginBottom: '1rem' }}>
-              <div>
-                <div className="panel-title">Catálogo y Listado de Fincas</div>
-                <div className="text-xs text-muted">Textos que encabezan la cuadrícula de fincas.</div>
-              </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
+              <label className="toggle-switch">
                 <input
                   type="checkbox"
                   checked={form.catalogo_visible}
                   onChange={e => handleChange('catalogo_visible', e.target.checked)}
                 />
-                <strong>Mostrar catálogo</strong>
+                <span className="slider round"></span>
               </label>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.9rem' }}>
-              <div className="field">
-                <label>Título del Catálogo</label>
-                <input
-                  type="text"
-                  value={form.catalogo_titulo}
-                  onChange={e => handleChange('catalogo_titulo', e.target.value)}
-                />
+            <div style={{ display: 'grid', gap: '0.85rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="field">
+                  <label>Título del Catálogo</label>
+                  <input
+                    type="text"
+                    value={form.catalogo_titulo}
+                    onChange={e => handleChange('catalogo_titulo', e.target.value)}
+                  />
+                </div>
+                <div className="field">
+                  <label>Vista predeterminada para el cliente</label>
+                  <select
+                    value={form.catalogo_vista_predeterminada || 'grid'}
+                    onChange={e => handleChange('catalogo_vista_predeterminada', e.target.value as any)}
+                  >
+                    <option value="grid">Cuadrícula 3D de lujo (Tarjetas interactivas con tilt)</option>
+                    <option value="lista">Lista compacta ejecutiva</option>
+                  </select>
+                </div>
               </div>
 
               <div className="field">
-                <label>Subtítulo</label>
+                <label>Subtítulo del Catálogo</label>
                 <input
                   type="text"
                   value={form.catalogo_subtitulo}
@@ -910,12 +797,65 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = ({
                 />
               </div>
 
-              <div className="field" style={{ gridColumn: '1 / -1' }}>
-                <label>Mensaje cuando no hay resultados para los filtros</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.35rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={form.catalogo_mostrar_badges ?? true}
+                    onChange={e => handleChange('catalogo_mostrar_badges', e.target.checked)}
+                  />
+                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Mostrar insignias de estado ("Disponible", "Alta demanda")</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={form.catalogo_mostrar_precio_total ?? true}
+                    onChange={e => handleChange('catalogo_mostrar_precio_total', e.target.checked)}
+                  />
+                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Mostrar también precio de finca completa</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Comparador de Fincas */}
+          <div className="panel" style={{ background: 'var(--surface)' }}>
+            <div className="panel-header" style={{ marginBottom: '1rem' }}>
+              <div>
+                <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Scale size={18} style={{ color: 'var(--primary)' }} />
+                  Comparador de Fincas Cara a Cara
+                </div>
+                <div className="text-xs text-muted mt-1">Permite a los huéspedes comparar 2 o 3 fincas simultáneamente.</div>
+              </div>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={form.comparador_visible ?? true}
+                  onChange={e => handleChange('comparador_visible', e.target.checked)}
+                />
+                <span className="slider round"></span>
+              </label>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="field">
+                <label>Título del Comparador</label>
                 <input
                   type="text"
-                  value={form.catalogo_vacio_texto}
-                  onChange={e => handleChange('catalogo_vacio_texto', e.target.value)}
+                  value={form.comparador_titulo || ''}
+                  onChange={e => handleChange('comparador_titulo', e.target.value)}
+                  placeholder="Comparador de Fincas"
+                />
+              </div>
+              <div className="field">
+                <label>Subtítulo</label>
+                <input
+                  type="text"
+                  value={form.comparador_subtitulo || ''}
+                  onChange={e => handleChange('comparador_subtitulo', e.target.value)}
+                  placeholder="Analiza lado a lado las especificaciones y tarifas"
                 />
               </div>
             </div>
@@ -923,53 +863,142 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = ({
         </div>
       )}
 
-      {/* PESTAÑA 5: MENÚS Y GASTRONOMÍA PÚBLICA */}
+      {/* PESTAÑA 5: DESTACADOS / BENEFICIOS */}
+      {tabActiva === 'destacados' && (
+        <div className="panel" style={{ background: 'var(--surface)' }}>
+          <div className="panel-header" style={{ marginBottom: '1rem' }}>
+            <div>
+              <div className="panel-title">Información Destacada y Beneficios</div>
+              <div className="text-xs text-muted mt-1">Tarjetas de propuesta de valor y tranquilidad.</div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <button type="button" className="btn btn-sm btn-outline" onClick={handleAddBeneficio}>
+                <Plus size={14} /> Añadir Beneficio
+              </button>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={form.destacados_visible}
+                  onChange={e => handleChange('destacados_visible', e.target.checked)}
+                />
+                <span className="slider round"></span>
+              </label>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gap: '0.85rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="field">
+                <label>Título de la sección</label>
+                <input
+                  type="text"
+                  value={form.destacados_titulo}
+                  onChange={e => handleChange('destacados_titulo', e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label>Subtítulo</label>
+                <input
+                  type="text"
+                  value={form.destacados_subtitulo}
+                  onChange={e => handleChange('destacados_subtitulo', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gap: '0.75rem', marginTop: '0.5rem' }}>
+              {form.destacados_items.map((item, idx) => (
+                <div
+                  key={item.id || idx}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '60px 1fr 1.5fr auto',
+                    gap: '0.65rem',
+                    alignItems: 'center',
+                    background: 'var(--surface-2)',
+                    padding: '0.65rem',
+                    borderRadius: 'var(--rad-xs, 8px)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={item.icono}
+                    onChange={e => handleUpdateBeneficio(idx, 'icono', e.target.value)}
+                    style={{ textAlign: 'center', fontSize: '1.25rem' }}
+                    title="Icono o emoji"
+                  />
+                  <input
+                    type="text"
+                    value={item.titulo}
+                    onChange={e => handleUpdateBeneficio(idx, 'titulo', e.target.value)}
+                    placeholder="Título del beneficio"
+                  />
+                  <input
+                    type="text"
+                    value={item.descripcion}
+                    onChange={e => handleUpdateBeneficio(idx, 'descripcion', e.target.value)}
+                    placeholder="Descripción"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveBeneficio(idx)}
+                    className="btn btn-sm"
+                    style={{ color: 'var(--danger)', padding: '0.4rem' }}
+                    title="Eliminar beneficio"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PESTAÑA 6: GASTRONOMÍA */}
       {tabActiva === 'menus' && (
         <div className="panel" style={{ background: 'var(--surface)' }}>
           <div className="panel-header" style={{ marginBottom: '1rem' }}>
             <div>
-              <div className="panel-title">Gastronomía y Menús en el Portal Público</div>
-              <div className="text-xs text-muted">
-                Muestra las opciones de alimentación activas para que los clientes las conozcan directamente.
-              </div>
+              <div className="panel-title">Gastronomía y Menús Campestres</div>
+              <div className="text-xs text-muted mt-1">Presentación comercial de la alimentación en el sitio público.</div>
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
+            <label className="toggle-switch">
               <input
                 type="checkbox"
                 checked={form.menus_visible}
                 onChange={e => handleChange('menus_visible', e.target.checked)}
               />
-              <strong>Mostrar sección de menús en el portal</strong>
+              <span className="slider round"></span>
             </label>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.9rem' }}>
-            <div className="field">
-              <label>Título de la Sección</label>
-              <input
-                type="text"
-                value={form.menus_titulo}
-                placeholder="Gastronomía y Menús Campestres"
-                onChange={e => handleChange('menus_titulo', e.target.value)}
-              />
+          <div style={{ display: 'grid', gap: '0.85rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="field">
+                <label>Título de la sección</label>
+                <input
+                  type="text"
+                  value={form.menus_titulo}
+                  onChange={e => handleChange('menus_titulo', e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label>Insignia superior (Badge)</label>
+                <input
+                  type="text"
+                  value={form.menus_badge_texto}
+                  onChange={e => handleChange('menus_badge_texto', e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="field">
-              <label>Etiqueta / Badge Superior</label>
-              <input
-                type="text"
-                value={form.menus_badge_texto}
-                placeholder="Servicio Adicional Opcional"
-                onChange={e => handleChange('menus_badge_texto', e.target.value)}
-              />
-            </div>
-
-            <div className="field" style={{ gridColumn: '1 / -1' }}>
-              <label>Subtítulo Descriptivo</label>
+              <label>Subtítulo o descripción comercial</label>
               <textarea
                 rows={2}
                 value={form.menus_subtitulo}
-                placeholder="Complementa tu descanso con deliciosas opciones de alimentación tradicional..."
                 onChange={e => handleChange('menus_subtitulo', e.target.value)}
               />
             </div>
@@ -977,171 +1006,342 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = ({
         </div>
       )}
 
-      {/* PESTAÑA 6: PREGUNTAS FRECUENTES (FAQ) */}
+      {/* PESTAÑA 7: PREGUNTAS FRECUENTES (FAQ) */}
       {tabActiva === 'faq' && (
         <div className="panel" style={{ background: 'var(--surface)' }}>
           <div className="panel-header" style={{ marginBottom: '1rem' }}>
             <div>
               <div className="panel-title">Preguntas Frecuentes (FAQ)</div>
-              <div className="text-xs text-muted">
-                Resuelve dudas habituales sobre pagos, horarios, mascotas y condiciones antes de cotizar.
-              </div>
+              <div className="text-xs text-muted mt-1">Resuelve dudas sobre separación, check-in y formas de pago.</div>
             </div>
-            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <button type="button" className="btn btn-sm btn-outline" onClick={handleAddFaq}>
+                <Plus size={14} /> Añadir Pregunta
+              </button>
+              <label className="toggle-switch">
                 <input
                   type="checkbox"
                   checked={form.faq_visible}
                   onChange={e => handleChange('faq_visible', e.target.checked)}
                 />
-                <strong>Mostrar FAQ</strong>
+                <span className="slider round"></span>
               </label>
-              <button
-                type="button"
-                className="btn btn-sm btn-primary"
-                onClick={handleAddFaq}
-              >
-                <Plus size={14} /> Nueva Pregunta
-              </button>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.9rem', marginBottom: '1.25rem' }}>
-            <div className="field">
-              <label>Título de la Sección FAQ</label>
-              <input
-                type="text"
-                value={form.faq_titulo}
-                onChange={e => handleChange('faq_titulo', e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Subtítulo</label>
-              <input
-                type="text"
-                value={form.faq_subtitulo}
-                onChange={e => handleChange('faq_subtitulo', e.target.value)}
-              />
             </div>
           </div>
 
           <div style={{ display: 'grid', gap: '0.85rem' }}>
-            {form.faq_items.map((item, idx) => (
-              <div
-                key={item.id || idx}
-                style={{
-                  display: 'flex',
-                  gap: '0.75rem',
-                  alignItems: 'flex-start',
-                  padding: '1rem',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--rad-sm)',
-                  background: 'var(--surface-2)',
-                }}
-              >
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="field">
+                <label>Título de la sección</label>
+                <input
+                  type="text"
+                  value={form.faq_titulo}
+                  onChange={e => handleChange('faq_titulo', e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label>Subtítulo</label>
+                <input
+                  type="text"
+                  value={form.faq_subtitulo}
+                  onChange={e => handleChange('faq_subtitulo', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gap: '0.85rem', marginTop: '0.5rem' }}>
+              {form.faq_items.map((item, idx) => (
                 <div
+                  key={item.id || idx}
                   style={{
-                    width: '26px',
-                    height: '26px',
-                    borderRadius: '50%',
-                    background: 'var(--surface-3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    marginTop: '1.4rem',
-                    flexShrink: 0,
+                    background: 'var(--surface-2)',
+                    padding: '0.85rem',
+                    borderRadius: 'var(--rad-xs, 8px)',
+                    border: '1px solid var(--border)',
+                    display: 'grid',
+                    gap: '0.5rem',
                   }}
                 >
-                  {idx + 1}
-                </div>
-
-                <div style={{ flex: 1, display: 'grid', gap: '0.5rem' }}>
-                  <div className="field">
-                    <label>Pregunta</label>
-                    <input
-                      type="text"
-                      value={item.pregunta}
-                      placeholder="¿Cuál es tu pregunta?"
-                      onChange={e => handleUpdateFaq(idx, 'pregunta', e.target.value)}
-                    />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)' }}>
+                      Pregunta #{idx + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFaq(idx)}
+                      style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}
+                      title="Eliminar pregunta"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
-                  <div className="field">
-                    <label>Respuesta</label>
-                    <textarea
-                      rows={3}
-                      value={item.respuesta}
-                      placeholder="Respuesta explicativa y clara para el cliente..."
-                      onChange={e => handleUpdateFaq(idx, 'respuesta', e.target.value)}
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={item.pregunta}
+                    onChange={e => handleUpdateFaq(idx, 'pregunta', e.target.value)}
+                    placeholder="Escribe la pregunta..."
+                    style={{ fontWeight: 600 }}
+                  />
+                  <textarea
+                    rows={2}
+                    value={item.respuesta}
+                    onChange={e => handleUpdateFaq(idx, 'respuesta', e.target.value)}
+                    placeholder="Escribe la respuesta clara..."
+                  />
                 </div>
-
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline"
-                  onClick={() => handleRemoveFaq(idx)}
-                  title="Eliminar pregunta"
-                  style={{ color: 'var(--danger)', borderColor: 'var(--danger-bg)', marginTop: '1.4rem' }}
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* PESTAÑA 7: PIE DE PÁGINA (FOOTER) */}
+      {/* PESTAÑA 8: PIE DE PÁGINA */}
       {tabActiva === 'footer' && (
         <div className="panel" style={{ background: 'var(--surface)' }}>
           <div className="panel-header" style={{ marginBottom: '1rem' }}>
             <div>
               <div className="panel-title">Pie de Página (Footer)</div>
-              <div className="text-xs text-muted">
-                Textos de cierre, llamado a WhatsApp e información de confianza.
-              </div>
+              <div className="text-xs text-muted mt-1">Cierre de página, WhatsApp institucional y redes sociales.</div>
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
+            <label className="toggle-switch">
               <input
                 type="checkbox"
                 checked={form.footer_visible}
                 onChange={e => handleChange('footer_visible', e.target.checked)}
               />
-              <strong>Mostrar Footer</strong>
+              <span className="slider round"></span>
             </label>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.9rem' }}>
+          <div style={{ display: 'grid', gap: '0.85rem' }}>
             <div className="field">
-              <label>Título del Negocio en Footer</label>
+              <label>Título / Nombre Institucional</label>
               <input
                 type="text"
                 value={form.footer_titulo}
-                placeholder="Control de Fincas Campestres"
                 onChange={e => handleChange('footer_titulo', e.target.value)}
               />
             </div>
-
             <div className="field">
-              <label>Llamado a la acción WhatsApp</label>
-              <input
-                type="text"
-                value={form.footer_whatsapp_cta}
-                placeholder="¿Tienes alguna duda especial? Escríbenos directamente a WhatsApp"
-                onChange={e => handleChange('footer_whatsapp_cta', e.target.value)}
-              />
-            </div>
-
-            <div className="field" style={{ gridColumn: '1 / -1' }}>
-              <label>Descripción / Frase de cierre</label>
+              <label>Subtítulo o descripción de pie de página</label>
               <textarea
                 rows={2}
                 value={form.footer_subtitulo}
-                placeholder="Alquiler exclusivo de fincas de recreo y descanso en Santa Elena, El Cerrito, Valle del Cauca."
                 onChange={e => handleChange('footer_subtitulo', e.target.value)}
               />
+            </div>
+            <div className="field">
+              <label>Llamada a la acción (WhatsApp)</label>
+              <input
+                type="text"
+                value={form.footer_whatsapp_cta}
+                onChange={e => handleChange('footer_whatsapp_cta', e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL SIMULADOR DE VISTA PREVIA EN VIVO ─── */}
+      {modalPreviewOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1200,
+            background: 'rgba(0,0,0,0.8)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            padding: '1rem',
+          }}
+          onClick={() => setModalPreviewOpen(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: previewDevice === 'mobile' ? '420px' : '95%',
+              maxWidth: '1200px',
+              height: '92vh',
+              background: 'var(--bg)',
+              borderRadius: 'var(--rad-md, 18px)',
+              border: '2px solid var(--border)',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: 'var(--sh-lg)',
+              overflow: 'hidden',
+              transition: 'width 0.3s ease',
+            }}
+          >
+            {/* Barra de control del simulador */}
+            <div
+              style={{
+                padding: '0.75rem 1.25rem',
+                background: 'var(--surface)',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text)' }}>
+                  Simulador en Tiempo Real
+                </span>
+                <span className="status-badge s-info" style={{ fontSize: '0.68rem' }}>
+                  {form.orden_secciones.filter(esVisible).length} secciones activas
+                </span>
+              </div>
+
+              {/* Selector de Dispositivo */}
+              <div style={{ display: 'flex', gap: '0.35rem', background: 'var(--surface-2)', padding: '0.2rem', borderRadius: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice('desktop')}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: previewDevice === 'desktop' ? 'var(--primary)' : 'transparent',
+                    color: previewDevice === 'desktop' ? '#fff' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <Monitor size={14} /> Escritorio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice('mobile')}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: previewDevice === 'mobile' ? 'var(--primary)' : 'transparent',
+                    color: previewDevice === 'mobile' ? '#fff' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <Smartphone size={14} /> Móvil
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  onClick={async () => {
+                    await handleGuardar();
+                    setModalPreviewOpen(false);
+                  }}
+                >
+                  <Save size={14} /> Aplicar Cambios
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalPreviewOpen(false)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Contenido Simulado con Scroll */}
+            <div style={{ flexGrow: 1, overflowY: 'auto', padding: '1.25rem' }}>
+              {/* Banner Simulado */}
+              {form.banner_visible && (
+                <div
+                  style={{
+                    padding: '0.65rem 1rem',
+                    background: 'var(--primary-bg)',
+                    color: 'var(--primary-h)',
+                    borderRadius: '8px',
+                    textAlign: 'center',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    marginBottom: '1rem',
+                  }}
+                >
+                  {form.banner_texto}
+                </div>
+              )}
+
+              {/* Hero Simulado */}
+              {form.hero_visible && (
+                <div
+                  style={{
+                    padding: '2rem 1.5rem',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--rad-md, 16px)',
+                    textAlign: 'center',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase' }}>
+                    {form.hero_eyebrow}
+                  </span>
+                  <h1 style={{ fontSize: previewDevice === 'mobile' ? '1.5rem' : '2.2rem', margin: '0.5rem 0', fontWeight: 900 }}>
+                    {form.hero_titulo}
+                  </h1>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', maxWidth: '600px', margin: '0 auto 1.25rem auto' }}>
+                    {form.hero_subtitulo}
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                    <button className="btn btn-primary btn-sm">{form.hero_cta_texto}</button>
+                    <button className="btn btn-outline btn-sm">{form.hero_cta_secundario_texto}</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Lista de Secciones Configuradas */}
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                {form.orden_secciones
+                  .filter(s => s !== 'banner' && s !== 'hero' && esVisible(s))
+                  .map(sec => {
+                    const info = SECCIONES_INFO[sec];
+                    return (
+                      <div
+                        key={sec}
+                        style={{
+                          padding: '1.25rem',
+                          background: 'var(--surface)',
+                          border: '1.5px dashed var(--border)',
+                          borderRadius: 'var(--rad-sm, 12px)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                          <span style={{ color: 'var(--primary)' }}>{info?.icon}</span>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text)' }}>
+                              {info?.label || sec}
+                            </div>
+                            <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                              {info?.desc || ''}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="status-badge s-avail" style={{ fontSize: '0.68rem' }}>
+                          Sección Activa
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
           </div>
         </div>

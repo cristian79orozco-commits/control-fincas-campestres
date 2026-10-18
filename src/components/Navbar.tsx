@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
-import { Home, Map, Moon, Sun, ShieldCheck } from 'lucide-react';
+import { Home, Map, Moon, Sun, ShieldCheck, FileCheck2 } from 'lucide-react';
 import type { ViewType } from '../types';
+import { useClientStore } from '../store/useClientStore';
 
 interface NavbarProps {
   currentView: ViewType;
@@ -21,6 +22,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAdminLoginModal,
   hasSelectedFinca,
 }) => {
+  const { setModalConsultaOpen } = useClientStore();
   const brandClicks = useRef(0);
   const brandTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -96,6 +98,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             <ShieldCheck size={18} style={{ color: 'var(--primary)' }} />
           </button>
         )}
+
+        {/* Acceso rápido a consulta de reserva para huéspedes */}
+        <button
+          className="icon-btn"
+          onClick={() => setModalConsultaOpen(true)}
+          title="Consultar estado de mi reserva o cotización"
+        >
+          <FileCheck2 size={18} style={{ color: 'var(--primary)' }} />
+        </button>
 
         <button
           className="icon-btn"
