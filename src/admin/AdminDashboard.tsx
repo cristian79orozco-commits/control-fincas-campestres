@@ -17,6 +17,7 @@ import { AdminHistorial } from './AdminHistorial';
 import { AdminConfiguracion } from './AdminConfiguracion';
 import { AdminPersonalizacion } from './AdminPersonalizacion';
 import { AdminDashboardOverview } from './dashboard/AdminDashboardOverview';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useApp } from '../context/AppContext';
 import {
   obtenerEstadoPermisoNotificaciones,
@@ -508,16 +509,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* ===== SECCIÓN: DASHBOARD REESTRUCTURADO UI/UX ===== */}
           {activeSection === 'dashboard' && (
-            <AdminDashboardOverview
-              fincas={fincas}
-              reservas={reservas}
-              cotizaciones={cotizaciones}
-              clientes={clientes}
-              menus={menus}
-              metricasReservas={metricasReservas}
-              navigateTo={navigateTo}
-              userEmail={userEmail}
-            />
+            <ErrorBoundary fallbackTitle="Panel de Dashboard">
+              <AdminDashboardOverview
+                fincas={fincas || []}
+                reservas={reservas || []}
+                cotizaciones={cotizaciones || []}
+                clientes={clientes || []}
+                menus={menus || []}
+                metricasReservas={metricasReservas || { total: 0, activas: 0, llegasHoy: 0, salenHoy: 0 }}
+                navigateTo={navigateTo}
+                userEmail={userEmail}
+              />
+            </ErrorBoundary>
           )}
 
           {/* ===== SECCIÓN: FINCAS ===== */}

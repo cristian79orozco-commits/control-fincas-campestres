@@ -1,70 +1,51 @@
 import React from 'react';
 import {
   Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-  Filler,
+  registerables,
   ChartOptions
 } from 'chart.js';
-import { Bar, Doughnut } from 'react-chartjs-2';
+import { Chart, Bar, Doughnut } from 'react-chartjs-2';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, PieChart as PieIcon, Building2, Target, Layers } from 'lucide-react';
 import type { SerieMensualFinanzas, RendimientoFincaItem, EmbudoCotizacionesData } from '../../utils/dashboardMetrics';
 
-// Registro completo de módulos de Chart.js
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-  Filler
-);
+// Registro 100% completo y seguro de todos los controladores (Bar, Line, Doughnut), escalas y plugins
+ChartJS.register(...registerables);
 
 interface DashboardChartsProps {
-  serieFinanzas: SerieMensualFinanzas;
-  rendimientoFincas: RendimientoFincaItem[];
-  embudoCotizaciones: EmbudoCotizacionesData;
-  ingresosHospedaje: number;
-  ingresosAlimentacion: number;
-  saldoPendiente: number;
+  serieFinanzas?: SerieMensualFinanzas;
+  rendimientoFincas?: RendimientoFincaItem[];
+  embudoCotizaciones?: EmbudoCotizacionesData;
+  ingresosHospedaje?: number;
+  ingresosAlimentacion?: number;
+  saldoPendiente?: number;
   tabActiva: 'finanzas' | 'ocupacion' | 'embudo';
   onCambiarTab: (tab: 'finanzas' | 'ocupacion' | 'embudo') => void;
 }
 
 function formatCOP(v: number): string {
-  return '$' + Math.round(v || 0).toLocaleString('es-CO');
+  const num = typeof v === 'number' && !isNaN(v) ? v : 0;
+  return '$' + Math.round(num).toLocaleString('es-CO');
 }
 
 export const DashboardCharts: React.FC<DashboardChartsProps> = ({
-  serieFinanzas,
-  rendimientoFincas,
-  embudoCotizaciones,
-  ingresosHospedaje,
-  ingresosAlimentacion,
-  saldoPendiente,
+  serieFinanzas = { labels: [], alojamiento: [], alimentacion: [], saldosPendientes: [] },
+  rendimientoFincas = [],
+  embudoCotizaciones = { labels: [], data: [], porcentajes: [], total: 0, tasaConversion: 0 },
+  ingresosHospedaje = 0,
+  ingresosAlimentacion = 0,
+  saldoPendiente = 0,
   tabActiva,
   onCambiarTab,
 }) => {
   // ---- 1. CONFIGURACIÓN DEL GRÁFICO FINANCIERO (BAR/LINE COMBO) ----
   const dataFinanzas = {
-    labels: serieFinanzas.labels,
+    labels: serieFinanzas?.labels || [],
     datasets: [
       {
         type: 'bar' as const,
         label: 'Alojamiento (Fincas)',
-        data: serieFinanzas.alojamiento,
+        data: serieFinanzas?.alojamiento || [],
         backgroundColor: 'rgba(26, 107, 94, 0.78)',
         hoverBackgroundColor: 'rgba(26, 107, 94, 0.95)',
         borderRadius: 6,
@@ -74,7 +55,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
       {
         type: 'bar' as const,
         label: 'Alimentación (Admin)',
-        data: serieFinanzas.alimentacion,
+        data: serieFinanzas?.alimentacion || [],
         backgroundColor: 'rgba(196, 122, 40, 0.82)',
         hoverBackgroundColor: 'rgba(196, 122, 40, 1)',
         borderRadius: 6,
@@ -84,7 +65,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
       {
         type: 'line' as const,
         label: 'Saldo Pendiente por Cobrar',
-        data: serieFinanzas.saldosPendientes,
+        data: serieFinanzas?.saldosPendientes || [],
         borderColor: '#dc2626',
         backgroundColor: 'rgba(220, 38, 38, 0.08)',
         borderWidth: 2.5,
@@ -154,7 +135,11 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
     labels: ['Alojamiento (Propietarios)', 'Menús & Gastronomía (Admin)', 'Saldos Pendientes'],
     datasets: [
       {
-        data: [ingresosHospedaje, ingresosAlimentacion, saldoPendiente],
+        data: [
+          Math.max(0, ingresosHospedaje),
+          Math.max(0, ingresosAlimentacion),
+          Math.max(0, saldoPendiente),
+        ],
         backgroundColor: [
           '#1a6b5e',
           '#c47a28',
@@ -198,13 +183,14 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
   };
 
   // ---- 3. RANKING DE FINCAS (HORIZONTAL BAR) ----
-  const topFincas = rendimientoFincas.slice(0, 6);
+  const safeRendimiento = Array.isArray(rendimientoFincas) ? rendimientoFincas : [];
+  const topFincas = safeRendimiento.slice(0, 6);
   const dataFincas = {
-    labels: topFincas.map((f) => f.nombre),
+    labels: topFincas.map((f) => f.nombre || 'Finca'),
     datasets: [
       {
         label: 'Ingresos Totales',
-        data: topFincas.map((f) => f.totalIngresos),
+        data: topFincas.map((f) => f.totalIngresos || 0),
         backgroundColor: 'rgba(26, 107, 94, 0.85)',
         hoverBackgroundColor: '#1a6b5e',
         borderRadius: 6,
@@ -245,16 +231,16 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
 
   // ---- 4. EMBUDO DE COTIZACIONES ----
   const dataEmbudo = {
-    labels: embudoCotizaciones.labels,
+    labels: embudoCotizaciones?.labels || ['Borrador', 'Cotizada', 'Pendiente', 'Confirmada', 'Rechazada'],
     datasets: [
       {
-        data: embudoCotizaciones.data,
+        data: embudoCotizaciones?.data || [0, 0, 0, 0, 0],
         backgroundColor: [
-          '#94a3b8', // Borrador (gris azulado)
-          '#38bdf8', // Cotizada (azul claro)
-          '#f59e0b', // Pendiente (ámbar)
-          '#16a34a', // Confirmada (verde victoria)
-          '#ef4444', // Rechazada (rojo)
+          '#94a3b8',
+          '#38bdf8',
+          '#f59e0b',
+          '#16a34a',
+          '#ef4444',
         ],
         borderWidth: 2,
         borderColor: '#ffffff',
@@ -278,7 +264,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
         callbacks: {
           label: (context) => {
             const val = Number(context.raw) || 0;
-            const pct = embudoCotizaciones.porcentajes[context.dataIndex] || 0;
+            const pct = (embudoCotizaciones?.porcentajes && embudoCotizaciones.porcentajes[context.dataIndex]) || 0;
             return ` ${context.label}: ${val} cotizaciones (${pct}%)`;
           },
         },
@@ -360,8 +346,8 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
                 <span className="text-xs" style={{ color: 'var(--primary)', fontWeight: 600 }}>Alojamiento + Menús</span>
               </div>
               <div style={{ height: '250px' }}>
-                {/* @ts-ignore - Chart.js combo typing */}
-                <Bar data={dataFinanzas as any} options={optionsFinanzas} />
+                {/* Usamos Chart genérico para compatibilidad perfecta con combo bar y line */}
+                <Chart type="bar" data={dataFinanzas as any} options={optionsFinanzas} />
               </div>
             </div>
 
@@ -391,7 +377,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
             <div className="text-xs text-muted" style={{ fontWeight: 600, marginBottom: '0.75rem' }}>
               Ranking de Fincas por Ingresos Generados y Volumen de Reservas
             </div>
-            {rendimientoFincas.length === 0 ? (
+            {topFincas.length === 0 ? (
               <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                 No hay suficientes datos de reservas para calcular el ranking de fincas.
               </div>
@@ -428,24 +414,24 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
               <div style={{ display: 'grid', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span className="text-xs text-muted">Total Solicitudes Registradas:</span>
-                  <span className="tabular-nums font-dashboard" style={{ fontWeight: 700 }}>{embudoCotizaciones.total}</span>
+                  <span className="tabular-nums font-dashboard" style={{ fontWeight: 700 }}>{embudoCotizaciones?.total || 0}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span className="text-xs text-muted">Cotizaciones Ganadas / Confirmadas:</span>
                   <span className="tabular-nums font-dashboard" style={{ fontWeight: 700, color: '#16a34a' }}>
-                    {embudoCotizaciones.data[3] || 0}
+                    {(embudoCotizaciones?.data && embudoCotizaciones.data[3]) || 0}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span className="text-xs text-muted">Tasa de Conversión a Reserva:</span>
                   <span className="dashboard-glow-badge tabular-nums font-dashboard" style={{ background: 'color-mix(in srgb, #16a34a 15%, transparent)', color: '#16a34a' }}>
-                    {embudoCotizaciones.tasaConversion}% de éxito
+                    {embudoCotizaciones?.tasaConversion || 0}% de éxito
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span className="text-xs text-muted">En Negociación / Pendientes:</span>
                   <span className="tabular-nums font-dashboard" style={{ fontWeight: 700, color: '#f59e0b' }}>
-                    {(embudoCotizaciones.data[1] || 0) + (embudoCotizaciones.data[2] || 0)}
+                    {((embudoCotizaciones?.data && embudoCotizaciones.data[1]) || 0) + ((embudoCotizaciones?.data && embudoCotizaciones.data[2]) || 0)}
                   </span>
                 </div>
               </div>

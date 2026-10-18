@@ -4,6 +4,7 @@ import { Hero } from './components/Hero';
 import { Catalog } from './components/Catalog';
 import { FincaDetail } from './components/FincaDetail';
 import { AdminDashboard } from './admin/AdminDashboard';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastContainer } from './components/Toast';
 import { ConfirmModal } from './components/ConfirmModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
@@ -351,59 +352,61 @@ export const App: React.FC = () => {
 
       {view === 'admin' && (
         <main className="main-content" style={{ marginTop: '1.5rem' }}>
-          <AdminDashboard
-            isAdminLoggedIn={isAdminLoggedIn}
-            userEmail={user?.email}
-            fincas={todasLasFincas}
-            bloquesAdmin={bloquesAdmin}
-            currentWaNumber={waNumberGlobal}
-            clientes={clientes}
-            cotizaciones={cotizaciones}
-            reservas={reservas}
-            metricasReservas={metricasReservas}
-            onLogin={login}
-            onLogout={() => {
-              logout();
-              handleViewChange('cliente');
-              showToast('Sesión administrativa finalizada', 'info');
-            }}
-            onSaveFinca={guardarFinca}
-            onDeleteFinca={desactivarFinca}
-            onMarcarDiasAdmin={marcarDiasAdmin}
-            onEliminarBloqueo={eliminarBloqueo}
-            onSaveWaNumber={handleSaveWaNumber}
-            onGuardarCliente={guardarCliente}
-            onDesactivarCliente={desactivarCliente}
-            onEliminarCliente={eliminarCliente}
-            onGuardarCotizacion={guardarCotizacion}
-            onCambiarEstadoCotizacion={cambiarEstadoCotizacion}
-            onEliminarCotizacion={eliminarCotizacion}
-            onGuardarReserva={guardarReserva}
-            onCambiarEstadoReserva={cambiarEstadoReserva}
-            onCerrarReserva={cerrarReserva}
-            onReabrirReserva={reabrirReserva}
-            onEliminarReserva={eliminarReserva}
-            onRegistrarPago={registrarPago}
-            onEliminarPago={eliminarPago}
-            menus={menus}
-            onGuardarMenu={guardarMenu}
-            onCambiarEstadoMenu={cambiarEstadoMenu}
-            onEliminarMenu={eliminarMenu}
-            comunicaciones={comunicaciones}
-            onRegistrarComunicacion={registrarComunicacion}
-            onLimpiarHistorialComunicaciones={limpiarHistorialComunicaciones}
-            configuracion={configuracion}
-            guardandoConfig={guardandoConfig}
-            onGuardarConfiguracion={guardarConfiguracion}
-            onRestablecerConfiguracion={restablecerConfiguracion}
-            contenidoSitio={contenidoSitio}
-            guardandoContenido={guardandoContenido}
-            onGuardarContenido={guardarContenido}
-            onRestablecerContenido={restablecerContenido}
-            onVerSitioPublico={() => handleViewChange('cliente')}
-            showToast={showToast}
-            openConfirm={openConfirm}
-          />
+          <ErrorBoundary fallbackTitle="Panel de Administración">
+            <AdminDashboard
+              isAdminLoggedIn={isAdminLoggedIn}
+              userEmail={user?.email}
+              fincas={todasLasFincas}
+              bloquesAdmin={bloquesAdmin}
+              currentWaNumber={waNumberGlobal}
+              clientes={clientes}
+              cotizaciones={cotizaciones}
+              reservas={reservas}
+              metricasReservas={metricasReservas}
+              onLogin={login}
+              onLogout={() => {
+                logout();
+                handleViewChange('cliente');
+                showToast('Sesión administrativa finalizada', 'info');
+              }}
+              onSaveFinca={guardarFinca}
+              onDeleteFinca={desactivarFinca}
+              onMarcarDiasAdmin={marcarDiasAdmin}
+              onEliminarBloqueo={eliminarBloqueo}
+              onSaveWaNumber={handleSaveWaNumber}
+              onGuardarCliente={guardarCliente}
+              onDesactivarCliente={desactivarCliente}
+              onEliminarCliente={eliminarCliente}
+              onGuardarCotizacion={guardarCotizacion}
+              onCambiarEstadoCotizacion={cambiarEstadoCotizacion}
+              onEliminarCotizacion={eliminarCotizacion}
+              onGuardarReserva={guardarReserva}
+              onCambiarEstadoReserva={cambiarEstadoReserva}
+              onCerrarReserva={cerrarReserva}
+              onReabrirReserva={reabrirReserva}
+              onEliminarReserva={eliminarReserva}
+              onRegistrarPago={registrarPago}
+              onEliminarPago={eliminarPago}
+              menus={menus}
+              onGuardarMenu={guardarMenu}
+              onCambiarEstadoMenu={cambiarEstadoMenu}
+              onEliminarMenu={eliminarMenu}
+              comunicaciones={comunicaciones}
+              onRegistrarComunicacion={registrarComunicacion}
+              onLimpiarHistorialComunicaciones={limpiarHistorialComunicaciones}
+              configuracion={configuracion}
+              guardandoConfig={guardandoConfig}
+              onGuardarConfiguracion={guardarConfiguracion}
+              onRestablecerConfiguracion={restablecerConfiguracion}
+              contenidoSitio={contenidoSitio}
+              guardandoContenido={guardandoContenido}
+              onGuardarContenido={guardarContenido}
+              onRestablecerContenido={restablecerContenido}
+              onVerSitioPublico={() => handleViewChange('cliente')}
+              showToast={showToast}
+              openConfirm={openConfirm}
+            />
+          </ErrorBoundary>
         </main>
       )}
 

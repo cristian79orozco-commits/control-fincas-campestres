@@ -30,27 +30,28 @@ import {
 import { DashboardCharts } from './DashboardCharts';
 
 interface AdminDashboardOverviewProps {
-  fincas: Finca[];
-  reservas: Reserva[];
-  cotizaciones: CotizacionDB[];
-  clientes: Cliente[];
-  menus: MenuType[];
-  metricasReservas: { total: number; activas: number; llegasHoy: number; salenHoy: number };
+  fincas?: Finca[];
+  reservas?: Reserva[];
+  cotizaciones?: CotizacionDB[];
+  clientes?: Cliente[];
+  menus?: MenuType[];
+  metricasReservas?: { total: number; activas: number; llegasHoy: number; salenHoy: number };
   navigateTo: (section: AdminSection) => void;
   userEmail?: string | null;
 }
 
 function formatCOP(v: number): string {
-  return '$' + Math.round(v || 0).toLocaleString('es-CO');
+  const num = typeof v === 'number' && !isNaN(v) ? v : 0;
+  return '$' + Math.round(num).toLocaleString('es-CO');
 }
 
 export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
-  fincas,
-  reservas,
-  cotizaciones,
-  clientes,
-  menus,
-  metricasReservas,
+  fincas = [],
+  reservas = [],
+  cotizaciones = [],
+  clientes = [],
+  menus = [],
+  metricasReservas = { total: 0, activas: 0, llegasHoy: 0, salenHoy: 0 },
   navigateTo,
   userEmail,
 }) => {
@@ -64,53 +65,64 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
 
   // 1. Filtrado dinámico 100% centralizado con Lodash y Zustand
   const { reservas: reservasFiltradas, cotizaciones: cotizacionesFiltradas } = useMemo(() => {
-    return filtrarDatosPorPeriodoYFinca(reservas, cotizaciones, periodo, fincaId);
+    return filtrarDatosPorPeriodoYFinca(reservas || [], cotizaciones || [], periodo, fincaId);
   }, [reservas, cotizaciones, periodo, fincaId]);
 
   // 2. Cálculo de métricas consolidadas en tiempo real
   const metricas = useMemo(() => {
-    return calcularMetricasDashboard(reservasFiltradas, cotizacionesFiltradas, metricasReservas);
+    return calcularMetricasDashboard(reservasFiltradas || [], cotizacionesFiltradas || [], metricasReservas);
   }, [reservasFiltradas, cotizacionesFiltradas, metricasReservas]);
 
   // 3. Gráficos estadísticos
   const serieFinanzas = useMemo(() => {
-    return generarSerieMensualFinanzas(reservas);
+    return generarSerieMensualFinanzas(reservas || []);
   }, [reservas]);
 
   const rendimientoFincas = useMemo(() => {
-    return calcularRendimientoFincas(fincas, reservas);
+    return calcularRendimientoFincas(fincas || [], reservas || []);
   }, [fincas, reservas]);
 
   const embudoCotizaciones = useMemo(() => {
-    return calcularEmbudoCotizaciones(cotizaciones);
+    return calcularEmbudoCotizaciones(cotizaciones || []);
   }, [cotizaciones]);
 
   // Reservas activas para la agenda operativa
   const proximasLlegadas = useMemo(() => {
-    return reservas
-      .filter((r) => r.estado === 'activa' && r.fecha_inicio >= hoyStr)
-      .sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))
+    const safeReservas = Array.isArray(reservas) ? reservas : [];
+    return safeReservas
+      .filter((r) => r && r.estado === 'activa' && r.fecha_inicio && r.fecha_inicio >= hoyStr)
+      .sort((a, b) => (a.fecha_inicio || '').localeCompare(b.fecha_inicio || ''))
       .slice(0, 5);
   }, [reservas, hoyStr]);
 
   // Fecha legible en español
   const fechaHoyLegible = useMemo(() => {
-    const d = new Date();
-    return d.toLocaleDateString('es-CO', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+    try {
+      const d = new Date();
+      return d.toLocaleDateString('es-CO', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch {
+      return 'Fecha del sistema';
+    }
   }, []);
 
   const handleSincronizarEnVivo = async () => {
     setSincronizando(true);
     try {
-      await recargarTodo();
-      showToast('✓ Base de datos sincronizada con éxito en tiempo real', 'success');
+      if (recargarTodo) {
+        await recargarTodo();
+      }
+      if (showToast) {
+        showToast('✓ Base de datos sincronizada con éxito en tiempo real', 'success');
+      }
     } catch (e) {
-      showToast('Error sincronizando datos con Supabase', 'error');
+      if (showToast) {
+        showToast('Error sincronizando datos con Supabase', 'error');
+      }
     } finally {
       setSincronizando(false);
     }
@@ -234,8 +246,8 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
               outline: 'none',
             }}
           >
-            <option value="todas">Todas las Fincas ({fincas.length})</option>
-            {fincas.map((f) => (
+            <option value="todas">Todas las Fincas ({(fincas || []).length})</option>
+            {(fincas || []).map((f) => (
               <option key={f.id} value={f.id}>
                 {f.nombre}
               </option>
@@ -601,20 +613,28 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
               onClick={() => navigateTo('reservas')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
             >
-              Ver todas ({reservas.filter((r) => r.estado === 'activa').length}) →
+              Ver todas ({(reservas || []).filter((r) => r && r.estado === 'activa').length}) →
             </button>
           </div>
 
           <div style={{ display: 'grid', gap: '0.55rem' }}>
             {proximasLlegadas.map((r) => {
               const clienteNombre = r.clientes
-                ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim()
-                : 'Cliente no registrado';
-              const [y, m, d] = r.fecha_inicio.split('-');
+                ? `${r.clientes.nombre || ''} ${r.clientes.apellido || ''}`.trim()
+                : (r.cliente_snapshot?.nombre || 'Cliente no registrado');
+
+              const fechaPartes = (r.fecha_inicio || '').split('-');
+              const diaMes = fechaPartes.length === 3 ? `${fechaPartes[2]}/${fechaPartes[1]}` : (r.fecha_inicio || '—');
               const esHoy = r.fecha_inicio === hoyStr;
-              const numNoches = r.fecha_inicio && r.fecha_fin
-                ? Math.max(1, Math.round((new Date(r.fecha_fin + 'T00:00:00').getTime() - new Date(r.fecha_inicio + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24)))
-                : 1;
+
+              let numNoches = 1;
+              if (r.fecha_inicio && r.fecha_fin) {
+                const d1 = new Date(r.fecha_inicio + 'T00:00:00');
+                const d2 = new Date(r.fecha_fin + 'T00:00:00');
+                if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+                  numNoches = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)));
+                }
+              }
 
               return (
                 <div
@@ -644,21 +664,21 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
                         fontSize: '0.85rem',
                       }}
                     >
-                      {d}/{m}
+                      {diaMes}
                     </div>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: '0.94rem', color: 'var(--text)' }}>
-                        {r.fincas?.nombre || 'Finca'}
+                        {r.fincas?.nombre || r.finca_snapshot?.nombre || 'Finca'}
                       </div>
                       <div className="text-xs text-muted">
-                        {clienteNombre} · {r.personas} personas · {numNoches} noche(s)
+                        {clienteNombre} · {r.personas || 1} personas · {numNoches} noche(s)
                       </div>
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <span className="font-dashboard tabular-nums" style={{ fontWeight: 700, fontSize: '0.9rem' }}>
-                      {formatCOP(r.valor_total)}
+                      {formatCOP(r.valor_total || 0)}
                     </span>
                     {esHoy && (
                       <span className="dashboard-glow-badge" style={{ background: '#16a34a', color: '#ffffff' }}>
