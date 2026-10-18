@@ -163,10 +163,99 @@ export function dibujarInsigniaChulo(
   dibujarChuloVector(doc, cx, cy, radio * 0.9, [255, 255, 255], radio * 0.22);
 }
 
+// ===============================================================
+// Caché en memoria y persistente de firma digital en formato DataURL
+// Permite que jsPDF estampe la imagen de firma de manera 100% sincrónica
+// sin retrasos de red, problemas de CORS ni parpadeos.
+// ===============================================================
+export const firmaDataUrlCache = new Map<string, string>();
+export const KEY_FIRMA_CACHE_LOCAL = 'fc_firma_digital_dataurl';
 const firmaImageCache = new Map<string, HTMLImageElement>();
 
+/**
+ * Obtiene de forma sincrónica el DataURL de la firma si ya se encuentra
+ * en memoria o en el almacenamiento local del navegador.
+ */
+export function obtenerFirmaDataUrlSincrona(url?: string | null): string | null {
+  if (!url || typeof url !== 'string' || url.trim().length === 0) return null;
+  if (url.startsWith('data:image')) return url;
+  
+  if (firmaDataUrlCache.has(url)) {
+    return firmaDataUrlCache.get(url) || null;
+  }
+  
+  try {
+    const guardada = localStorage.getItem(KEY_FIRMA_CACHE_LOCAL);
+    if (guardada && guardada.startsWith('data:image')) {
+      firmaDataUrlCache.set(url, guardada);
+      return guardada;
+    }
+  } catch {
+    // Si localStorage no está disponible
+  }
+  
+  return null;
+}
+
+/**
+ * Guarda en caché local y memoria el DataURL de la firma digital activa
+ */
+export function guardarFirmaEnCacheLocal(url: string, dataUrl: string): void {
+  if (!dataUrl || !dataUrl.startsWith('data:image')) return;
+  if (url) firmaDataUrlCache.set(url, dataUrl);
+  firmaDataUrlCache.set('active', dataUrl);
+  try {
+    localStorage.setItem(KEY_FIRMA_CACHE_LOCAL, dataUrl);
+  } catch {
+    // ignorar error de cuota
+  }
+}
+
+/**
+ * Descarga y convierte asincrónicamente una URL pública de Supabase Storage
+ * en un DataURL Base64 y lo almacena en caché para estampar en jsPDF.
+ */
+export async function precargarFirmaDataUrl(url?: string | null): Promise<string | null> {
+  if (!url || typeof url !== 'string' || url.trim().length === 0) return null;
+  if (url.startsWith('data:image')) {
+    guardarFirmaEnCacheLocal(url, url);
+    return url;
+  }
+
+  const enCache = obtenerFirmaDataUrlSincrona(url);
+  if (enCache) return enCache;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        if (dataUrl && dataUrl.startsWith('data:image')) {
+          guardarFirmaEnCacheLocal(url, dataUrl);
+          resolve(dataUrl);
+        } else {
+          resolve(null);
+        }
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch (err) {
+    console.warn('[documentos] Aviso al precargar DataURL de firma:', err);
+    return null;
+  }
+}
+
 export function predescargarFirma(url?: string | null) {
-  if (!url || typeof url !== 'string' || url.startsWith('data:image') || firmaImageCache.has(url)) return;
+  if (!url || typeof url !== 'string' || url.startsWith('data:image')) return;
+  // Disparar precarga a DataURL garantizada
+  precargarFirmaDataUrl(url);
+
+  if (firmaImageCache.has(url)) return;
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.onload = () => firmaImageCache.set(url, img);
@@ -207,9 +296,11 @@ function dibujarBloqueFirmaAdmin(
       const xFirma = x + Math.max(0, (anchoLinea - anchoFirma) / 2);
       const yFirma = yLinea - altoFirma + 1.2; // se apoya directamente sobre la línea
 
-      if (firmaUrl.startsWith('data:image')) {
-        const formato = firmaUrl.includes('image/jpeg') || firmaUrl.includes('image/jpg') ? 'JPEG' : 'PNG';
-        doc.addImage(firmaUrl, formato, xFirma, yFirma, anchoFirma, altoFirma);
+      const dataUrl = obtenerFirmaDataUrlSincrona(firmaUrl) || (firmaUrl.startsWith('data:image') ? firmaUrl : null);
+
+      if (dataUrl) {
+        const formato = dataUrl.includes('image/jpeg') || dataUrl.includes('image/jpg') ? 'JPEG' : 'PNG';
+        doc.addImage(dataUrl, formato, xFirma, yFirma, anchoFirma, altoFirma);
       } else {
         const cached = firmaImageCache.get(firmaUrl);
         if (cached && cached.complete && cached.naturalWidth > 0) {

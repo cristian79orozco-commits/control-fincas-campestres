@@ -120,3 +120,73 @@ BEGIN
     NULL;
   END;
 END $$;
+
+-- 7. Garantizar Bucket finca-imagenes y Políticas de Storage para subida de firmas
+DO $$
+BEGIN
+  -- Asegurar bucket publico finca-imagenes
+  BEGIN
+    INSERT INTO storage.buckets (id, name, public)
+    VALUES ('finca-imagenes', 'finca-imagenes', true)
+    ON CONFLICT (id) DO UPDATE SET public = true;
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
+
+  -- Politica SELECT storage
+  BEGIN
+    DROP POLICY IF EXISTS "Acceso publico lectura finca-imagenes" ON storage.objects;
+    CREATE POLICY "Acceso publico lectura finca-imagenes"
+      ON storage.objects FOR SELECT
+      TO anon, authenticated
+      USING (bucket_id = 'finca-imagenes');
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
+
+  -- Politica INSERT storage
+  BEGIN
+    DROP POLICY IF EXISTS "Insercion total finca-imagenes" ON storage.objects;
+    CREATE POLICY "Insercion total finca-imagenes"
+      ON storage.objects FOR INSERT
+      TO anon, authenticated
+      WITH CHECK (bucket_id = 'finca-imagenes');
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
+
+  -- Politica UPDATE storage
+  BEGIN
+    DROP POLICY IF EXISTS "Actualizacion total finca-imagenes" ON storage.objects;
+    CREATE POLICY "Actualizacion total finca-imagenes"
+      ON storage.objects FOR UPDATE
+      TO anon, authenticated
+      USING (bucket_id = 'finca-imagenes')
+      WITH CHECK (bucket_id = 'finca-imagenes');
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
+
+  -- Politica DELETE storage
+  BEGIN
+    DROP POLICY IF EXISTS "Eliminacion total finca-imagenes" ON storage.objects;
+    CREATE POLICY "Eliminacion total finca-imagenes"
+      ON storage.objects FOR DELETE
+      TO anon, authenticated
+      USING (bucket_id = 'finca-imagenes');
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
+END $$;
+
+-- 8. Vincular la última firma ya subida en Storage si la columna actual está vacía
+UPDATE public.configuracion_general
+SET 
+  firma_digital_url = 'https://porhjqsvhffshvdxvije.supabase.co/storage/v1/object/public/finca-imagenes/firmas/firma_admin_1792280691493.png',
+  plantillas_pdf = jsonb_set(
+    COALESCE(plantillas_pdf, '{}'::jsonb),
+    '{firma_digital_url}',
+    '"https://porhjqsvhffshvdxvije.supabase.co/storage/v1/object/public/finca-imagenes/firmas/firma_admin_1792280691493.png"'
+  )
+WHERE id = 'general' AND (firma_digital_url IS NULL OR firma_digital_url = '');
+

@@ -15,6 +15,10 @@ import {
   generarEstadoCuenta,
   generarPazYSalvo,
   generarPropuestaAlimentacion,
+  guardarFirmaEnCacheLocal,
+  precargarFirmaDataUrl,
+  KEY_FIRMA_CACHE_LOCAL,
+  firmaDataUrlCache,
 } from '../services/documentos';
 import { procesarFirmaTransparente, formatearBytes } from '../utils/imageOptimizer';
 
@@ -156,7 +160,10 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
       // 1. Detección de fondo, remoción automática de blanco, auto-crop y compresión PNG
       const resultado = await procesarFirmaTransparente(file);
 
-      // 2. Intentar subir el archivo PNG transparente y liviano (~20 KB) a Supabase Storage
+      // Guardar inmediatamente en caché DataURL para que los PDF de muestra y reales dispongan de la imagen al instante
+      guardarFirmaEnCacheLocal(resultado.dataUrl, resultado.dataUrl);
+
+      // 2. Intentar subir el archivo PNG transparente y liviano (~15-35 KB) a Supabase Storage
       let finalUrl = resultado.dataUrl;
       try {
         const { supabase } = await import('../services/supabase');
@@ -169,6 +176,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
           const { data: urlData } = supabase.storage.from('finca-imagenes').getPublicUrl(path);
           if (urlData?.publicUrl) {
             finalUrl = urlData.publicUrl;
+            guardarFirmaEnCacheLocal(finalUrl, resultado.dataUrl);
           }
         } else {
           console.warn('[AdminConfiguracion] Supabase Storage aviso:', uploadError.message, 'usando DataURL optimizada');
@@ -178,22 +186,50 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
       }
 
       // 3. Actualizar estado local reactivo
-      setFormData(prev => ({
-        ...prev,
+      const nuevoForm = {
+        ...formData,
         firma_digital_url: finalUrl,
         plantillas_pdf: {
-          ...(prev.plantillas_pdf || {}),
+          ...(formData.plantillas_pdf || {}),
           firma_digital_url: finalUrl,
         },
-      }));
-      setHayCambios(true);
+      };
+      setFormData(nuevoForm);
 
       const resumenPeso = `${formatearBytes(resultado.originalBytes)} ➔ ${formatearBytes(resultado.optimizedBytes)}`;
       const detalleTexto = resultado.fondoRemovido
         ? `Fondo blanco retirado · 100% transparente · Reducida (${resumenPeso})`
         : `Firma recortada y optimizada · ${resumenPeso}`;
       setInfoFirmaOptimizada(detalleTexto);
-      showToast(`Firma optimizada y lista (${resumenPeso}). Haz clic en Guardar para confirmar.`, 'success');
+
+      // 4. Persistencia inmediata y automática en Supabase (evita que el usuario deba buscar otro botón de guardar)
+      try {
+        let cleanWa = (nuevoForm.whatsapp || '').replace(/[^0-9]/g, '');
+        if (cleanWa.length < 10) cleanWa = '573176827093';
+
+        const payloadAutoGuardado: ConfiguracionGeneral = {
+          ...nuevoForm,
+          whatsapp: cleanWa,
+          firma_digital_url: finalUrl,
+          plantillas_pdf: {
+            ...(nuevoForm.plantillas_pdf || {}),
+            firma_digital_url: finalUrl,
+          },
+        };
+
+        const resAuto = await onGuardar(payloadAutoGuardado);
+        if (resAuto && resAuto.success) {
+          setHayCambios(false);
+          showToast(`Firma digital subida, guardada e implementada con éxito ✅ (${resumenPeso})`, 'success');
+        } else {
+          setHayCambios(true);
+          showToast(`Firma optimizada (${resumenPeso}). Haz clic en Guardar para confirmar en la base de datos.`, 'info');
+        }
+      } catch (saveErr) {
+        console.warn('[AdminConfiguracion] Error en autoguardado de firma:', saveErr);
+        setHayCambios(true);
+        showToast(`Firma optimizada (${resumenPeso}). Haz clic en Guardar para confirmar en la base de datos.`, 'info');
+      }
     } catch (err: any) {
       console.error('Error al procesar la imagen de firma:', err);
       showToast(err?.message || 'No se pudo procesar la firma seleccionada', 'error');
@@ -203,18 +239,51 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
     }
   };
 
-  const handleEliminarFirmaDigital = () => {
-    setFormData(prev => ({
-      ...prev,
+  const handleEliminarFirmaDigital = async () => {
+    try {
+      localStorage.removeItem(KEY_FIRMA_CACHE_LOCAL);
+      firmaDataUrlCache.clear();
+    } catch {
+      // ignorar
+    }
+
+    const nuevoForm = {
+      ...formData,
       firma_digital_url: '',
       plantillas_pdf: {
-        ...(prev.plantillas_pdf || {}),
+        ...(formData.plantillas_pdf || {}),
         firma_digital_url: '',
       },
-    }));
+    };
+    setFormData(nuevoForm);
     setInfoFirmaOptimizada(null);
-    setHayCambios(true);
-    showToast('Firma digital retirada. Pulsa Guardar para aplicar en el sistema.', 'info');
+
+    try {
+      let cleanWa = (nuevoForm.whatsapp || '').replace(/[^0-9]/g, '');
+      if (cleanWa.length < 10) cleanWa = '573176827093';
+
+      const payloadEliminacion: ConfiguracionGeneral = {
+        ...nuevoForm,
+        whatsapp: cleanWa,
+        firma_digital_url: '',
+        plantillas_pdf: {
+          ...(nuevoForm.plantillas_pdf || {}),
+          firma_digital_url: '',
+        },
+      };
+
+      const res = await onGuardar(payloadEliminacion);
+      if (res && res.success) {
+        setHayCambios(false);
+        showToast('Firma digital retirada y guardada en el sistema exitosamente ✅', 'info');
+      } else {
+        setHayCambios(true);
+        showToast('Firma digital retirada localmente. Pulsa Guardar para aplicar cambios.', 'info');
+      }
+    } catch {
+      setHayCambios(true);
+      showToast('Firma digital retirada localmente. Pulsa Guardar para aplicar cambios.', 'info');
+    }
   };
 
   const handleGuardar = async (e?: React.FormEvent) => {
@@ -278,6 +347,11 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
   const emitirPrueba = async (tipo: DocumentoSubTab) => {
     setDescargandoPrueba(true);
     try {
+      const firmaUrlEfectiva = formData.firma_digital_url || formData.plantillas_pdf?.firma_digital_url;
+      if (firmaUrlEfectiva && typeof firmaUrlEfectiva === 'string' && firmaUrlEfectiva.trim().length > 0) {
+        await precargarFirmaDataUrl(firmaUrlEfectiva);
+      }
+
       const demoCliente = {
         id: 'demo-cli',
         nombre: 'Carlos',

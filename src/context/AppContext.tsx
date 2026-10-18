@@ -19,6 +19,7 @@ import {
   esAdminAutenticado,
   probarNotificacionAdmin,
 } from '../services/notificaciones';
+import { precargarFirmaDataUrl } from '../services/documentos';
 
 // -----------------------------------------------------------------------------
 // Interfaz del Estado y Acciones Centralizadas
@@ -666,6 +667,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
         setConfiguracion(configCombinada);
         setConfiguracionGlobal(configCombinada);
+        guardarCache('fc_configuracion_general', configCombinada);
+        guardarCache('fc_cache_configuracion', configCombinada);
+
+        const firmaUrlEfectiva = configCombinada.firma_digital_url || configCombinada.plantillas_pdf?.firma_digital_url;
+        if (firmaUrlEfectiva && typeof firmaUrlEfectiva === 'string' && firmaUrlEfectiva.trim().length > 0) {
+          precargarFirmaDataUrl(firmaUrlEfectiva);
+        }
       }
     } catch (err) {
       console.warn('[AppContext] Error cargando configuracion:', err);
@@ -2478,7 +2486,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         throw error;
       }
 
+      guardarCache('fc_configuracion_general', actualizado);
       guardarCache('fc_cache_configuracion', actualizado);
+
+      const firmaUrlEfectiva = actualizado.firma_digital_url || actualizado.plantillas_pdf?.firma_digital_url;
+      if (firmaUrlEfectiva && typeof firmaUrlEfectiva === 'string' && firmaUrlEfectiva.trim().length > 0) {
+        precargarFirmaDataUrl(firmaUrlEfectiva);
+      }
+
       return { success: true };
     } catch (err: any) {
       console.error('[AppContext] Excepción en guardarConfiguracion:', err);
