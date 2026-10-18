@@ -1,7 +1,7 @@
 // Service Worker para Fincas Campestres
 // Permite instalación como PWA en Windows y gestión de notificaciones nativas
 
-const CACHE_NAME = 'fc-pwa-cache-v1';
+const CACHE_NAME = 'fc-pwa-cache-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

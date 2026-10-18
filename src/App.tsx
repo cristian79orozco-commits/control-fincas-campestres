@@ -350,6 +350,26 @@ export const App: React.FC = () => {
         </main>
       )}
 
+      {view === 'detalle' && !selectedFinca && (
+        <main className="main-content" style={{ marginTop: '2.5rem', textAlign: 'center', padding: '3rem 1.5rem' }}>
+          <div style={{ maxWidth: '480px', margin: '0 auto', background: 'var(--surface)', padding: '2.5rem 2rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem', color: 'var(--text)' }}>
+              Finca no seleccionada
+            </h2>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+              No se ha seleccionado ninguna propiedad para ver en detalle o la página fue recargada.
+            </p>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => handleViewChange('cliente')}
+            >
+              Explorar Catálogo de Fincas
+            </button>
+          </div>
+        </main>
+      )}
+
       {view === 'admin' && (
         <main className="main-content" style={{ marginTop: '1.5rem' }}>
           <ErrorBoundary fallbackTitle="Panel de Administración">
