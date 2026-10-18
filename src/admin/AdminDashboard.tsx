@@ -16,6 +16,7 @@ import { AdminMenus } from './AdminMenus';
 import { AdminHistorial } from './AdminHistorial';
 import { AdminConfiguracion } from './AdminConfiguracion';
 import { AdminPersonalizacion } from './AdminPersonalizacion';
+import { AdminDashboardOverview } from './dashboard/AdminDashboardOverview';
 import { useApp } from '../context/AppContext';
 import {
   obtenerEstadoPermisoNotificaciones,
@@ -505,187 +506,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* CONTENIDO PRINCIPAL */}
         <div style={{ minWidth: 0 }}>
 
-          {/* ===== SECCIÓN: DASHBOARD ===== */}
+          {/* ===== SECCIÓN: DASHBOARD REESTRUCTURADO UI/UX ===== */}
           {activeSection === 'dashboard' && (
-            <div style={{ display: 'grid', gap: '1rem' }}>
-              {/* Tarjetas de métricas */}
-              <div className="admin-stats-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('fincas')}>
-                  <div className="stat-val">{fincas.length}</div>
-                  <div className="stat-lbl">Fincas activas</div>
-                </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('reservas')}>
-                  <div className="stat-val" style={{ color: 'var(--primary)' }}>{metricasReservas.activas}</div>
-                  <div className="stat-lbl">Reservas activas</div>
-                </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('reservas')}>
-                  <div className="stat-val" style={{ color: 'var(--success)' }}>{metricasReservas.llegasHoy}</div>
-                  <div className="stat-lbl">Llegadas hoy</div>
-                </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('reservas')}>
-                  <div className="stat-val" style={{ color: 'var(--danger)' }}>{metricasReservas.salenHoy}</div>
-                  <div className="stat-lbl">Salidas hoy</div>
-                </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('cotizaciones')}>
-                  <div className="stat-val" style={{ color: 'var(--warning, #f59e0b)' }}>{cotizacionesPendientes}</div>
-                  <div className="stat-lbl">Cotizaciones pendientes</div>
-                </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('clientes')}>
-                  <div className="stat-val">{clientes.length}</div>
-                  <div className="stat-lbl">Clientes</div>
-                </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('menus')}>
-                  <div className="stat-val" style={{ color: 'var(--primary)' }}>{menus.filter(m => m.activo).length}</div>
-                  <div className="stat-lbl">Menús activos</div>
-                </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('historial')}>
-                  <div className="stat-val" style={{ color: 'var(--primary)' }}>
-                    {reservas.filter(r => r.estado === 'completada').length}
-                  </div>
-                  <div className="stat-lbl">Cerradas / Historial</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-val" style={{ color: 'var(--danger)', fontSize: '1.1rem' }}>{formatCOP(totalSaldoPendiente)}</div>
-                  <div className="stat-lbl">Saldo por cobrar</div>
-                  {saldoPendienteAdminAlimentacion > 0 && (
-                    <div className="text-xs text-muted" style={{ marginTop: '0.2rem', fontSize: '0.68rem' }}>
-                      Dueños: {formatCOP(saldoPendienteFincasDueños)} · Admin: {formatCOP(saldoPendienteAdminAlimentacion)}
-                    </div>
-                  )}
-                </div>
-                <div className="stat-card" style={{ cursor: 'pointer', borderLeft: '3px solid var(--accent, #ea580c)' }} onClick={() => navigateTo('menus')}>
-                  <div className="stat-val" style={{ color: 'var(--accent, #ea580c)', fontSize: '1.1rem' }}>{formatCOP(ingresosAlimentacionLiquidados)}</div>
-                  <div className="stat-lbl">Menús Cobrados (Admin)</div>
-                </div>
-              </div>
-
-              {/* Rendimiento del Servicio de Alimentación (Admin) */}
-              <div className="panel" style={{ borderLeft: '4px solid var(--accent, #ea580c)' }}>
-                <div className="panel-header" style={{ marginBottom: '0.85rem' }}>
-                  <div>
-                    <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: 'var(--accent, #ea580c)' }}>
-                      <UtensilsCrossed size={16} /> Estadísticas de Planes de Alimentación (Gestión Admin)
-                    </div>
-                    <div className="text-xs text-muted mt-1">
-                      Servicio gastronómico directo del administrador (pagos independientes del hospedaje)
-                    </div>
-                  </div>
-                  <button className="btn btn-sm" onClick={() => navigateTo('menus')}>
-                    Ver Menús →
-                  </button>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
-                  <div style={{ background: 'var(--surface-alt, var(--surface))', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                    <div className="text-xs text-muted">Menús Cobrados / Liquidados</div>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#16a34a', marginTop: '0.2rem' }}>
-                      {formatCOP(ingresosAlimentacionLiquidados)} COP
-                    </div>
-                    <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
-                      {reservasConMenu.filter(r => r.estado_alimentacion === 'pagada' || r.cotizacion_snapshot?.estado_alimentacion === 'pagada').length} reservas con alimentación liquidada
-                    </div>
-                  </div>
-
-                  <div style={{ background: 'var(--surface-alt, var(--surface))', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                    <div className="text-xs text-muted">Pendiente de Cobro (En Reservas Activas)</div>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#c2410c', marginTop: '0.2rem' }}>
-                      {formatCOP(ingresosAlimentacionPorCobrar)} COP
-                    </div>
-                    <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
-                      {reservasConMenu.filter(r => r.estado === 'activa' && r.estado_alimentacion !== 'pagada' && r.cotizacion_snapshot?.estado_alimentacion !== 'pagada').length} reservas con menú pendiente de cobro
-                    </div>
-                  </div>
-
-                  <div style={{ background: 'var(--surface-alt, var(--surface))', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                    <div className="text-xs text-muted">Proyección en Cotizaciones Pendientes</div>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--warning, #f59e0b)', marginTop: '0.2rem' }}>
-                      {formatCOP(ingresosAlimentacionEnCotizaciones)} COP
-                    </div>
-                    <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
-                      {cotizaciones.filter(c => ['borrador', 'cotizada', 'pendiente'].includes(c.estado) && (c.costo_alimentacion || 0) > 0).length} cotizaciones con menú por cerrar
-                    </div>
-                  </div>
-
-                  <div style={{ background: 'var(--surface-alt, var(--surface))', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                    <div className="text-xs text-muted">Comensales Atendidos</div>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--primary)', marginTop: '0.2rem' }}>
-                      {totalPersonasAlimentadas} personas
-                    </div>
-                    <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
-                      En estancias confirmadas y finalizadas
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Accesos rápidos */}
-              <div className="panel">
-                <div className="panel-header" style={{ marginBottom: '1rem' }}>
-                  <div className="panel-title"><TrendingUp size={16} /> Accesos rápidos</div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.6rem' }}>
-                  {NAV_ITEMS.slice(1).map(item => (
-                    <button
-                      key={item.section}
-                      className="btn"
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-start', padding: '0.65rem 1rem' }}
-                      onClick={() => navigateTo(item.section)}
-                    >
-                      {item.icon} {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Próximas reservas */}
-              {reservasActivas.length > 0 && (
-                <div className="panel">
-                  <div className="panel-header">
-                    <div className="panel-title"><Clock size={16} /> Próximas llegadas</div>
-                  </div>
-                  <div className="avail-table">
-                    {reservasActivas
-                      .filter(r => r.fecha_inicio >= hoy)
-                      .sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))
-                      .slice(0, 5)
-                      .map(r => {
-                        const clienteNombre = r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim() : '—';
-                        const [y, m, d] = r.fecha_inicio.split('-');
-                        return (
-                          <div key={r.id} className="avail-row">
-                            <div>
-                              <div style={{ fontWeight: 600 }}>{r.fincas?.nombre || '—'}</div>
-                              <div className="text-xs text-muted">{d}/{m}/{y} · {r.personas} personas · {clienteNombre}</div>
-                            </div>
-                            <span className="status-badge s-avail">activa</span>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
-
-              {/* Alertas */}
-              {totalSaldoPendiente > 0 && (
-                <div className="panel" style={{ borderLeft: '3px solid var(--danger)' }}>
-                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', color: 'var(--danger)', fontWeight: 600 }}>
-                    <AlertTriangle size={16} /> Saldo pendiente por cobrar: {formatCOP(totalSaldoPendiente)} COP
-                  </div>
-                  <p className="text-xs text-muted" style={{ marginTop: '0.3rem' }}>
-                    Hay {reservasActivas.length} reserva{reservasActivas.length !== 1 ? 's' : ''} activa{reservasActivas.length !== 1 ? 's' : ''} con saldo pendiente.
-                  </p>
-                </div>
-              )}
-
-              {cotizacionesPendientes > 0 && (
-                <div className="panel" style={{ borderLeft: '3px solid var(--primary)', cursor: 'pointer' }} onClick={() => navigateTo('cotizaciones')}>
-                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', color: 'var(--primary)', fontWeight: 600 }}>
-                    <CheckCircle size={16} /> {cotizacionesPendientes} cotización{cotizacionesPendientes !== 1 ? 'es' : ''} pendiente{cotizacionesPendientes !== 1 ? 's' : ''} de atención
-                  </div>
-                  <p className="text-xs text-muted" style={{ marginTop: '0.3rem' }}>Haz clic para verlas →</p>
-                </div>
-              )}
-            </div>
+            <AdminDashboardOverview
+              fincas={fincas}
+              reservas={reservas}
+              cotizaciones={cotizaciones}
+              clientes={clientes}
+              menus={menus}
+              metricasReservas={metricasReservas}
+              navigateTo={navigateTo}
+              userEmail={userEmail}
+            />
           )}
 
           {/* ===== SECCIÓN: FINCAS ===== */}
