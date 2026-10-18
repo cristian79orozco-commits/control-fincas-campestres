@@ -240,11 +240,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return enriquecerFincasConMetadatos(raw);
   });
   const [bloquesAdmin, setBloquesAdmin] = useState<BloqueoDisponibilidad[]>(() => leerCache('fc_cache_disponibilidad', []));
-  const [clientes, setClientes] = useState<Cliente[]>(() => leerCache('fc_cache_clientes', []));
-  const [cotizaciones, setCotizaciones] = useState<CotizacionDB[]>(() => leerCache('fc_cache_cotizaciones', []));
-  const [reservas, setReservas] = useState<Reserva[]>(() => leerCache('fc_cache_reservas', []));
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [cotizaciones, setCotizaciones] = useState<CotizacionDB[]>([]);
+  const [reservas, setReservas] = useState<Reserva[]>([]);
   const [menus, setMenus] = useState<MenuType[]>(() => leerCache('fc_cache_menus', []));
-  const [comunicaciones, setComunicaciones] = useState<Comunicacion[]>(() => leerCache('fc_cache_comunicaciones', []));
+  const [comunicaciones, setComunicaciones] = useState<Comunicacion[]>([]);
   const [configuracion, setConfiguracion] = useState<ConfiguracionGeneral>(() => leerCache('fc_configuracion_general', CONFIGURACION_DEFAULT));
   const [contenidoSitio, setContenidoSitio] = useState<ContenidoSitio>(() => normalizeContenidoSitio(leerCache('fc_contenido_sitio_v2', CONTENIDO_SITIO_DEFAULT)));
   const [loading, setLoading] = useState(false);
@@ -256,11 +256,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const saved = localStorage.getItem('fc_app_view') as ViewType;
       if (saved === 'admin') {
-        const authRaw = localStorage.getItem('fc_admin_auth_session');
-        if (authRaw) {
-          const auth = JSON.parse(authRaw);
-          if (auth?.isLoggedIn) return 'admin';
-        }
+        if (esAdminAutenticado()) return 'admin';
         return 'cliente';
       }
       if (saved === 'detalle') {
@@ -452,6 +448,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const cargarClientes = useCallback(async () => {
+    if (!esAdminAutenticado()) {
+      setClientes([]);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('clientes')
@@ -461,13 +461,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (error) throw error;
       const arr = (data as Cliente[]) || [];
       setClientes(arr);
-      guardarCache('fc_cache_clientes', arr);
     } catch (err) {
       console.warn('[AppContext] Error cargando clientes:', err);
     }
   }, []);
 
   const cargarCotizaciones = useCallback(async (silencioso: boolean = false) => {
+    if (!esAdminAutenticado()) {
+      setCotizaciones([]);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('cotizaciones')
@@ -499,13 +502,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         return ordenadas;
       });
-      guardarCache('fc_cache_cotizaciones', ordenadas);
     } catch (err) {
       console.warn('[AppContext] Error cargando cotizaciones:', err);
     }
   }, [showToast, view, navegarAAdmin]);
 
   const cargarReservas = useCallback(async () => {
+    if (!esAdminAutenticado()) {
+      setReservas([]);
+      return;
+    }
     try {
       let data: any[] | null = null;
       const resFull = await supabase
@@ -587,7 +593,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return new Date(b.fecha_inicio || '').getTime() - new Date(a.fecha_inicio || '').getTime();
       });
       setReservas(ordenadas);
-      guardarCache('fc_cache_reservas', ordenadas);
     } catch (err) {
       console.warn('[AppContext] Error cargando reservas:', err);
     }
@@ -612,6 +617,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const cargarComunicaciones = useCallback(async () => {
+    if (!esAdminAutenticado()) {
+      setComunicaciones([]);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('comunicaciones')
@@ -700,17 +709,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const recargarTodo = useCallback(async () => {
     setLoading(true);
-    await Promise.allSettled([
+    const tareasPublicas = [
       cargarFincas(),
       cargarDisponibilidad(),
-      cargarClientes(),
-      cargarCotizaciones(),
-      cargarReservas(),
       cargarMenus(),
-      cargarComunicaciones(),
       cargarConfiguracion(),
       cargarContenidoSitio(),
-    ]);
+    ];
+
+    if (esAdminAutenticado()) {
+      await Promise.allSettled([
+        ...tareasPublicas,
+        cargarClientes(),
+        cargarCotizaciones(),
+        cargarReservas(),
+        cargarComunicaciones(),
+      ]);
+    } else {
+      // Limpiar datos sensibles para visitantes anónimos
+      setClientes([]);
+      setCotizaciones([]);
+      setReservas([]);
+      setComunicaciones([]);
+      try {
+        localStorage.removeItem('fc_cache_clientes');
+        localStorage.removeItem('fc_cache_cotizaciones');
+        localStorage.removeItem('fc_cache_reservas');
+        localStorage.removeItem('fc_cache_comunicaciones');
+        localStorage.removeItem('fc_admin_auth_session');
+      } catch {}
+      await Promise.allSettled(tareasPublicas);
+    }
     setLoading(false);
   }, [
     cargarFincas,
@@ -727,6 +756,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Carga inicial y Suscripción Realtime multi-capa (Supabase + BroadcastChannel + Smart Polling)
   useEffect(() => {
     recargarTodo();
+
+    // 0. Sincronización automática de datos ante inicio/cierre de sesión administrativo
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (newSession && newSession.user) {
+        cargarClientes();
+        cargarCotizaciones();
+        cargarReservas();
+        cargarComunicaciones();
+      } else {
+        setClientes([]);
+        setCotizaciones([]);
+        setReservas([]);
+        setComunicaciones([]);
+      }
+    });
 
     // 1. Sincronización en tiempo real oficial con Supabase
     const channel = supabase
@@ -829,6 +873,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.addEventListener('focus', handleReenfoque);
 
     return () => {
+      authSub.unsubscribe();
       supabase.removeChannel(channel);
       if (bc) {
         try {

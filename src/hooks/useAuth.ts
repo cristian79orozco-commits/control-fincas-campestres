@@ -2,114 +2,67 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import type { User, Session } from '@supabase/supabase-js';
 
-const AUTH_STORAGE_KEY = 'fc_admin_auth_session';
-
-interface StoredAuthSession {
-  isLoggedIn: boolean;
-  email: string;
-  loginType: 'supabase' | 'fallback';
-  timestamp: number;
-}
-
-const getStoredAuthSession = (): StoredAuthSession | null => {
+// Verificación síncrona inicial de existencia de token de Supabase Auth
+const checkSupabaseAuthTokenExists = (): boolean => {
   try {
-    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && parsed.isLoggedIn && parsed.email) {
-      return parsed;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && (parsed.access_token || parsed.user)) {
+            return true;
+          }
+        }
+      }
     }
-  } catch (err) {
-    console.warn('[useAuth] Error leyendo sesión guardada:', err);
+  } catch {
+    // Ignorar errores de acceso a storage
   }
-  return null;
-};
-
-const guardarAuthSession = (sessionData: StoredAuthSession) => {
-  try {
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(sessionData));
-  } catch (err) {
-    console.warn('[useAuth] Error guardando sesión en storage:', err);
-  }
-};
-
-const borrarAuthSession = () => {
-  try {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-  } catch (err) {
-    console.warn('[useAuth] Error borrando sesión en storage:', err);
-  }
+  return false;
 };
 
 export function useAuth() {
-  // Inicialización síncrona desde el primer render para evitar flicker o pérdida de sesión
-  const initialAuth = getStoredAuthSession();
-
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => !!initialAuth?.isLoggedIn);
-  const [user, setUser] = useState<User | { email: string; id?: string } | null>(() => {
-    if (initialAuth?.isLoggedIn && initialAuth.email) {
-      return { email: initialAuth.email, id: 'admin-persisted-user' } as any;
-    }
-    return null;
-  });
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => checkSupabaseAuthTokenExists());
+  const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Obtener sesión activa de Supabase al cargar
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      if (currentSession) {
+    // 1. Obtener sesión activa oficial de Supabase Auth
+    supabase.auth.getSession().then(({ data: { session: currentSession }, error }) => {
+      if (error) {
+        console.warn('[useAuth] Error al recuperar sesión de Supabase:', error.message);
+      }
+      if (currentSession && currentSession.user) {
         setSession(currentSession);
         setUser(currentSession.user);
         setIsAdminLoggedIn(true);
-        guardarAuthSession({
-          isLoggedIn: true,
-          email: currentSession.user?.email || 'admin@fincas.com',
-          loginType: 'supabase',
-          timestamp: Date.now(),
-        });
       } else {
-        // Si Supabase Auth no tiene sesión oficial, comprobar si existe sesión fallback activa
-        const stored = getStoredAuthSession();
-        if (stored && stored.isLoggedIn) {
-          setIsAdminLoggedIn(true);
-          setUser({ email: stored.email, id: 'admin-fallback-user' } as any);
-        } else {
-          setIsAdminLoggedIn(false);
-          setUser(null);
-        }
+        setSession(null);
+        setUser(null);
+        setIsAdminLoggedIn(false);
       }
       setLoading(false);
     }).catch(err => {
       console.warn('[useAuth] Error al verificar sesión inicial:', err);
-      const stored = getStoredAuthSession();
-      if (stored && stored.isLoggedIn) {
-        setIsAdminLoggedIn(true);
-        setUser({ email: stored.email, id: 'admin-fallback-user' } as any);
-      }
+      setSession(null);
+      setUser(null);
+      setIsAdminLoggedIn(false);
       setLoading(false);
     });
 
     // 2. Escuchar cambios de autenticación oficial de Supabase
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      if (newSession) {
+      if (newSession && newSession.user) {
         setSession(newSession);
         setUser(newSession.user);
         setIsAdminLoggedIn(true);
-        guardarAuthSession({
-          isLoggedIn: true,
-          email: newSession.user?.email || 'admin@fincas.com',
-          loginType: 'supabase',
-          timestamp: Date.now(),
-        });
       } else {
-        const stored = getStoredAuthSession();
-        if (!stored || stored.loginType === 'supabase') {
-          setSession(null);
-          setUser(null);
-          setIsAdminLoggedIn(false);
-          borrarAuthSession();
-        }
+        setSession(null);
+        setUser(null);
+        setIsAdminLoggedIn(false);
       }
       setLoading(false);
     });
@@ -121,54 +74,44 @@ export function useAuth() {
 
   const login = async (email: string, pass: string): Promise<{ success: boolean; message?: string }> => {
     try {
-      // Intento con Supabase Auth oficial
+      const cleanEmail = email.trim();
+      if (!cleanEmail || !pass) {
+        return { success: false, message: 'Ingresa correo y contraseña' };
+      }
+
+      // Autenticación estricta con Supabase Auth (sin backdoors ni credenciales en duro)
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: cleanEmail,
         password: pass,
       });
 
-      if (!error && data.session) {
-        const loggedUser = data.session.user;
-        setUser(loggedUser);
-        setSession(data.session);
-        setIsAdminLoggedIn(true);
-        guardarAuthSession({
-          isLoggedIn: true,
-          email: loggedUser.email || email,
-          loginType: 'supabase',
-          timestamp: Date.now(),
-        });
-        return { success: true };
+      if (error) {
+        return {
+          success: false,
+          message: error.message === 'Invalid login credentials'
+            ? 'Credenciales incorrectas. Verifica tu correo y contraseña registrados en Supabase.'
+            : (error.message || 'Error de autenticación'),
+        };
       }
 
-      // Si el proyecto aún no tiene usuario creado en Supabase Auth, permitimos el fallback administrativo configurado
-      const FALLBACK_EMAIL = 'admin@fincas.com';
-      const FALLBACK_PASS = 'Admin1234!';
-      if (email.trim().toLowerCase() === FALLBACK_EMAIL.toLowerCase() && pass === FALLBACK_PASS) {
-        const fallbackUser = { email: FALLBACK_EMAIL, id: 'admin-fallback-user' } as any;
-        setUser(fallbackUser);
+      if (data && data.session) {
+        setUser(data.session.user);
+        setSession(data.session);
         setIsAdminLoggedIn(true);
-        guardarAuthSession({
-          isLoggedIn: true,
-          email: FALLBACK_EMAIL,
-          loginType: 'fallback',
-          timestamp: Date.now(),
-        });
-        return { success: true, message: 'Sesión administrativa iniciada' };
+        return { success: true };
       }
 
       return {
         success: false,
-        message: error ? error.message : 'Credenciales inválidas. Verifica tu correo y contraseña.',
+        message: 'No se pudo iniciar sesión. Verifica tu conexión y credenciales.',
       };
     } catch (err: any) {
-      return { success: false, message: err.message || 'Error de conexión' };
+      return { success: false, message: err?.message || 'Error de conexión con el servidor de autenticación' };
     }
   };
 
   const logout = async () => {
     try {
-      borrarAuthSession();
       try {
         localStorage.setItem('fc_app_view', 'cliente');
       } catch {}

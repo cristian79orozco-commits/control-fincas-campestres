@@ -75,7 +75,7 @@ export class ErrorBoundary extends Component<Props, State> {
             Se ha prevenido el bloqueo de la aplicación. Puedes intentar recargar el módulo o volver a intentarlo.
           </p>
 
-          {this.state.error && (
+          {this.state.error && import.meta.env.DEV && (
             <div
               style={{
                 background: 'var(--surface-2)',

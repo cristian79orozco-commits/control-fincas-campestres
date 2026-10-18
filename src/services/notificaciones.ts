@@ -40,14 +40,23 @@ function persistirIdsNotificados() {
 
 /**
  * Verifica si el usuario actual tiene sesión activa de Administrador.
- * Consulta la clave oficial de autenticación administrativa en localStorage.
+ * Comprueba criptográficamente la existencia de un token JWT válido de Supabase Auth en storage.
  */
 export function esAdminAutenticado(): boolean {
   try {
-    const raw = localStorage.getItem('fc_admin_auth_session');
-    if (!raw) return false;
-    const parsed = JSON.parse(raw);
-    return !!(parsed && parsed.isLoggedIn);
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && (parsed.access_token || parsed.user)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   } catch {
     return false;
   }
