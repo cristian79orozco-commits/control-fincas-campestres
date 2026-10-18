@@ -289,6 +289,7 @@ export const VisualExplorer: React.FC<VisualExplorerProps> = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
       className="visual-explorer-section"
+      id="graficos"
       style={{
         marginTop: '2rem',
         marginBottom: '2rem',

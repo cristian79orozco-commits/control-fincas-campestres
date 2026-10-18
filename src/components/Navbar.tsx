@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Home, Map, Moon, Sun, ShieldCheck, FileCheck2 } from 'lucide-react';
+import { Home, Map, Moon, Sun, ShieldCheck, FileCheck2, TrendingUp } from 'lucide-react';
 import type { ViewType } from '../types';
 import { useClientStore } from '../store/useClientStore';
 
@@ -70,6 +70,24 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => onViewChange('cliente')}
           >
             <Home size={15} /> Catálogo
+          </button>
+          <button
+            className="seg-btn"
+            onClick={() => {
+              if (currentView !== 'cliente') onViewChange('cliente');
+              setTimeout(() => {
+                const el = document.getElementById('graficos');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }, 120);
+            }}
+          >
+            <TrendingUp size={15} /> Gráficos
+          </button>
+          <button
+            className="seg-btn"
+            onClick={() => setModalConsultaOpen(true)}
+          >
+            <FileCheck2 size={15} /> Mis Reservas
           </button>
           {hasSelectedFinca && (
             <button

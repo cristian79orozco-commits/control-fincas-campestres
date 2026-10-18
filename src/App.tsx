@@ -176,7 +176,11 @@ export const App: React.FC = () => {
   const renderSeccionesCliente = () => {
     let catalogoRendered = false;
 
-    return contenidoSitio.orden_secciones.map((seccion: SeccionClave) => {
+    const orden: SeccionClave[] = (contenidoSitio.orden_secciones && contenidoSitio.orden_secciones.includes('graficos'))
+      ? contenidoSitio.orden_secciones
+      : ['banner', 'hero', 'destacados', 'graficos', 'estado', 'filtros', 'catalogo', 'comparador', 'menus', 'faq'];
+
+    return orden.map((seccion: SeccionClave) => {
       switch (seccion) {
         case 'hero':
           return (
@@ -195,6 +199,11 @@ export const App: React.FC = () => {
                 const el = document.getElementById('seccion-menus');
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
               }}
+              onVisualClick={() => {
+                const el = document.getElementById('graficos');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              onPortalClick={() => setModalConsultaOpen(true)}
             />
           );
 

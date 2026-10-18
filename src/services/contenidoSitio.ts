@@ -1,4 +1,4 @@
-import type { ContenidoSitio } from '../types';
+import type { ContenidoSitio, SeccionClave } from '../types';
 
 export const CONTENIDO_SITIO_DEFAULT: ContenidoSitio = {
   id: 'principal',
@@ -161,13 +161,56 @@ export const CONTENIDO_SITIO_DEFAULT: ContenidoSitio = {
   footer_whatsapp_cta: '¿Tienes alguna duda especial? Escríbenos directamente a WhatsApp',
 };
 
-const STORAGE_KEY = 'fc_contenido_sitio';
+export function normalizeContenidoSitio(raw: any): ContenidoSitio {
+  if (!raw) return CONTENIDO_SITIO_DEFAULT;
+  const merged: ContenidoSitio = { ...CONTENIDO_SITIO_DEFAULT, ...raw };
+
+  // Garantizar que las nuevas secciones existan siempre en orden_secciones
+  const orden: SeccionClave[] = Array.isArray(raw.orden_secciones) && raw.orden_secciones.length > 0
+    ? [...raw.orden_secciones]
+    : [...CONTENIDO_SITIO_DEFAULT.orden_secciones];
+
+  if (!orden.includes('graficos')) {
+    const idxCat = orden.indexOf('catalogo');
+    if (idxCat !== -1) {
+      orden.splice(idxCat, 0, 'graficos');
+    } else {
+      orden.push('graficos');
+    }
+  }
+
+  if (!orden.includes('comparador')) {
+    const idxCat = orden.indexOf('catalogo');
+    if (idxCat !== -1) {
+      orden.splice(idxCat + 1, 0, 'comparador');
+    } else {
+      orden.push('comparador');
+    }
+  }
+
+  merged.orden_secciones = orden;
+  merged.graficos_visible = raw.graficos_visible ?? true;
+  merged.graficos_titulo = raw.graficos_titulo || CONTENIDO_SITIO_DEFAULT.graficos_titulo;
+  merged.graficos_subtitulo = raw.graficos_subtitulo || CONTENIDO_SITIO_DEFAULT.graficos_subtitulo;
+  merged.graficos_tipo = raw.graficos_tipo || 'ambos';
+  merged.comparador_visible = raw.comparador_visible ?? true;
+  merged.comparador_titulo = raw.comparador_titulo || CONTENIDO_SITIO_DEFAULT.comparador_titulo;
+  merged.comparador_subtitulo = raw.comparador_subtitulo || CONTENIDO_SITIO_DEFAULT.comparador_subtitulo;
+  merged.portal_cliente_visible = raw.portal_cliente_visible ?? true;
+  merged.catalogo_vista_predeterminada = raw.catalogo_vista_predeterminada || 'grid';
+  merged.catalogo_mostrar_badges = raw.catalogo_mostrar_badges ?? true;
+  merged.catalogo_mostrar_precio_total = raw.catalogo_mostrar_precio_total ?? true;
+
+  return merged;
+}
+
+const STORAGE_KEY = 'fc_contenido_sitio_v2';
 
 let contenidoGlobal: ContenidoSitio = (() => {
   try {
     const local = localStorage.getItem(STORAGE_KEY);
     if (local) {
-      return { ...CONTENIDO_SITIO_DEFAULT, ...JSON.parse(local) };
+      return normalizeContenidoSitio(JSON.parse(local));
     }
   } catch {
     // Si localStorage no está disponible
@@ -180,7 +223,7 @@ export function getContenidoSitioGlobal(): ContenidoSitio {
 }
 
 export function setContenidoSitioGlobal(cfg: ContenidoSitio): void {
-  contenidoGlobal = { ...CONTENIDO_SITIO_DEFAULT, ...cfg };
+  contenidoGlobal = normalizeContenidoSitio(cfg);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(contenidoGlobal));
   } catch {

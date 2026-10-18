@@ -12,7 +12,7 @@ import { calcularSaldo } from '../types';
 import { obtenerSiguienteConsecutivo } from '../utils/consecutivos';
 import { generarUUID, esUUID } from '../utils/uuid';
 import { CONFIGURACION_DEFAULT, setConfiguracionGlobal } from '../services/configuracion';
-import { CONTENIDO_SITIO_DEFAULT, setContenidoSitioGlobal } from '../services/contenidoSitio';
+import { CONTENIDO_SITIO_DEFAULT, setContenidoSitioGlobal, normalizeContenidoSitio } from '../services/contenidoSitio';
 import type { DatosCotizacionPublica, ResultadoCotizacionPublica } from '../hooks/useCotizadorPublico';
 import {
   notificarNuevaCotizacion,
@@ -246,7 +246,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [menus, setMenus] = useState<MenuType[]>(() => leerCache('fc_cache_menus', []));
   const [comunicaciones, setComunicaciones] = useState<Comunicacion[]>(() => leerCache('fc_cache_comunicaciones', []));
   const [configuracion, setConfiguracion] = useState<ConfiguracionGeneral>(() => leerCache('fc_configuracion_general', CONFIGURACION_DEFAULT));
-  const [contenidoSitio, setContenidoSitio] = useState<ContenidoSitio>(() => leerCache('fc_contenido_sitio_v1', CONTENIDO_SITIO_DEFAULT));
+  const [contenidoSitio, setContenidoSitio] = useState<ContenidoSitio>(() => normalizeContenidoSitio(leerCache('fc_contenido_sitio_v2', CONTENIDO_SITIO_DEFAULT)));
   const [loading, setLoading] = useState(false);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [guardandoContenido, setGuardandoContenido] = useState(false);
@@ -689,8 +689,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .maybeSingle();
 
       if (!error && data) {
-        setContenidoSitio(data as ContenidoSitio);
-        setContenidoSitioGlobal(data as ContenidoSitio);
+        const normalizado = normalizeContenidoSitio(data);
+        setContenidoSitio(normalizado);
+        setContenidoSitioGlobal(normalizado);
       }
     } catch (err) {
       console.warn('[AppContext] Error cargando contenido sitio:', err);

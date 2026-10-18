@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import type { BeneficioItem } from '../types';
 
 interface BeneficiosSectionProps {
@@ -17,13 +18,39 @@ export const BeneficiosSection: React.FC<BeneficiosSectionProps> = ({
   if (!visible || !items || items.length === 0) return null;
 
   return (
-    <section className="beneficios-section" style={{ margin: '2rem 0' }}>
-      <div className="sec-header" style={{ marginBottom: '1.2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <h2 className="sec-title" style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>
+    <section className="beneficios-section" style={{ margin: '2.5rem 0' }}>
+      <div
+        className="sec-header"
+        style={{
+          marginBottom: '1.5rem',
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        <h2
+          className="sec-title"
+          style={{
+            fontSize: 'clamp(1.25rem, 1.1rem + 0.8vw, 1.8rem)',
+            fontWeight: 800,
+            color: 'var(--text)',
+            letterSpacing: '-0.02em',
+          }}
+        >
           {titulo}
         </h2>
         {subtitulo && (
-          <p className="sec-sub" style={{ maxWidth: '680px', margin: '0.3rem auto 0 auto' }}>
+          <p
+            className="sec-sub"
+            style={{
+              maxWidth: '680px',
+              margin: '0.4rem auto 0 auto',
+              fontSize: '0.9rem',
+              color: 'var(--text-muted)',
+              lineHeight: 1.5,
+            }}
+          >
             {subtitulo}
           </p>
         )}
@@ -33,44 +60,46 @@ export const BeneficiosSection: React.FC<BeneficiosSectionProps> = ({
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))',
-          gap: '1.2rem',
+          gap: '1.25rem',
         }}
       >
-        {items.map(item => (
-          <div
-            key={item.id}
-            className="card"
+        {items.map((item, idx) => (
+          <motion.div
+            key={item.id || idx}
+            whileHover={{ y: -5, scale: 1.02 }}
+            transition={{ type: 'spring', stiffness: 350, damping: 25 }}
             style={{
-              padding: '1.4rem',
+              padding: '1.6rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.65rem',
+              gap: '0.75rem',
               background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--rad-md)',
+              border: '1.5px solid var(--border)',
+              borderRadius: 'var(--rad-md, 18px)',
               boxShadow: 'var(--sh-sm)',
-              transition: 'transform 0.2s, box-shadow 0.2s',
+              position: 'relative',
+              overflow: 'hidden',
             }}
           >
             <div
               style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '12px',
+                width: '48px',
+                height: '48px',
+                borderRadius: '14px',
                 background: 'var(--primary-bg)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '1.35rem',
+                fontSize: '1.5rem',
+                boxShadow: '0 2px 8px rgba(26, 107, 94, 0.12)',
               }}
             >
               {item.icono || '✨'}
             </div>
             <h3
               style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: '1.15rem',
-                fontWeight: 600,
+                fontSize: '1.1rem',
+                fontWeight: 800,
                 color: 'var(--text)',
                 margin: 0,
               }}
@@ -79,15 +108,15 @@ export const BeneficiosSection: React.FC<BeneficiosSectionProps> = ({
             </h3>
             <p
               style={{
-                fontSize: 'var(--text-xs)',
+                fontSize: '0.84rem',
                 color: 'var(--text-muted)',
-                lineHeight: 1.55,
+                lineHeight: 1.6,
                 margin: 0,
               }}
             >
               {item.descripcion}
             </p>
-          </div>
+          </motion.div>
         ))}
       </div>
     </section>
