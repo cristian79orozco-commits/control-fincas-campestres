@@ -86,11 +86,15 @@ export function useAuth() {
       });
 
       if (error) {
+        let msg = error.message;
+        if (error.message === 'Invalid login credentials') {
+          msg = 'Credenciales incorrectas. Verifica tu correo y contraseña registrados en Supabase.';
+        } else if (error.message.includes('Database error querying schema')) {
+          msg = 'Error de esquema en Supabase Auth. Ejecuta el script supabase/reparar_acceso_admin.sql en el SQL Editor para restaurar tu usuario.';
+        }
         return {
           success: false,
-          message: error.message === 'Invalid login credentials'
-            ? 'Credenciales incorrectas. Verifica tu correo y contraseña registrados en Supabase.'
-            : (error.message || 'Error de autenticación'),
+          message: msg,
         };
       }
 
