@@ -11,8 +11,6 @@ import {
   TrendingUp,
   MessageCircle,
   ShieldCheck,
-  Home,
-  Utensils,
   CheckCircle,
   FileText,
 } from 'lucide-react';
@@ -94,15 +92,15 @@ export const ComunicacionesCharts: React.FC<ComunicacionesChartsProps> = ({
           tiposDataMap.personalizado,
         ],
         backgroundColor: [
-          '#16a34a', // Verde Esmeralda (Cotización)
-          '#0d9488', // Teal (Separación)
-          '#0284c7', // Azul Cielo (Abono)
-          '#f59e0b', // Ámbar (Estado de Cuenta)
-          '#8b5cf6', // Púrpura (Paz y Salvo)
-          '#ea580c', // Naranja Quemado (Menús)
-          '#ef4444', // Rojo Coral (Recordatorio)
-          '#10b981', // Menta (Bienvenida)
-          '#64748b', // Pizarra (Otros)
+          '#16a34a',
+          '#0d9488',
+          '#0284c7',
+          '#f59e0b',
+          '#8b5cf6',
+          '#ea580c',
+          '#ef4444',
+          '#10b981',
+          '#64748b',
         ],
         borderWidth: 2,
         borderColor: 'var(--surface)',
@@ -205,119 +203,101 @@ export const ComunicacionesCharts: React.FC<ComunicacionesChartsProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* Tarjetas KPI Superiores */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm flex items-center justify-between"
-        >
-          <div>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-              Total Envíos WhatsApp
-            </span>
-            <span className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1 block">
-              {stats.total}
-            </span>
-            <span className="text-xs text-emerald-600 font-medium flex items-center gap-1 mt-0.5">
-              <CheckCircle size={12} /> Registro en auditoría activo
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold text-lg">
-            <MessageCircle size={24} />
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.05 }}
-          className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm flex items-center justify-between"
-        >
-          <div>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-              Cotizaciones Emitidas
-            </span>
-            <span className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1 block">
-              {tiposDataMap.cotizacion}
-            </span>
-            <span className="text-xs text-slate-500 font-medium">
-              Fase 1: Prospección oficial
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center font-bold text-lg">
-            <FileText size={24} />
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-          className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm flex items-center justify-between"
-        >
-          <div>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-              Abonos y Separaciones
-            </span>
-            <span className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1 block">
-              {tiposDataMap.separacion + tiposDataMap.abono}
-            </span>
-            <span className="text-xs text-teal-600 font-medium">
-              Fase 2: Bloqueo de fechas
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-teal-500/10 text-teal-600 flex items-center justify-center font-bold text-lg">
-            <ShieldCheck size={24} />
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.15 }}
-          className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm flex items-center justify-between"
-        >
-          <div>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-              Saldos & Paz y Salvo
-            </span>
-            <span className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1 block">
-              {tiposDataMap.estado_cuenta + tiposDataMap.paz_salvo}
-            </span>
-            <span className="text-xs text-amber-600 font-medium">
-              Fase 3: Doble balance
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold text-lg">
-            <TrendingUp size={24} />
-          </div>
-        </motion.div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Tarjetas KPI Superiores con Diseño Nativo */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.85rem' }}>
+        {[
+          {
+            label: 'Total Envíos WhatsApp',
+            val: stats.total,
+            sub: 'Auditoría en tiempo real',
+            icon: <MessageCircle size={22} style={{ color: '#16a34a' }} />,
+            color: 'rgba(22, 163, 74, 0.12)',
+          },
+          {
+            label: 'Cotizaciones Formales',
+            val: tiposDataMap.cotizacion,
+            sub: 'Fase 1: Prospección',
+            icon: <FileText size={22} style={{ color: '#0284c7' }} />,
+            color: 'rgba(2, 132, 199, 0.12)',
+          },
+          {
+            label: 'Separaciones & Abonos',
+            val: tiposDataMap.separacion + tiposDataMap.abono,
+            sub: 'Fase 2: Bloqueo fechas',
+            icon: <ShieldCheck size={22} style={{ color: '#0d9488' }} />,
+            color: 'rgba(13, 148, 136, 0.12)',
+          },
+          {
+            label: 'Saldos & Paz y Salvo',
+            val: tiposDataMap.estado_cuenta + tiposDataMap.paz_salvo,
+            sub: 'Fase 3: Liquidación',
+            icon: <TrendingUp size={22} style={{ color: '#ea580c' }} />,
+            color: 'rgba(234, 88, 12, 0.12)',
+          },
+        ].map((kpi, idx) => (
+          <motion.div
+            key={idx}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, delay: idx * 0.04 }}
+            style={{
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: '12px',
+              padding: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+            }}
+          >
+            <div>
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {kpi.label}
+              </span>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text)', lineHeight: '1.2', marginTop: '0.2rem' }}>
+                {kpi.val}
+              </div>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                {kpi.sub}
+              </span>
+            </div>
+            <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: kpi.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {kpi.icon}
+            </div>
+          </motion.div>
+        ))}
       </div>
 
-      {/* Grid de Gráficas de Análisis */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      {/* Grid de Gráficas de Análisis con Aspecto Nativo */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1rem' }}>
         {/* Gráfico 1: Proporción por Tipo de Comunicación */}
-        <div className="p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <PieIcon size={18} className="text-emerald-600" />
-              <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100">
-                Distribución de Mensajes por Etapa Comercial
-              </h3>
+        <div
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: '14px',
+            padding: '1.1rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.85rem',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.86rem', color: 'var(--text)' }}>
+              <PieIcon size={17} style={{ color: '#16a34a' }} />
+              <span>Distribución de Mensajes por Etapa Comercial</span>
             </div>
-            <span className="text-xs text-slate-400 font-medium">
-              Historial Total
-            </span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Historial Total</span>
           </div>
 
-          <div style={{ height: '240px' }} className="relative">
+          <div style={{ height: '240px', position: 'relative' }}>
             {stats.total > 0 ? (
               <Doughnut data={dataDistribucion} options={optionsDoughnut} />
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-400">
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                 No hay comunicaciones registradas aún para graficar.
               </div>
             )}
@@ -325,73 +305,96 @@ export const ComunicacionesCharts: React.FC<ComunicacionesChartsProps> = ({
         </div>
 
         {/* Gráfico 2: Doble Balance Financiero Visual en Vivo */}
-        <div className="p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <TrendingUp size={18} className="text-amber-600" />
-              <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100">
-                Radiografía del Doble Balance: Expediente #{expedienteConsecutivo}
-              </h3>
+        <div
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: '14px',
+            padding: '1.1rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.85rem',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.86rem', color: 'var(--text)' }}>
+              <TrendingUp size={17} style={{ color: '#ea580c' }} />
+              <span>Radiografía del Doble Balance: #{expedienteConsecutivo}</span>
             </div>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold">
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'rgba(234, 88, 12, 0.12)', color: '#ea580c' }}>
               En Vivo
             </span>
           </div>
 
-          <div style={{ height: '200px' }} className="relative">
+          <div style={{ height: '200px', position: 'relative' }}>
             {finanzasDoble ? (
               <Bar data={dataDobleBalance} options={optionsBarraBalance} />
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-400">
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                 Selecciona un expediente para comparar saldos en tiempo real.
               </div>
             )}
           </div>
 
           {finanzasDoble && (
-            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 flex-shrink-0" />
-                <span className="text-slate-600 dark:text-slate-400">
-                  Total Dueño: <strong>{formatCOP(finanzasDoble.subtotalFinca)}</strong>
-                </span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', paddingTop: '0.6rem', borderTop: '1px solid var(--border)', fontSize: '0.76rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#16a34a', flexShrink: 0 }} />
+                <span>Total Dueño: <strong>{formatCOP(finanzasDoble.subtotalFinca)}</strong></span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-600 flex-shrink-0" />
-                <span className="text-slate-600 dark:text-slate-400">
-                  Total Menú: <strong>{formatCOP(finanzasDoble.costoAlimentacion)}</strong>
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#ea580c', flexShrink: 0 }} />
+                <span>Total Menú: <strong>{formatCOP(finanzasDoble.costoAlimentacion)}</strong></span>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Tabla Resumen de Huéspedes Frecuentes con Lodash */}
+      {/* Huéspedes con Mayor Interacción en WhatsApp con Lodash */}
       {stats.destinatariosFrecuentes.length > 0 && (
-        <div className="p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-          <h4 className="font-bold text-xs text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">
+        <div
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: '14px',
+            padding: '1.1rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+          }}
+        >
+          <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Huéspedes con Mayor Interacción en WhatsApp
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.65rem' }}>
             {stats.destinatariosFrecuentes.map((item, idx) => (
               <div
                 key={idx}
-                className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 flex flex-col justify-between"
+                style={{
+                  padding: '0.65rem 0.8rem',
+                  borderRadius: '10px',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: '0.4rem',
+                }}
               >
                 <div>
-                  <div className="font-bold text-xs text-slate-800 dark:text-slate-100 truncate">
+                  <div style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {item.destinatario || 'Huésped'}
                   </div>
-                  <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                  <div style={{ fontSize: '0.72rem', color: '#16a34a', fontFamily: 'monospace', fontWeight: 600 }}>
                     +{item.telefono}
                   </div>
                 </div>
-                <div className="mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-700/50 flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400">Contactos:</span>
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                    {item.total} envíos
-                  </span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: '0.35rem' }}>
+                  <span>Contactos:</span>
+                  <strong style={{ color: 'var(--primary)' }}>{item.total} envíos</strong>
                 </div>
               </div>
             ))}
