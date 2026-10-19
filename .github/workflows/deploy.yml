@@ -28,10 +28,6 @@ jobs:
 
       - name: Compilar para producción (Vite + React + TypeScript)
         run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://porhjqsvhffshvdxvije.supabase.co' }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvcmhqcXN2aGZmc2h2ZHh2aWplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5ODM4MTIsImV4cCI6MjA5MjU1OTgxMn0.DdnJ-9Ip-PdL1RneNzymogQ5mo-9yRvi3S1f096YfOc' }}
-          VITE_DEFAULT_WA_NUMBER: ${{ secrets.VITE_DEFAULT_WA_NUMBER || '573176827093' }}
 
       - name: Desplegar en GitHub Pages (rama gh-pages)
         uses: peaceiris/actions-gh-pages@v4
