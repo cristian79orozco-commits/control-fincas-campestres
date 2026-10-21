@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import _ from 'lodash';
-import type { TipoComunicacion, Comunicacion } from '../types';
+import type { TipoComunicacion, Comunicacion, MetodoEnvioWhatsApp } from '../types';
+import { obtenerMetodoWhatsAppActual, setMetodoWhatsAppActual } from '../services/whatsapp';
 
 export type TabComunicaciones = 'envio' | 'analytics' | 'plantillas' | 'historial' | 'config';
 export type FaseMensaje = 'fase_1_cotizacion' | 'fase_2_reserva' | 'fase_3_saldos' | 'fase_4_llegada' | 'fase_5_libre';
@@ -42,14 +43,16 @@ export interface ComunicacionesState {
   filtroTipoHistorial: string;
   busquedaHistorial: string;
 
-  // Configuración WhatsApp
+  // Configuración WhatsApp (Número corporativo y Método Desktop PC vs Web)
   waGlobalInput: string;
+  metodoWhatsApp: MetodoEnvioWhatsApp;
 
   // Acciones
   setTabActiva: (tab: TabComunicaciones) => void;
   setFaseFiltro: (fase: FaseMensaje) => void;
   setTipoSeleccionado: (tipo: TipoComunicacion) => void;
   setSubTipoAccion: (subtipo: 'normal' | 'pedir_abono' | 'cobrar_alimentacion') => void;
+  setMetodoWhatsApp: (metodo: MetodoEnvioWhatsApp) => void;
   
   setExpediente: (datos: {
     tipo: 'cotizacion' | 'reserva' | null;
@@ -119,6 +122,7 @@ export const useComunicacionesStore = create<ComunicacionesState>((set, get) => 
   filtroTipoHistorial: 'todos',
   busquedaHistorial: '',
   waGlobalInput: '',
+  metodoWhatsApp: obtenerMetodoWhatsAppActual(),
 
   setTabActiva: (tabActiva) => set({ tabActiva }),
   setFaseFiltro: (faseFiltro) => set({ faseFiltro }),
@@ -159,6 +163,10 @@ export const useComunicacionesStore = create<ComunicacionesState>((set, get) => 
   setFiltroTipoHistorial: (filtroTipoHistorial) => set({ filtroTipoHistorial }),
   setBusquedaHistorial: (busquedaHistorial) => set({ busquedaHistorial }),
   setWaGlobalInput: (waGlobalInput) => set({ waGlobalInput }),
+  setMetodoWhatsApp: (metodoWhatsApp) => {
+    setMetodoWhatsAppActual(metodoWhatsApp);
+    set({ metodoWhatsApp });
+  },
 
   obtenerEstadisticasHistorial: (comunicaciones: Comunicacion[]) => {
     const total = comunicaciones.length;

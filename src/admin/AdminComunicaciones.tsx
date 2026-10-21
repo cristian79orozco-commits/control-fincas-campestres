@@ -5,10 +5,10 @@ import {
   Download, Trash2, Settings, Phone, BookOpen,
   Search, RotateCcw, Save, Sparkles, Tag,
   CreditCard, Utensils, Home, BarChart3,
-  ShieldCheck, Eye, Edit3
+  ShieldCheck, Eye, Edit3, Laptop, Globe, Info
 } from 'lucide-react';
 import type {
-  Cliente, Finca, Reserva, CotizacionDB, Menu, Pago, TipoComunicacion, Comunicacion, ConfiguracionGeneral
+  Cliente, Finca, Reserva, CotizacionDB, Menu, Pago, TipoComunicacion, Comunicacion, ConfiguracionGeneral, MetodoEnvioWhatsApp
 } from '../types';
 import { calcularSaldo, desglosarFinanzasReserva } from '../types';
 import {
@@ -141,6 +141,8 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
     setFiltroTipoHistorial,
     waGlobalInput,
     setWaGlobalInput,
+    metodoWhatsApp,
+    setMetodoWhatsApp,
   } = useComunicacionesStore();
 
   useEffect(() => {
@@ -927,7 +929,8 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
   // ---------------------------------------------------------------------------
   // Enviar a WhatsApp
   // ---------------------------------------------------------------------------
-  const handleEnviarWhatsApp = async () => {
+  const handleEnviarWhatsApp = async (metodoForzado?: MetodoEnvioWhatsApp) => {
+    const metodoAUsar = metodoForzado || metodoWhatsApp;
     const telLimpio = formatearTelefonoWhatsApp(telefonoInput);
     if (!telLimpio || telLimpio.length < 10) {
       showToast('Por favor introduce un número de WhatsApp válido (ej: 573176827093)', 'error');
@@ -940,7 +943,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
         await ejecutarDescargaPdf();
       }
 
-      abrirWhatsApp(telLimpio, mensajeTexto);
+      abrirWhatsApp(telLimpio, mensajeTexto, metodoAUsar);
 
       await onRegistrarComunicacion({
         cliente_id: clienteActual?.id || clienteId || null,
@@ -953,7 +956,12 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
         estado: 'enviado',
       });
 
-      showToast('WhatsApp abierto y comunicación registrada con éxito ✅', 'success');
+      showToast(
+        metodoAUsar === 'desktop'
+          ? 'WhatsApp Desktop abierto en PC y registrado en auditoría ✅'
+          : 'WhatsApp Web abierto en navegador y registrado en auditoría ✅',
+        'success'
+      );
     } catch (err: any) {
       showToast(`Error al procesar comunicación: ${err.message}`, 'error');
     } finally {
@@ -1865,33 +1873,122 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
                   </div>
                 </div>
 
-                {/* Botón Gigante de Envío */}
-                <div style={{ padding: '0.85rem', background: '#f0f2f5', borderTop: '1px solid #d1d7db' }}>
-                  <button
-                    type="button"
-                    onClick={handleEnviarWhatsApp}
-                    disabled={procesando || !telefonoInput.trim()}
-                    style={{
-                      width: '100%',
-                      background: '#25d366',
-                      borderColor: '#25d366',
-                      color: '#ffffff',
-                      fontWeight: 700,
-                      fontSize: '0.9rem',
-                      padding: '0.75rem 1rem',
-                      borderRadius: '10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.5rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 14px rgba(37, 211, 102, 0.4)',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    <Send size={18} />
-                    {procesando ? 'Procesando y abriendo WhatsApp…' : 'Abrir chat de WhatsApp Oficial'}
-                  </button>
+                {/* Botón y Canal de Envío */}
+                <div style={{ padding: '0.85rem', background: '#f0f2f5', borderTop: '1px solid #d1d7db', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  {/* Selector rápido de modo de apertura */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem', fontSize: '0.78rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600, color: '#1e293b' }}>
+                      {metodoWhatsApp === 'desktop' ? (
+                        <Laptop size={14} style={{ color: '#16a34a' }} />
+                      ) : (
+                        <Globe size={14} style={{ color: '#0284c7' }} />
+                      )}
+                      <span>Canal:</span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setMetodoWhatsApp('desktop')}
+                        style={{
+                          fontSize: '0.7rem',
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '6px',
+                          border: metodoWhatsApp === 'desktop' ? '1px solid #16a34a' : '1px solid #cbd5e1',
+                          background: metodoWhatsApp === 'desktop' ? '#16a34a' : '#ffffff',
+                          color: metodoWhatsApp === 'desktop' ? '#ffffff' : '#475569',
+                          fontWeight: metodoWhatsApp === 'desktop' ? 700 : 500,
+                          cursor: 'pointer',
+                        }}
+                        title="Abre la app de WhatsApp Desktop instalada en tu PC directamente"
+                      >
+                        💻 App PC (Desktop)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMetodoWhatsApp('web')}
+                        style={{
+                          fontSize: '0.7rem',
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '6px',
+                          border: metodoWhatsApp === 'web' ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                          background: metodoWhatsApp === 'web' ? '#0284c7' : '#ffffff',
+                          color: metodoWhatsApp === 'web' ? '#ffffff' : '#475569',
+                          fontWeight: metodoWhatsApp === 'web' ? 700 : 500,
+                          cursor: 'pointer',
+                        }}
+                        title="Abre WhatsApp Web en una pestaña nueva"
+                      >
+                        🌐 WhatsApp Web
+                      </button>
+                    </div>
+                  </div>
+
+                  {metodoWhatsApp === 'desktop' && (
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Info size={11} style={{ color: '#16a34a', flexShrink: 0 }} />
+                      <span>Se conectará directo a tu app de WhatsApp sin salir de la página web.</span>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'stretch' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleEnviarWhatsApp()}
+                      disabled={procesando || !telefonoInput.trim()}
+                      style={{
+                        flex: 1,
+                        background: metodoWhatsApp === 'desktop' ? '#16a34a' : '#0284c7',
+                        borderColor: metodoWhatsApp === 'desktop' ? '#16a34a' : '#0284c7',
+                        color: '#ffffff',
+                        fontWeight: 700,
+                        fontSize: '0.88rem',
+                        padding: '0.7rem 0.9rem',
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        cursor: 'pointer',
+                        boxShadow: metodoWhatsApp === 'desktop'
+                          ? '0 4px 14px rgba(22, 163, 74, 0.35)'
+                          : '0 4px 14px rgba(2, 132, 199, 0.35)',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <Send size={16} />
+                      {procesando
+                        ? 'Procesando y abriendo WhatsApp…'
+                        : (metodoWhatsApp === 'desktop'
+                            ? 'Abrir chat en WhatsApp Desktop (PC)'
+                            : 'Abrir chat en WhatsApp Web')}
+                    </button>
+
+                    {metodoWhatsApp === 'desktop' && (
+                      <button
+                        type="button"
+                        onClick={() => handleEnviarWhatsApp('web')}
+                        disabled={procesando || !telefonoInput.trim()}
+                        style={{
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          color: '#475569',
+                          fontWeight: 600,
+                          fontSize: '0.74rem',
+                          padding: '0.7rem 0.75rem',
+                          borderRadius: '10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          cursor: 'pointer',
+                        }}
+                        title="Alternativa de respaldo: Abrir en WhatsApp Web en una pestaña nueva"
+                      >
+                        <Globe size={13} />
+                        <span>Web</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

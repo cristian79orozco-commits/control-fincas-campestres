@@ -15,7 +15,7 @@
  *    - Enviar propuestas de menús / alimentación
  */
 
-import type { Reserva, Pago, CotizacionDB, Cliente, Finca, TipoComunicacion } from '../types';
+import type { Reserva, Pago, CotizacionDB, Cliente, Finca, TipoComunicacion, MetodoEnvioWhatsApp } from '../types';
 import { calcularSaldo, desglosarFinanzasReserva } from '../types';
 import {
   generarDocSeparacion,
@@ -72,16 +72,85 @@ export function renderizarPlantillaPersonalizada(template: string, tokens: Recor
 }
 
 // ---------------------------------------------------------------
-// Generación de Enlaces de WhatsApp
+// Generación y Apertura de Enlaces de WhatsApp (Desktop PC & Web)
 // ---------------------------------------------------------------
-export function generarUrlWhatsApp(telefono: string, mensaje: string): string {
+export const LOCAL_STORAGE_METODO_WA_KEY = 'pt_metodo_whatsapp';
+
+export function obtenerMetodoWhatsAppActual(): MetodoEnvioWhatsApp {
+  try {
+    const local = localStorage.getItem(LOCAL_STORAGE_METODO_WA_KEY);
+    if (local === 'desktop' || local === 'web') {
+      return local;
+    }
+    const globalCfg = getConfiguracionGlobal();
+    if (globalCfg?.metodo_whatsapp === 'desktop' || globalCfg?.metodo_whatsapp === 'web') {
+      return globalCfg.metodo_whatsapp;
+    }
+  } catch {
+    // Si localStorage no está disponible
+  }
+  return 'desktop';
+}
+
+export function setMetodoWhatsAppActual(metodo: MetodoEnvioWhatsApp): void {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_METODO_WA_KEY, metodo);
+  } catch {}
+  try {
+    const cfg = getConfiguracionGlobal();
+    if (cfg) {
+      cfg.metodo_whatsapp = metodo;
+    }
+  } catch {}
+}
+
+export function generarUrlWhatsApp(
+  telefono: string,
+  mensaje: string,
+  metodo: MetodoEnvioWhatsApp = obtenerMetodoWhatsAppActual()
+): string {
   const telLimpio = formatearTelefonoWhatsApp(telefono) || DEFAULT_WA_NUMBER;
+  if (metodo === 'desktop') {
+    // Protocolo nativo de Windows para la app oficial de WhatsApp Desktop
+    return `whatsapp://send?phone=${telLimpio}&text=${encodeURIComponent(mensaje)}`;
+  }
+  // Alternativa web estándar para navegador
   return `https://wa.me/${telLimpio}?text=${encodeURIComponent(mensaje)}`;
 }
 
-export function abrirWhatsApp(telefono: string, mensaje: string): void {
-  const url = generarUrlWhatsApp(telefono, mensaje);
-  window.open(url, '_blank', 'noopener,noreferrer');
+export function abrirWhatsApp(
+  telefono: string,
+  mensaje: string,
+  metodo?: MetodoEnvioWhatsApp
+): void {
+  const metodoEfectivo = metodo || obtenerMetodoWhatsAppActual();
+  const url = generarUrlWhatsApp(telefono, mensaje, metodoEfectivo);
+
+  if (metodoEfectivo === 'desktop') {
+    // Disparo seguro mediante elemento ancla transitorio:
+    // 1. Windows enfoca y abre de inmediato la app de WhatsApp Desktop con el chat y mensaje listo.
+    // 2. NO navega fuera de la página web (la app web se mantiene 100% activa e intacta).
+    // 3. NO abre pestañas en blanco (about:blank).
+    // 4. Permite tener el navegador en una mitad de pantalla y WhatsApp en la otra (multitarea fluida).
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        if (a.parentNode) {
+          a.parentNode.removeChild(a);
+        }
+      }, 500);
+    } catch {
+      // Fallback
+      window.location.assign(url);
+    }
+  } else {
+    // WhatsApp Web en nueva pestaña
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
 }
 
 export async function copiarAlPortapapeles(texto: string): Promise<boolean> {
@@ -614,13 +683,14 @@ export interface EnviarWhatsAppOpciones {
   menuDatos?: PropuestaAlimentacionDatos;
   mensajePersonalizado?: string;
   generarPdfAntes?: boolean;
+  metodo?: MetodoEnvioWhatsApp;
 }
 
 export async function ejecutarEnvioWhatsAppConDocumento(
   opciones: EnviarWhatsAppOpciones
 ): Promise<{ success: boolean; mensaje: string; error?: string }> {
   try {
-    const { tipo, telefonoDestino, reserva, pago, cotizacion, cliente, finca, menuDatos, mensajePersonalizado, generarPdfAntes = true } = opciones;
+    const { tipo, telefonoDestino, reserva, pago, cotizacion, cliente, finca, menuDatos, mensajePersonalizado, generarPdfAntes = true, metodo } = opciones;
 
     let mensajeFinal = '';
 
@@ -714,8 +784,8 @@ export async function ejecutarEnvioWhatsAppConDocumento(
       throw new Error('No se pudo construir el contenido del mensaje.');
     }
 
-    // 3. Abrir WhatsApp con el número del cliente
-    abrirWhatsApp(telefonoDestino, mensajeFinal);
+    // 3. Abrir WhatsApp con el número del cliente respetando el método seleccionado
+    abrirWhatsApp(telefonoDestino, mensajeFinal, metodo);
 
     return {
       success: true,

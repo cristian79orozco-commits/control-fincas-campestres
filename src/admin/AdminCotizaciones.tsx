@@ -11,6 +11,8 @@ import {
   plantillaPedirAbonoCotizacion,
   plantillaPropuestaAlimentacion,
   plantillaCobroAlimentacion,
+  abrirWhatsApp,
+  generarUrlWhatsApp,
 } from '../services/whatsapp';
 import { calcularCotizacion } from '../utils/calcularCotizacion';
 import { CurrencyInput } from '../components/CurrencyInput';
@@ -793,10 +795,13 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
                         {' · '}👤 <strong>{clienteNombre}</strong>
                         {c.clientes?.whatsapp && (
                           <a
-                            href={`https://wa.me/${c.clientes.whatsapp.replace(/\D/g, '')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ color: '#25d366', marginLeft: '0.35rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600 }}
+                            href={generarUrlWhatsApp(c.clientes.whatsapp, '')}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              abrirWhatsApp(c.clientes!.whatsapp!, '');
+                            }}
+                            style={{ color: '#25d366', marginLeft: '0.35rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600, cursor: 'pointer' }}
+                            title="Abrir chat en WhatsApp (Desktop PC / Web)"
                           >
                             <MessageCircle size={11} /> {c.clientes.whatsapp}
                           </a>

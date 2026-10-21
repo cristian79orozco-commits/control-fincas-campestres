@@ -17,6 +17,8 @@ import {
   plantillaPazYSalvo,
   plantillaEstadoCuenta,
   plantillaCobroAlimentacion,
+  abrirWhatsApp,
+  generarUrlWhatsApp,
 } from '../services/whatsapp';
 import { generarDocSeparacion, generarPazYSalvo, generarEstadoCuenta, generarPropuestaAlimentacion } from '../services/documentos';
 import { CurrencyInput } from '../components/CurrencyInput';
@@ -1066,10 +1068,13 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
                       {' · '}👤 {clienteNombre}
                       {clienteTel && (
                         <a
-                          href={`https://wa.me/${clienteTel.replace(/\D/g, '')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: '#25d366', textDecoration: 'none', marginLeft: '0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                          href={generarUrlWhatsApp(clienteTel, '')}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            abrirWhatsApp(clienteTel, '');
+                          }}
+                          style={{ color: '#25d366', textDecoration: 'none', marginLeft: '0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer' }}
+                          title="Abrir chat en WhatsApp (Desktop PC / Web)"
                         >
                           <MessageCircle size={10} /> {clienteTel}
                         </a>

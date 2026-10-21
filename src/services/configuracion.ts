@@ -88,6 +88,9 @@ export const CONFIGURACION_DEFAULT: ConfiguracionGeneral = {
     firma_digital_url: '',
     pie_firma_cliente: 'Firma del Cliente',
   },
+
+  // 7. Método de Apertura de WhatsApp (Desktop PC vs Web)
+  metodo_whatsapp: 'desktop',
 };
 
 // Variable en memoria global para sincronización inmediata

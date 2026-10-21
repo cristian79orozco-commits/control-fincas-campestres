@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, FileDown, Copy, Check, X, Send, Phone, Edit2 } from 'lucide-react';
-import { abrirWhatsApp, copiarAlPortapapeles, formatearTelefonoWhatsApp } from '../services/whatsapp';
+import { MessageCircle, FileDown, Copy, Check, X, Send, Phone, Edit2, Laptop, Globe, Info } from 'lucide-react';
+import {
+  abrirWhatsApp,
+  copiarAlPortapapeles,
+  formatearTelefonoWhatsApp,
+  obtenerMetodoWhatsAppActual,
+  setMetodoWhatsAppActual,
+} from '../services/whatsapp';
+import type { MetodoEnvioWhatsApp } from '../types';
 
 export interface WhatsAppModalProps {
   isOpen: boolean;
@@ -30,6 +37,7 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
   const [generarPdf, setGenerarPdf] = useState(true);
   const [copiado, setCopiado] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [metodo, setMetodo] = useState<MetodoEnvioWhatsApp>(obtenerMetodoWhatsAppActual());
 
   useEffect(() => {
     if (isOpen) {
@@ -37,6 +45,7 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
       setMensaje(mensajeInicial);
       setGenerarPdf(Boolean(nombreDocumento && onGenerarPdf));
       setCopiado(false);
+      setMetodo(obtenerMetodoWhatsAppActual());
     }
   }, [isOpen, telefonoInicial, mensajeInicial, nombreDocumento, onGenerarPdf]);
 
@@ -61,7 +70,8 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
     }
   };
 
-  const handleEnviarWhatsApp = async () => {
+  const handleEnviarWhatsApp = async (metodoForzado?: MetodoEnvioWhatsApp) => {
+    const metodoAUsar = metodoForzado || metodo;
     const telLimpio = formatearTelefonoWhatsApp(telefono);
     if (!telLimpio) {
       alert('Por favor introduce un número de teléfono o celular válido.');
@@ -75,8 +85,8 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
         await onGenerarPdf();
       }
 
-      // 2. Abrir WhatsApp con el número del cliente y el mensaje estructurado
-      abrirWhatsApp(telLimpio, mensaje);
+      // 2. Abrir WhatsApp con el número del cliente y el mensaje estructurado respetando el canal (Desktop PC o Web)
+      abrirWhatsApp(telLimpio, mensaje, metodoAUsar);
 
       // 3. Notificar callback de registro
       onDespuesDeEnviar?.(telLimpio, mensaje);
@@ -210,6 +220,85 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
               }}
             />
           </div>
+
+          {/* Selector de Canal: WhatsApp Desktop PC vs WhatsApp Web */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.65rem 0.85rem',
+              borderRadius: 'var(--rad-sm)',
+              background: 'var(--surface-alt, #f7f9f8)',
+              border: '1px solid var(--border)',
+              fontSize: '0.8rem',
+              flexWrap: 'wrap',
+              gap: '0.5rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              {metodo === 'desktop' ? (
+                <Laptop size={16} style={{ color: '#16a34a' }} />
+              ) : (
+                <Globe size={16} style={{ color: '#0284c7' }} />
+              )}
+              <span style={{ fontWeight: 600 }}>Modo de apertura:</span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+              <button
+                type="button"
+                className={`btn btn-sm ${metodo === 'desktop' ? 'btn-primary' : ''}`}
+                style={{
+                  fontSize: '0.74rem',
+                  padding: '0.22rem 0.55rem',
+                  ...(metodo === 'desktop' ? { backgroundColor: '#16a34a', borderColor: '#16a34a' } : {}),
+                }}
+                onClick={() => {
+                  setMetodo('desktop');
+                  setMetodoWhatsAppActual('desktop');
+                }}
+                title="Abre directamente la aplicación de WhatsApp instalada en tu PC (sin salir de la página)"
+              >
+                💻 App de PC (Desktop)
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${metodo === 'web' ? 'btn-primary' : ''}`}
+                style={{
+                  fontSize: '0.74rem',
+                  padding: '0.22rem 0.55rem',
+                  ...(metodo === 'web' ? { backgroundColor: '#0284c7', borderColor: '#0284c7' } : {}),
+                }}
+                onClick={() => {
+                  setMetodo('web');
+                  setMetodoWhatsAppActual('web');
+                }}
+                title="Abre WhatsApp Web en una nueva pestaña del navegador"
+              >
+                🌐 WhatsApp Web
+              </button>
+            </div>
+          </div>
+
+          {metodo === 'desktop' && (
+            <div
+              style={{
+                fontSize: '0.72rem',
+                color: 'var(--text-muted)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                marginTop: '-0.35rem',
+                paddingLeft: '0.25rem',
+              }}
+            >
+              <Info size={12} style={{ color: '#16a34a', flexShrink: 0 }} />
+              <span>
+                Se abrirá en la app de WhatsApp de tu PC sin cerrar ni salir de esta web (ideal para multitarea).
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Footer con acciones */}
@@ -221,30 +310,49 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
             justifyContent: 'space-between',
             alignItems: 'center',
             background: 'var(--surface)',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
           }}
         >
           <button type="button" className="btn btn-sm" onClick={onClose}>
             Cancelar
           </button>
 
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={handleEnviarWhatsApp}
-            disabled={enviando || !telefono.trim()}
-            style={{
-              backgroundColor: '#25d366',
-              borderColor: '#25d366',
-              color: '#ffffff',
-              fontWeight: 600,
-              gap: '0.45rem',
-            }}
-          >
-            <Send size={15} />
-            {enviando
-              ? 'Procesando…'
-              : (nombreDocumento && generarPdf ? 'Descargar PDF y Enviar por WhatsApp' : 'Abrir chat de WhatsApp')}
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {metodo === 'desktop' && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => handleEnviarWhatsApp('web')}
+                disabled={enviando || !telefono.trim()}
+                style={{ fontSize: '0.74rem', color: 'var(--text-muted)', gap: '0.3rem' }}
+                title="Abrir como respaldo en WhatsApp Web si esta PC no tiene la app instalada"
+              >
+                <Globe size={12} /> Abrir en Web
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => handleEnviarWhatsApp()}
+              disabled={enviando || !telefono.trim()}
+              style={{
+                backgroundColor: metodo === 'desktop' ? '#16a34a' : '#0284c7',
+                borderColor: metodo === 'desktop' ? '#16a34a' : '#0284c7',
+                color: '#ffffff',
+                fontWeight: 600,
+                gap: '0.45rem',
+              }}
+            >
+              <Send size={15} />
+              {enviando
+                ? 'Procesando…'
+                : (nombreDocumento && generarPdf
+                    ? (metodo === 'desktop' ? 'Descargar PDF y Abrir en WhatsApp PC' : 'Descargar PDF y Abrir en WhatsApp Web')
+                    : (metodo === 'desktop' ? 'Abrir chat en WhatsApp PC' : 'Abrir chat en WhatsApp Web'))}
+            </button>
+          </div>
         </div>
       </div>
     </div>

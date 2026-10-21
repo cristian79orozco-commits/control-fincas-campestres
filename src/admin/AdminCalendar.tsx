@@ -22,6 +22,8 @@ import {
   plantillaSeparacion,
   plantillaPazYSalvo,
   plantillaEstadoCuenta,
+  abrirWhatsApp,
+  generarUrlWhatsApp,
 } from '../services/whatsapp';
 import { generarDocSeparacion, generarPazYSalvo, generarEstadoCuenta } from '../services/documentos';
 
@@ -752,11 +754,14 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
 
                     {resVin && tel && (
                       <a
-                        href={`https://wa.me/${tel.replace(/\D/g, '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href={generarUrlWhatsApp(tel, '')}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          abrirWhatsApp(tel, '');
+                        }}
                         className="btn btn-sm"
-                        style={{ color: '#25d366', fontSize: '0.72rem', padding: '0.2rem 0.5rem', gap: '0.3rem' }}
+                        style={{ color: '#25d366', fontSize: '0.72rem', padding: '0.2rem 0.5rem', gap: '0.3rem', cursor: 'pointer' }}
+                        title="Abrir chat en WhatsApp (Desktop PC / Web)"
                       >
                         <MessageCircle size={12} /> Contactar WhatsApp
                       </a>
@@ -987,9 +992,11 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
                         <span>👤 <strong>{clienteNombre}</strong></span>
                         {clienteTel && (
                           <a
-                            href={`https://wa.me/${clienteTel.replace(/\D/g, '')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            href={generarUrlWhatsApp(clienteTel, '')}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              abrirWhatsApp(clienteTel, '');
+                            }}
                             style={{
                               color: '#25d366',
                               textDecoration: 'none',
@@ -999,8 +1006,10 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
                               fontWeight: 600,
                               background: 'rgba(37, 211, 102, 0.1)',
                               padding: '0.1rem 0.4rem',
-                              borderRadius: '4px'
+                              borderRadius: '4px',
+                              cursor: 'pointer',
                             }}
+                            title="Abrir chat en WhatsApp (Desktop PC / Web)"
                           >
                             <MessageCircle size={11} /> {clienteTel}
                           </a>

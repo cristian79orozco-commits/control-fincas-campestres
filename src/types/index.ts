@@ -458,9 +458,14 @@ export interface ConfiguracionGeneral {
   regla_alimentacion_min_servicios?: number;
   regla_alimentacion_mensaje?: string | null;
 
+  // 7. Método de Apertura de WhatsApp (Desktop PC vs Web)
+  metodo_whatsapp?: MetodoEnvioWhatsApp;
+
   created_at?: string;
   updated_at?: string;
 }
+
+export type MetodoEnvioWhatsApp = 'desktop' | 'web';
 
 // ---------------------------------------------------------------
 // FASE 5 — Control del Contenido del Cliente (Sitio Público)

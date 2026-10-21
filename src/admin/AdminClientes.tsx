@@ -5,6 +5,7 @@ import {
   DollarSign, Sparkles
 } from 'lucide-react';
 import type { Cliente, Reserva, CotizacionDB, Finca } from '../types';
+import { abrirWhatsApp, generarUrlWhatsApp } from '../services/whatsapp';
 
 interface AdminClientesProps {
   clientes: Cliente[];
@@ -322,11 +323,13 @@ export const AdminClientes: React.FC<AdminClientesProps> = ({
                             </span>
                             {telWhatsApp && (
                               <a
-                                href={`https://wa.me/${telWhatsApp}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                                href={generarUrlWhatsApp(telWhatsApp, '')}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  abrirWhatsApp(telWhatsApp, '');
+                                }}
                                 className="btn btn-sm"
-                                title="Abrir chat de WhatsApp"
+                                title="Abrir chat de WhatsApp (Desktop PC / Web)"
                                 style={{
                                   padding: '0.15rem 0.45rem',
                                   fontSize: '0.68rem',
@@ -336,6 +339,8 @@ export const AdminClientes: React.FC<AdminClientesProps> = ({
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '0.25rem',
+                                  cursor: 'pointer',
+                                  textDecoration: 'none',
                                 }}
                               >
                                 <MessageCircle size={11} /> WhatsApp
@@ -442,12 +447,14 @@ export const AdminClientes: React.FC<AdminClientesProps> = ({
                       <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
                         {(c.whatsapp || c.telefono) && (
                           <a
-                            href={`https://wa.me/${(c.whatsapp || c.telefono || '').replace(/\D/g, '')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            href={generarUrlWhatsApp(c.whatsapp || c.telefono || '', '')}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              abrirWhatsApp(c.whatsapp || c.telefono || '', '');
+                            }}
                             className="btn btn-sm"
-                            title="Abrir chat de WhatsApp"
-                            style={{ padding: '0.3rem 0.5rem', color: '#16a34a', borderColor: '#bbf7d0', background: '#f0fdf4' }}
+                            title="Abrir chat de WhatsApp (Desktop PC / Web)"
+                            style={{ padding: '0.3rem 0.5rem', color: '#16a34a', borderColor: '#bbf7d0', background: '#f0fdf4', cursor: 'pointer' }}
                           >
                             <MessageCircle size={13} />
                           </a>
@@ -548,11 +555,14 @@ export const AdminClientes: React.FC<AdminClientesProps> = ({
                   </div>
                   {clienteSeleccionado.cliente.whatsapp && (
                     <a
-                      href={`https://wa.me/${clienteSeleccionado.cliente.whatsapp.replace(/\D/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      href={generarUrlWhatsApp(clienteSeleccionado.cliente.whatsapp, '')}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        abrirWhatsApp(clienteSeleccionado.cliente.whatsapp!, '');
+                      }}
                       className="btn btn-sm"
-                      style={{ color: '#25d366', borderColor: '#25d366' }}
+                      style={{ color: '#25d366', borderColor: '#25d366', cursor: 'pointer' }}
+                      title="Abrir chat en WhatsApp (Desktop PC / Web)"
                     >
                       <MessageCircle size={13} /> Chat WhatsApp
                     </a>

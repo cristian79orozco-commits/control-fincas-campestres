@@ -6,8 +6,12 @@ import {
   ShieldCheck,
   Scale,
   Hash,
+  Laptop,
+  Globe,
+  Info,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useComunicacionesStore } from '../../store/useComunicacionesStore';
 
 interface ComunicacionesConfigProps {
   currentWaNumber: string;
@@ -21,6 +25,7 @@ export const ComunicacionesConfig: React.FC<ComunicacionesConfigProps> = ({
   showToast,
 }) => {
   const [waInput, setWaInput] = useState(currentWaNumber);
+  const { metodoWhatsApp, setMetodoWhatsApp } = useComunicacionesStore();
 
   useEffect(() => {
     setWaInput(currentWaNumber);
@@ -81,6 +86,102 @@ export const ComunicacionesConfig: React.FC<ComunicacionesConfigProps> = ({
         <div className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5 pt-1">
           <CheckCircle size={14} />
           <span>Línea corporativa activa: +{currentWaNumber}</span>
+        </div>
+      </div>
+
+      {/* Modo de Apertura Predeterminado: WhatsApp Desktop PC vs Web */}
+      <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col gap-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold">
+            <Laptop size={18} />
+          </div>
+          <div>
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+              Canal Predeterminado de Envío de WhatsApp
+            </h3>
+            <span className="text-xs text-slate-400">
+              Define si los mensajes se abren directamente en la app de escritorio de tu PC o en el navegador
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          {/* Opción Desktop PC */}
+          <div
+            onClick={() => {
+              setMetodoWhatsApp('desktop');
+              showToast('Canal configurado: WhatsApp Desktop (App de PC) 💻', 'success');
+            }}
+            className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col gap-2 ${
+              metodoWhatsApp === 'desktop'
+                ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-sm ring-1 ring-emerald-500/20'
+                : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white">
+                <Laptop size={16} className="text-emerald-600" />
+                <span>WhatsApp Desktop (PC)</span>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600">
+                Recomendado
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Abre directamente la aplicación instalada en tu Windows. <strong>No abre pestañas en blanco</strong> y permite trabajar con la web y el chat en pantalla dividida.
+            </p>
+          </div>
+
+          {/* Opción WhatsApp Web */}
+          <div
+            onClick={() => {
+              setMetodoWhatsApp('web');
+              showToast('Canal configurado: WhatsApp Web (Navegador) 🌐', 'info');
+            }}
+            className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col gap-2 ${
+              metodoWhatsApp === 'web'
+                ? 'border-blue-500 bg-blue-50/40 dark:bg-blue-950/20 shadow-sm ring-1 ring-blue-500/20'
+                : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white">
+                <Globe size={16} className="text-blue-600" />
+                <span>WhatsApp Web</span>
+              </div>
+              <span className="text-[10px] font-medium text-slate-400">
+                Navegador
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Abre una pestaña nueva en el navegador dirigida a WhatsApp Web. Útil para equipos temporales o prestados sin la aplicación instalada.
+            </p>
+          </div>
+        </div>
+
+        {/* Guía para nuevo computador */}
+        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 flex items-start gap-2.5 text-xs text-slate-600 dark:text-slate-400">
+          <Info size={16} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 space-y-1">
+            <strong className="text-slate-800 dark:text-slate-200 block">
+              ¿Estás configurando o usando un computador nuevo?
+            </strong>
+            <p className="leading-relaxed">
+              1. Asegúrate de tener instalada la aplicación oficial de WhatsApp para PC (puedes descargarla gratis desde{' '}
+              <a
+                href="https://www.whatsapp.com/download"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500"
+              >
+                whatsapp.com/download
+              </a>{' '}
+              o Microsoft Store).
+            </p>
+            <p className="leading-relaxed">
+              2. La primera vez que el navegador te pregunte <em>¿Abrir WhatsApp?</em>, marca la casilla <strong>"Permitir siempre que este sitio abra estos vínculos"</strong> para que en adelante se abra al instante sin confirmaciones.
+            </p>
+          </div>
         </div>
       </div>
 
