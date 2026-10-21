@@ -75,10 +75,10 @@ export const AdminWaConfig: React.FC<AdminWaConfigProps> = ({
             onClick={() => {
               setMetodo('desktop');
               setMetodoWhatsAppActual('desktop');
-              showToast('Canal configurado: WhatsApp Desktop (App de PC) 💻', 'success');
+              showToast('Canal configurado: App de PC (WhatsApp Web / PWA) 💻', 'success');
             }}
           >
-            💻 WhatsApp Desktop (App de PC)
+            💻 App de PC (Recomendado)
           </button>
           <button
             type="button"
@@ -98,7 +98,7 @@ export const AdminWaConfig: React.FC<AdminWaConfigProps> = ({
         </div>
         <p className="text-xs text-muted" style={{ marginTop: '0.45rem' }}>
           {metodo === 'desktop'
-            ? '✓ Se abre directamente en tu app de WhatsApp para Windows sin cerrar ni salir de esta web (ideal para multitarea).'
+            ? '✓ Se conecta directamente a la app de WhatsApp de tu PC sin salir ni recargar esta web (ideal para multitarea en pantalla dividida).'
             : '✓ Se abre en una pestaña nueva del navegador en WhatsApp Web.'}
         </p>
       </div>

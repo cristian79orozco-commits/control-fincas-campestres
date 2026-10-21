@@ -121,14 +121,14 @@ export const ComunicacionesConfig: React.FC<ComunicacionesConfigProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white">
                 <Laptop size={16} className="text-emerald-600" />
-                <span>WhatsApp Desktop (PC)</span>
+                <span>App de PC (WhatsApp Web / PWA)</span>
               </div>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600">
                 Recomendado
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              Abre directamente la aplicación instalada en tu Windows. <strong>No abre pestañas en blanco</strong> y permite trabajar con la web y el chat en pantalla dividida.
+              Abre directamente el chat en la aplicación de WhatsApp instalada en tu PC (descargada del navegador / Chrome PWA). <strong>Sin páginas intermedias ni pantallas de confirmación</strong>, perfecto para trabajar con ambas ventanas en pantalla dividida.
             </p>
           </div>
 
@@ -147,14 +147,14 @@ export const ComunicacionesConfig: React.FC<ComunicacionesConfigProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white">
                 <Globe size={16} className="text-blue-600" />
-                <span>WhatsApp Web</span>
+                <span>WhatsApp Web (Nueva Pestaña)</span>
               </div>
               <span className="text-[10px] font-medium text-slate-400">
                 Navegador
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              Abre una pestaña nueva en el navegador dirigida a WhatsApp Web. Útil para equipos temporales o prestados sin la aplicación instalada.
+              Abre una pestaña nueva e independiente en el navegador dirigida a WhatsApp Web con el mensaje pre-cargado listo para enviar.
             </p>
           </div>
         </div>
@@ -164,22 +164,13 @@ export const ComunicacionesConfig: React.FC<ComunicacionesConfigProps> = ({
           <Info size={16} className="text-emerald-600 flex-shrink-0 mt-0.5" />
           <div className="flex-1 space-y-1">
             <strong className="text-slate-800 dark:text-slate-200 block">
-              ¿Estás configurando o usando un computador nuevo?
+              ¿Cómo funciona la conexión con la app de WhatsApp de tu PC?
             </strong>
             <p className="leading-relaxed">
-              1. Asegúrate de tener instalada la aplicación oficial de WhatsApp para PC (puedes descargarla gratis desde{' '}
-              <a
-                href="https://www.whatsapp.com/download"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500"
-              >
-                whatsapp.com/download
-              </a>{' '}
-              o Microsoft Store).
+              1. <strong>App instalada desde el navegador (PWA):</strong> Si instalaste WhatsApp desde Chrome o Edge (icono de instalar en la barra superior), el canal <strong>App de PC</strong> envía el enlace directo a tu ventana de WhatsApp con el número del cliente y el mensaje listo.
             </p>
             <p className="leading-relaxed">
-              2. La primera vez que el navegador te pregunte <em>¿Abrir WhatsApp?</em>, marca la casilla <strong>"Permitir siempre que este sitio abra estos vínculos"</strong> para que en adelante se abra al instante sin confirmaciones.
+              2. <strong>Multitarea fluida:</strong> Puedes tener la web de Paraíso Terrenal en la mitad izquierda de tu pantalla y WhatsApp en la mitad derecha. Cada envío actualizará el chat sin salir ni recargar el sistema.
             </p>
           </div>
         </div>

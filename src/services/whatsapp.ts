@@ -76,14 +76,19 @@ export function renderizarPlantillaPersonalizada(template: string, tokens: Recor
 // ---------------------------------------------------------------
 export const LOCAL_STORAGE_METODO_WA_KEY = 'pt_metodo_whatsapp';
 
+export function esDispositivoMovil(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
 export function obtenerMetodoWhatsAppActual(): MetodoEnvioWhatsApp {
   try {
     const local = localStorage.getItem(LOCAL_STORAGE_METODO_WA_KEY);
-    if (local === 'desktop' || local === 'web') {
+    if (local === 'desktop' || local === 'web' || local === 'native') {
       return local;
     }
     const globalCfg = getConfiguracionGlobal();
-    if (globalCfg?.metodo_whatsapp === 'desktop' || globalCfg?.metodo_whatsapp === 'web') {
+    if (globalCfg?.metodo_whatsapp === 'desktop' || globalCfg?.metodo_whatsapp === 'web' || globalCfg?.metodo_whatsapp === 'native') {
       return globalCfg.metodo_whatsapp;
     }
   } catch {
@@ -110,12 +115,21 @@ export function generarUrlWhatsApp(
   metodo: MetodoEnvioWhatsApp = obtenerMetodoWhatsAppActual()
 ): string {
   const telLimpio = formatearTelefonoWhatsApp(telefono) || DEFAULT_WA_NUMBER;
-  if (metodo === 'desktop') {
-    // Protocolo nativo de Windows para la app oficial de WhatsApp Desktop
-    return `whatsapp://send?phone=${telLimpio}&text=${encodeURIComponent(mensaje)}`;
+  const encodedMsg = mensaje ? encodeURIComponent(mensaje) : '';
+
+  // 1. En dispositivos móviles (smartphones/tablets), wa.me redirige automáticamente a la app móvil de WhatsApp
+  if (esDispositivoMovil()) {
+    return `https://wa.me/${telLimpio}${encodedMsg ? `?text=${encodedMsg}` : ''}`;
   }
-  // Alternativa web estándar para navegador
-  return `https://wa.me/${telLimpio}?text=${encodeURIComponent(mensaje)}`;
+
+  // 2. Si se solicita explícitamente el protocolo nativo de Windows (Microsoft Store / WhatsApp.exe)
+  if (metodo === 'native') {
+    return `whatsapp://send?phone=${telLimpio}${encodedMsg ? `&text=${encodedMsg}` : ''}`;
+  }
+
+  // 3. En PC / Desktop (tanto 'desktop' para la app descargada del navegador/PWA como 'web'):
+  // Conexión DIRECTA a web.whatsapp.com que abre el chat y pre-carga el mensaje sin pantallas intermedias de wa.me
+  return `https://web.whatsapp.com/send?phone=${telLimpio}${encodedMsg ? `&text=${encodedMsg}` : ''}`;
 }
 
 export function abrirWhatsApp(
@@ -123,33 +137,82 @@ export function abrirWhatsApp(
   mensaje: string,
   metodo?: MetodoEnvioWhatsApp
 ): void {
+  const telLimpio = formatearTelefonoWhatsApp(telefono) || DEFAULT_WA_NUMBER;
   const metodoEfectivo = metodo || obtenerMetodoWhatsAppActual();
-  const url = generarUrlWhatsApp(telefono, mensaje, metodoEfectivo);
+  const directWebUrl = generarUrlWhatsApp(telefono, mensaje, 'desktop');
 
-  if (metodoEfectivo === 'desktop') {
-    // Disparo seguro mediante elemento ancla transitorio:
-    // 1. Windows enfoca y abre de inmediato la app de WhatsApp Desktop con el chat y mensaje listo.
-    // 2. NO navega fuera de la página web (la app web se mantiene 100% activa e intacta).
-    // 3. NO abre pestañas en blanco (about:blank).
-    // 4. Permite tener el navegador en una mitad de pantalla y WhatsApp en la otra (multitarea fluida).
+  // 1. En móviles (Android / iOS): Abrir mediante wa.me
+  if (esDispositivoMovil()) {
+    window.open(`https://wa.me/${telLimpio}${mensaje ? `?text=${encodeURIComponent(mensaje)}` : ''}`, '_blank');
+    return;
+  }
+
+  // 2. Si se eligió la app nativa de Windows (Microsoft Store / WhatsApp.exe):
+  if (metodoEfectivo === 'native') {
+    let appAbierta = false;
+    const onBlur = () => { appAbierta = true; };
+    window.addEventListener('blur', onBlur, { once: true });
+
     try {
+      const nativeUrl = `whatsapp://send?phone=${telLimpio}${mensaje ? `&text=${encodeURIComponent(mensaje)}` : ''}`;
       const a = document.createElement('a');
-      a.href = url;
+      a.href = nativeUrl;
       a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
       setTimeout(() => {
-        if (a.parentNode) {
-          a.parentNode.removeChild(a);
-        }
+        if (a.parentNode) a.parentNode.removeChild(a);
       }, 500);
     } catch {
-      // Fallback
-      window.location.assign(url);
+      window.open(directWebUrl, 'WhatsAppWeb');
     }
-  } else {
-    // WhatsApp Web en nueva pestaña
-    window.open(url, '_blank', 'noopener,noreferrer');
+
+    // Fallback de seguridad: si pasados 1200ms la app nativa no respondió
+    // (ej. el PC no tiene registrada la app en el registro de Windows),
+    // abre directamente WhatsApp Web para que el mensaje nunca quede en el limbo.
+    setTimeout(() => {
+      window.removeEventListener('blur', onBlur);
+      if (!appAbierta && !document.hidden) {
+        window.open(directWebUrl, 'WhatsAppWeb');
+      }
+    }, 1200);
+    return;
+  }
+
+  // 3. Canal Desktop (Predeterminado para App de PC descargada del navegador / Chrome PWA / Pantalla Dividida):
+  // Dispara el enlace directo a web.whatsapp.com en la ventana/pestaña dedicada 'WhatsAppWeb'.
+  // Beneficios:
+  // - Abre de inmediato el chat del cliente con el texto redactado y listo para enviar.
+  // - NO sale ni recarga la página web de Paraíso Terrenal (mantiene las dos ventanas activas en multitarea).
+  // - Reutiliza la ventana de WhatsApp Web para envíos sucesivos sin saturar con pestañas múltiples.
+  if (metodoEfectivo === 'desktop') {
+    const win = window.open(directWebUrl, 'WhatsAppWeb');
+    if (!win || win.closed || typeof win.closed === 'undefined') {
+      const a = document.createElement('a');
+      a.href = directWebUrl;
+      a.target = 'WhatsAppWeb';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        if (a.parentNode) a.parentNode.removeChild(a);
+      }, 500);
+    }
+    return;
+  }
+
+  // 4. Canal Web estándar: Abre en nueva pestaña independiente (_blank)
+  const win = window.open(directWebUrl, '_blank');
+  if (!win || win.closed || typeof win.closed === 'undefined') {
+    const a = document.createElement('a');
+    a.href = directWebUrl;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      if (a.parentNode) a.parentNode.removeChild(a);
+    }, 500);
   }
 }
 

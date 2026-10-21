@@ -465,7 +465,7 @@ export interface ConfiguracionGeneral {
   updated_at?: string;
 }
 
-export type MetodoEnvioWhatsApp = 'desktop' | 'web';
+export type MetodoEnvioWhatsApp = 'desktop' | 'web' | 'native';
 
 // ---------------------------------------------------------------
 // FASE 5 — Control del Contenido del Cliente (Sitio Público)
