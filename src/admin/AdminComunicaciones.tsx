@@ -939,11 +939,13 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = ({
 
     setProcesando(true);
     try {
+      // 1. Invocar apertura de WhatsApp de inmediato con el gesto de usuario activo
+      abrirWhatsApp(telLimpio, mensajeTexto, metodoAUsar);
+
+      // 2. Si está configurado generar y descargar el documento PDF, procesarlo
       if (tieneDocumentoPdf && descargarPdf) {
         await ejecutarDescargaPdf();
       }
-
-      abrirWhatsApp(telLimpio, mensajeTexto, metodoAUsar);
 
       await onRegistrarComunicacion({
         cliente_id: clienteActual?.id || clienteId || null,

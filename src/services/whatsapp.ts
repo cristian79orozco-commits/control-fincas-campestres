@@ -122,14 +122,14 @@ export function generarUrlWhatsApp(
     return `https://wa.me/${telLimpio}${encodedMsg ? `?text=${encodedMsg}` : ''}`;
   }
 
-  // 2. Si se solicita explícitamente el protocolo nativo de Windows (Microsoft Store / WhatsApp.exe)
-  if (metodo === 'native') {
-    return `whatsapp://send?phone=${telLimpio}${encodedMsg ? `&text=${encodedMsg}` : ''}`;
+  // 2. Si se solicita explícitamente abrir en WhatsApp Web (navegador):
+  if (metodo === 'web') {
+    return `https://web.whatsapp.com/send?phone=${telLimpio}${encodedMsg ? `&text=${encodedMsg}` : ''}`;
   }
 
-  // 3. En PC / Desktop (tanto 'desktop' para la app descargada del navegador/PWA como 'web'):
-  // Conexión DIRECTA a web.whatsapp.com que abre el chat y pre-carga el mensaje sin pantallas intermedias de wa.me
-  return `https://web.whatsapp.com/send?phone=${telLimpio}${encodedMsg ? `&text=${encodedMsg}` : ''}`;
+  // 3. Canal Desktop (Predeterminado para PC):
+  // Protocolo nativo de Windows para la app oficial de WhatsApp Desktop (WhatsApp.Root.exe)
+  return `whatsapp://send?phone=${telLimpio}${encodedMsg ? `&text=${encodedMsg}` : ''}`;
 }
 
 export function abrirWhatsApp(
@@ -139,81 +139,52 @@ export function abrirWhatsApp(
 ): void {
   const telLimpio = formatearTelefonoWhatsApp(telefono) || DEFAULT_WA_NUMBER;
   const metodoEfectivo = metodo || obtenerMetodoWhatsAppActual();
-  const directWebUrl = generarUrlWhatsApp(telefono, mensaje, 'desktop');
+  const encodedMsg = mensaje ? encodeURIComponent(mensaje) : '';
 
-  // 1. En móviles (Android / iOS): Abrir mediante wa.me
+  // 1. En móviles (Android / iOS): Redirección móvil estándar mediante wa.me
   if (esDispositivoMovil()) {
-    window.open(`https://wa.me/${telLimpio}${mensaje ? `?text=${encodeURIComponent(mensaje)}` : ''}`, '_blank');
+    window.location.href = `https://wa.me/${telLimpio}${encodedMsg ? `?text=${encodedMsg}` : ''}`;
     return;
   }
 
-  // 2. Si se eligió la app nativa de Windows (Microsoft Store / WhatsApp.exe):
-  if (metodoEfectivo === 'native') {
-    let appAbierta = false;
-    const onBlur = () => { appAbierta = true; };
-    window.addEventListener('blur', onBlur, { once: true });
+  // 2. Canal Web: Abre en una nueva pestaña del navegador en WhatsApp Web
+  if (metodoEfectivo === 'web') {
+    const webUrl = `https://web.whatsapp.com/send?phone=${telLimpio}${encodedMsg ? `&text=${encodedMsg}` : ''}`;
+    window.open(webUrl, '_blank', 'noopener,noreferrer');
+    return;
+  }
 
-    try {
-      const nativeUrl = `whatsapp://send?phone=${telLimpio}${mensaje ? `&text=${encodeURIComponent(mensaje)}` : ''}`;
-      const a = document.createElement('a');
-      a.href = nativeUrl;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        if (a.parentNode) a.parentNode.removeChild(a);
-      }, 500);
-    } catch {
-      window.open(directWebUrl, 'WhatsAppWeb');
+  // 3. Canal Desktop (Predeterminado para App de PC instalada en Windows):
+  // Dispara el protocolo registrado en el sistema operativo (whatsapp://) usando window.location.href
+  // - En navegadores modernos (Chrome/Edge), este es el estándar oficial para invocar aplicaciones de escritorio.
+  // - Al ser un protocolo de sistema operativo, el navegador NO recarga ni abandona la página web actual.
+  // - Conecta directamente con la app de WhatsApp Desktop (WhatsApp.Root.exe) abriendo el chat del cliente
+  //   y cargando el mensaje redactado listo para enviar.
+  const appUrl = `whatsapp://send?phone=${telLimpio}${encodedMsg ? `&text=${encodedMsg}` : ''}`;
+  const webFallbackUrl = `https://web.whatsapp.com/send?phone=${telLimpio}${encodedMsg ? `&text=${encodedMsg}` : ''}`;
+
+  // Temporizador de respaldo: si después de 2.2 segundos la ventana del navegador no perdió foco
+  // (significa que la app de WhatsApp Desktop no está instalada o Windows no la activó),
+  // abre automáticamente WhatsApp Web para asegurar que el mensaje nunca quede en el limbo.
+  let appLanzo = false;
+  const onBlur = () => {
+    appLanzo = true;
+    window.removeEventListener('blur', onBlur);
+  };
+  window.addEventListener('blur', onBlur, { once: true });
+
+  try {
+    window.location.href = appUrl;
+  } catch {
+    window.location.assign(appUrl);
+  }
+
+  setTimeout(() => {
+    window.removeEventListener('blur', onBlur);
+    if (!appLanzo && !document.hidden) {
+      window.open(webFallbackUrl, '_blank', 'noopener,noreferrer');
     }
-
-    // Fallback de seguridad: si pasados 1200ms la app nativa no respondió
-    // (ej. el PC no tiene registrada la app en el registro de Windows),
-    // abre directamente WhatsApp Web para que el mensaje nunca quede en el limbo.
-    setTimeout(() => {
-      window.removeEventListener('blur', onBlur);
-      if (!appAbierta && !document.hidden) {
-        window.open(directWebUrl, 'WhatsAppWeb');
-      }
-    }, 1200);
-    return;
-  }
-
-  // 3. Canal Desktop (Predeterminado para App de PC descargada del navegador / Chrome PWA / Pantalla Dividida):
-  // Dispara el enlace directo a web.whatsapp.com en la ventana/pestaña dedicada 'WhatsAppWeb'.
-  // Beneficios:
-  // - Abre de inmediato el chat del cliente con el texto redactado y listo para enviar.
-  // - NO sale ni recarga la página web de Paraíso Terrenal (mantiene las dos ventanas activas en multitarea).
-  // - Reutiliza la ventana de WhatsApp Web para envíos sucesivos sin saturar con pestañas múltiples.
-  if (metodoEfectivo === 'desktop') {
-    const win = window.open(directWebUrl, 'WhatsAppWeb');
-    if (!win || win.closed || typeof win.closed === 'undefined') {
-      const a = document.createElement('a');
-      a.href = directWebUrl;
-      a.target = 'WhatsAppWeb';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        if (a.parentNode) a.parentNode.removeChild(a);
-      }, 500);
-    }
-    return;
-  }
-
-  // 4. Canal Web estándar: Abre en nueva pestaña independiente (_blank)
-  const win = window.open(directWebUrl, '_blank');
-  if (!win || win.closed || typeof win.closed === 'undefined') {
-    const a = document.createElement('a');
-    a.href = directWebUrl;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      if (a.parentNode) a.parentNode.removeChild(a);
-    }, 500);
-  }
+  }, 2200);
 }
 
 export async function copiarAlPortapapeles(texto: string): Promise<boolean> {
@@ -757,42 +728,7 @@ export async function ejecutarEnvioWhatsAppConDocumento(
 
     let mensajeFinal = '';
 
-    // 1. Paso obligatorio: Generar y descargar el documento PDF si aplica
-    if (generarPdfAntes) {
-      switch (tipo) {
-        case 'separacion':
-          if (reserva) {
-            generarDocSeparacion(reserva);
-          }
-          break;
-        case 'abono':
-          if (reserva && pago) {
-            generarComprobantePago(reserva, pago);
-          }
-          break;
-        case 'estado_cuenta':
-          if (reserva) {
-            generarEstadoCuenta(reserva);
-          }
-          break;
-        case 'paz_salvo':
-          if (reserva) {
-            generarPazYSalvo(reserva);
-          }
-          break;
-        case 'menu':
-          if (menuDatos) {
-            await generarPropuestaAlimentacion({
-              ...menuDatos,
-              consecutivo: menuDatos.consecutivo || (cotizacion?.consecutivo ?? reserva?.consecutivo),
-              tituloDocumento: menuDatos.tituloDocumento || 'PROPUESTA DE SERVICIO GASTRONÓMICO',
-            });
-          }
-          break;
-      }
-    }
-
-    // 2. Determinar el mensaje de WhatsApp a enviar
+    // 1. Determinar el mensaje de WhatsApp a enviar
     if (mensajePersonalizado && mensajePersonalizado.trim()) {
       mensajeFinal = mensajePersonalizado;
     } else {
@@ -847,8 +783,43 @@ export async function ejecutarEnvioWhatsAppConDocumento(
       throw new Error('No se pudo construir el contenido del mensaje.');
     }
 
-    // 3. Abrir WhatsApp con el número del cliente respetando el método seleccionado
+    // 2. Abrir WhatsApp con el número del cliente de inmediato para preservar el gesto de usuario activo
     abrirWhatsApp(telefonoDestino, mensajeFinal, metodo);
+
+    // 3. Generar y descargar el documento PDF si aplica
+    if (generarPdfAntes) {
+      switch (tipo) {
+        case 'separacion':
+          if (reserva) {
+            generarDocSeparacion(reserva);
+          }
+          break;
+        case 'abono':
+          if (reserva && pago) {
+            generarComprobantePago(reserva, pago);
+          }
+          break;
+        case 'estado_cuenta':
+          if (reserva) {
+            generarEstadoCuenta(reserva);
+          }
+          break;
+        case 'paz_salvo':
+          if (reserva) {
+            generarPazYSalvo(reserva);
+          }
+          break;
+        case 'menu':
+          if (menuDatos) {
+            await generarPropuestaAlimentacion({
+              ...menuDatos,
+              consecutivo: menuDatos.consecutivo || (cotizacion?.consecutivo ?? reserva?.consecutivo),
+              tituloDocumento: menuDatos.tituloDocumento || 'PROPUESTA DE SERVICIO GASTRONÓMICO',
+            });
+          }
+          break;
+      }
+    }
 
     return {
       success: true,

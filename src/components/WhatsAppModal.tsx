@@ -80,13 +80,13 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
 
     setEnviando(true);
     try {
-      // 1. Si está activo generar PDF, ejecutarlo primero (regla del plan maestro)
+      // 1. Abrir WhatsApp de inmediato con el gesto de usuario activo para evitar bloqueo de protocolos
+      abrirWhatsApp(telLimpio, mensaje, metodoAUsar);
+
+      // 2. Si está activo generar PDF, ejecutar la generación y descarga
       if (generarPdf && onGenerarPdf) {
         await onGenerarPdf();
       }
-
-      // 2. Abrir WhatsApp con el número del cliente y el mensaje estructurado respetando el canal (Desktop PC o Web)
-      abrirWhatsApp(telLimpio, mensaje, metodoAUsar);
 
       // 3. Notificar callback de registro
       onDespuesDeEnviar?.(telLimpio, mensaje);
