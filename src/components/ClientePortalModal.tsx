@@ -126,8 +126,9 @@ export const ClientePortalModal: React.FC<ClientePortalModalProps> = ({
         position: 'fixed',
         inset: 0,
         zIndex: 1000,
-        background: 'rgba(0, 0, 0, 0.7)',
-        backdropFilter: 'blur(6px)',
+        background: 'rgba(0, 0, 0, 0.8)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -140,50 +141,57 @@ export const ClientePortalModal: React.FC<ClientePortalModalProps> = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.94, y: 15 }}
         onClick={(e) => e.stopPropagation()}
+        className="card-pro"
         style={{
-          background: 'var(--surface)',
-          border: '1.5px solid var(--border)',
-          borderRadius: 'var(--rad-md, 18px)',
           width: '100%',
           maxWidth: '640px',
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
+          borderRadius: 'var(--rad-md, 20px)',
+          border: '1.5px solid var(--border)',
           boxShadow: 'var(--sh-lg)',
           overflow: 'hidden',
+          position: 'relative',
         }}
       >
+        {/* Luz ambiental sutil */}
+        <div className="card-pro-ambient" />
+
         {/* Cabecera */}
         <div
           style={{
-            padding: '1.25rem',
+            padding: '1.35rem 1.5rem',
             borderBottom: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             background: 'var(--surface-2)',
+            position: 'relative',
+            zIndex: 1,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <span
               style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
+                width: '40px',
+                height: '40px',
+                borderRadius: '12px',
                 background: 'var(--primary-bg)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: 'var(--primary)',
+                boxShadow: '0 2px 10px rgba(77, 168, 158, 0.25)',
               }}
             >
-              <FileCheck2 size={20} />
+              <FileCheck2 size={22} />
             </span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text)' }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.02em' }}>
                 Portal del Huésped
               </h3>
-              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 Consulta el estado de tu cotización o reserva campestre
               </p>
             </div>
@@ -193,21 +201,25 @@ export const ClientePortalModal: React.FC<ClientePortalModalProps> = ({
             type="button"
             onClick={onClose}
             style={{
-              background: 'none',
-              border: 'none',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
               color: 'var(--text-muted)',
               cursor: 'pointer',
-              padding: '0.35rem',
+              padding: '0.45rem',
               borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease',
             }}
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        {/* Buscador */}
-        <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--border)' }}>
-          <form onSubmit={handleBuscar} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.6rem' }}>
+        {/* Buscador de Reserva con Focus Glow */}
+        <div style={{ padding: '1.35rem 1.5rem', borderBottom: '1px solid var(--border)', position: 'relative', zIndex: 1 }}>
+          <form onSubmit={handleBuscar} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.65rem' }}>
             <div style={{ position: 'relative' }}>
               <input
                 type="text"
@@ -218,24 +230,18 @@ export const ClientePortalModal: React.FC<ClientePortalModalProps> = ({
                   setHaBuscado(false);
                 }}
                 required
-                style={{
-                  width: '100%',
-                  padding: '0.65rem 0.85rem 0.65rem 2.2rem',
-                  borderRadius: 'var(--rad-xs, 8px)',
-                  border: '1.5px solid var(--border)',
-                  background: 'var(--surface)',
-                  color: 'var(--text)',
-                  fontSize: '0.85rem',
-                }}
+                className="input-pro"
+                style={{ paddingLeft: '2.2rem' }}
               />
               <Search
                 size={16}
                 style={{
                   position: 'absolute',
-                  left: '10px',
+                  left: '11px',
                   top: '50%',
                   transform: 'translateY(-50%)',
                   color: 'var(--text-muted)',
+                  pointerEvents: 'none',
                 }}
               />
             </div>
@@ -249,65 +255,80 @@ export const ClientePortalModal: React.FC<ClientePortalModalProps> = ({
                   setTelefonoInput(e.target.value);
                   setHaBuscado(false);
                 }}
-                style={{
-                  width: '100%',
-                  padding: '0.65rem 0.85rem 0.65rem 2.2rem',
-                  borderRadius: 'var(--rad-xs, 8px)',
-                  border: '1.5px solid var(--border)',
-                  background: 'var(--surface)',
-                  color: 'var(--text)',
-                  fontSize: '0.85rem',
-                }}
+                className="input-pro"
+                style={{ paddingLeft: '2.2rem' }}
               />
               <Phone
                 size={16}
                 style={{
                   position: 'absolute',
-                  left: '10px',
+                  left: '11px',
                   top: '50%',
                   transform: 'translateY(-50%)',
                   color: 'var(--text-muted)',
+                  pointerEvents: 'none',
                 }}
               />
             </div>
 
             <button
               type="submit"
-              className="btn btn-primary"
+              className="btn-pro-primary"
               disabled={buscando}
-              style={{ padding: '0.65rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              style={{ padding: '0.65rem 1.25rem', fontSize: '0.85rem' }}
             >
               {buscando ? <Loader2 size={16} className="spin" /> : <Search size={16} />}
-              {buscando ? 'Buscando…' : 'Consultar'}
+              <span>{buscando ? 'Buscando…' : 'Consultar'}</span>
             </button>
           </form>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.45rem' }}>
-            <ShieldCheck size={12} color="var(--primary)" /> Consulta segura protegida por verificación de número consecutivo y teléfono.
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.6rem' }}>
+            <ShieldCheck size={14} style={{ color: 'var(--primary)' }} />
+            <span>Consulta cifrada protegida por verificación de número consecutivo y teléfono.</span>
           </div>
         </div>
 
         {/* Resultados con Scroll */}
-        <div style={{ padding: '1.25rem', overflowY: 'auto', flexGrow: 1 }}>
+        <div style={{ padding: '1.5rem', overflowY: 'auto', flexGrow: 1, position: 'relative', zIndex: 1 }}>
           {!haBuscado && !resultadoRpc ? (
-            <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)' }}>
-              <Home size={38} style={{ margin: '0 auto 0.75rem auto', opacity: 0.5 }} />
-              <p style={{ margin: 0, fontSize: '0.85rem' }}>
-                Ingresa tu código consecutivo y teléfono registrado para verificar el estado de tu estadía.
+            <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+              <div
+                style={{
+                  width: '54px',
+                  height: '54px',
+                  borderRadius: '50%',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 1rem auto',
+                  color: 'var(--primary)',
+                }}
+              >
+                <Home size={26} />
+              </div>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text)', fontWeight: 600 }}>
+                Consulta el estado de tu estadía
+              </p>
+              <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                Ingresa tu número consecutivo y teléfono registrado para verificar fechas, pagos y saldos.
               </p>
             </div>
           ) : buscando ? (
-            <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
-              <Loader2 size={32} className="spin" style={{ margin: '0 auto 0.75rem auto', color: 'var(--primary)' }} />
-              <p style={{ margin: 0, fontSize: '0.85rem' }}>Consultando tu reserva de forma segura…</p>
+            <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+              <Loader2 size={36} className="spin" style={{ margin: '0 auto 1rem auto', color: 'var(--accent)' }} />
+              <p style={{ margin: 0, fontSize: '0.88rem', fontWeight: 600, color: 'var(--text)' }}>
+                Consultando tu reserva de forma segura…
+              </p>
             </div>
           ) : !resultadoRpc?.encontrado ? (
-            <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)' }}>
-              <AlertCircle size={36} style={{ margin: '0 auto 0.6rem auto', color: 'var(--accent)' }} />
-              <p style={{ margin: 0, fontWeight: 700, color: 'var(--text)' }}>
+            <div style={{ textAlign: 'center', padding: '2.5rem 1.5rem', color: 'var(--text-muted)' }}>
+              <AlertCircle size={40} style={{ margin: '0 auto 0.75rem auto', color: 'var(--accent)' }} />
+              <p style={{ margin: 0, fontWeight: 800, fontSize: '1.05rem', color: 'var(--text)' }}>
                 No encontramos registros coincidentes
               </p>
-              <p style={{ margin: '0.3rem 0 1rem 0', fontSize: '0.8rem' }}>
-                Verifica que el número consecutivo y el teléfono coincidan con los de tu solicitud.
+              <p style={{ margin: '0.35rem 0 1.25rem 0', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                Verifica que el número consecutivo y el teléfono coincidan con los de tu solicitud o habla directamente con nosotros.
               </p>
               <a
                 href={`https://wa.me/${waNumber}?text=${encodeURIComponent(
@@ -315,152 +336,162 @@ export const ClientePortalModal: React.FC<ClientePortalModalProps> = ({
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn btn-primary btn-sm"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                className="btn-pro-primary"
+                style={{ display: 'inline-flex', textDecoration: 'none' }}
               >
-                <MessageCircle size={14} /> Consultar con un Asesor por WhatsApp
+                <MessageCircle size={15} />
+                <span>Consultar con un Asesor por WhatsApp</span>
               </a>
             </div>
           ) : resultadoRpc.tipo === 'reserva' ? (
             <div
+              className="card-pro"
               style={{
                 background: 'var(--surface-2)',
                 border: '1.5px solid var(--primary)',
-                borderRadius: 'var(--rad-sm, 12px)',
-                padding: '1rem',
+                borderRadius: 'var(--rad-sm, 14px)',
+                padding: '1.25rem',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div>
                   <span
                     style={{
-                      fontSize: '0.68rem',
+                      fontSize: '0.7rem',
                       fontWeight: 800,
-                      padding: '0.15rem 0.5rem',
-                      borderRadius: '4px',
+                      padding: '0.2rem 0.6rem',
+                      borderRadius: '6px',
                       background: 'var(--primary)',
                       color: '#ffffff',
+                      letterSpacing: '0.04em',
                     }}
                   >
                     RESERVA #{resultadoRpc.consecutivo}
                   </span>
-                  <h4 style={{ margin: '0.35rem 0 0 0', fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)' }}>
+                  <h4 style={{ margin: '0.5rem 0 0 0', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.01em' }}>
                     {resultadoRpc.finca_nombre || 'Finca Campestre'}
                   </h4>
                   {resultadoRpc.cliente_nombre && (
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      Titular: <strong>{resultadoRpc.cliente_nombre}</strong>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                      Titular: <strong style={{ color: 'var(--text)' }}>{resultadoRpc.cliente_nombre}</strong>
                     </div>
                   )}
                 </div>
-                <span className="status-badge s-avail" style={{ fontSize: '0.72rem' }}>
+                <span className="badge-pro-avail" style={{ fontSize: '0.72rem' }}>
+                  <span className="pulse-dot" />
                   {(resultadoRpc.estado || 'ACTIVA').toUpperCase()}
                 </span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.6rem', marginTop: '0.75rem', fontSize: '0.78rem' }}>
-                <div>
-                  <div style={{ color: 'var(--text-muted)' }}>Llegada:</div>
-                  <div style={{ fontWeight: 700, color: 'var(--text)' }}>{resultadoRpc.fecha_inicio}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', marginTop: '1rem', fontSize: '0.8rem' }}>
+                <div style={{ background: 'var(--surface)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Llegada:</div>
+                  <div style={{ fontWeight: 800, color: 'var(--text)', marginTop: '2px' }}>{resultadoRpc.fecha_inicio}</div>
                 </div>
-                <div>
-                  <div style={{ color: 'var(--text-muted)' }}>Salida:</div>
-                  <div style={{ fontWeight: 700, color: 'var(--text)' }}>{resultadoRpc.fecha_fin}</div>
+                <div style={{ background: 'var(--surface)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Salida:</div>
+                  <div style={{ fontWeight: 800, color: 'var(--text)', marginTop: '2px' }}>{resultadoRpc.fecha_fin}</div>
                 </div>
-                <div>
-                  <div style={{ color: 'var(--text-muted)' }}>Huéspedes:</div>
-                  <div style={{ fontWeight: 700, color: 'var(--text)' }}>{resultadoRpc.personas} personas</div>
+                <div style={{ background: 'var(--surface)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Huéspedes:</div>
+                  <div style={{ fontWeight: 800, color: 'var(--text)', marginTop: '2px' }}>{resultadoRpc.personas} personas</div>
                 </div>
               </div>
 
-              {/* Desglose Financiero */}
+              {/* Desglose Financiero High-End */}
               <div
                 style={{
-                  marginTop: '0.85rem',
-                  padding: '0.75rem',
-                  borderRadius: '8px',
+                  marginTop: '1rem',
+                  padding: '1rem',
+                  borderRadius: '10px',
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '0.5rem',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                  gap: '0.75rem',
                 }}
               >
                 <div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Total Reserva:</div>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text)' }}>
+                  <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700 }}>Total Reserva:</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--text)', marginTop: '2px' }}>
                     {formatCOP(resultadoRpc.valor_total || 0)}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Anticipo / Separación:</div>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--success)' }}>
+                  <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700 }}>Anticipo / Separación:</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--success)', marginTop: '2px' }}>
                     {formatCOP(resultadoRpc.separacion || 0)}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Saldo Check-in:</div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--primary)' }}>
+                  <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700 }}>Saldo Check-in:</div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 900, color: 'var(--primary)', marginTop: '2px' }}>
                     {formatCOP(Math.max(0, (resultadoRpc.valor_total || 0) - (resultadoRpc.separacion || 0)))}
                   </div>
                 </div>
               </div>
 
-              {/* Botón WhatsApp de Atención */}
+              {/* Botón WhatsApp de Atención Directa */}
               <a
                 href={`https://wa.me/${waNumber}?text=${encodeURIComponent(
                   `Hola, tengo una consulta sobre mi reserva #${resultadoRpc.consecutivo || ''} en ${resultadoRpc.finca_nombre || ''}.`
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn btn-sm btn-primary"
-                style={{ marginTop: '0.85rem', width: '100%', justifyContent: 'center', gap: '0.4rem' }}
+                className="btn-pro-primary"
+                style={{ marginTop: '1rem', width: '100%', textDecoration: 'none' }}
               >
-                <MessageCircle size={15} /> Contactar a mi Anfitrión por WhatsApp
+                <MessageCircle size={16} />
+                <span>Contactar a mi Anfitrión por WhatsApp</span>
               </a>
             </div>
           ) : (
             <div
+              className="card-pro"
               style={{
                 background: 'var(--surface-2)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--rad-sm, 12px)',
-                padding: '1rem',
+                border: '1.5px solid var(--accent)',
+                borderRadius: 'var(--rad-sm, 14px)',
+                padding: '1.25rem',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div>
                   <span
                     style={{
-                      fontSize: '0.68rem',
-                      fontWeight: 700,
-                      padding: '0.15rem 0.5rem',
-                      borderRadius: '4px',
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      padding: '0.2rem 0.6rem',
+                      borderRadius: '6px',
                       background: 'var(--accent)',
-                      color: '#ffffff',
+                      color: '#141210',
+                      letterSpacing: '0.04em',
                     }}
                   >
                     COTIZACIÓN #{resultadoRpc.consecutivo}
                   </span>
-                  <h4 style={{ margin: '0.35rem 0 0 0', fontSize: '1rem', fontWeight: 800, color: 'var(--text)' }}>
+                  <h4 style={{ margin: '0.5rem 0 0 0', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text)' }}>
                     {resultadoRpc.finca_nombre || 'Finca Campestre'}
                   </h4>
                   {resultadoRpc.cliente_nombre && (
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      Solicitante: <strong>{resultadoRpc.cliente_nombre}</strong>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                      Solicitante: <strong style={{ color: 'var(--text)' }}>{resultadoRpc.cliente_nombre}</strong>
                     </div>
                   )}
                 </div>
-                <span className="status-badge s-warn" style={{ fontSize: '0.72rem' }}>
+                <span className="badge-pro-accent" style={{ fontSize: '0.72rem' }}>
+                  <span className="pulse-dot" />
                   {(resultadoRpc.estado || 'COTIZADA').toUpperCase()}
                 </span>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.65rem', fontSize: '0.8rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <span>Fechas: {resultadoRpc.fecha_inicio} al {resultadoRpc.fecha_fin}</span>
-                <strong style={{ color: 'var(--primary)', fontSize: '0.95rem' }}>{formatCOP(resultadoRpc.total || 0)}</strong>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.85rem', padding: '0.75rem', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  Fechas: <strong style={{ color: 'var(--text)' }}>{resultadoRpc.fecha_inicio} al {resultadoRpc.fecha_fin}</strong>
+                </span>
+                <strong style={{ color: 'var(--primary)', fontSize: '1.1rem', fontWeight: 900 }}>
+                  {formatCOP(resultadoRpc.total || 0)}
+                </strong>
               </div>
 
               <a
@@ -469,10 +500,11 @@ export const ClientePortalModal: React.FC<ClientePortalModalProps> = ({
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn btn-sm btn-outline"
-                style={{ marginTop: '0.75rem', width: '100%', justifyContent: 'center', gap: '0.4rem' }}
+                className="btn-pro-primary"
+                style={{ marginTop: '1rem', width: '100%', textDecoration: 'none' }}
               >
-                <MessageCircle size={15} /> Confirmar Cotización por WhatsApp
+                <MessageCircle size={16} />
+                <span>Confirmar Cotización por WhatsApp</span>
               </a>
             </div>
           )}

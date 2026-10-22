@@ -27,21 +27,19 @@ function formatCOP(v: number) {
 // ─── Skeleton Card para carga del catálogo ────────────────────────────────────
 const SkeletonFincaItem: React.FC = () => (
   <div
+    className="card-pro"
     style={{
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--rad-sm, 14px)',
-      padding: '1rem',
+      padding: '1.25rem',
       display: 'flex',
-      gap: '0.85rem',
+      gap: '1rem',
       alignItems: 'center',
-      background: 'var(--surface)',
     }}
   >
-    <div className="skeleton-box" style={{ width: '80px', height: '80px', borderRadius: '8px', flexShrink: 0 }} />
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', flexGrow: 1 }}>
-      <div className="skeleton-box" style={{ height: '16px', width: '60%' }} />
-      <div className="skeleton-box" style={{ height: '12px', width: '40%' }} />
-      <div className="skeleton-box" style={{ height: '12px', width: '30%' }} />
+    <div className="skeleton-shimmer" style={{ width: '88px', height: '88px', borderRadius: '12px', flexShrink: 0 }} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', flexGrow: 1 }}>
+      <div className="skeleton-shimmer" style={{ height: '18px', width: '65%' }} />
+      <div className="skeleton-shimmer" style={{ height: '14px', width: '45%' }} />
+      <div className="skeleton-shimmer" style={{ height: '12px', width: '35%' }} />
     </div>
   </div>
 );
@@ -114,62 +112,127 @@ export const Catalog: React.FC<CatalogProps> = ({
 
   return (
     <div className="cliente-flow">
-      {/* 1. Panel de Búsqueda y Filtros Centralizados */}
+      {/* 1. Panel de Búsqueda y Filtros Centralizados High-End */}
       {filtrosVisible && (
-        <div className="filters-card" id="catalogo" style={{ borderRadius: 'var(--rad-md, 18px)' }}>
-          <div className="sec-header" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.6rem' }}>
+        <div
+          className="card-pro"
+          id="catalogo"
+          style={{
+            padding: '1.6rem',
+            borderRadius: 'var(--rad-md, 20px)',
+            marginBottom: '1.5rem',
+          }}
+        >
+          {/* Luz ambiental sutil en esquina */}
+          <div className="card-pro-ambient" />
+
+          {/* Cabecera del Panel de Filtros */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '1.25rem',
+              flexWrap: 'wrap',
+              gap: '0.75rem',
+              position: 'relative',
+              zIndex: 1,
+            }}
+          >
             <div>
-              <div className="sec-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Filter size={18} style={{ color: 'var(--primary)' }} /> {filtrosTitulo}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <span
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    background: 'var(--primary-bg)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--primary)',
+                    boxShadow: '0 2px 8px rgba(77, 168, 158, 0.2)',
+                  }}
+                >
+                  <Filter size={18} />
+                </span>
+                <div>
+                  <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+                    {filtrosTitulo}
+                  </h2>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.15rem 0 0 0' }}>
+                    {filtrosSubtitulo}
+                  </p>
+                </div>
               </div>
-              <div className="sec-sub">{filtrosSubtitulo}</div>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
               {onOpenPortalHuesped && (
                 <button
                   type="button"
-                  className="btn btn-sm btn-outline"
+                  className="btn-pro-secondary"
                   onClick={onOpenPortalHuesped}
-                  style={{ fontSize: '0.75rem', gap: '5px' }}
+                  style={{ fontSize: '0.78rem', padding: '0.45rem 0.95rem' }}
                 >
-                  <FileCheck2 size={13} style={{ color: 'var(--primary)' }} /> Consultar mi reserva
+                  <FileCheck2 size={14} style={{ color: 'var(--primary)' }} />
+                  <span>Consultar mi reserva</span>
                 </button>
               )}
 
               {hayFiltrosActivos && (
                 <button
                   type="button"
-                  className="btn btn-sm"
+                  className="btn-pro-secondary"
                   onClick={limpiarFiltros}
-                  style={{ fontSize: '0.75rem', gap: '4px' }}
+                  style={{ fontSize: '0.78rem', padding: '0.45rem 0.85rem', color: 'var(--text-muted)' }}
+                  title="Restablecer todos los filtros"
                 >
-                  <X size={13} /> Limpiar filtros
+                  <X size={14} />
+                  <span>Limpiar</span>
                 </button>
               )}
             </div>
           </div>
 
-          {/* Fila principal: Búsqueda, Fechas y Capacidad */}
-          <div className="filters-grid">
+          {/* Fila principal: Búsqueda, Fechas y Capacidad con Focus Glow */}
+          <div className="filters-grid" style={{ position: 'relative', zIndex: 1, gap: '0.85rem' }}>
             {/* Búsqueda por texto */}
-            <div className="field">
-              <label><Search size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> Finca o palabra clave</label>
-              <input
-                type="text"
-                placeholder="Ej: Paraíso, Piscina, Santa Elena..."
-                value={busquedaTexto}
-                onChange={e => setBusquedaTexto(e.target.value)}
-              />
+            <div className="field" style={{ margin: 0 }}>
+              <label style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Search size={13} style={{ color: 'var(--primary)' }} /> Finca o palabra clave
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  className="input-pro"
+                  placeholder="Ej: Paraíso, Piscina, Santa Elena..."
+                  value={busquedaTexto}
+                  onChange={e => setBusquedaTexto(e.target.value)}
+                  style={{ paddingLeft: '2.2rem' }}
+                />
+                <Search
+                  size={15}
+                  style={{
+                    position: 'absolute',
+                    left: '11px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--text-muted)',
+                    pointerEvents: 'none',
+                  }}
+                />
+              </div>
             </div>
 
             {/* Fecha Llegada */}
-            <div className="field">
-              <label>
-                <Calendar size={12} style={{ display: 'inline', verticalAlign: '-1px', color: 'var(--primary)' }} /> Fecha de llegada
+            <div className="field" style={{ margin: 0 }}>
+              <label style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Calendar size={13} style={{ color: 'var(--primary)' }} /> Fecha de llegada
               </label>
               <input
                 type="date"
+                className="input-pro"
                 value={fechaEntrada}
                 min={new Date().toISOString().split('T')[0]}
                 onChange={e => {
@@ -183,12 +246,13 @@ export const Catalog: React.FC<CatalogProps> = ({
             </div>
 
             {/* Fecha Salida */}
-            <div className="field">
-              <label>
-                <Calendar size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> Fecha de salida
+            <div className="field" style={{ margin: 0 }}>
+              <label style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Calendar size={13} style={{ color: 'var(--accent)' }} /> Fecha de salida
               </label>
               <input
                 type="date"
+                className="input-pro"
                 value={fechaSalida}
                 min={fechaEntrada || new Date().toISOString().split('T')[0]}
                 onChange={e => setFechaSalida(e.target.value)}
@@ -196,13 +260,15 @@ export const Catalog: React.FC<CatalogProps> = ({
             </div>
 
             {/* Capacidad requerida */}
-            <div className="field">
-              <label>
-                <Users size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> Capacidad de huéspedes
+            <div className="field" style={{ margin: 0 }}>
+              <label style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Users size={13} style={{ color: 'var(--primary)' }} /> Capacidad de huéspedes
               </label>
               <select
+                className="input-pro"
                 value={personas}
                 onChange={e => setPersonas(e.target.value)}
+                style={{ cursor: 'pointer' }}
               >
                 <option value="">Cualquier capacidad</option>
                 <option value="Hasta 10">Hasta 10 personas</option>
@@ -213,68 +279,80 @@ export const Catalog: React.FC<CatalogProps> = ({
             </div>
           </div>
 
-          {/* Indicador de filtro de fechas activo */}
+          {/* Indicador de filtro de fechas activo en tiempo real */}
           {(fechaEntrada || fechaSalida) && (
             <div
+              className="badge-pro-avail"
               style={{
-                marginTop: '0.65rem',
-                fontSize: '0.76rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                color: 'var(--primary)',
-                background: 'var(--primary-bg)',
-                padding: '0.45rem 0.85rem',
-                borderRadius: 'var(--rad-xs, 8px)',
-                width: 'fit-content',
+                marginTop: '1rem',
+                padding: '0.5rem 1rem',
+                fontSize: '0.78rem',
+                position: 'relative',
+                zIndex: 1,
               }}
             >
-              <Calendar size={14} />
+              <span className="pulse-dot" />
               <span>
-                Filtro en tiempo real: <strong>{fechaEntrada ? `Llegada: ${fechaEntrada}` : ''}</strong>
-                {fechaSalida ? ` | Salida: ${fechaSalida}` : ' (comprobando fecha exacta)'}
+                Filtro activo: <strong>{fechaEntrada ? `Llegada: ${fechaEntrada}` : ''}</strong>
+                {fechaSalida ? ` | Salida: ${fechaSalida}` : ' (comprobando disponibilidad)'}
                 {' — '}
                 {fincasFiltradas.length} finca{fincasFiltradas.length !== 1 ? 's' : ''} disponible{fincasFiltradas.length !== 1 ? 's' : ''}
               </span>
             </div>
           )}
 
-          {/* Botón para desplegar más comodidades y ordenamiento */}
-          <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+          {/* Barra inferior: Botón de comodidades y Ordenamiento */}
+          <div
+            style={{
+              marginTop: '1.15rem',
+              paddingTop: '0.95rem',
+              borderTop: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.75rem',
+              position: 'relative',
+              zIndex: 1,
+            }}
+          >
             <button
               type="button"
               onClick={() => setFiltrosAvanzadosOpen(v => !v)}
               style={{
                 background: 'none',
                 border: 'none',
-                color: 'var(--primary)',
-                fontSize: '0.8rem',
+                color: 'var(--accent)',
+                fontSize: '0.82rem',
                 fontWeight: 700,
                 cursor: 'pointer',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.35rem',
-                padding: '0.2rem 0',
+                gap: '0.45rem',
+                padding: '0.3rem 0',
+                transition: 'opacity 0.2s ease',
               }}
             >
               <Sparkles size={14} />
-              {filtrosAvanzadosOpen ? 'Ocultar comodidades y ordenamiento' : 'Filtrar por comodidades (Piscina, Jacuzzi, Mascotas, etc.)'}
+              <span>
+                {filtrosAvanzadosOpen ? 'Ocultar comodidades y ordenamiento' : 'Filtrar por comodidades (Piscina, Jacuzzi, Mascotas, etc.)'}
+              </span>
               {filtrosAvanzadosOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
 
             {/* Selector de ordenamiento rápido */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Ordenar por:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem' }}>
+              <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Ordenar por:</span>
               <select
                 value={ordenPor}
                 onChange={e => setOrdenPor(e.target.value as any)}
+                className="input-pro"
                 style={{
-                  padding: '0.25rem 0.6rem',
-                  fontSize: '0.76rem',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--surface)',
-                  color: 'var(--text)',
+                  padding: '0.35rem 0.75rem',
+                  fontSize: '0.78rem',
+                  borderRadius: 'var(--rad-xs, 8px)',
+                  width: 'auto',
+                  cursor: 'pointer',
                 }}
               >
                 <option value="recomendado">Recomendados</option>
@@ -292,18 +370,20 @@ export const Catalog: React.FC<CatalogProps> = ({
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               style={{
-                marginTop: '0.75rem',
-                paddingTop: '0.75rem',
-                borderTop: '1px solid var(--border)',
+                marginTop: '0.85rem',
+                paddingTop: '0.85rem',
+                borderTop: '1px dashed var(--border)',
                 display: 'grid',
-                gap: '0.6rem',
+                gap: '0.75rem',
+                position: 'relative',
+                zIndex: 1,
               }}
             >
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)' }}>
                 Comodidades prioritarias para tu grupo:
               </div>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
                 {AMENIDADES_FILTRO.map(am => {
                   const activa = amenidades.includes(am);
                   return (
@@ -312,18 +392,19 @@ export const Catalog: React.FC<CatalogProps> = ({
                       type="button"
                       onClick={() => toggleAmenidad(am)}
                       style={{
-                        padding: '0.35rem 0.75rem',
+                        padding: '0.4rem 0.85rem',
                         borderRadius: '999px',
-                        border: `1.5px solid ${activa ? 'var(--primary)' : 'var(--border)'}`,
-                        background: activa ? 'var(--primary-bg)' : 'var(--surface)',
-                        color: activa ? 'var(--primary)' : 'var(--text)',
-                        fontSize: '0.75rem',
+                        border: `1.5px solid ${activa ? 'var(--accent)' : 'var(--border)'}`,
+                        background: activa ? 'color-mix(in srgb, var(--accent) 15%, var(--surface))' : 'var(--surface-2)',
+                        color: activa ? 'var(--accent)' : 'var(--text)',
+                        fontSize: '0.76rem',
                         fontWeight: activa ? 700 : 500,
                         cursor: 'pointer',
-                        display: 'flex',
+                        display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '0.35rem',
-                        transition: 'all 0.15s ease',
+                        gap: '0.4rem',
+                        transition: 'all 0.2s ease',
+                        boxShadow: activa ? '0 0 12px rgba(212, 146, 74, 0.2)' : 'none',
                       }}
                     >
                       {activa && <Check size={12} />}
@@ -332,27 +413,28 @@ export const Catalog: React.FC<CatalogProps> = ({
                   );
                 })}
 
-                {/* Chip Pet Friendly */}
+                {/* Chip Pet Friendly con estándar High-End */}
                 <button
                   type="button"
                   onClick={() => setSoloPetFriendly(!soloPetFriendly)}
                   style={{
-                    padding: '0.35rem 0.75rem',
+                    padding: '0.4rem 0.85rem',
                     borderRadius: '999px',
                     border: `1.5px solid ${soloPetFriendly ? 'var(--success)' : 'var(--border)'}`,
-                    background: soloPetFriendly ? 'var(--success-bg)' : 'var(--surface)',
+                    background: soloPetFriendly ? 'color-mix(in srgb, var(--success) 16%, var(--surface))' : 'var(--surface-2)',
                     color: soloPetFriendly ? 'var(--success)' : 'var(--text)',
-                    fontSize: '0.75rem',
+                    fontSize: '0.76rem',
                     fontWeight: soloPetFriendly ? 700 : 500,
                     cursor: 'pointer',
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '0.35rem',
-                    transition: 'all 0.15s ease',
+                    gap: '0.4rem',
+                    transition: 'all 0.2s ease',
+                    boxShadow: soloPetFriendly ? '0 0 12px rgba(90, 170, 120, 0.25)' : 'none',
                   }}
                 >
-                  <Dog size={13} />
-                  Permite mascotas (Pet Friendly)
+                  <Dog size={14} />
+                  <span>Permite mascotas (Pet Friendly)</span>
                 </button>
               </div>
             </motion.div>
@@ -371,34 +453,49 @@ export const Catalog: React.FC<CatalogProps> = ({
               justifyContent: 'space-between',
               gap: '1rem',
               flexWrap: 'wrap',
-              marginBottom: '1rem',
+              marginBottom: '1.25rem',
             }}
           >
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Home size={22} style={{ color: 'var(--primary)' }} />
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--text)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <span
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: 'var(--primary-bg)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--primary)',
+                  }}
+                >
+                  <Home size={18} />
+                </span>
+                <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0, color: 'var(--text)', letterSpacing: '-0.02em' }}>
                   {catalogoTitulo}
                 </h2>
-                <span className="status-badge s-avail" style={{ fontSize: '0.72rem' }}>
+                <span className="badge-pro-avail" style={{ fontSize: '0.7rem' }}>
+                  <span className="pulse-dot" />
                   {fincasFiltradas.length} disponible{fincasFiltradas.length !== 1 ? 's' : ''}
                 </span>
               </div>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.2rem 0 0 0' }}>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0', lineHeight: 1.5 }}>
                 {catalogoSubtitulo}
               </p>
             </div>
 
-            {/* Selector de Modo de Vista (Grid 3D vs Lista) */}
+            {/* Selector de Modo de Vista High-End (Grid 3D vs Lista) */}
             <div
               style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.35rem',
-                background: 'var(--surface)',
+                gap: '4px',
+                background: 'var(--surface-2)',
                 border: '1px solid var(--border)',
-                borderRadius: '8px',
-                padding: '0.25rem',
+                borderRadius: 'var(--rad-xs, 8px)',
+                padding: '4px',
+                boxShadow: 'var(--sh-sm)',
               }}
             >
               <button
@@ -406,60 +503,94 @@ export const Catalog: React.FC<CatalogProps> = ({
                 onClick={() => setVistaModo('grid')}
                 title="Vista cuadrícula 3D de lujo"
                 style={{
-                  padding: '0.35rem 0.65rem',
+                  padding: '0.4rem 0.85rem',
                   borderRadius: '6px',
                   border: 'none',
-                  background: vistaModo === 'grid' ? 'var(--primary)' : 'transparent',
-                  color: vistaModo === 'grid' ? '#ffffff' : 'var(--text-muted)',
+                  background: vistaModo === 'grid' ? 'var(--accent)' : 'transparent',
+                  color: vistaModo === 'grid' ? '#141210' : 'var(--text-muted)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '0.75rem',
+                  gap: '6px',
+                  fontSize: '0.78rem',
                   fontWeight: 700,
-                  transition: 'all 0.15s ease',
+                  transition: 'all 0.2s ease',
+                  boxShadow: vistaModo === 'grid' ? '0 2px 10px rgba(212, 146, 74, 0.3)' : 'none',
                 }}
               >
-                <LayoutGrid size={14} /> Cuadrícula 3D
+                <LayoutGrid size={14} />
+                <span>Cuadrícula 3D</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setVistaModo('lista')}
-                title="Vista lista compacta"
+                title="Vista lista compacta ejecutiva"
                 style={{
-                  padding: '0.35rem 0.65rem',
+                  padding: '0.4rem 0.85rem',
                   borderRadius: '6px',
                   border: 'none',
-                  background: vistaModo === 'lista' ? 'var(--primary)' : 'transparent',
-                  color: vistaModo === 'lista' ? '#ffffff' : 'var(--text-muted)',
+                  background: vistaModo === 'lista' ? 'var(--accent)' : 'transparent',
+                  color: vistaModo === 'lista' ? '#141210' : 'var(--text-muted)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '0.75rem',
+                  gap: '6px',
+                  fontSize: '0.78rem',
                   fontWeight: 700,
-                  transition: 'all 0.15s ease',
+                  transition: 'all 0.2s ease',
+                  boxShadow: vistaModo === 'lista' ? '0 2px 10px rgba(212, 146, 74, 0.3)' : 'none',
                 }}
               >
-                <List size={14} /> Lista
+                <List size={14} />
+                <span>Lista</span>
               </button>
             </div>
           </div>
 
           {/* Renderizado de Fincas según vista seleccionada */}
           {loading ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
               {[1, 2, 3, 4, 5, 6].map(n => (
                 <SkeletonFincaItem key={n} />
               ))}
             </div>
           ) : fincasFiltradas.length === 0 ? (
-            <div className="panel" style={{ textAlign: 'center', padding: '3rem 1.5rem', background: 'var(--surface)' }}>
-              <p className="text-muted" style={{ fontSize: '0.95rem', marginBottom: '1rem' }}>
+            <div
+              className="card-pro"
+              style={{
+                textAlign: 'center',
+                padding: '3.5rem 1.5rem',
+                borderRadius: 'var(--rad-md, 20px)',
+              }}
+            >
+              <div
+                style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '50%',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 1rem auto',
+                  color: 'var(--accent)',
+                }}
+              >
+                <Home size={26} />
+              </div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text)', margin: '0 0 0.4rem 0' }}>
+                Sin fincas para estos criterios
+              </h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', maxWidth: '440px', margin: '0 auto 1.5rem auto', lineHeight: 1.6 }}>
                 {catalogoVacioTexto}
               </p>
-              <button className="btn btn-primary btn-sm" onClick={limpiarFiltros}>
+              <button
+                type="button"
+                className="btn-pro-primary"
+                onClick={limpiarFiltros}
+              >
                 Restablecer filtros y ver todas las fincas
               </button>
             </div>
@@ -484,8 +615,8 @@ export const Catalog: React.FC<CatalogProps> = ({
               ))}
             </motion.div>
           ) : (
-            /* ─── VISTA 2: LISTA COMPACTA EJECUTIVA CON SCROLL ─── */
-            <div className="fincas-scroll-viewport" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            /* ─── VISTA 2: LISTA COMPACTA EJECUTIVA CARD PRO ─── */
+            <div className="fincas-scroll-viewport" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               {fincasFiltradas.map(f => {
                 const primeraFoto = f.finca_imagenes?.[0]?.url || '';
                 const totalFotos = f.finca_imagenes?.length || 0;
@@ -493,31 +624,29 @@ export const Catalog: React.FC<CatalogProps> = ({
                   <div
                     key={f.id}
                     onClick={() => onSelectFinca(f.id)}
-                    className="finca-list-interactive-item"
+                    className="card-pro finca-list-interactive-item"
                     role="button"
                     tabIndex={0}
                     style={{
-                      background: 'var(--surface)',
-                      border: '1.5px solid var(--border)',
-                      borderRadius: 'var(--rad-sm, 12px)',
-                      padding: '0.85rem',
+                      padding: '0.95rem 1.15rem',
                       display: 'flex',
-                      gap: '1rem',
+                      gap: '1.15rem',
                       alignItems: 'center',
                       cursor: 'pointer',
-                      transition: 'all 0.2s ease',
+                      borderRadius: 'var(--rad-sm, 14px)',
+                      transition: 'all 0.25s ease',
                     }}
                   >
                     {/* Miniatura */}
                     <div
                       style={{
-                        width: '90px',
-                        height: '90px',
-                        borderRadius: '10px',
+                        width: '96px',
+                        height: '96px',
+                        borderRadius: '12px',
                         overflow: 'hidden',
                         flexShrink: 0,
                         position: 'relative',
-                        background: '#0f172a',
+                        background: 'var(--surface-2)',
                       }}
                     >
                       {primeraFoto ? (
@@ -528,25 +657,26 @@ export const Catalog: React.FC<CatalogProps> = ({
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                       ) : (
-                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-                          <Home size={26} />
+                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                          <Home size={28} />
                         </div>
                       )}
                       {totalFotos > 1 && (
                         <span
                           style={{
                             position: 'absolute',
-                            bottom: '3px',
-                            right: '3px',
-                            background: 'rgba(0,0,0,0.7)',
-                            color: '#fff',
-                            fontSize: '0.6rem',
+                            bottom: '4px',
+                            right: '4px',
+                            background: 'rgba(20, 18, 16, 0.75)',
+                            color: 'var(--text)',
+                            fontSize: '0.62rem',
                             fontWeight: 700,
-                            padding: '0.1rem 0.35rem',
+                            padding: '0.12rem 0.4rem',
                             borderRadius: '4px',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '2px',
+                            gap: '3px',
+                            backdropFilter: 'blur(4px)',
                           }}
                         >
                           <ImageIcon size={9} /> {totalFotos}
@@ -555,74 +685,106 @@ export const Catalog: React.FC<CatalogProps> = ({
                     </div>
 
                     {/* Información condensada */}
-                    <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem' }}>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, color: 'var(--text)' }}>
+                    <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text)', letterSpacing: '-0.01em' }}>
                           {f.nombre}
                         </h3>
-                        <span className="status-badge s-avail" style={{ fontSize: '0.64rem' }}>
+                        <span className="badge-pro-avail" style={{ fontSize: '0.68rem' }}>
+                          <span className="pulse-dot" />
                           Disponible
                         </span>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                        <MapPin size={12} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        <MapPin size={13} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                         <span>{f.zona || 'Santa Elena, Valle'}</span>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'var(--surface-2)', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
-                          <Users size={12} style={{ color: 'var(--primary)' }} /> {f.capacidad_minima ? `${f.capacidad_minima} - ${f.capacidad}` : `Hasta ${f.capacidad}`} pers.
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            background: 'var(--surface-2)',
+                            border: '1px solid var(--border)',
+                            padding: '0.18rem 0.5rem',
+                            borderRadius: '6px',
+                            fontWeight: 600,
+                            color: 'var(--text)',
+                          }}
+                        >
+                          <Users size={12} style={{ color: 'var(--primary)' }} />
+                          {f.capacidad_minima ? `${f.capacidad_minima} - ${f.capacidad}` : `Hasta ${f.capacidad}`} pers.
                         </span>
                         {f.habitaciones && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'var(--surface-2)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: 'var(--surface-2)',
+                              border: '1px solid var(--border)',
+                              padding: '0.18rem 0.5rem',
+                              borderRadius: '6px',
+                            }}
+                          >
                             <Bed size={12} style={{ color: 'var(--primary)' }} /> {f.habitaciones} habs
                           </span>
                         )}
                         {f.politica_mascotas === 'permitido' && (
-                          <span style={{ color: 'var(--success)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span
+                            style={{
+                              color: 'var(--success)',
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: 'color-mix(in srgb, var(--success) 12%, transparent)',
+                              border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)',
+                              padding: '0.18rem 0.5rem',
+                              borderRadius: '6px',
+                            }}
+                          >
                             <Dog size={12} /> Pet Friendly
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Tarifa y Cotizar */}
+                    {/* Tarifa y Botón Cotizar Pro */}
                     <div
                       style={{
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'flex-end',
                         justifyContent: 'center',
-                        gap: '0.35rem',
+                        gap: '0.45rem',
                         flexShrink: 0,
-                        paddingLeft: '0.75rem',
+                        paddingLeft: '1rem',
                         borderLeft: '1px solid var(--border)',
                       }}
                     >
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '0.62rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        <div style={{ fontSize: '0.64rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.04em' }}>
                           Tarifa /pp noche
                         </div>
-                        <div style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--primary)' }}>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--primary)', marginTop: '2px' }}>
                           {formatCOP(Number(f.precio_pp) || 0)}
                         </div>
                       </div>
 
                       <button
                         type="button"
-                        className="btn btn-primary"
+                        className="btn-pro-primary"
                         onClick={(e) => {
                           e.stopPropagation();
                           onSelectFinca(f.id);
                         }}
                         style={{
-                          padding: '0.4rem 0.8rem',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.3rem',
+                          padding: '0.45rem 0.95rem',
+                          fontSize: '0.78rem',
                         }}
                       >
                         <span>Cotizar</span>

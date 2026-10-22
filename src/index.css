@@ -2510,7 +2510,169 @@ textarea:focus {
   .menu-expanded-container {
     padding: 0.75rem 0.65rem;
   }
+}/* ==========================================================================
+   FINCAS UI/UX HIGH-END DESIGN SYSTEM (FUTURO DIGITAL PRO)
+   ========================================================================== */
+
+.card-pro {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--rad-md, 20px);
+  box-shadow: var(--sh-md);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
 }
 
+.card-pro:hover {
+  border-color: var(--accent);
+  box-shadow: 0 8px 30px rgba(212, 146, 74, 0.09);
+}
 
+.card-pro-ambient {
+  position: absolute;
+  top: -6rem;
+  right: -6rem;
+  width: 12rem;
+  height: 12rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(212, 146, 74, 0.08) 0%, transparent 70%);
+  filter: blur(32px);
+  pointer-events: none;
+}
 
+.btn-pro-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.4rem;
+  border-radius: var(--rad-xs, 8px);
+  background: var(--accent);
+  color: #141210;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.01em;
+  box-shadow: 0 2px 10px rgba(212, 146, 74, 0.25);
+  transition: transform 0.15s ease, filter 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-pro-primary:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 4px 20px rgba(212, 146, 74, 0.4);
+}
+
+.btn-pro-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-pro-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-pro-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.25rem;
+  border-radius: var(--rad-xs, 8px);
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.btn-pro-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 15px rgba(212, 146, 74, 0.15);
+}
+
+.btn-pro-secondary:active {
+  transform: scale(0.98);
+}
+
+.input-pro {
+  width: 100%;
+  padding: 0.7rem 0.95rem;
+  border-radius: var(--rad-xs, 8px);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.875rem;
+  border: 1px solid var(--border);
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-pro::placeholder {
+  color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+}
+
+.input-pro:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 14px rgba(212, 146, 74, 0.25);
+}
+
+.badge-pro-avail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 28%, transparent);
+}
+
+.badge-pro-accent {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 0%,
+    color-mix(in srgb, var(--surface-2) 60%, var(--surface-3)) 50%,
+    var(--surface-2) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite ease-in-out;
+  border-radius: var(--rad-xs, 8px);
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.5; }
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentColor;
+  display: inline-block;
+  animation: pulseDot 2s infinite ease-in-out;
+}

@@ -94,26 +94,31 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
       className="finca-card-3d-wrapper"
     >
       <div
+        className="card-pro"
         style={{
-          background: 'var(--surface)',
-          border: `1.5px solid ${isEnComparacion ? 'var(--primary)' : 'var(--border)'}`,
-          borderRadius: 'var(--rad-md, 18px)',
+          border: `1.5px solid ${isEnComparacion ? 'var(--primary)' : isHovered ? 'var(--accent)' : 'var(--border)'}`,
+          borderRadius: 'var(--rad-md, 20px)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: isHovered ? 'var(--sh-lg)' : 'var(--sh-sm)',
-          transition: 'box-shadow 0.25s ease, border-color 0.25s ease',
+          boxShadow: isHovered
+            ? '0 12px 32px rgba(212, 146, 74, 0.12), var(--sh-md)'
+            : 'var(--sh-sm)',
+          transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
           height: '100%',
         }}
       >
+        {/* Luz ambiental sutil en esquina superior */}
+        <div className="card-pro-ambient" />
+
         {/* Cabecera / Fotografía Principal */}
         <div
           style={{
             position: 'relative',
             width: '100%',
-            height: '220px',
+            height: '224px',
             overflow: 'hidden',
-            background: '#0f172a',
+            background: 'var(--surface-2)',
             cursor: 'pointer',
           }}
           onClick={() => onSelect(finca.id)}
@@ -126,18 +131,18 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
               width: '100%',
               height: '100%',
               objectFit: 'cover',
-              transform: isHovered ? 'scale(1.05)' : 'scale(1)',
-              transition: 'transform 0.4s ease',
+              transform: isHovered ? 'scale(1.06)' : 'scale(1)',
+              transition: 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
           />
 
-          {/* Gradiente superior e inferior para legibilidad */}
+          {/* Gradiente cinematográfico superior e inferior */}
           <div
             style={{
               position: 'absolute',
               inset: 0,
               background:
-                'linear-gradient(180deg, rgba(0,0,0,0.5) 0%, transparent 40%, rgba(0,0,0,0.65) 100%)',
+                'linear-gradient(180deg, rgba(20, 18, 16, 0.55) 0%, transparent 45%, rgba(20, 18, 16, 0.75) 100%)',
               pointerEvents: 'none',
             }}
           />
@@ -146,35 +151,29 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
           <div
             style={{
               position: 'absolute',
-              top: '10px',
-              left: '10px',
-              right: '10px',
+              top: '12px',
+              left: '12px',
+              right: '12px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
+              zIndex: 2,
             }}
           >
             {mostrarBadges && (
               <span
+                className={finca.estado === 'alta_demanda' ? 'badge-pro-accent' : 'badge-pro-avail'}
                 style={{
-                  fontSize: '0.68rem',
-                  fontWeight: 700,
-                  padding: '0.2rem 0.6rem',
-                  borderRadius: '999px',
-                  background: 'rgba(26, 107, 94, 0.92)',
-                  color: '#ffffff',
-                  backdropFilter: 'blur(4px)',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
+                  backdropFilter: 'blur(8px)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
                 }}
               >
-                <Sparkles size={11} /> {finca.estado === 'alta_demanda' ? 'Alta Demanda' : 'Disponible'}
+                <span className="pulse-dot" />
+                {finca.estado === 'alta_demanda' ? 'Alta Demanda' : 'Disponible'}
               </span>
             )}
 
-            {/* Botón Favorito */}
+            {/* Botón Favorito con feedback visual */}
             <button
               type="button"
               onClick={(e) => {
@@ -183,21 +182,22 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
               }}
               title={isFavorito ? 'Quitar de favoritos' : 'Guardar en favoritos'}
               style={{
-                width: '32px',
-                height: '32px',
+                width: '34px',
+                height: '34px',
                 borderRadius: '50%',
-                background: 'rgba(0,0,0,0.55)',
-                backdropFilter: 'blur(4px)',
-                border: 'none',
+                background: isFavorito ? 'rgba(239, 68, 68, 0.18)' : 'rgba(20, 18, 16, 0.65)',
+                backdropFilter: 'blur(8px)',
+                border: `1px solid ${isFavorito ? 'rgba(239, 68, 68, 0.45)' : 'rgba(255, 255, 255, 0.15)'}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: isFavorito ? '#ef4444' : '#ffffff',
+                color: isFavorito ? '#ef4444' : 'var(--text)',
                 cursor: 'pointer',
-                transition: 'transform 0.15s ease',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
               }}
             >
-              <Heart size={16} fill={isFavorito ? '#ef4444' : 'none'} />
+              <Heart size={15} fill={isFavorito ? '#ef4444' : 'none'} />
             </button>
           </div>
 
@@ -206,18 +206,20 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
             <div
               style={{
                 position: 'absolute',
-                bottom: '10px',
-                right: '10px',
+                bottom: '12px',
+                right: '12px',
                 fontSize: '0.68rem',
                 fontWeight: 700,
-                padding: '0.15rem 0.5rem',
+                padding: '0.2rem 0.55rem',
                 borderRadius: '6px',
-                background: 'rgba(0,0,0,0.65)',
-                color: '#ffffff',
-                backdropFilter: 'blur(4px)',
+                background: 'rgba(20, 18, 16, 0.72)',
+                color: 'var(--text)',
+                backdropFilter: 'blur(6px)',
+                border: '1px solid rgba(255,255,255,0.1)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
+                zIndex: 2,
               }}
             >
               <ImageIcon size={11} /> {totalFotos} fotos
@@ -228,11 +230,13 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
         {/* Cuerpo de la Tarjeta */}
         <div
           style={{
-            padding: '1.15rem',
+            padding: '1.25rem',
             display: 'flex',
             flexDirection: 'column',
             flexGrow: 1,
-            gap: '0.75rem',
+            gap: '0.85rem',
+            position: 'relative',
+            zIndex: 1,
           }}
         >
           {/* Nombre y Ubicación */}
@@ -240,12 +244,14 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
             <h3
               onClick={() => onSelect(finca.id)}
               style={{
-                fontSize: '1.12rem',
+                fontSize: '1.15rem',
                 fontWeight: 800,
                 margin: 0,
                 color: 'var(--text)',
                 cursor: 'pointer',
-                lineHeight: 1.25,
+                lineHeight: 1.3,
+                letterSpacing: '-0.02em',
+                transition: 'color 0.2s ease',
               }}
             >
               {finca.nombre}
@@ -257,7 +263,7 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
                 gap: '0.35rem',
                 fontSize: '0.78rem',
                 color: 'var(--text-muted)',
-                marginTop: '0.25rem',
+                marginTop: '0.3rem',
               }}
             >
               <MapPin size={13} style={{ color: 'var(--primary)', flexShrink: 0 }} />
@@ -277,13 +283,15 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
           >
             <span
               style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: '3px',
+                gap: '4px',
                 background: 'var(--surface-2)',
-                padding: '0.2rem 0.5rem',
-                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                padding: '0.22rem 0.55rem',
+                borderRadius: 'var(--rad-xs, 8px)',
                 fontWeight: 600,
+                color: 'var(--text)',
               }}
             >
               <Users size={12} style={{ color: 'var(--primary)' }} />
@@ -296,12 +304,14 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
             {finca.habitaciones && finca.habitaciones > 0 && (
               <span
                 style={{
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '3px',
+                  gap: '4px',
                   background: 'var(--surface-2)',
-                  padding: '0.2rem 0.5rem',
-                  borderRadius: '6px',
+                  border: '1px solid var(--border)',
+                  padding: '0.22rem 0.55rem',
+                  borderRadius: 'var(--rad-xs, 8px)',
+                  color: 'var(--text-muted)',
                 }}
               >
                 <Bed size={12} style={{ color: 'var(--primary)' }} /> {finca.habitaciones} habs
@@ -311,12 +321,14 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
             {finca.banos && finca.banos > 0 && (
               <span
                 style={{
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '3px',
+                  gap: '4px',
                   background: 'var(--surface-2)',
-                  padding: '0.2rem 0.5rem',
-                  borderRadius: '6px',
+                  border: '1px solid var(--border)',
+                  padding: '0.22rem 0.55rem',
+                  borderRadius: 'var(--rad-xs, 8px)',
+                  color: 'var(--text-muted)',
                 }}
               >
                 <Bath size={12} style={{ color: 'var(--primary)' }} /> {finca.banos} baños
@@ -326,13 +338,14 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
             {finca.politica_mascotas === 'permitido' && (
               <span
                 style={{
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '3px',
-                  background: 'rgba(16, 185, 129, 0.1)',
-                  color: '#059669',
-                  padding: '0.2rem 0.5rem',
-                  borderRadius: '6px',
+                  gap: '4px',
+                  background: 'color-mix(in srgb, var(--success) 12%, transparent)',
+                  color: 'var(--success)',
+                  border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)',
+                  padding: '0.22rem 0.55rem',
+                  borderRadius: 'var(--rad-xs, 8px)',
                   fontWeight: 600,
                 }}
               >
@@ -356,24 +369,26 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
                 <span
                   key={i}
                   style={{
-                    background: 'var(--surface-3)',
-                    padding: '0.15rem 0.45rem',
-                    borderRadius: '4px',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '6px',
+                    color: 'var(--text-muted)',
                   }}
                 >
                   ✓ {a.nombre}
                 </span>
               ))}
               {finca.finca_amenidades.length > 3 && (
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', alignSelf: 'center' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', alignSelf: 'center', fontStyle: 'italic' }}>
                   +{finca.finca_amenidades.length - 3} más
                 </span>
               )}
             </div>
           )}
 
-          {/* Divisor */}
-          <div style={{ height: '1px', background: 'var(--border)', margin: '0.25rem 0' }} />
+          {/* Divisor Delicado */}
+          <div style={{ height: '1px', background: 'var(--border)', margin: '0.35rem 0' }} />
 
           {/* Tarifas y Botones de Acción */}
           <div
@@ -385,38 +400,39 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
               marginTop: 'auto',
             }}
           >
-            {/* Tarifas */}
+            {/* Tarifas con Jerarquía High-End */}
             <div>
-              <div style={{ fontSize: '0.66rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700 }}>
+              <div style={{ fontSize: '0.66rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.04em' }}>
                 Tarifa /pp noche
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--primary)', lineHeight: 1.1 }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--primary)', lineHeight: 1.15, marginTop: '2px' }}>
                 {formatCOP(precioPp)}
               </div>
               {mostrarPrecioTotal && precioFincaCompleta > 0 && (
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  O completa: <strong>{formatCOP(precioFincaCompleta)}</strong>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                  O completa: <strong style={{ color: 'var(--text)' }}>{formatCOP(precioFincaCompleta)}</strong>
                 </div>
               )}
             </div>
 
-            {/* Botones: Comparar y Cotizar */}
-            <div style={{ display: 'flex', gap: '0.35rem' }}>
+            {/* Botones: Comparar y Cotizar Pro */}
+            <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
               <button
                 type="button"
                 onClick={() => toggleCompararFinca(finca.id)}
                 title={isEnComparacion ? 'Quitar del comparador' : 'Comparar con otras fincas'}
                 style={{
-                  padding: '0.45rem',
-                  borderRadius: '8px',
+                  padding: '0.5rem',
+                  borderRadius: 'var(--rad-xs, 8px)',
                   border: `1.5px solid ${isEnComparacion ? 'var(--primary)' : 'var(--border)'}`,
-                  background: isEnComparacion ? 'var(--primary-bg)' : 'var(--surface)',
+                  background: isEnComparacion ? 'var(--primary-bg)' : 'var(--surface-2)',
                   color: isEnComparacion ? 'var(--primary)' : 'var(--text-muted)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  transition: 'all 0.15s ease',
+                  transition: 'all 0.2s ease',
+                  boxShadow: isEnComparacion ? '0 0 10px rgba(77, 168, 158, 0.25)' : 'none',
                 }}
               >
                 {isEnComparacion ? <Check size={16} /> : <Scale size={16} />}
@@ -424,16 +440,11 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
 
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn-pro-primary"
                 onClick={() => onSelect(finca.id)}
                 style={{
-                  padding: '0.45rem 0.85rem',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  boxShadow: '0 2px 8px rgba(26, 107, 94, 0.25)',
+                  padding: '0.5rem 0.95rem',
+                  fontSize: '0.8rem',
                 }}
               >
                 <span>Cotizar</span>
