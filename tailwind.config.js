@@ -39,6 +39,11 @@ export default {
         'brand-md': 'var(--sh-md)',
         'brand-lg': 'var(--sh-lg)',
       },
+      fontFamily: {
+        dashboard: ['var(--font-dashboard)', 'Plus Jakarta Sans', 'sans-serif'],
+        body: ['var(--font-body)', 'Plus Jakarta Sans', 'sans-serif'],
+        display: ['var(--font-display)', 'Cormorant Garamond', 'serif'],
+      },
     },
   },
   plugins: [],
