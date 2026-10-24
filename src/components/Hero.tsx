@@ -99,7 +99,8 @@ export const Hero: React.FC<HeroProps> = ({
               marginTop: '0.85rem',
               fontSize: 'clamp(2rem, 1.8rem + 1.8vw, 3.2rem)',
               lineHeight: 1.15,
-              fontWeight: 900,
+              fontWeight: 700,
+              letterSpacing: '-0.02em',
               color: 'var(--text)',
             }}
           >

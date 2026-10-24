@@ -63,7 +63,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
               />
             </div>
             <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 600 }}>
+              <div style={{ fontFamily: 'var(--font-dashboard)', fontSize: '1.18rem', fontWeight: 700, letterSpacing: '-0.015em' }}>
                 Acceso Administrador
               </div>
               <p className="text-muted text-xs" style={{ margin: 0, marginTop: '2px' }}>Paraíso Terrenal · Supabase Auth</p>

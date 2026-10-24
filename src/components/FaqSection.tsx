@@ -54,11 +54,12 @@ export const FaqSection: React.FC<FaqSectionProps> = ({
             <div
               key={item.id || idx}
               style={{
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--rad-sm)',
+                border: `1px solid ${isOpen ? 'var(--accent)' : 'var(--border)'}`,
+                borderRadius: 'var(--rad-xs, 12px)',
                 background: isOpen ? 'var(--surface)' : 'var(--surface-2)',
+                boxShadow: isOpen ? '0 4px 18px rgba(212, 146, 74, 0.08)' : 'none',
                 overflow: 'hidden',
-                transition: 'background 0.2s, border-color 0.2s',
+                transition: 'all 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
               }}
             >
               <button

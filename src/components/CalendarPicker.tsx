@@ -135,17 +135,18 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
       <div
         style={{
           background: fechaInicio && fechaFin
-            ? 'color-mix(in srgb, var(--primary) 10%, transparent)'
-            : 'var(--surface-sunken)',
-          border: `1px solid ${fechaInicio && fechaFin ? 'color-mix(in srgb, var(--primary) 30%, transparent)' : 'var(--border-subtle)'}`,
-          borderRadius: 'var(--rad-xs, 6px)',
-          padding: '0.6rem 0.85rem',
+            ? 'color-mix(in srgb, var(--primary) 12%, var(--surface))'
+            : 'var(--surface-2)',
+          border: `1px solid ${fechaInicio && fechaFin ? 'color-mix(in srgb, var(--primary) 32%, transparent)' : 'var(--border)'}`,
+          borderRadius: 'var(--rad-xs, 8px)',
+          padding: '0.7rem 0.95rem',
           marginBottom: '0.85rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '0.5rem',
           fontSize: '0.82rem',
+          boxShadow: 'var(--sh-sm)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>

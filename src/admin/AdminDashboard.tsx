@@ -100,18 +100,25 @@ interface AdminDashboardProps {
   openConfirm: (title: string, message: string, onConfirm: () => void) => void;
 }
 
-const NAV_ITEMS: { section: AdminSection; label: string; icon: React.ReactNode }[] = [
-  { section: 'dashboard',    label: 'Dashboard',      icon: <LayoutDashboard size={16} /> },
-  { section: 'fincas',       label: 'Fincas',         icon: <Home size={16} /> },
-  { section: 'disponibilidad', label: 'Disponibilidad', icon: <Calendar size={16} /> },
-  { section: 'clientes',     label: 'Clientes',       icon: <Users size={16} /> },
-  { section: 'cotizaciones', label: 'Cotizaciones',   icon: <FileText size={16} /> },
-  { section: 'reservas',     label: 'Reservas',       icon: <ClipboardList size={16} /> },
-  { section: 'menus',        label: 'Menús',          icon: <UtensilsCrossed size={16} /> },
-  { section: 'historial',    label: 'Historial',      icon: <History size={16} /> },
-  { section: 'whatsapp',     label: 'Comunicaciones', icon: <MessageCircle size={16} /> },
-  { section: 'configuracion', label: 'Configuración',  icon: <Settings size={16} /> },
-  { section: 'personalizacion', label: 'Personalización del sitio', icon: <Palette size={16} /> },
+interface NavItemConfig {
+  section: AdminSection;
+  label: string;
+  icon: React.ReactNode;
+  group: 'Operación' | 'CRM & Clientes' | 'Sistema';
+}
+
+const NAV_ITEMS: NavItemConfig[] = [
+  { section: 'dashboard',       label: 'Dashboard',             icon: <LayoutDashboard size={16} />, group: 'Operación' },
+  { section: 'fincas',          label: 'Fincas',                icon: <Home size={16} />,            group: 'Operación' },
+  { section: 'disponibilidad',  label: 'Disponibilidad',        icon: <Calendar size={16} />,        group: 'Operación' },
+  { section: 'reservas',        label: 'Reservas',              icon: <ClipboardList size={16} />,   group: 'Operación' },
+  { section: 'cotizaciones',    label: 'Cotizaciones',          icon: <FileText size={16} />,        group: 'Operación' },
+  { section: 'clientes',        label: 'Clientes',              icon: <Users size={16} />,           group: 'CRM & Clientes' },
+  { section: 'whatsapp',        label: 'Comunicaciones',        icon: <MessageCircle size={16} />,   group: 'CRM & Clientes' },
+  { section: 'menus',           label: 'Menús',                 icon: <UtensilsCrossed size={16} />, group: 'CRM & Clientes' },
+  { section: 'historial',       label: 'Historial',             icon: <History size={16} />,         group: 'Sistema' },
+  { section: 'personalizacion', label: 'Personalización',       icon: <Palette size={16} />,         group: 'Sistema' },
+  { section: 'configuracion',   label: 'Configuración',         icon: <Settings size={16} />,        group: 'Sistema' },
 ];
 
 function formatCOP(v: number) { return '$' + v.toLocaleString('es-CO'); }
@@ -485,23 +492,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           )}
 
-          {NAV_ITEMS.map(item => (
-            <button
-              key={item.section}
-              onClick={() => navigateTo(item.section)}
-              className={`admin-nav-btn${activeSection === item.section ? ' active' : ''}`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-              {/* Badges */}
-              {item.section === 'cotizaciones' && cotizacionesPendientes > 0 && (
-                <span className="admin-nav-badge">{cotizacionesPendientes}</span>
-              )}
-              {item.section === 'reservas' && metricasReservas.activas > 0 && (
-                <span className="admin-nav-badge">{metricasReservas.activas}</span>
-              )}
-            </button>
-          ))}
+          {(['Operación', 'CRM & Clientes', 'Sistema'] as const).map(groupName => {
+            const items = NAV_ITEMS.filter(it => it.group === groupName);
+            return (
+              <div key={groupName} className="admin-nav-group">
+                <div className="admin-nav-group-title">{groupName}</div>
+                {items.map(item => (
+                  <button
+                    key={item.section}
+                    onClick={() => navigateTo(item.section)}
+                    className={`admin-nav-btn${activeSection === item.section ? ' active' : ''}`}
+                    title={item.label}
+                  >
+                    <span className="admin-nav-icon">{item.icon}</span>
+                    <span className="admin-nav-label">{item.label}</span>
+                    {/* Badges */}
+                    {item.section === 'cotizaciones' && cotizacionesPendientes > 0 && (
+                      <span className="admin-nav-badge">{cotizacionesPendientes}</span>
+                    )}
+                    {item.section === 'reservas' && metricasReservas.activas > 0 && (
+                      <span className="admin-nav-badge">{metricasReservas.activas}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
         </nav>
 
         {/* CONTENIDO PRINCIPAL */}

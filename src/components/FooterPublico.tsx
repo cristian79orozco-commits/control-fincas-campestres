@@ -111,9 +111,10 @@ export const FooterPublico: React.FC<FooterPublicoProps> = ({
         <div>
           <h4
             style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: '1.05rem',
-              fontWeight: 600,
+              fontFamily: 'var(--font-dashboard)',
+              fontSize: '0.92rem',
+              fontWeight: 700,
+              letterSpacing: '-0.01em',
               marginBottom: '0.85rem',
               color: 'var(--text)',
             }}
@@ -148,9 +149,10 @@ export const FooterPublico: React.FC<FooterPublicoProps> = ({
         <div>
           <h4
             style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: '1.05rem',
-              fontWeight: 600,
+              fontFamily: 'var(--font-dashboard)',
+              fontSize: '0.92rem',
+              fontWeight: 700,
+              letterSpacing: '-0.01em',
               marginBottom: '0.85rem',
               color: 'var(--text)',
             }}

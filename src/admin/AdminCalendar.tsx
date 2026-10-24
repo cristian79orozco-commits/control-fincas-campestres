@@ -543,7 +543,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
             <button className="btn btn-sm" onClick={handlePrevMonth} title="Mes anterior">
               <ChevronLeft size={16} />
             </button>
-            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.25rem', minWidth: '160px', textAlign: 'center' }}>
+            <span style={{ fontFamily: 'var(--font-dashboard)', fontWeight: 700, fontSize: '1.25rem', letterSpacing: '-0.015em', minWidth: '160px', textAlign: 'center' }}>
               {MESES[mes]} {anio}
             </span>
             <button className="btn btn-sm" onClick={handleNextMonth} title="Mes siguiente">
