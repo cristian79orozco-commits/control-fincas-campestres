@@ -1,16 +1,19 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React from 'react';
 import {
   Save, Trash2, Plus, Upload, Link as LinkIcon, Loader, Image as ImageIcon,
   Eye, ChevronDown, ChevronUp, Search, Check, Sparkles, MapPin, Users,
-  Bed, Bath, Clock, ShieldAlert, Volume2, Dog, HelpCircle, AlertCircle, Home,
-  CreditCard, Copy, Building, DollarSign
+  Bed, Bath, Clock, ShieldAlert, Volume2, Dog, Home,
+  CreditCard, Copy, Building, DollarSign, ArrowLeft
 } from 'lucide-react';
-import { supabase, DEFAULT_WA_NUMBER } from '../services/supabase';
-import { optimizarImagen, formatearBytes } from '../utils/imageOptimizer';
 import type { Finca, FincaEstado } from '../types';
 import { CurrencyInput } from '../components/CurrencyInput';
 import { NumericInput } from '../components/NumericInput';
-import { useApp } from '../context/AppContext';
+import {
+  useFincaFormController,
+  AMENIDADES_SUGERIDAS,
+  PLANES_SUGERIDOS,
+  type FincaFormTabId
+} from './useFincaFormController';
 
 interface AdminFincaFormProps {
   fincas: Finca[];
@@ -25,34 +28,6 @@ interface AdminFincaFormProps {
   openConfirm: (title: string, message: string, onConfirm: () => void) => void;
 }
 
-// Lista de amenidades predeterminadas sugeridas para fincas campestres
-const AMENIDADES_SUGERIDAS: { nombre: string; icono: string; emoji: string }[] = [
-  { nombre: 'Piscina privada', icono: 'waves', emoji: '🏊' },
-  { nombre: 'Jacuzzi / Hidromasaje', icono: 'sparkles', emoji: '♨️' },
-  { nombre: 'Zona BBQ / Asador campestre', icono: 'flame', emoji: '🥩' },
-  { nombre: 'Wi-Fi de alta velocidad', icono: 'wifi', emoji: '📶' },
-  { nombre: 'Parqueadero privado', icono: 'car', emoji: '🚗' },
-  { nombre: 'Amplias zonas verdes', icono: 'trees', emoji: '🌿' },
-  { nombre: 'Cancha de fútbol / múltiple', icono: 'activity', emoji: '⚽' },
-  { nombre: 'Equipo de sonido Bluetooth', icono: 'speaker', emoji: '🔊' },
-  { nombre: 'Cocina dotada con electrodomésticos', icono: 'utensils', emoji: '🍳' },
-  { nombre: 'Smart TV con streaming', icono: 'tv', emoji: '📺' },
-  { nombre: 'Mesa de billar / juegos de mesa', icono: 'dices', emoji: '🎱' },
-  { nombre: 'Kiosko / Estadero social', icono: 'home', emoji: '🛖' },
-  { nombre: 'Vista panorámica al valle/montaña', icono: 'mountain', emoji: '🌅' },
-  { nombre: 'Aire acondicionado / Ventiladores', icono: 'wind', emoji: '❄️' },
-];
-
-const PLANES_SUGERIDOS = [
-  'Sin alimentación',
-  'Desayuno incluido',
-  'Media pensión',
-  'Alimentación completa (3 comidas)',
-  'Todo incluido campestre',
-];
-
-type TabId = 'general' | 'acomodacion' | 'tarifas' | 'bancario' | 'amenidades' | 'politicas' | 'fotos';
-
 export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
   fincas,
   onSave,
@@ -60,879 +35,337 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
   showToast,
   openConfirm,
 }) => {
-  const { previsualizarFinca, fincaParaEditarId, setFincaParaEditarId, eliminarFinca, desactivarFinca, reactivarFinca } = useApp();
+  // Capa Controladora Desacoplada (Architecture Shield)
+  const {
+    selectedFincaId,
+    isNew,
+    fincaActual,
+    fincasFiltradas,
+    listaDesplegada,
+    toggleListaDesplegada,
+    busquedaFinca,
+    setBusquedaFinca,
+    activeTab,
+    setActiveTab,
+    guardando,
+    fotoPortadaActual,
 
-  // Estado de selección y lista contraída: por defecto cargar la primera finca existente para comodidad del administrador
-  const [selectedFincaId, setSelectedFincaId] = useState<string>(() => (fincas.length > 0 ? fincas[0].id : 'new'));
-  const [listaDesplegada, setListaDesplegada] = useState<boolean>(false);
-  const [busquedaFinca, setBusquedaFinca] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<TabId>('general');
-  const [guardando, setGuardando] = useState<boolean>(false);
+    // Campos del formulario
+    nombre, setNombre,
+    zona, setZona,
+    capacidad, setCapacidad,
+    capacidadMinima, setCapacidadMinima,
+    habitaciones, setHabitaciones,
+    camas, setCamas,
+    banos, setBanos,
+    precio, setPrecio,
+    precioFincaCompleta, setPrecioFincaCompleta,
+    depositoGarantia, setDepositoGarantia,
+    estado, setEstado,
+    activo, setActivo,
+    descripcion, setDescripcion,
+    indicacionesLlegada, setIndicacionesLlegada,
+    checkinHora, setCheckinHora,
+    checkoutHora, setCheckoutHora,
+    politicaMascotas, setPoliticaMascotas,
+    valorMascota, setValorMascota,
+    politicaMusica, setPoliticaMusica,
+    normas, setNormas,
+    waNumber, setWaNumber,
 
-  // Si se solicita editar una finca específica desde el panel cliente
-  useEffect(() => {
-    if (fincaParaEditarId) {
-      lastLoadedFincaIdRef.current = null;
-      setSelectedFincaId(fincaParaEditarId);
-      setListaDesplegada(false);
-      setFincaParaEditarId(null);
-    }
-  }, [fincaParaEditarId, setFincaParaEditarId]);
+    // Datos bancarios
+    bancoNombre, setBancoNombre,
+    bancoTipoCuenta, setBancoTipoCuenta,
+    bancoCuenta, setBancoCuenta,
+    bancoTitular, setBancoTitular,
+    bancoIdentificacion, setBancoIdentificacion,
+    copiadoCuenta, handleCopiarCuenta,
 
-  // Si las fincas cargan de forma asíncrona y selectedFincaId estaba en 'new' inicial
-  useEffect(() => {
-    if (fincas.length > 0 && selectedFincaId === 'new' && lastLoadedFincaIdRef.current === null) {
-      setSelectedFincaId(fincas[0].id);
-    }
-  }, [fincas, selectedFincaId]);
+    // Amenidades y Planes
+    amenidades,
+    nuevaAmenidadTexto, setNuevaAmenidadTexto,
+    toggleAmenidadSugerida,
+    handleAgregarAmenidadPersonalizada,
+    handleEliminarAmenidad,
+    planesSeleccionados,
+    nuevoPlanTexto, setNuevoPlanTexto,
+    togglePlan,
+    handleAgregarPlanPersonalizado,
 
-  // Campos del formulario
-  const [nombre, setNombre] = useState('');
-  const [zona, setZona] = useState('Santa Elena, Valle');
-  const [capacidad, setCapacidad] = useState<number>(10);
-  const [capacidadMinima, setCapacidadMinima] = useState<number>(1);
-  const [habitaciones, setHabitaciones] = useState<number>(3);
-  const [camas, setCamas] = useState<number>(5);
-  const [banos, setBanos] = useState<number>(2);
-  const [precio, setPrecio] = useState<number>(85000);
-  const [precioFincaCompleta, setPrecioFincaCompleta] = useState<number>(0);
-  const [depositoGarantia, setDepositoGarantia] = useState<number>(0);
-  const [estado, setEstado] = useState<FincaEstado>('disponible');
-  const [activo, setActivo] = useState(true);
-  const [descripcion, setDescripcion] = useState('');
-  const [indicacionesLlegada, setIndicacionesLlegada] = useState('');
-  const [checkinHora, setCheckinHora] = useState('15:00');
-  const [checkoutHora, setCheckoutHora] = useState('13:00');
-  const [politicaMascotas, setPoliticaMascotas] = useState('permitido');
-  const [valorMascota, setValorMascota] = useState<number>(0);
-  const [politicaMusica, setPoliticaMusica] = useState('moderada');
-  const [normas, setNormas] = useState('');
-  const [waNumber, setWaNumber] = useState(DEFAULT_WA_NUMBER);
+    // Galería
+    imagenes,
+    selectedThumbs,
+    uploading,
+    uploadLabel,
+    handleSubirImagenes,
+    handleAgregarUrl,
+    toggleThumbSelection,
+    handleMarcarComoPrincipal,
+    handleEliminarSeleccionadas,
 
-  // Datos bancarios del propietario (exclusivo para solicitud de abonos / separación)
-  const [bancoNombre, setBancoNombre] = useState('Bancolombia');
-  const [bancoTipoCuenta, setBancoTipoCuenta] = useState('Ahorros');
-  const [bancoCuenta, setBancoCuenta] = useState('');
-  const [bancoTitular, setBancoTitular] = useState('');
-  const [bancoIdentificacion, setBancoIdentificacion] = useState('');
-  const [copiadoCuenta, setCopiadoCuenta] = useState(false);
-
-  // Referencia para evitar sobreescribir las ediciones del usuario al cambiar de pestañas
-  const lastLoadedFincaIdRef = useRef<string | null>(null);
-
-  // Amenidades y Planes
-  const [amenidades, setAmenidades] = useState<{ nombre: string; icono?: string }[]>([]);
-  const [nuevaAmenidadTexto, setNuevaAmenidadTexto] = useState('');
-  const [planesSeleccionados, setPlanesSeleccionados] = useState<string[]>([
-    'Sin alimentación',
-    'Desayuno incluido',
-    'Todo incluido campestre',
-  ]);
-  const [nuevoPlanTexto, setNuevoPlanTexto] = useState('');
-
-  // Galería de Imágenes
-  const [imagenes, setImagenes] = useState<string[]>([]);
-  const [selectedThumbs, setSelectedThumbs] = useState<Set<number>>(new Set());
-  const [uploading, setUploading] = useState(false);
-  const [uploadLabel, setUploadLabel] = useState('');
-
-  // Finca seleccionada actualmente
-  const fincaActual = useMemo(() => {
-    return fincas.find(f => f.id === selectedFincaId) || null;
-  }, [fincas, selectedFincaId]);
-
-  // Fincas filtradas en la lista desplegable
-  const fincasFiltradas = useMemo(() => {
-    if (!busquedaFinca.trim()) return fincas;
-    const q = busquedaFinca.toLowerCase();
-    return fincas.filter(f =>
-      f.nombre.toLowerCase().includes(q) ||
-      (f.zona && f.zona.toLowerCase().includes(q))
-    );
-  }, [fincas, busquedaFinca]);
-
-  // Cargar datos de la finca seleccionada o resetear a nuevo
-  useEffect(() => {
-    // Si ya cargamos esta finca específica, no sobreescribir las ediciones del usuario mientras navega entre pestañas
-    if (lastLoadedFincaIdRef.current === selectedFincaId) return;
-    lastLoadedFincaIdRef.current = selectedFincaId;
-
-    if (selectedFincaId === 'new') {
-      setNombre('');
-      setZona('Santa Elena, Valle');
-      setCapacidad(10);
-      setCapacidadMinima(1);
-      setHabitaciones(3);
-      setCamas(5);
-      setBanos(2);
-      setPrecio(85000);
-      setPrecioFincaCompleta(0);
-      setDepositoGarantia(0);
-      setEstado('disponible');
-      setActivo(true);
-      setDescripcion('');
-      setIndicacionesLlegada('');
-      setCheckinHora('15:00');
-      setCheckoutHora('13:00');
-      setPoliticaMascotas('permitido');
-      setValorMascota(0);
-      setPoliticaMusica('moderada');
-      setNormas('Cuidar las instalaciones y la naturaleza. Respetar horarios de silencio. Dejar la finca en las condiciones recibidas.');
-      setWaNumber(DEFAULT_WA_NUMBER);
-      setBancoNombre('Bancolombia');
-      setBancoTipoCuenta('Ahorros');
-      setBancoCuenta('');
-      setBancoTitular('');
-      setBancoIdentificacion('');
-      setCopiadoCuenta(false);
-      setAmenidades([
-        { nombre: 'Piscina privada', icono: 'waves' },
-        { nombre: 'Zona BBQ / Asador campestre', icono: 'flame' },
-        { nombre: 'Wi-Fi de alta velocidad', icono: 'wifi' },
-        { nombre: 'Parqueadero privado', icono: 'car' },
-        { nombre: 'Amplias zonas verdes', icono: 'trees' },
-        { nombre: 'Cocina dotada con electrodomésticos', icono: 'utensils' },
-      ]);
-      setPlanesSeleccionados(['Sin alimentación', 'Desayuno incluido', 'Todo incluido campestre']);
-      setImagenes([]);
-      setSelectedThumbs(new Set());
-    } else {
-      const f = fincas.find(x => x.id === selectedFincaId);
-      if (f) {
-        setNombre(f.nombre || '');
-        setZona(f.zona || 'Santa Elena, Valle');
-        setCapacidad(f.capacidad || 10);
-        setCapacidadMinima(f.capacidad_minima || 1);
-        setHabitaciones(f.habitaciones || 3);
-        setCamas(f.camas || 5);
-        setBanos(f.banos || 2);
-        setPrecio(Number(f.precio_pp) || 0);
-        setPrecioFincaCompleta(Number(f.precio_finca_completa) || 0);
-        setDepositoGarantia(Number(f.deposito_garantia) || 0);
-        setEstado(f.estado || 'disponible');
-        setActivo(f.activo !== false);
-        setDescripcion(f.descripcion || '');
-        setIndicacionesLlegada(f.indicaciones_llegada || '');
-        setCheckinHora(f.checkin_hora || '15:00');
-        setCheckoutHora(f.checkout_hora || '13:00');
-        setPoliticaMascotas(f.politica_mascotas || 'permitido');
-        setValorMascota(Number(f.valor_mascota) || 0);
-        setPoliticaMusica(f.politica_musica || 'moderada');
-        setNormas(f.normas || '');
-        setWaNumber(f.whatsapp || DEFAULT_WA_NUMBER);
-        setBancoNombre(f.banco_nombre || 'Bancolombia');
-        setBancoTipoCuenta(f.banco_tipo_cuenta || 'Ahorros');
-        setBancoCuenta(f.banco_cuenta || '');
-        setBancoTitular(f.banco_titular || '');
-        setBancoIdentificacion(f.banco_identificacion || '');
-        setCopiadoCuenta(false);
-
-        // Cargar amenidades existentes
-        if (f.finca_amenidades && f.finca_amenidades.length > 0) {
-          setAmenidades(f.finca_amenidades.map(a => ({ nombre: a.nombre, icono: a.icono || 'check' })));
-        } else {
-          setAmenidades([
-            { nombre: 'Piscina privada', icono: 'waves' },
-            { nombre: 'Zona BBQ / Asador campestre', icono: 'flame' },
-            { nombre: 'Wi-Fi de alta velocidad', icono: 'wifi' },
-          ]);
-        }
-
-        // Cargar planes
-        if (f.finca_planes && f.finca_planes.length > 0) {
-          setPlanesSeleccionados(f.finca_planes.map(p => p.nombre));
-        } else {
-          setPlanesSeleccionados(['Sin alimentación', 'Desayuno incluido', 'Todo incluido campestre']);
-        }
-
-        const imgs = [...(f.finca_imagenes || [])].sort((a, b) => a.orden - b.orden).map(i => i.url);
-        setImagenes(imgs);
-        setSelectedThumbs(new Set());
-      }
-    }
-  }, [selectedFincaId, fincas]);
-
-  // Acciones de amenidades
-  const toggleAmenidadSugerida = (sugerida: { nombre: string; icono: string }) => {
-    const yaExiste = amenidades.some(a => a.nombre.toLowerCase() === sugerida.nombre.toLowerCase());
-    if (yaExiste) {
-      setAmenidades(prev => prev.filter(a => a.nombre.toLowerCase() !== sugerida.nombre.toLowerCase()));
-    } else {
-      setAmenidades(prev => [...prev, { nombre: sugerida.nombre, icono: sugerida.icono }]);
-    }
-  };
-
-  const handleAgregarAmenidadPersonalizada = () => {
-    const texto = nuevaAmenidadTexto.trim();
-    if (!texto) return;
-    if (amenidades.some(a => a.nombre.toLowerCase() === texto.toLowerCase())) {
-      showToast('Esta comodidad ya está añadida', 'info');
-      return;
-    }
-    setAmenidades(prev => [...prev, { nombre: texto, icono: 'check' }]);
-    setNuevaAmenidadTexto('');
-  };
-
-  const handleEliminarAmenidad = (index: number) => {
-    setAmenidades(prev => prev.filter((_, idx) => idx !== index));
-  };
-
-  // Acciones de planes
-  const togglePlan = (plan: string) => {
-    if (planesSeleccionados.includes(plan)) {
-      setPlanesSeleccionados(prev => prev.filter(p => p !== plan));
-    } else {
-      setPlanesSeleccionados(prev => [...prev, plan]);
-    }
-  };
-
-  const handleAgregarPlanPersonalizado = () => {
-    const texto = nuevoPlanTexto.trim();
-    if (!texto) return;
-    if (planesSeleccionados.includes(texto)) {
-      showToast('Este plan ya está en la lista', 'info');
-      return;
-    }
-    setPlanesSeleccionados(prev => [...prev, texto]);
-    setNuevoPlanTexto('');
-  };
-
-  // Subir y optimizar imágenes
-  const handleSubirImagenes = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-
-    const available = 20 - imagenes.length;
-    if (available <= 0) {
-      showToast('Ya tienes el límite de 20 imágenes por finca.', 'error');
-      return;
-    }
-
-    const toUpload = files.slice(0, available);
-    if (files.length > available) {
-      showToast(`Solo se subirán ${available} imágenes (límite: 20)`, 'info');
-    }
-
-    setUploading(true);
-    let subidasOk = 0;
-    let totalBytesOriginales = 0;
-    let totalBytesOptimizados = 0;
-    const nuevasUrls: string[] = [];
-
-    for (let i = 0; i < toUpload.length; i++) {
-      const rawFile = toUpload[i];
-      setUploadLabel(`Optimizando imagen ${i + 1} de ${toUpload.length}: ${rawFile.name}…`);
-
-      const opt = await optimizarImagen(rawFile);
-      const fileToUpload = opt.file;
-      totalBytesOriginales += opt.originalSize;
-      totalBytesOptimizados += opt.optimizedSize;
-
-      if (opt.reductionPct > 0) {
-        setUploadLabel(`Subiendo ${i + 1} de ${toUpload.length} (reducida ${opt.reductionPct}% a WebP)…`);
-      } else {
-        setUploadLabel(`Subiendo ${i + 1} de ${toUpload.length}: ${fileToUpload.name}…`);
-      }
-
-      const mimeType = fileToUpload.type || 'image/webp';
-      const ext = mimeType.includes('webp') ? 'webp' : (fileToUpload.name.split('.').pop()?.toLowerCase() || 'jpg');
-      const path = `fincas/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-
-      const { error } = await supabase.storage
-        .from('finca-imagenes')
-        .upload(path, fileToUpload, { upsert: false, contentType: mimeType });
-
-      if (error) {
-        console.error('Error subiendo imagen:', error);
-        showToast(`Error subiendo ${rawFile.name}: ${error.message}`, 'error');
-        continue;
-      }
-
-      const { data: urlData } = supabase.storage.from('finca-imagenes').getPublicUrl(path);
-      if (urlData?.publicUrl) {
-        nuevasUrls.push(urlData.publicUrl);
-        subidasOk++;
-      }
-    }
-
-    setUploading(false);
-    e.target.value = '';
-
-    if (nuevasUrls.length > 0) {
-      setImagenes(prev => [...prev, ...nuevasUrls]);
-      const ahorro = totalBytesOriginales - totalBytesOptimizados;
-      const ahorroTexto = ahorro > 0 ? ` (ahorro de peso: ${formatearBytes(ahorro)})` : '';
-      showToast(`${subidasOk} imagen(es) optimizada(s) a WebP y subida(s) con éxito ✅${ahorroTexto}`, 'success');
-    }
-  };
-
-  const handleAgregarUrl = () => {
-    const url = prompt('Ingresa la URL pública de la imagen:');
-    if (!url || !url.startsWith('http')) return;
-    setImagenes(prev => [...prev, url]);
-    showToast('Imagen añadida a la galería', 'info');
-  };
-
-  const toggleThumbSelection = (index: number) => {
-    setSelectedThumbs(prev => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
-  };
-
-  const handleMarcarComoPrincipal = (index: number) => {
-    if (index === 0) return;
-    setImagenes(prev => {
-      const list = [...prev];
-      const [item] = list.splice(index, 1);
-      list.unshift(item);
-      return list;
-    });
-    showToast('Imagen fijada como portada principal', 'success');
-  };
-
-  const handleEliminarSeleccionadas = () => {
-    if (!selectedThumbs.size) {
-      showToast('Selecciona al menos una imagen haciendo clic en ella', 'error');
-      return;
-    }
-
-    openConfirm(
-      '¿Eliminar imágenes seleccionadas?',
-      `Se removerán ${selectedThumbs.size} imagen(es) de esta finca.`,
-      () => {
-        setImagenes(prev => prev.filter((_, i) => !selectedThumbs.has(i)));
-        setSelectedThumbs(new Set());
-        showToast('Imágenes eliminadas', 'success');
-      }
-    );
-  };
-
-  // Guardar finca completa en Supabase
-  const handleGuardar = async () => {
-    if (!nombre.trim()) {
-      showToast('El nombre de la finca es obligatorio', 'error');
-      setActiveTab('general');
-      return;
-    }
-
-    if (Number(capacidadMinima) > Number(capacidad)) {
-      showToast('La capacidad mínima no puede ser mayor que la capacidad máxima', 'error');
-      setActiveTab('acomodacion');
-      return;
-    }
-
-    setGuardando(true);
-
-    const payload: Partial<Finca> = {
-      nombre: nombre.trim(),
-      zona: zona.trim() || 'Santa Elena, Valle',
-      capacidad: Number(capacidad) || 10,
-      capacidad_minima: Math.max(1, Number(capacidadMinima) || 1),
-      habitaciones: Number(habitaciones) || 3,
-      camas: Number(camas) || 5,
-      banos: Number(banos) || 2,
-      precio_pp: Number(precio) || 0,
-      precio_finca_completa: Number(precioFincaCompleta) || 0,
-      deposito_garantia: Number(depositoGarantia) || 0,
-      estado,
-      activo,
-      descripcion: descripcion.trim(),
-      indicaciones_llegada: indicacionesLlegada.trim(),
-      checkin_hora: checkinHora,
-      checkout_hora: checkoutHora,
-      politica_mascotas: politicaMascotas,
-      valor_mascota: politicaMascotas === 'con_costo' ? Number(valorMascota) || 0 : 0,
-      politica_musica: politicaMusica,
-      normas: normas.trim(),
-      whatsapp: waNumber.replace(/[^0-9]/g, ''),
-      banco_nombre: bancoNombre.trim() || null,
-      banco_tipo_cuenta: bancoTipoCuenta || 'Ahorros',
-      banco_cuenta: bancoCuenta.trim() || null,
-      banco_titular: bancoTitular.trim() || null,
-      banco_identificacion: bancoIdentificacion.trim() || null,
-    };
-
-    if (selectedFincaId !== 'new') {
-      payload.id = selectedFincaId;
-    }
-
-    const planesStr = planesSeleccionados.join(', ');
-    const res = await onSave(payload, imagenes, planesStr, amenidades);
-    setGuardando(false);
-
-    if (res.success) {
-      showToast(
-        selectedFincaId === 'new'
-          ? '¡Nueva finca creada exitosamente! 🎉'
-          : 'Finca actualizada exitosamente en Supabase ✅',
-        'success'
-      );
-      if (res.id) {
-        lastLoadedFincaIdRef.current = null;
-        setSelectedFincaId(res.id);
-      }
-    } else {
-      showToast(`Error al guardar: ${res.error}`, 'error');
-    }
-  };
-
-  const handleDesactivarFinca = () => {
-    if (selectedFincaId === 'new') return;
-    const esActivo = activo;
-    openConfirm(
-      esActivo ? `¿Desactivar "${nombre}"?` : `¿Reactivar "${nombre}"?`,
-      esActivo
-        ? 'La finca dejará de estar visible en el catálogo de clientes, pero se conservará en el sistema.'
-        : 'La finca volverá a estar disponible en el catálogo público de clientes.',
-      async () => {
-        const res = esActivo ? await desactivarFinca(selectedFincaId) : await reactivarFinca(selectedFincaId);
-        if (res.success) {
-          showToast(esActivo ? 'Finca desactivada exitosamente' : 'Finca reactivada exitosamente', 'success');
-          setActivo(!esActivo);
-        } else {
-          showToast(`Error: ${res.error}`, 'error');
-        }
-      }
-    );
-  };
-
-  const handleEliminarDefinitivo = () => {
-    if (selectedFincaId === 'new') return;
-    openConfirm(
-      `¿ELIMINAR DEFINITIVAMENTE "${nombre}"?`,
-      '⚠️ Esta acción borrará la finca, sus imágenes y su disponibilidad permanentemente de la base de datos.',
-      async () => {
-        const res = await eliminarFinca(selectedFincaId);
-        if (res.success) {
-          showToast('Finca eliminada definitivamente de la base de datos ✅', 'success');
-          setSelectedFincaId('new');
-        } else {
-          showToast(`Error al eliminar: ${res.error}`, 'error');
-        }
-      }
-    );
-  };
-
-  // Datos para resumen de la finca seleccionada en la cabecera
-  const fotoPortadaActual = imagenes[0] || (fincaActual?.finca_imagenes?.[0]?.url) || '';
+    // Acciones principales
+    handleSelectFinca,
+    handleNuevaFinca,
+    handleGuardar,
+    handleEliminarDefinitivo,
+    handleVerEnCliente,
+  } = useFincaFormController({
+    fincas,
+    onSave,
+    onDelete,
+    showToast,
+    openConfirm,
+  });
 
   return (
-    <div className="panel" style={{ padding: '1.25rem', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
+    <div className="relative w-full max-w-full overflow-hidden rounded-[var(--rad-md,16px)] bg-[var(--surface,#1a1814)] border border-[var(--border,#312e28)] p-4 sm:p-6 shadow-[var(--sh-md,0_4px_20px_rgba(0,0,0,0.25))] transition-all duration-300">
+      {/* Luz ambiental sutil High-End en esquina superior */}
+      <div className="pointer-events-none absolute -top-24 -right-24 h-56 w-56 rounded-full bg-[var(--accent,#d4924a)]/5 blur-3xl" />
+
       {/* ============================================================== */}
-      {/* 1. CABECERA: TÍTULO, SELECTOR CONTRAÍDO Y BOTÓN NUEVA FINCA */}
+      {/* 1. CABECERA: TÍTULO, SELECTOR Y ACCIONES PRINCIPALES */}
       {/* ============================================================== */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '1.25rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+      <div className="relative z-10 flex flex-col gap-4 mb-6">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-lg)' }}>
-              <Home size={20} style={{ color: 'var(--primary)' }} />
-              Gestionador Profesional de Fincas
+            <div className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-[var(--text,#f0eae0)]">
+              <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--primary,#4da89e)]/10 text-[var(--primary,#4da89e)] border border-[var(--primary,#4da89e)]/20">
+                <Home size={18} />
+              </span>
+              Gestor Profesional de Fincas
             </div>
-            <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
-              Administra detalles, capacidad, tarifas, amenidades, normas y fotografías
-            </div>
+            <p className="text-xs text-[var(--text-muted,#a8a097)] mt-1">
+              Configura acomodación, tarifas, comodidades, normas, cuentas y fotografías de alta resolución
+            </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-            {selectedFincaId !== 'new' && (
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Si está creando una nueva finca, permite cancelar y regresar a la lista */}
+            {isNew ? (
               <button
                 type="button"
-                className="btn btn-sm"
-                onClick={() => previsualizarFinca(selectedFincaId)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: 'var(--surface-2)' }}
-                title="Ver cómo lo ve el cliente en el catálogo y cotizador"
+                onClick={() => handleSelectFinca(fincas.length > 0 ? fincas[0].id : 'new')}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-[var(--rad-sm,10px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs font-semibold border border-[var(--border,#312e28)] transition-all hover:border-[var(--accent,#d4924a)] hover:text-[var(--accent,#d4924a)]"
               >
-                <Eye size={14} /> Ver en cliente
+                <ArrowLeft size={14} /> Volver a la lista
               </button>
-            )}
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleVerEnCliente}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-[var(--rad-sm,10px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs font-semibold border border-[var(--border,#312e28)] transition-all hover:border-[var(--primary,#4da89e)] hover:text-[var(--primary,#4da89e)]"
+                  title="Ver cómo lo ve el cliente en el catálogo público"
+                >
+                  <Eye size={14} /> Ver en cliente
+                </button>
 
-            {/* BOTÓN INDEPENDIENTE PARA NUEVA FINCA */}
-            <button
-              type="button"
-              className={`btn btn-sm ${selectedFincaId === 'new' ? 'btn-primary' : ''}`}
-              onClick={() => {
-                lastLoadedFincaIdRef.current = null;
-                setSelectedFincaId('new');
-                setListaDesplegada(false);
-              }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                fontWeight: 700,
-                border: selectedFincaId === 'new' ? 'none' : '1px solid var(--primary)',
-                color: selectedFincaId === 'new' ? '#fff' : 'var(--primary)',
-              }}
-            >
-              <Plus size={15} /> Nueva finca
-            </button>
+                <button
+                  type="button"
+                  onClick={handleNuevaFinca}
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-[var(--rad-sm,10px)] bg-[var(--accent,#d4924a)] text-[#141210] text-xs font-bold tracking-wide shadow-[0_2px_10px_rgba(212,146,74,0.25)] transition-all hover:brightness-110 hover:shadow-[0_4px_16px_rgba(212,146,74,0.35)] active:scale-[0.98]"
+                >
+                  <Plus size={15} /> Nueva finca
+                </button>
+              </>
+            )}
           </div>
         </div>
 
         {/* ============================================================== */}
-        {/* BARRA CONTRAÍDA PREDETERMINADA CON SELECTOR Y ESTADO */}
+        {/* BARRA CONTRAÍDA PREDETERMINADA CON SELECTOR Y ESTADO PRO */}
         {/* ============================================================== */}
-        <div
-          style={{
-            background: 'var(--surface-sunken, var(--surface-2))',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--rad-sm, 14px)',
-            padding: '0.65rem 0.95rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '0.75rem',
-            flexWrap: 'wrap',
-          }}
-        >
-          {/* Tarjeta compacta de la finca actualmente activa */}
+        <div className="rounded-[var(--rad-sm,12px)] bg-[var(--surface-2,#201e19)] border border-[var(--border,#312e28)] p-3 transition-all hover:border-[var(--accent,#d4924a)]/60">
           <div
-            onClick={() => setListaDesplegada(!listaDesplegada)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              cursor: 'pointer',
-              flex: 1,
-              minWidth: '240px',
-              userSelect: 'none',
-            }}
-            title="Haz clic para desplegar o contraer todas las fincas"
+            onClick={toggleListaDesplegada}
+            className="flex items-center justify-between gap-3 cursor-pointer select-none"
+            title="Haz clic para desplegar o contraer el catálogo de fincas"
           >
-            {fotoPortadaActual ? (
-              <img
-                src={fotoPortadaActual}
-                alt="Portada"
-                style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: 'var(--rad-xs, 8px)',
-                  objectFit: 'cover',
-                  border: '1px solid var(--border)',
-                  flexShrink: 0,
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: 'var(--rad-xs, 8px)',
-                  background: 'var(--surface-3)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--text-muted)',
-                  flexShrink: 0,
-                }}
-              >
-                <Home size={18} />
-              </div>
-            )}
+            <div className="flex items-center gap-3.5 min-w-0">
+              {fotoPortadaActual ? (
+                <img
+                  src={fotoPortadaActual}
+                  alt="Portada"
+                  className="w-11 h-11 rounded-[var(--rad-xs,8px)] object-cover border border-[var(--border,#312e28)] shrink-0 shadow-sm"
+                />
+              ) : (
+                <div className="w-11 h-11 rounded-[var(--rad-xs,8px)] bg-[var(--surface-3,#272420)] border border-[var(--border,#312e28)] flex items-center justify-center text-[var(--text-muted,#a8a097)] shrink-0">
+                  <Home size={18} />
+                </div>
+              )}
 
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)' }}>
-                  {selectedFincaId === 'new' ? '✨ Creando Nueva Finca' : nombre || 'Finca sin nombre'}
-                </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-sm text-[var(--text,#f0eae0)] truncate max-w-[280px] sm:max-w-md">
+                    {isNew ? '✨ Creando Nueva Finca' : nombre || 'Finca sin nombre'}
+                  </span>
 
-                {selectedFincaId !== 'new' && (
-                  <>
+                  {isNew ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--accent,#d4924a)]/15 text-[var(--accent,#d4924a)] border border-[var(--accent,#d4924a)]/30">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent,#d4924a)] animate-pulse" />
+                      Nueva
+                    </span>
+                  ) : (
                     <span
-                      style={{
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        padding: '0.15rem 0.5rem',
-                        borderRadius: '999px',
-                        color: activo ? 'var(--success)' : '#ef4444',
-                        background: activo ? 'color-mix(in srgb, var(--success) 12%, transparent)' : 'rgba(239,68,68,0.1)',
-                      }}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                        activo
+                          ? 'bg-[var(--success,#22c55e)]/10 text-[var(--success,#22c55e)] border border-[var(--success,#22c55e)]/20'
+                          : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                      }`}
                     >
-                      {activo ? 'Activa ✓' : 'Inactiva 🚫'}
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          activo ? 'bg-[var(--success,#22c55e)] animate-pulse' : 'bg-red-400'
+                        }`}
+                      />
+                      {activo ? 'Activa' : 'Inactiva'}
                     </span>
-                    <span className="status-badge s-avail" style={{ fontSize: '0.68rem', padding: '0.12rem 0.45rem' }}>
-                      {estado}
-                    </span>
-                  </>
-                )}
-              </div>
+                  )}
+                </div>
 
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
-                <span><Users size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> {capacidadMinima > 1 ? `${capacidadMinima} - ${capacidad}` : `Hasta ${capacidad}`} personas</span>
-                <span>•</span>
-                <span>${(precio || 0).toLocaleString('es-CO')} /pp</span>
-                <span>•</span>
-                <span><ImageIcon size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> {imagenes.length} fotos</span>
+                <div className="text-xs text-[var(--text-muted,#a8a097)] flex items-center gap-2 mt-0.5">
+                  <span>{zona || 'Ubicación no especificada'}</span>
+                  <span>•</span>
+                  <span>
+                    {capacidadMinima && capacidadMinima > 1
+                      ? `${capacidadMinima} a ${capacidad} huéspedes`
+                      : `Hasta ${capacidad} huéspedes`}
+                  </span>
+                  <span>•</span>
+                  <span>${Number(precio || 0).toLocaleString('es-CO')} / pers.</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-muted,#a8a097)] shrink-0 pl-2">
+              <span className="hidden sm:inline">
+                {listaDesplegada ? 'Cerrar selector' : `Ver todas (${fincas.length})`}
+              </span>
+              <div className="w-7 h-7 rounded-md bg-[var(--surface-3,#272420)] flex items-center justify-center text-[var(--text,#f0eae0)] border border-[var(--border,#312e28)]">
+                {listaDesplegada ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
               </div>
             </div>
           </div>
 
-          {/* Botón de despliegue de lista */}
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={() => setListaDesplegada(!listaDesplegada)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              background: listaDesplegada ? 'var(--primary-bg)' : 'var(--surface-3)',
-              color: listaDesplegada ? 'var(--primary)' : 'var(--text)',
-              borderColor: listaDesplegada ? 'var(--primary)' : 'transparent',
-              fontWeight: 600,
-              padding: '0.45rem 0.85rem',
-            }}
-          >
-            <span>{listaDesplegada ? 'Ocultar listado' : `Ver listado completo (${fincas.length} fincas)`}</span>
-            {listaDesplegada ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-          </button>
-        </div>
-
-        {/* ============================================================== */}
-        {/* LISTA DESPLEGABLE DE TODAS LAS FINCAS CREADAS */}
-        {/* ============================================================== */}
-        {listaDesplegada && (
-          <div
-            style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--rad-sm, 14px)',
-              padding: '1rem',
-              boxShadow: 'var(--sh-md)',
-              animation: 'fadeIn 0.2s ease-out',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
-              <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text)' }}>
-                Selecciona una finca para editar sus campos:
-              </div>
-
-              {/* Buscador en la lista */}
-              <div style={{ position: 'relative', width: '100%', maxWidth: '240px', minWidth: '160px' }}>
-                <Search size={14} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          {/* ============================================================== */}
+          {/* GRILLA DESPLEGABLE DE SELECCIÓN RÁPIDA DE FINCAS */}
+          {/* ============================================================== */}
+          {listaDesplegada && (
+            <div className="mt-3.5 pt-3.5 border-t border-[var(--border,#312e28)]">
+              {/* Buscador interno */}
+              <div className="relative mb-3">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted,#a8a097)]" />
                 <input
                   type="text"
-                  placeholder="Buscar finca…"
+                  placeholder="Buscar finca por nombre o zona…"
                   value={busquedaFinca}
                   onChange={e => setBusquedaFinca(e.target.value)}
-                  style={{
-                    paddingLeft: '1.85rem',
-                    paddingRight: '0.5rem',
-                    paddingTop: '0.35rem',
-                    paddingBottom: '0.35rem',
-                    fontSize: '0.8rem',
-                    borderRadius: 'var(--rad-xs, 8px)',
-                    height: '32px',
-                    width: '100%',
-                    boxSizing: 'border-box',
-                  }}
+                  className="w-full pl-9 pr-4 py-2 rounded-[var(--rad-xs,8px)] bg-[var(--surface-3,#272420)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                  autoFocus
                 />
               </div>
-            </div>
 
-            {/* Grid de tarjetas de fincas */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 240px), 1fr))',
-                gap: '0.65rem',
-                maxHeight: '320px',
-                overflowY: 'auto',
-                paddingRight: '0.25rem',
-              }}
-            >
-              {/* Opción rápida: Nueva Finca */}
-              <div
-                onClick={() => {
-                  lastLoadedFincaIdRef.current = null;
-                  setSelectedFincaId('new');
-                  setListaDesplegada(false);
-                }}
-                style={{
-                  border: selectedFincaId === 'new' ? '2px solid var(--primary)' : '1px dashed var(--border)',
-                  borderRadius: 'var(--rad-xs, 8px)',
-                  padding: '0.75rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.65rem',
-                  cursor: 'pointer',
-                  background: selectedFincaId === 'new' ? 'var(--primary-bg)' : 'var(--surface-2)',
-                  transition: 'all 0.15s ease',
-                }}
-              >
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+                {/* Opción rápida: Nueva Finca */}
                 <div
-                  style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: 'var(--rad-xs, 8px)',
-                    background: 'var(--primary)',
-                    color: '#fff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
+                  onClick={handleNuevaFinca}
+                  className={`flex items-center gap-3 p-2.5 rounded-[var(--rad-xs,8px)] cursor-pointer transition-all border ${
+                    isNew
+                      ? 'bg-[var(--accent,#d4924a)]/15 border-[var(--accent,#d4924a)] shadow-[0_0_12px_rgba(212,146,74,0.15)]'
+                      : 'bg-[var(--surface-3,#272420)] border-dashed border-[var(--border,#312e28)] hover:border-[var(--accent,#d4924a)]'
+                  }`}
                 >
-                  <Plus size={18} />
+                  <div className="w-9 h-9 rounded-md bg-[var(--accent,#d4924a)] text-[#141210] flex items-center justify-center font-bold shrink-0">
+                    <Plus size={16} />
+                  </div>
+                  <div>
+                    <div className="font-bold text-xs text-[var(--accent,#d4924a)]">Nueva Finca</div>
+                    <div className="text-[11px] text-[var(--text-muted,#a8a097)]">Crear propiedad desde cero</div>
+                  </div>
                 </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--primary)' }}>Nueva Finca</div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Crear propiedad desde cero</div>
-                </div>
-              </div>
 
-              {/* Lista de fincas registradas */}
-              {fincasFiltradas.map(f => {
-                const isSelected = f.id === selectedFincaId;
-                const thumb = f.finca_imagenes?.[0]?.url;
-                return (
-                  <div
-                    key={f.id}
-                    onClick={() => {
-                      lastLoadedFincaIdRef.current = null;
-                      setSelectedFincaId(f.id);
-                      setListaDesplegada(false);
-                    }}
-                    style={{
-                      border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
-                      borderRadius: 'var(--rad-xs, 8px)',
-                      padding: '0.6rem 0.75rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.65rem',
-                      cursor: 'pointer',
-                      background: isSelected ? 'var(--primary-bg)' : 'var(--surface-2)',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    {thumb ? (
-                      <img
-                        src={thumb}
-                        alt={f.nombre}
-                        style={{
-                          width: '42px',
-                          height: '42px',
-                          borderRadius: 'var(--rad-xs, 6px)',
-                          objectFit: 'cover',
-                          border: '1px solid var(--border)',
-                          flexShrink: 0,
-                        }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: '42px',
-                          height: '42px',
-                          borderRadius: 'var(--rad-xs, 6px)',
-                          background: 'var(--surface-3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--text-muted)',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Home size={16} />
-                      </div>
-                    )}
+                {/* Lista de fincas */}
+                {fincasFiltradas.map(f => {
+                  const isSelected = f.id === selectedFincaId;
+                  const thumb = f.finca_imagenes?.[0]?.url;
+                  return (
+                    <div
+                      key={f.id}
+                      onClick={() => handleSelectFinca(f.id)}
+                      className={`flex items-center gap-3 p-2.5 rounded-[var(--rad-xs,8px)] cursor-pointer transition-all border ${
+                        isSelected
+                          ? 'bg-[var(--primary,#4da89e)]/15 border-[var(--primary,#4da89e)] shadow-[0_0_12px_rgba(77,168,158,0.15)]'
+                          : 'bg-[var(--surface-3,#272420)] border-[var(--border,#312e28)] hover:border-[var(--border,#312e28)]/80 hover:bg-[var(--surface-3,#272420)]/80'
+                      }`}
+                    >
+                      {thumb ? (
+                        <img
+                          src={thumb}
+                          alt={f.nombre}
+                          className="w-9 h-9 rounded-md object-cover border border-[var(--border,#312e28)] shrink-0"
+                        />
+                      ) : (
+                        <div className="w-9 h-9 rounded-md bg-[var(--surface,#1a1814)] border border-[var(--border,#312e28)] flex items-center justify-center text-[var(--text-muted,#a8a097)] shrink-0">
+                          <Home size={15} />
+                        </div>
+                      )}
 
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.3rem' }}>
-                        <span
-                          style={{
-                            fontWeight: 700,
-                            fontSize: '0.84rem',
-                            color: 'var(--text)',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {f.nombre}
-                        </span>
-                        {f.activo === false && (
-                          <span style={{ fontSize: '0.62rem', color: '#ef4444', fontWeight: 700 }}>Inactiva</span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', gap: '0.45rem', marginTop: '0.1rem' }}>
-                        <span>{f.capacidad_minima && f.capacidad_minima > 1 ? `${f.capacidad_minima} - ${f.capacidad}` : `Hasta ${f.capacidad}`} pers.</span>
-                        <span>•</span>
-                        <span>${Number(f.precio_pp || 0).toLocaleString('es-CO')}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-bold text-xs text-[var(--text,#f0eae0)] truncate">
+                            {f.nombre}
+                          </span>
+                          {f.activo === false && (
+                            <span className="text-[10px] text-red-400 font-bold shrink-0">Inactiva</span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-[var(--text-muted,#a8a097)] flex items-center gap-1.5 mt-0.5 truncate">
+                          <span>{f.capacidad_minima && f.capacidad_minima > 1 ? `${f.capacidad_minima}-${f.capacidad}` : `Hasta ${f.capacidad}`} pers.</span>
+                          <span>•</span>
+                          <span>${Number(f.precio_pp || 0).toLocaleString('es-CO')}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* ============================================================== */}
-      {/* 2. PESTAÑAS DEL FORMULARIO ORGANIZADAS POR SECCIÓN (RESPONSIVE - CERO SCROLL HORIZONTAL) */}
+      {/* 2. PESTAÑAS DEL FORMULARIO HIGH-END (RESPONSIVE GRID) */}
       {/* ============================================================== */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))',
-          gap: '0.45rem',
-          marginBottom: '1.25rem',
-          width: '100%',
-          maxWidth: '100%',
-          boxSizing: 'border-box',
-        }}
-      >
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 mb-6 w-full">
         {[
-          { id: 'general', label: '1. General', icon: <MapPin size={14} /> },
-          { id: 'acomodacion', label: '2. Capacidad', icon: <Bed size={14} /> },
-          { id: 'tarifas', label: '3. Tarifas', icon: <DollarSign size={14} /> },
-          { id: 'bancario', label: '4. Cuenta y Abonos', icon: <CreditCard size={14} /> },
-          { id: 'amenidades', label: '5. Comodidades', icon: <Check size={14} />, badge: amenidades.length },
-          { id: 'politicas', label: '6. Políticas', icon: <Clock size={14} /> },
-          { id: 'fotos', label: '7. Galería', icon: <ImageIcon size={14} />, badge: imagenes.length },
+          { id: 'general', label: '1. General', icon: <MapPin size={13} /> },
+          { id: 'acomodacion', label: '2. Capacidad', icon: <Bed size={13} /> },
+          { id: 'tarifas', label: '3. Tarifas', icon: <DollarSign size={13} /> },
+          { id: 'bancario', label: '4. Bancario', icon: <CreditCard size={13} /> },
+          { id: 'amenidades', label: '5. Comodidades', icon: <Check size={13} />, badge: amenidades.length },
+          { id: 'politicas', label: '6. Políticas', icon: <Clock size={13} /> },
+          { id: 'fotos', label: '7. Galería', icon: <ImageIcon size={13} />, badge: imagenes.length },
         ].map(tab => {
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id as TabId)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.4rem',
-                padding: '0.55rem 0.5rem',
-                border: isActive ? '1px solid var(--primary)' : '1px solid var(--border)',
-                background: isActive ? 'var(--primary)' : 'var(--surface-2)',
-                color: isActive ? '#fff' : 'var(--text)',
-                borderRadius: 'var(--rad-xs, 8px)',
-                cursor: 'pointer',
-                fontWeight: isActive ? 700 : 500,
-                fontSize: '0.82rem',
-                transition: 'all 0.15s ease',
-                boxShadow: isActive ? '0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent)' : 'none',
-                width: '100%',
-                boxSizing: 'border-box',
-                textAlign: 'center',
-              }}
+              onClick={() => setActiveTab(tab.id as FincaFormTabId)}
+              className={`inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[var(--rad-xs,8px)] text-xs font-semibold transition-all border ${
+                isActive
+                  ? 'bg-[var(--accent,#d4924a)] text-[#141210] border-[var(--accent,#d4924a)] shadow-[0_2px_12px_rgba(212,146,74,0.3)] font-bold'
+                  : 'bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] border-[var(--border,#312e28)] hover:border-[var(--accent,#d4924a)]/50 hover:text-[var(--accent,#d4924a)]'
+              }`}
             >
-              <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>{tab.icon}</span>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tab.label}</span>
+              <span className="shrink-0">{tab.icon}</span>
+              <span className="truncate">{tab.label}</span>
               {tab.badge !== undefined && (
                 <span
-                  style={{
-                    fontSize: '0.65rem',
-                    padding: '0.1rem 0.35rem',
-                    borderRadius: '999px',
-                    background: isActive ? 'rgba(255,255,255,0.25)' : 'var(--surface-3)',
-                    color: isActive ? '#fff' : 'var(--text-muted)',
-                    fontWeight: 700,
-                    lineHeight: 1,
-                  }}
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold leading-none ${
+                    isActive ? 'bg-[#141210]/20 text-[#141210]' : 'bg-[var(--surface-3,#272420)] text-[var(--text-muted,#a8a097)]'
+                  }`}
                 >
                   {tab.badge}
                 </span>
@@ -943,925 +376,822 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
       </div>
 
       {/* ============================================================== */}
-      {/* 3. CONTENIDO DE LAS PESTAÑAS */}
+      {/* 3. CONTENIDO DE LAS PESTAÑAS (HIGH-END INPUTS CON FOCUS GLOW) */}
       {/* ============================================================== */}
+      <div className="relative z-10 min-h-[360px]">
 
-      {/* TAB 1: GENERAL Y UBICACIÓN */}
-      {activeTab === 'general' && (
-        <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))' }}>
-          <div className="field col-span-full">
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>Nombre comercial de la finca campestre *</span>
-              <span className="text-xs text-muted">Aparece en catálogo y cotizaciones</span>
-            </label>
-            <input
-              type="text"
-              placeholder="Ej: Finca Campestre El Edén de las Mercedes"
-              value={nombre}
-              onChange={e => setNombre(e.target.value)}
-              style={{ fontSize: '1rem', fontWeight: 600 }}
-            />
-          </div>
-
-          {/* Toggle Activa / Inactiva */}
-          <div
-            className="field col-span-full"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: 'var(--surface-sunken)',
-              padding: '0.75rem 1rem',
-              borderRadius: 'var(--rad-xs, 8px)',
-              border: '1px solid var(--border)',
-            }}
-          >
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', margin: 0, userSelect: 'none' }}>
+        {/* TAB 1: GENERAL */}
+        {activeTab === 'general' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                Nombre comercial de la finca campestre *
+                <span className="text-[11px] font-normal text-[var(--text-muted,#a8a097)] ml-2">
+                  (Nombre oficial visible para los clientes)
+                </span>
+              </label>
               <input
-                type="checkbox"
-                checked={activo}
-                onChange={e => setActivo(e.target.checked)}
-                style={{ width: '18px', height: '18px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                type="text"
+                placeholder="Ej: Finca Campestre El Edén de las Mercedes"
+                value={nombre}
+                onChange={e => setNombre(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-sm font-semibold border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)] focus:shadow-[0_0_12px_rgba(212,146,74,0.2)]"
               />
-              <div>
-                <div style={{ fontSize: '0.88rem', fontWeight: 700 }}>
-                  Finca visible y activa en el catálogo público
+            </div>
+
+            {/* Switch elegante de estado Activa / Inactiva */}
+            <div className="md:col-span-2 flex items-center justify-between p-3.5 rounded-[var(--rad-xs,10px)] bg-[var(--surface-2,#201e19)] border border-[var(--border,#312e28)]">
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={activo}
+                  onChange={e => setActivo(e.target.checked)}
+                  className="w-4 h-4 rounded text-[var(--primary,#4da89e)] accent-[var(--accent,#d4924a)] cursor-pointer"
+                />
+                <div>
+                  <div className="text-xs font-bold text-[var(--text,#f0eae0)]">
+                    Finca visible y activa en el catálogo público
+                  </div>
+                  <div className="text-[11px] text-[var(--text-muted,#a8a097)]">
+                    Si se desactiva, los clientes no podrán cotizarla ni verla en la web principal
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  Si se desactiva, los clientes no podrán cotizarla ni verla en la web principal
-                </div>
+              </label>
+
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-bold ${
+                  activo
+                    ? 'bg-[var(--success,#22c55e)]/10 text-[var(--success,#22c55e)] border border-[var(--success,#22c55e)]/20'
+                    : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                }`}
+              >
+                {activo ? 'Activa ✓' : 'Inactiva 🚫'}
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                Zona / Ubicación (Municipio, Vereda)
+              </label>
+              <input
+                type="text"
+                placeholder="Ej: Santa Elena, El Cerrito, Valle del Cauca"
+                value={zona}
+                onChange={e => setZona(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                Estado operativo inicial
+              </label>
+              <select
+                value={estado}
+                onChange={e => setEstado(e.target.value as FincaEstado)}
+                className="w-full px-3.5 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+              >
+                <option value="disponible">🟢 Disponible para reservas</option>
+                <option value="alta_demanda">🟠 Alta demanda / Temporada</option>
+                <option value="fin_de_semana">🔵 Fines de semana exclusivamente</option>
+                <option value="no_disponible">🔴 En mantenimiento / No disponible</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                WhatsApp específico para esta propiedad (opcional)
+              </label>
+              <input
+                type="text"
+                placeholder="Ej: 573176827093"
+                value={waNumber}
+                onChange={e => setWaNumber(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+              />
+              <span className="text-[11px] text-[var(--text-muted,#a8a097)] mt-1 block">
+                Si lo dejas vacío, el sistema utilizará el número de WhatsApp central configurado.
+              </span>
+            </div>
+
+            <div className="md:col-span-2">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-[var(--text,#f0eae0)]">
+                  Descripción completa y atractiva
+                </label>
+                <span className="text-[11px] text-[var(--text-muted,#a8a097)]">
+                  {descripcion.length} caracteres
+                </span>
               </div>
-            </label>
-            <span
-              style={{
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                padding: '0.2rem 0.65rem',
-                borderRadius: '999px',
-                color: activo ? 'var(--success)' : '#ef4444',
-                background: activo ? 'color-mix(in srgb, var(--success) 12%, transparent)' : 'rgba(239,68,68,0.1)',
-              }}
-            >
-              {activo ? 'Activa ✓' : 'Inactiva 🚫'}
-            </span>
-          </div>
-
-          <div className="field">
-            <label>Zona / Ubicación (Municipio, Vereda)</label>
-            <input
-              type="text"
-              placeholder="Ej: Santa Elena, El Cerrito, Valle del Cauca"
-              value={zona}
-              onChange={e => setZona(e.target.value)}
-            />
-          </div>
-
-          <div className="field">
-            <label>Estado operativo inicial</label>
-            <select value={estado} onChange={e => setEstado(e.target.value as FincaEstado)}>
-              <option value="disponible">🟢 Disponible para reservas</option>
-              <option value="alta_demanda">🟠 Alta demanda / Temporada</option>
-              <option value="fin_de_semana">🔵 Fines de semana exclusivamente</option>
-              <option value="no_disponible">🔴 En mantenimiento / No disponible</option>
-            </select>
-          </div>
-
-          <div className="field col-span-full">
-            <label>Número de WhatsApp específico (opcional)</label>
-            <input
-              type="text"
-              placeholder="573176827093"
-              value={waNumber}
-              onChange={e => setWaNumber(e.target.value)}
-            />
-            <span className="text-xs text-muted" style={{ marginTop: '0.25rem', display: 'block' }}>
-              Si lo dejas en blanco, usará el número central configurado en el sistema
-            </span>
-          </div>
-
-          <div className="field col-span-full">
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>Descripción detallada de la propiedad</span>
-              <span className="text-xs text-muted">{descripcion.length} caracteres</span>
-            </label>
-            <textarea
-              rows={6}
-              placeholder="Describe el ambiente, la vista, privacidad, zonas verdes, si el clima es cálido o templado, y las características que enamoran a los huéspedes…&#10;&#10;Ejemplo:&#10;• Casa principal con amplios ventanales&#10;• Kiosko y asador al lado de la piscina&#10;• Clima cálido con brisa fresca en la tarde"
-              value={descripcion}
-              onChange={e => setDescripcion(e.target.value)}
-              style={{
-                whiteSpace: 'pre-wrap',
-                lineHeight: '1.6',
-                minHeight: '130px',
-                fontSize: '0.9rem',
-              }}
-            />
-            <span className="text-xs text-muted" style={{ marginTop: '0.35rem', display: 'block' }}>
-              💡 <strong>Visualización exacta:</strong> Los párrafos (Enter), viñetas y espaciados que introduzcas se mantendrán exactamente igual al mostrarse al cliente en el catálogo.
-            </span>
-          </div>
-
-          <div className="field col-span-full">
-            <label>Indicaciones de llegada o referencias de acceso (interno / confirmación)</label>
-            <textarea
-              rows={2}
-              placeholder="Ej: A 5 minutos del parque de Santa Elena, entrada por el callejón de los guaduales, portón blanco número 12."
-              value={indicacionesLlegada}
-              onChange={e => setIndicacionesLlegada(e.target.value)}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: CAPACIDAD Y DISTRIBUCIÓN (NUMERIC INPUTS FLUIDOS) */}
-      {activeTab === 'acomodacion' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div
-            style={{
-              background: 'var(--surface-sunken)',
-              padding: '0.85rem 1rem',
-              borderRadius: 'var(--rad-xs, 8px)',
-              border: '1px solid var(--border)',
-              fontSize: '0.84rem',
-              color: 'var(--text-muted)',
-            }}
-          >
-            💡 <strong>Edición rápida sin trabas:</strong> Puedes hacer clic en los campos, borrar libremente con Backspace o escribir directamente el número deseado, o usar los controles (+ / -).
-          </div>
-
-          <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))' }}>
-            <div className="field">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Users size={14} style={{ color: 'var(--primary)' }} />
-                <span>Capacidad mínima (personas) *</span>
-              </label>
-              <NumericInput
-                value={capacidadMinima}
-                onChange={val => setCapacidadMinima(val)}
-                min={1}
-                max={capacidad || 250}
-                suffix="personas"
-                placeholder="1"
+              <textarea
+                rows={5}
+                placeholder="Describe el ambiente, la vista, privacidad, zonas verdes, si el clima es cálido o templado, y las características que enamoran a los huéspedes…&#10;&#10;Ejemplo:&#10;• Casa principal con amplios ventanales&#10;• Kiosko y asador al lado de la piscina&#10;• Clima cálido con brisa fresca en la tarde"
+                value={descripcion}
+                onChange={e => setDescripcion(e.target.value)}
+                className="w-full p-3.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all leading-relaxed focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)] focus:shadow-[0_0_12px_rgba(212,146,74,0.2)]"
               />
-              <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
-                Mínimo de huéspedes requerido para reservar o cotizar
+              <span className="text-[11px] text-[var(--text-muted,#a8a097)] mt-1 block">
+                💡 <strong>Visualización exacta:</strong> Los saltos de línea (Enter) y viñetas se respetan fielmente en la ficha pública.
               </span>
             </div>
 
-            <div className="field">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Users size={14} style={{ color: 'var(--primary)' }} />
-                <span>Capacidad máxima (personas) *</span>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                Indicaciones de llegada / referencias de acceso (Privado)
               </label>
-              <NumericInput
-                value={capacidad}
-                onChange={val => setCapacidad(val)}
-                min={Math.max(1, capacidadMinima)}
-                max={250}
-                suffix="personas"
-                placeholder="10"
-              />
-              <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
-                Límite máximo de huéspedes permitido en cotizaciones
-              </span>
-            </div>
-
-            <div className="field">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Bed size={14} style={{ color: 'var(--primary)' }} />
-                <span>Número de habitaciones</span>
-              </label>
-              <NumericInput
-                value={habitaciones}
-                onChange={val => setHabitaciones(val)}
-                min={1}
-                max={50}
-                suffix="habitaciones"
-                placeholder="3"
-              />
-            </div>
-
-            <div className="field">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Bed size={14} style={{ color: 'var(--primary)' }} />
-                <span>Total de camas disponibles</span>
-              </label>
-              <NumericInput
-                value={camas}
-                onChange={val => setCamas(val)}
-                min={1}
-                max={100}
-                suffix="camas"
-                placeholder="5"
-              />
-            </div>
-
-            <div className="field">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Bath size={14} style={{ color: 'var(--primary)' }} />
-                <span>Número de baños</span>
-              </label>
-              <NumericInput
-                value={banos}
-                onChange={val => setBanos(val)}
-                min={1}
-                max={30}
-                suffix="baños"
-                placeholder="2"
+              <textarea
+                rows={2}
+                placeholder="Ej: A 5 minutos del parque principal de Santa Elena, entrada por el callejón de los guaduales, portón blanco número 12."
+                value={indicacionesLlegada}
+                onChange={e => setIndicacionesLlegada(e.target.value)}
+                className="w-full p-3 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
               />
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* TAB 3: TARIFAS Y PRECIOS */}
-      {activeTab === 'tarifas' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))' }}>
-            <div className="field">
-              <label>Precio por persona / noche (COP) *</label>
+        {/* TAB 2: ACOMODACIÓN Y CAPACIDAD */}
+        {activeTab === 'acomodacion' && (
+          <div className="flex flex-col gap-4">
+            <div className="p-3 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] border border-[var(--border,#312e28)] text-xs text-[var(--text-muted,#a8a097)]">
+              💡 <strong>Edición rápida fluida:</strong> Puedes escribir directamente el número con el teclado numérico o pulsar los botones (+ / -).
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                  <Users size={14} className="text-[var(--primary,#4da89e)]" />
+                  Capacidad mínima (personas) *
+                </label>
+                <NumericInput
+                  value={capacidadMinima}
+                  onChange={val => setCapacidadMinima(val)}
+                  min={1}
+                  max={capacidad || 250}
+                  suffix="personas"
+                  placeholder="1"
+                />
+                <span className="text-[11px] text-[var(--text-muted,#a8a097)] mt-1 block">
+                  Mínimo de huéspedes exigido para cotizar o reservar
+                </span>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                  <Users size={14} className="text-[var(--primary,#4da89e)]" />
+                  Capacidad máxima (personas) *
+                </label>
+                <NumericInput
+                  value={capacidad}
+                  onChange={val => setCapacidad(val)}
+                  min={Math.max(1, capacidadMinima)}
+                  max={250}
+                  suffix="personas"
+                  placeholder="10"
+                />
+                <span className="text-[11px] text-[var(--text-muted,#a8a097)] mt-1 block">
+                  Límite máximo de huéspedes admitido
+                </span>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                  <Bed size={14} className="text-[var(--primary,#4da89e)]" />
+                  Habitaciones
+                </label>
+                <NumericInput
+                  value={habitaciones}
+                  onChange={val => setHabitaciones(val)}
+                  min={1}
+                  max={50}
+                  suffix="habitaciones"
+                  placeholder="3"
+                />
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                  <Bed size={14} className="text-[var(--primary,#4da89e)]" />
+                  Camas disponibles
+                </label>
+                <NumericInput
+                  value={camas}
+                  onChange={val => setCamas(val)}
+                  min={1}
+                  max={100}
+                  suffix="camas"
+                  placeholder="5"
+                />
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                  <Bath size={14} className="text-[var(--primary,#4da89e)]" />
+                  Baños
+                </label>
+                <NumericInput
+                  value={banos}
+                  onChange={val => setBanos(val)}
+                  min={1}
+                  max={30}
+                  suffix="baños"
+                  placeholder="2"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: TARIFAS Y PRECIOS */}
+        {activeTab === 'tarifas' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                Precio por persona / noche (COP) *
+              </label>
               <CurrencyInput
                 value={precio}
                 onChange={val => setPrecio(val)}
                 placeholder="85.000"
               />
-              <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
+              <span className="text-[11px] text-[var(--text-muted,#a8a097)] mt-1 block">
                 Tarifa base para el cotizador público por persona
               </span>
             </div>
 
-            <div className="field">
-              <label>Precio alquiler finca completa por noche (COP)</label>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                Precio finca completa por noche (COP)
+              </label>
               <CurrencyInput
                 value={precioFincaCompleta}
                 onChange={val => setPrecioFincaCompleta(val)}
                 placeholder="0"
               />
-              <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
-                Opcional. Alquiler exclusivo sin importar cantidad de personas
+              <span className="text-[11px] text-[var(--text-muted,#a8a097)] mt-1 block">
+                Opcional. Alquiler exclusivo sin importar cantidad de huéspedes
               </span>
             </div>
 
-            <div className="field">
-              <label>Depósito de garantía reembolsable (COP)</label>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                Depósito de garantía reembolsable (COP)
+              </label>
               <CurrencyInput
                 value={depositoGarantia}
                 onChange={val => setDepositoGarantia(val)}
                 placeholder="0"
               />
-              <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
-                Garantía reembolsable para cubrir posibles daños o normas
+              <span className="text-[11px] text-[var(--text-muted,#a8a097)] mt-1 block">
+                Depósito retornable que cubre posibles daños o normas
               </span>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* TAB 4: DATOS BANCARIOS DEL PROPIETARIO PARA SEPARACIÓN / ABONOS */}
-      {activeTab === 'bancario' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {/* Banner de Privacidad y Alcance */}
-          <div
-            style={{
-              background: 'var(--surface-sunken)',
-              padding: '1rem 1.15rem',
-              borderRadius: 'var(--rad-xs, 10px)',
-              border: '1px solid var(--border)',
-              display: 'flex',
-              gap: '0.85rem',
-              alignItems: 'flex-start',
-            }}
-          >
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
-                background: 'color-mix(in srgb, var(--primary) 15%, transparent)',
-                color: 'var(--primary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                marginTop: '0.1rem',
-              }}
-            >
-              <CreditCard size={18} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text)', marginBottom: '0.2rem' }}>
-                Cuenta Bancaria y Entidad Financiera del Propietario
+        {/* TAB 4: DATOS BANCARIOS DEL PROPIETARIO */}
+        {activeTab === 'bancario' && (
+          <div className="flex flex-col gap-4">
+            <div className="p-3.5 rounded-[var(--rad-xs,10px)] bg-[var(--surface-2,#201e19)] border border-[var(--border,#312e28)] flex gap-3 items-start">
+              <div className="w-9 h-9 rounded-lg bg-[var(--primary,#4da89e)]/10 text-[var(--primary,#4da89e)] border border-[var(--primary,#4da89e)]/20 flex items-center justify-center shrink-0 mt-0.5">
+                <CreditCard size={18} />
               </div>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                🔒 <strong>Privacidad protegida:</strong> Esta información <strong>NO</strong> aparece en el catálogo ni en la web pública del cliente. Se utilizará e insertará de manera centralizada y automática <strong>únicamente en el mensaje oficial de WhatsApp</strong> que se le envía al cliente cuando se le solicita el dinero de separación o anticipo de la finca.
-              </p>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-xs text-[var(--text,#f0eae0)] mb-0.5">
+                  Cuenta Bancaria para Separación y Anticipo (50%)
+                </div>
+                <p className="m-0 text-[11px] text-[var(--text-muted,#a8a097)] leading-relaxed">
+                  🔒 <strong>Privacidad resguardada:</strong> Estos datos <strong>NO</strong> se muestran públicamente en el catálogo. Se insertan automáticamente <strong>únicamente en el mensaje oficial de WhatsApp</strong> al solicitar el abono de reserva al cliente.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="sm:col-span-2 md:col-span-4">
+                <label className="block text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                  Banco o Entidad Financiera *
+                </label>
+                {/* Chips de bancos rápidos */}
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {[
+                    { nombre: 'Bancolombia', tipo: 'Ahorros' },
+                    { nombre: 'Nequi', tipo: 'Billetera Digital / Celular' },
+                    { nombre: 'Daviplata', tipo: 'Billetera Digital / Celular' },
+                    { nombre: 'Davivienda', tipo: 'Ahorros' },
+                    { nombre: 'Banco de Bogotá', tipo: 'Ahorros' },
+                    { nombre: 'BBVA', tipo: 'Ahorros' },
+                    { nombre: 'Nu Colombia', tipo: 'Cuenta de Ahorros' },
+                    { nombre: 'Lulo Bank', tipo: 'Cuenta de Ahorros' },
+                  ].map(b => {
+                    const isSelected = bancoNombre.toLowerCase() === b.nombre.toLowerCase();
+                    return (
+                      <button
+                        key={b.nombre}
+                        type="button"
+                        onClick={() => {
+                          setBancoNombre(b.nombre);
+                          if (b.nombre === 'Nequi' || b.nombre === 'Daviplata') {
+                            setBancoTipoCuenta('Billetera Digital / Celular');
+                          } else if (!bancoTipoCuenta || bancoTipoCuenta === 'Billetera Digital / Celular') {
+                            setBancoTipoCuenta('Ahorros');
+                          }
+                        }}
+                        className={`px-3 py-1 rounded-full text-xs transition-all border ${
+                          isSelected
+                            ? 'bg-[var(--primary,#4da89e)] text-[#141210] font-bold border-[var(--primary,#4da89e)]'
+                            : 'bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] border-[var(--border,#312e28)] hover:border-[var(--primary,#4da89e)]/40'
+                        }`}
+                      >
+                        {b.nombre} {isSelected && '✓'}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Ej: Bancolombia, Nequi, etc."
+                  value={bancoNombre}
+                  onChange={e => setBancoNombre(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                  Tipo de Cuenta
+                </label>
+                <select
+                  value={bancoTipoCuenta}
+                  onChange={e => setBancoTipoCuenta(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                >
+                  <option value="Ahorros">Cuenta de Ahorros</option>
+                  <option value="Corriente">Cuenta Corriente</option>
+                  <option value="Billetera Digital / Celular">Billetera Digital / Celular</option>
+                  <option value="Llave Transfiya / Bre-B">Llave Transfiya / Bre-B</option>
+                </select>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-[var(--text,#f0eae0)]">
+                    Número de Cuenta o Celular *
+                  </label>
+                  {bancoCuenta && (
+                    <button
+                      type="button"
+                      onClick={handleCopiarCuenta}
+                      className="text-[11px] text-[var(--primary,#4da89e)] hover:underline inline-flex items-center gap-1 font-semibold"
+                    >
+                      {copiadoCuenta ? <Check size={11} /> : <Copy size={11} />}
+                      {copiadoCuenta ? 'Copiado' : 'Copiar'}
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Ej: 123-456789-01 o 3151234567"
+                  value={bancoCuenta}
+                  onChange={e => setBancoCuenta(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs tracking-wider border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                  Nombre del Titular
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Carlos Gómez"
+                  value={bancoTitular}
+                  onChange={e => setBancoTitular(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                  Cédula / NIT del Titular
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: CC 16.789.012"
+                  value={bancoIdentificacion}
+                  onChange={e => setBancoIdentificacion(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                />
+              </div>
+            </div>
+
+            {/* Live Preview de WhatsApp */}
+            <div className="rounded-[var(--rad-xs,10px)] bg-[var(--surface-2,#201e19)] border border-[var(--border,#312e28)] p-3.5 mt-2">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text,#f0eae0)]">
+                  <span>📲</span>
+                  <span>Previsualización en mensaje oficial de WhatsApp:</span>
+                </div>
+                <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-[#25d366]/15 text-[#25d366] border border-[#25d366]/20">
+                  WhatsApp Oficial
+                </span>
+              </div>
+
+              <div className="rounded-lg bg-[var(--surface,#1a1814)] border border-[var(--border,#312e28)] p-3 font-mono text-xs text-[var(--text,#f0eae0)] whitespace-pre-wrap leading-relaxed">
+                <strong>💳 *DATOS DE CONSIGNACIÓN / CUENTA DEL PROPIETARIO:*</strong>{'\n'}
+                {bancoCuenta ? (
+                  <>
+                    • *Banco:* {bancoNombre || 'Bancolombia'}{'\n'}
+                    • *Tipo de Cuenta:* {bancoTipoCuenta || 'Ahorros'}{'\n'}
+                    • *Número de Cuenta:* {bancoCuenta}{'\n'}
+                    • *Titular:* {bancoTitular || 'Propietario de la Finca'}
+                    {bancoIdentificacion ? `\n• *Identificación / NIT:* ${bancoIdentificacion}` : ''}
+                  </>
+                ) : (
+                  <span className="text-[var(--text-muted,#a8a097)] italic font-sans">
+                    (Al completar los datos de cuenta arriba, se visualizará aquí el bloque exacto que recibirá el cliente.)
+                  </span>
+                )}
+              </div>
             </div>
           </div>
+        )}
 
-          <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))' }}>
-            {/* Entidad Financiera / Banco */}
-            <div className="field col-span-full">
-              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.3rem' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
-                  <Building size={14} style={{ color: 'var(--primary)' }} />
-                  Banco o Entidad Financiera *
-                </span>
-                <span className="text-xs text-muted">Selecciona una entidad rápida o escribe el nombre</span>
-              </label>
+        {/* TAB 5: COMODIDADES */}
+        {activeTab === 'amenidades' && (
+          <div className="flex flex-col gap-4">
+            <div>
+              <div className="font-bold text-xs text-[var(--text,#f0eae0)] mb-1">
+                Comodidades seleccionadas ({amenidades.length}):
+              </div>
+              <p className="text-[11px] text-[var(--text-muted,#a8a097)] mb-3">
+                Haz clic en cualquiera de las comodidades sugeridas para activarla o añadir una propia personalizada.
+              </p>
 
-              {/* Chips rápidos de bancos comunes en Colombia */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.65rem' }}>
-                {[
-                  { nombre: 'Bancolombia', tipo: 'Ahorros' },
-                  { nombre: 'Nequi', tipo: 'Billetera Digital / Celular' },
-                  { nombre: 'Daviplata', tipo: 'Billetera Digital / Celular' },
-                  { nombre: 'Davivienda', tipo: 'Ahorros' },
-                  { nombre: 'Banco de Bogotá', tipo: 'Ahorros' },
-                  { nombre: 'BBVA', tipo: 'Ahorros' },
-                  { nombre: 'Nu Colombia', tipo: 'Cuenta de Ahorros' },
-                  { nombre: 'Lulo Bank', tipo: 'Cuenta de Ahorros' },
-                  { nombre: 'Dale!', tipo: 'Billetera Digital / Celular' },
-                ].map(b => {
-                  const isSelected = bancoNombre.toLowerCase() === b.nombre.toLowerCase();
+              {/* Chips sugeridos */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {AMENIDADES_SUGERIDAS.map(sug => {
+                  const seleccionada = amenidades.some(a => a.nombre.toLowerCase() === sug.nombre.toLowerCase());
                   return (
                     <button
-                      key={b.nombre}
+                      key={sug.nombre}
                       type="button"
-                      onClick={() => {
-                        setBancoNombre(b.nombre);
-                        if (b.nombre === 'Nequi' || b.nombre === 'Daviplata' || b.nombre === 'Dale!') {
-                          setBancoTipoCuenta('Billetera Digital / Celular');
-                        } else if (!bancoTipoCuenta || bancoTipoCuenta === 'Billetera Digital / Celular') {
-                          setBancoTipoCuenta('Ahorros');
-                        }
-                      }}
-                      style={{
-                        padding: '0.35rem 0.75rem',
-                        borderRadius: '999px',
-                        fontSize: '0.78rem',
-                        fontWeight: isSelected ? 700 : 500,
-                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
-                        background: isSelected ? 'var(--primary)' : 'var(--surface-2)',
-                        color: isSelected ? '#fff' : 'var(--text)',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
+                      onClick={() => toggleAmenidadSugerida(sug)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                        seleccionada
+                          ? 'bg-[var(--primary,#4da89e)]/15 border-[var(--primary,#4da89e)] text-[var(--primary,#4da89e)] shadow-[0_0_10px_rgba(77,168,158,0.2)]'
+                          : 'bg-[var(--surface-2,#201e19)] border-[var(--border,#312e28)] text-[var(--text,#f0eae0)] hover:border-[var(--primary,#4da89e)]/40'
+                      }`}
                     >
-                      {b.nombre} {isSelected && '✓'}
+                      <span>{sug.emoji}</span>
+                      <span>{sug.nombre}</span>
+                      {seleccionada && <Check size={13} className="stroke-[3]" />}
                     </button>
                   );
                 })}
               </div>
 
+              {/* Input para agregar comodidad personalizada */}
+              <div className="flex gap-2 max-w-md">
+                <input
+                  type="text"
+                  placeholder="Añadir otra comodidad (ej: Sendero ecológico)…"
+                  value={nuevaAmenidadTexto}
+                  onChange={e => setNuevaAmenidadTexto(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAgregarAmenidadPersonalizada();
+                    }
+                  }}
+                  className="flex-1 px-3.5 py-2 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                />
+                <button
+                  type="button"
+                  onClick={handleAgregarAmenidadPersonalizada}
+                  className="px-4 py-2 rounded-[var(--rad-xs,8px)] bg-[var(--accent,#d4924a)] text-[#141210] font-bold text-xs shrink-0 transition-all hover:brightness-110 active:scale-[0.98]"
+                >
+                  <Plus size={14} className="inline mr-1" /> Añadir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: POLÍTICAS Y NORMAS */}
+        {activeTab === 'politicas' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                <Clock size={14} className="text-[var(--primary,#4da89e)]" />
+                Hora de Check-in (Entrada)
+              </label>
               <input
                 type="text"
-                placeholder="Ej: Bancolombia, Nequi, Davivienda, etc."
-                value={bancoNombre}
-                onChange={e => setBancoNombre(e.target.value)}
-                style={{ fontSize: '0.95rem' }}
+                placeholder="15:00 o 3:00 PM"
+                value={checkinHora}
+                onChange={e => setCheckinHora(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
               />
             </div>
 
-            {/* Tipo de Cuenta */}
-            <div className="field">
-              <label>Tipo de Cuenta</label>
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                <Clock size={14} className="text-[var(--primary,#4da89e)]" />
+                Hora de Check-out (Salida)
+              </label>
+              <input
+                type="text"
+                placeholder="13:00 o 1:00 PM"
+                value={checkoutHora}
+                onChange={e => setCheckoutHora(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                <Dog size={14} className="text-[var(--primary,#4da89e)]" />
+                Política de mascotas (Pet-friendly)
+              </label>
               <select
-                value={bancoTipoCuenta}
-                onChange={e => setBancoTipoCuenta(e.target.value)}
+                value={politicaMascotas}
+                onChange={e => setPoliticaMascotas(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
               >
-                <option value="Ahorros">Cuenta de Ahorros</option>
-                <option value="Corriente">Cuenta Corriente</option>
-                <option value="Billetera Digital / Celular">Billetera Digital / Celular (Nequi / Daviplata)</option>
-                <option value="Llave Transfiya / Bre-B">Llave Transfiya / Bre-B</option>
+                <option value="permitido">🐶 Mascotas permitidas sin costo adicional</option>
+                <option value="con_costo">🐾 Se aceptan mascotas con tarifa adicional</option>
+                <option value="consulta_previa">⚠️ Permitido con consulta previa / razas pequeñas</option>
+                <option value="no_permitido">🚫 No se permiten mascotas</option>
               </select>
             </div>
 
-            {/* Número de Cuenta / Celular */}
-            <div className="field">
-              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Número de Cuenta o Celular *</span>
-                {bancoCuenta && (
+            {politicaMascotas === 'con_costo' ? (
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                  <DollarSign size={14} className="text-[var(--accent,#d4924a)]" />
+                  Valor adicional por mascota (COP) *
+                </label>
+                <CurrencyInput
+                  value={valorMascota}
+                  onChange={val => setValorMascota(val)}
+                  placeholder="25.000"
+                />
+              </div>
+            ) : (
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                  <Volume2 size={14} className="text-[var(--primary,#4da89e)]" />
+                  Política de música y sonido
+                </label>
+                <select
+                  value={politicaMusica}
+                  onChange={e => setPoliticaMusica(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                >
+                  <option value="moderada">🎵 Música moderada (tranquilidad campestre)</option>
+                  <option value="hasta_medianoche">🔊 Música permitida hasta medianoche (12:00 AM)</option>
+                  <option value="sin_restriccion">🎉 Eventos y música libre acordada</option>
+                  <option value="no_permitida">🤫 Finca de descanso / Prohibido sonido alto</option>
+                </select>
+              </div>
+            )}
+
+            {politicaMascotas === 'con_costo' && (
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                  <Volume2 size={14} className="text-[var(--primary,#4da89e)]" />
+                  Política de música y sonido
+                </label>
+                <select
+                  value={politicaMusica}
+                  onChange={e => setPoliticaMusica(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                >
+                  <option value="moderada">🎵 Música moderada (tranquilidad campestre)</option>
+                  <option value="hasta_medianoche">🔊 Música permitida hasta medianoche (12:00 AM)</option>
+                  <option value="sin_restriccion">🎉 Eventos y música libre acordada</option>
+                  <option value="no_permitida">🤫 Finca de descanso / Prohibido sonido alto</option>
+                </select>
+              </div>
+            )}
+
+            <div className="md:col-span-2">
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                <ShieldAlert size={14} className="text-[var(--primary,#4da89e)]" />
+                Normas de convivencia y reglas de la finca
+              </label>
+              <textarea
+                rows={3}
+                placeholder="Ej: Uso de traje de baño obligatorio en piscina. Apagar luces exteriores al dormir. Prohibido fumar dentro de las habitaciones."
+                value={normas}
+                onChange={e => setNormas(e.target.value)}
+                className="w-full p-3 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                <Sparkles size={14} className="text-[var(--primary,#4da89e)]" />
+                Planes de alimentación disponibles
+              </label>
+              <div className="flex flex-wrap gap-1.5 mb-2.5">
+                {PLANES_SUGERIDOS.map(plan => {
+                  const activoPlan = planesSeleccionados.includes(plan);
+                  return (
+                    <button
+                      key={plan}
+                      type="button"
+                      onClick={() => togglePlan(plan)}
+                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-[var(--rad-xs,6px)] text-xs font-semibold transition-all border ${
+                        activoPlan
+                          ? 'bg-[var(--primary,#4da89e)]/15 border-[var(--primary,#4da89e)] text-[var(--primary,#4da89e)]'
+                          : 'bg-[var(--surface-2,#201e19)] border-[var(--border,#312e28)] text-[var(--text-muted,#a8a097)] hover:text-[var(--text,#f0eae0)]'
+                      }`}
+                    >
+                      <span>{plan}</span>
+                      {activoPlan && <Check size={12} />}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-2 max-w-sm">
+                <input
+                  type="text"
+                  placeholder="Añadir otro plan…"
+                  value={nuevoPlanTexto}
+                  onChange={e => setNuevoPlanTexto(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAgregarPlanPersonalizado();
+                    }
+                  }}
+                  className="flex-1 px-3 py-1.5 rounded-[var(--rad-xs,6px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleAgregarPlanPersonalizado}
+                  className="px-3 py-1.5 rounded-[var(--rad-xs,6px)] bg-[var(--surface-3,#272420)] border border-[var(--border,#312e28)] text-xs text-[var(--text,#f0eae0)] font-semibold"
+                >
+                  Añadir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 7: FOTOGRAFÍAS Y GALERÍA (SIN BOTONES REDUNDANTES) */}
+        {activeTab === 'fotos' && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-[var(--border,#312e28)]">
+              <div>
+                <div className="text-xs font-bold text-[var(--text,#f0eae0)] flex items-center gap-2">
+                  <ImageIcon size={15} /> Fotografías de la finca ({imagenes.length}/20)
+                </div>
+                <div className="text-[11px] text-[var(--text-muted,#a8a097)]">
+                  La primera imagen es la portada. Haz clic sobre una foto para seleccionarla.
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAgregarUrl}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs font-semibold border border-[var(--border,#312e28)] hover:border-[var(--accent,#d4924a)]"
+                >
+                  <LinkIcon size={12} /> Añadir URL
+                </button>
+
+                {selectedThumbs.size > 0 && (
                   <button
                     type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(bancoCuenta);
-                      setCopiadoCuenta(true);
-                      setTimeout(() => setCopiadoCuenta(false), 2000);
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: copiadoCuenta ? 'var(--success)' : 'var(--primary)',
-                      fontSize: '0.75rem',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      fontWeight: 600,
-                      padding: 0,
-                    }}
+                    onClick={handleEliminarSeleccionadas}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--rad-xs,8px)] bg-red-500/15 text-red-400 text-xs font-bold border border-red-500/30 hover:bg-red-500/25"
                   >
-                    {copiadoCuenta ? <Check size={12} /> : <Copy size={12} />}
-                    {copiadoCuenta ? 'Copiado' : 'Copiar'}
+                    <Trash2 size={12} /> Eliminar ({selectedThumbs.size})
                   </button>
                 )}
-              </label>
-              <input
-                type="text"
-                placeholder="Ej: 123-456789-01 o 3151234567"
-                value={bancoCuenta}
-                onChange={e => setBancoCuenta(e.target.value)}
-                style={{ fontSize: '0.95rem', letterSpacing: '0.5px' }}
-              />
-              <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
-                Número al que consignará el cliente para separar la finca
-              </span>
-            </div>
-
-            {/* Nombre del Titular */}
-            <div className="field">
-              <label>Nombre del Titular / Beneficiario (Dueño)</label>
-              <input
-                type="text"
-                placeholder="Ej: Carlos Alberto Gómez"
-                value={bancoTitular}
-                onChange={e => setBancoTitular(e.target.value)}
-              />
-              <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
-                Nombre completo de la persona a nombre de quien está la cuenta
-              </span>
-            </div>
-
-            {/* Identificación / Cédula / NIT */}
-            <div className="field">
-              <label>Cédula o NIT del Titular (Opcional)</label>
-              <input
-                type="text"
-                placeholder="Ej: CC 16.789.012 o NIT 900.123.456-7"
-                value={bancoIdentificacion}
-                onChange={e => setBancoIdentificacion(e.target.value)}
-              />
-              <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
-                Facilita transferencias interbancarias y pagos vía PSE
-              </span>
-            </div>
-          </div>
-
-          {/* ============================================================== */}
-          {/* LIVE PREVIEW: CÓMO LO RECIBIRÁ EL CLIENTE EN WHATSAPP */}
-          {/* ============================================================== */}
-          <div
-            style={{
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--rad-xs, 10px)',
-              padding: '1rem',
-              marginTop: '0.5rem',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)' }}>
-                <span>📲</span>
-                <span>Previsualización exacta en el texto de separación del cliente:</span>
-              </div>
-              <span
-                style={{
-                  fontSize: '0.72rem',
-                  padding: '0.2rem 0.55rem',
-                  borderRadius: '999px',
-                  background: 'color-mix(in srgb, #25d366 15%, transparent)',
-                  color: '#16a34a',
-                  fontWeight: 700,
-                }}
-              >
-                Formato WhatsApp Oficial
-              </span>
-            </div>
-
-            <div
-              style={{
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                padding: '0.85rem 1rem',
-                fontFamily: 'monospace, -apple-system, sans-serif',
-                fontSize: '0.82rem',
-                lineHeight: '1.6',
-                color: 'var(--text)',
-                whiteSpace: 'pre-wrap',
-              }}
-            >
-              <strong>💳 *DATOS DE CONSIGNACIÓN / CUENTA DEL PROPIETARIO:*</strong>{'\n'}
-              {bancoCuenta ? (
-                <>
-                  • *Banco:* {bancoNombre || 'Bancolombia'}{'\n'}
-                  • *Tipo de Cuenta:* {bancoTipoCuenta || 'Ahorros'}{'\n'}
-                  • *Número de Cuenta:* {bancoCuenta}{'\n'}
-                  • *Titular:* {bancoTitular || 'Propietario de la Finca'}
-                  {bancoIdentificacion ? `\n• *Identificación / NIT:* ${bancoIdentificacion}` : ''}
-                </>
-              ) : (
-                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                  (No has definido un número de cuenta todavía. Al completar los campos arriba, aparecerán automáticamente aquí.)
-                </span>
-              )}
-            </div>
-
-            <div className="text-xs text-muted" style={{ marginTop: '0.5rem' }}>
-              💡 Este fragmento se inserta automáticamente al pulsar <strong>"Pedir Abono (50%)"</strong> en el módulo de Cotizaciones para esta propiedad.
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 5: AMENIDADES Y SERVICIOS */}
-      {activeTab === 'amenidades' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.35rem' }}>
-              Comodidades activas para esta finca ({amenidades.length}):
-            </div>
-            <div className="text-xs text-muted" style={{ marginBottom: '0.75rem' }}>
-              Haz clic en cualquiera de las comodidades sugeridas para activarla o desactivarla, o añade tus propias comodidades personalizadas.
-            </div>
-
-            {/* Chips de amenidades sugeridas */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.25rem' }}>
-              {AMENIDADES_SUGERIDAS.map(sug => {
-                const seleccionada = amenidades.some(a => a.nombre.toLowerCase() === sug.nombre.toLowerCase());
-                return (
-                  <button
-                    key={sug.nombre}
-                    type="button"
-                    onClick={() => toggleAmenidadSugerida(sug)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.45rem',
-                      padding: '0.45rem 0.85rem',
-                      borderRadius: '999px',
-                      border: seleccionada ? '1px solid var(--primary)' : '1px solid var(--border)',
-                      background: seleccionada ? 'var(--primary-bg)' : 'var(--surface-2)',
-                      color: seleccionada ? 'var(--primary)' : 'var(--text)',
-                      fontWeight: seleccionada ? 700 : 500,
-                      fontSize: '0.82rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    <span>{sug.emoji}</span>
-                    <span>{sug.nombre}</span>
-                    {seleccionada && <Check size={13} style={{ strokeWidth: 3 }} />}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Agregar amenidad personalizada */}
-            <div
-              style={{
-                display: 'flex',
-                gap: '0.5rem',
-                alignItems: 'center',
-                maxWidth: '460px',
-              }}
-            >
-              <input
-                type="text"
-                placeholder="Añadir otra comodidad (ej: Sendero ecológico)…"
-                value={nuevaAmenidadTexto}
-                onChange={e => setNuevaAmenidadTexto(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAgregarAmenidadPersonalizada();
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="btn btn-sm btn-primary"
-                onClick={handleAgregarAmenidadPersonalizada}
-                style={{ flexShrink: 0 }}
-              >
-                <Plus size={14} /> Añadir
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 6: POLÍTICAS, HORARIOS Y NORMAS */}
-      {activeTab === 'politicas' && (
-        <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))' }}>
-          <div className="field">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Clock size={14} style={{ color: 'var(--primary)' }} />
-              <span>Hora de Check-in (Entrada)</span>
-            </label>
-            <input
-              type="text"
-              placeholder="15:00 o 3:00 PM"
-              value={checkinHora}
-              onChange={e => setCheckinHora(e.target.value)}
-            />
-          </div>
-
-          <div className="field">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Clock size={14} style={{ color: 'var(--primary)' }} />
-              <span>Hora de Check-out (Salida)</span>
-            </label>
-            <input
-              type="text"
-              placeholder="13:00 o 1:00 PM"
-              value={checkoutHora}
-              onChange={e => setCheckoutHora(e.target.value)}
-            />
-          </div>
-
-          <div className="field">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Dog size={14} style={{ color: 'var(--primary)' }} />
-              <span>Política de mascotas (Pet-friendly)</span>
-            </label>
-            <select value={politicaMascotas} onChange={e => setPoliticaMascotas(e.target.value)}>
-              <option value="permitido">🐶 Mascotas bienvenidas sin costo adicional</option>
-              <option value="con_costo">🐾 Se aceptan mascotas con tarifa / costo adicional</option>
-              <option value="consulta_previa">⚠️ Permitido con consulta previa / solo razas pequeñas</option>
-              <option value="no_permitido">🚫 No se permiten mascotas</option>
-            </select>
-          </div>
-
-          {politicaMascotas === 'con_costo' && (
-            <div className="field">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Dog size={14} style={{ color: 'var(--accent)' }} />
-                <span>Valor adicional por mascota (COP) *</span>
-              </label>
-              <CurrencyInput
-                value={valorMascota}
-                onChange={val => setValorMascota(val)}
-                placeholder="25.000"
-              />
-              <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
-                Tarifa cobrada por mascota para esta propiedad
-              </span>
-            </div>
-          )}
-
-          <div className="field">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Volume2 size={14} style={{ color: 'var(--primary)' }} />
-              <span>Política de música y sonido</span>
-            </label>
-            <select value={politicaMusica} onChange={e => setPoliticaMusica(e.target.value)}>
-              <option value="moderada">🎵 Música moderada (respetando la tranquilidad campestre)</option>
-              <option value="hasta_medianoche">🔊 Música permitida hasta las 12:00 AM (medianoche)</option>
-              <option value="sin_restriccion">🎉 Eventos y música libre en horario acordado</option>
-              <option value="no_permitida">🤫 Finca de descanso / Prohibido sonido alto</option>
-            </select>
-          </div>
-
-          <div className="field col-span-full">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <ShieldAlert size={14} style={{ color: 'var(--primary)' }} />
-              <span>Normas de convivencia y condiciones de alquiler</span>
-            </label>
-            <textarea
-              rows={3}
-              placeholder="Ej: Uso de traje de baño obligatorio en piscina. Apagar luces exteriores al dormir. Prohibido fumar dentro de las habitaciones."
-              value={normas}
-              onChange={e => setNormas(e.target.value)}
-            />
-          </div>
-
-          {/* Planes de alimentación */}
-          <div className="field col-span-full">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Sparkles size={14} style={{ color: 'var(--primary)' }} />
-              <span>Planes de estadía y alimentación disponibles:</span>
-            </label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', marginTop: '0.35rem', marginBottom: '0.75rem' }}>
-              {PLANES_SUGERIDOS.map(plan => {
-                const activoPlan = planesSeleccionados.includes(plan);
-                return (
-                  <button
-                    key={plan}
-                    type="button"
-                    onClick={() => togglePlan(plan)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                      padding: '0.35rem 0.75rem',
-                      borderRadius: 'var(--rad-xs, 6px)',
-                      border: activoPlan ? '1px solid var(--primary)' : '1px solid var(--border)',
-                      background: activoPlan ? 'var(--primary-bg)' : 'var(--surface-2)',
-                      color: activoPlan ? 'var(--primary)' : 'var(--text-muted)',
-                      fontWeight: activoPlan ? 700 : 500,
-                      fontSize: '0.8rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <span>{plan}</span>
-                    {activoPlan && <Check size={12} />}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.5rem', maxWidth: '400px' }}>
-              <input
-                type="text"
-                placeholder="Añadir otro plan…"
-                value={nuevoPlanTexto}
-                onChange={e => setNuevoPlanTexto(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAgregarPlanPersonalizado();
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={handleAgregarPlanPersonalizado}
-                style={{ flexShrink: 0 }}
-              >
-                <Plus size={13} /> Añadir
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 7: FOTOGRAFÍAS Y GALERÍA WEBP */}
-      {activeTab === 'fotos' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div className="sec-header" style={{ marginBottom: '0.25rem' }}>
-            <div>
-              <div className="sec-title" style={{ fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <ImageIcon size={16} /> Fotografías de la finca ({imagenes.length}/20)
-              </div>
-              <div className="text-xs text-muted">
-                La primera foto es la imagen de portada. Puedes reordenar haciendo clic en "Fijar portada".
               </div>
             </div>
 
-            <div className="img-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <label className="btn btn-sm btn-primary" style={{ cursor: 'pointer' }}>
-                <Upload size={13} /> Subir fotos optimizadas
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*,image/heic,image/heif,.heic,.heif"
-                  style={{ display: 'none' }}
-                  onChange={handleSubirImagenes}
-                />
-              </label>
-              <button className="btn btn-sm" onClick={handleAgregarUrl}>
-                <LinkIcon size={13} /> Añadir URL
-              </button>
-              {selectedThumbs.size > 0 && (
-                <button className="btn btn-sm btn-danger" onClick={handleEliminarSeleccionadas}>
-                  <Trash2 size={13} /> Eliminar ({selectedThumbs.size})
-                </button>
-              )}
-            </div>
-          </div>
+            {/* Dropzone unificada con micro-animación y optimización WebP */}
+            <label className="relative flex flex-col items-center justify-center p-6 border-2 border-dashed border-[var(--border,#312e28)] rounded-[var(--rad-sm,12px)] bg-[var(--surface-2,#201e19)] hover:border-[var(--accent,#d4924a)] cursor-pointer transition-all">
+              <input
+                type="file"
+                multiple
+                accept="image/*,image/heic,image/heif,.heic,.heif"
+                className="hidden"
+                onChange={handleSubirImagenes}
+              />
+              <div className="w-12 h-12 rounded-full bg-[var(--accent,#d4924a)]/10 text-[var(--accent,#d4924a)] flex items-center justify-center mb-2">
+                <Upload size={22} />
+              </div>
+              <div className="text-xs font-bold text-[var(--text,#f0eae0)]">
+                Arrastra imágenes aquí o <span className="text-[var(--accent,#d4924a)] underline">haz clic para examinar</span>
+              </div>
+              <div className="text-[11px] text-[var(--text-muted,#a8a097)] mt-1 text-center">
+                Conversión automática a WebP ligero · Compatible con iPhone HEIC, JPG y PNG
+              </div>
+            </label>
 
-          <label className="upload-area" style={{ cursor: 'pointer' }}>
-            <input
-              type="file"
-              multiple
-              accept="image/*,image/heic,image/heif,.heic,.heif"
-              style={{ display: 'none' }}
-              onChange={handleSubirImagenes}
-            />
-            <Upload size={24} style={{ color: 'var(--text-faint)', marginBottom: '0.35rem' }} />
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
-              Arrastra imágenes aquí o <span style={{ color: 'var(--primary)', fontWeight: 600 }}>haz clic para seleccionar</span>
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '0.25rem' }}>
-              Conversión automática a formato WebP ligero · Compatible con iPhone HEIC, JPG y PNG
-            </div>
-          </label>
+            {uploading && (
+              <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-[var(--surface-2,#201e19)] border border-[var(--primary,#4da89e)] text-xs text-[var(--primary,#4da89e)] font-bold animate-pulse">
+                <Loader size={16} className="animate-spin" />
+                <span>{uploadLabel}</span>
+              </div>
+            )}
 
-          {uploading && (
-            <div className="upload-progress">
-              <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />
-              <span>{uploadLabel}</span>
-            </div>
-          )}
+            {/* Grilla de miniaturas con estrella de portada */}
+            {imagenes.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 mt-1">
+                {imagenes.map((url, idx) => {
+                  const isSelected = selectedThumbs.has(idx);
+                  const esPrincipal = idx === 0;
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => toggleThumbSelection(idx)}
+                      className={`group relative aspect-video rounded-[var(--rad-xs,8px)] overflow-hidden border cursor-pointer transition-all ${
+                        isSelected
+                          ? 'border-[var(--accent,#d4924a)] ring-2 ring-[var(--accent,#d4924a)] shadow-[0_0_15px_rgba(212,146,74,0.3)]'
+                          : 'border-[var(--border,#312e28)] hover:border-[var(--text-muted,#a8a097)]'
+                      }`}
+                    >
+                      <img src={url} alt={`Finca ${idx + 1}`} className="w-full h-full object-cover" />
 
-          {imagenes.length > 0 && (
-            <div className="img-grid" style={{ marginTop: '0.5rem' }}>
-              {imagenes.map((url, idx) => {
-                const isSelected = selectedThumbs.has(idx);
-                const esPrincipal = idx === 0;
-                return (
-                  <div
-                    key={idx}
-                    className={`img-thumb ${isSelected ? 'selected' : ''}`}
-                    onClick={() => toggleThumbSelection(idx)}
-                    title={esPrincipal ? 'Foto de portada principal' : 'Clic para seleccionar'}
-                    style={{ position: 'relative' }}
-                  >
-                    <img src={url} alt={`Imagen ${idx + 1}`} />
-                    <div className="img-order">
-                      {esPrincipal ? '★ Portada' : idx + 1}
-                    </div>
-
-                    {!esPrincipal && (
-                      <button
-                        type="button"
-                        onClick={e => {
-                          e.stopPropagation();
-                          handleMarcarComoPrincipal(idx);
-                        }}
-                        style={{
-                          position: 'absolute',
-                          bottom: '6px',
-                          right: '6px',
-                          fontSize: '10px',
-                          background: 'rgba(0,0,0,0.7)',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '4px',
-                          padding: '2px 6px',
-                          cursor: 'pointer',
-                        }}
-                        title="Mover esta imagen a la primera posición como foto de portada"
+                      <div
+                        className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-bold ${
+                          esPrincipal
+                            ? 'bg-[var(--accent,#d4924a)] text-[#141210] shadow'
+                            : 'bg-black/60 text-white backdrop-blur-sm'
+                        }`}
                       >
-                        Hacer portada
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+                        {esPrincipal ? '★ Portada' : `#${idx + 1}`}
+                      </div>
+
+                      {!esPrincipal && (
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleMarcarComoPrincipal(idx);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 absolute bottom-2 right-2 px-2 py-1 rounded bg-black/80 hover:bg-[var(--accent,#d4924a)] hover:text-[#141210] text-white text-[10px] font-bold transition-all shadow"
+                        >
+                          Hacer portada
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
 
       {/* ============================================================== */}
-      {/* 4. BARRA FIJA DE ACCIONES: GUARDAR, VER EN CLIENTE, ELIMINAR */}
+      {/* 4. BARRA DE ACCIONES PRINCIPALES (STICKY / SIN REDUNDANCIAS) */}
       {/* ============================================================== */}
-      <div
-        className="form-actions"
-        style={{
-          marginTop: '1.75rem',
-          paddingTop: '1.25rem',
-          borderTop: '1px solid var(--border)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '0.75rem',
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+      <div className="relative z-10 flex items-center justify-between flex-wrap gap-3 mt-8 pt-4 border-t border-[var(--border,#312e28)]">
+        <div className="flex items-center gap-3">
           <button
             type="button"
-            className="btn btn-primary"
             onClick={handleGuardar}
             disabled={guardando}
-            style={{ fontWeight: 700, padding: '0.65rem 1.35rem' }}
+            className={`inline-flex items-center justify-center gap-2 px-7 py-3 rounded-[var(--rad-sm,10px)] font-bold text-sm tracking-wide shadow-lg transition-all active:scale-[0.98] ${
+              isNew
+                ? 'bg-[var(--accent,#d4924a)] text-[#141210] shadow-[0_4px_20px_rgba(212,146,74,0.35)] hover:brightness-110'
+                : 'bg-[var(--primary,#4da89e)] text-[#141210] shadow-[0_4px_20px_rgba(77,168,158,0.35)] hover:brightness-110'
+            }`}
           >
             {guardando ? (
               <>
-                <Loader size={15} style={{ animation: 'spin 1s linear infinite' }} /> Guardando…
+                <Loader size={16} className="animate-spin" /> Guardando…
+              </>
+            ) : isNew ? (
+              <>
+                <Plus size={16} /> Crear Nueva Finca
               </>
             ) : (
               <>
-                <Save size={16} /> Guardar Finca en Supabase
+                <Save size={16} /> Guardar Cambios
               </>
             )}
           </button>
-
-          {selectedFincaId !== 'new' && (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={handleDesactivarFinca}
-              title={activo ? 'Ocultar finca del catálogo público' : 'Mostrar finca en el catálogo público'}
-            >
-              {activo ? 'Desactivar finca' : 'Reactivar finca'}
-            </button>
-          )}
         </div>
 
-        {selectedFincaId !== 'new' && (
+        {!isNew && (
           <button
             type="button"
-            className="btn btn-danger"
             onClick={handleEliminarDefinitivo}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[var(--rad-sm,10px)] text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-all"
             title="Borrar permanentemente de la base de datos"
-            style={{ fontSize: '0.85rem' }}
           >
-            <Trash2 size={14} /> Eliminar definitivamente
+            <Trash2 size={14} /> Eliminar finca
           </button>
         )}
       </div>

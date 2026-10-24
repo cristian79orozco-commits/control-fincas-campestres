@@ -194,6 +194,17 @@ const guardarMetadatosFinca = (id: string, datos: Partial<Finca>) => {
       valor_mascota: (datos.valor_mascota !== undefined && datos.valor_mascota !== null)
         ? Number(datos.valor_mascota)
         : (todos[id]?.valor_mascota || 0),
+      habitaciones: datos.habitaciones !== undefined && datos.habitaciones !== null ? Number(datos.habitaciones) : todos[id]?.habitaciones,
+      camas: datos.camas !== undefined && datos.camas !== null ? Number(datos.camas) : todos[id]?.camas,
+      banos: datos.banos !== undefined && datos.banos !== null ? Number(datos.banos) : todos[id]?.banos,
+      checkin_hora: datos.checkin_hora !== undefined ? datos.checkin_hora : todos[id]?.checkin_hora,
+      checkout_hora: datos.checkout_hora !== undefined ? datos.checkout_hora : todos[id]?.checkout_hora,
+      politica_mascotas: datos.politica_mascotas !== undefined ? datos.politica_mascotas : todos[id]?.politica_mascotas,
+      politica_musica: datos.politica_musica !== undefined ? datos.politica_musica : todos[id]?.politica_musica,
+      precio_finca_completa: datos.precio_finca_completa !== undefined && datos.precio_finca_completa !== null ? Number(datos.precio_finca_completa) : todos[id]?.precio_finca_completa,
+      deposito_garantia: datos.deposito_garantia !== undefined && datos.deposito_garantia !== null ? Number(datos.deposito_garantia) : todos[id]?.deposito_garantia,
+      normas: datos.normas !== undefined ? datos.normas : todos[id]?.normas,
+      indicaciones_llegada: datos.indicaciones_llegada !== undefined ? datos.indicaciones_llegada : todos[id]?.indicaciones_llegada,
       banco_nombre: datos.banco_nombre !== undefined ? datos.banco_nombre : todos[id]?.banco_nombre,
       banco_tipo_cuenta: datos.banco_tipo_cuenta !== undefined ? datos.banco_tipo_cuenta : todos[id]?.banco_tipo_cuenta,
       banco_cuenta: datos.banco_cuenta !== undefined ? datos.banco_cuenta : todos[id]?.banco_cuenta,
@@ -218,6 +229,17 @@ const enriquecerFincasConMetadatos = (listaFincas: Finca[]): Finca[] => {
       valor_mascota: (f.valor_mascota !== undefined && f.valor_mascota !== null)
         ? Number(f.valor_mascota)
         : (m.valor_mascota !== undefined ? Number(m.valor_mascota) : 0),
+      habitaciones: f.habitaciones !== undefined && f.habitaciones !== null ? Number(f.habitaciones) : (m.habitaciones ?? 3),
+      camas: f.camas !== undefined && f.camas !== null ? Number(f.camas) : (m.camas ?? 5),
+      banos: f.banos !== undefined && f.banos !== null ? Number(f.banos) : (m.banos ?? 2),
+      checkin_hora: f.checkin_hora || m.checkin_hora || '15:00',
+      checkout_hora: f.checkout_hora || m.checkout_hora || '13:00',
+      politica_mascotas: f.politica_mascotas || m.politica_mascotas || 'permitido',
+      politica_musica: f.politica_musica || m.politica_musica || 'moderada',
+      precio_finca_completa: f.precio_finca_completa !== undefined && f.precio_finca_completa !== null ? Number(f.precio_finca_completa) : (m.precio_finca_completa ?? 0),
+      deposito_garantia: f.deposito_garantia !== undefined && f.deposito_garantia !== null ? Number(f.deposito_garantia) : (m.deposito_garantia ?? 0),
+      normas: f.normas !== undefined && f.normas !== null ? f.normas : (m.normas || ''),
+      indicaciones_llegada: f.indicaciones_llegada !== undefined && f.indicaciones_llegada !== null ? f.indicaciones_llegada : (m.indicaciones_llegada || ''),
       banco_nombre: f.banco_nombre || m.banco_nombre || 'Bancolombia',
       banco_tipo_cuenta: f.banco_tipo_cuenta || m.banco_tipo_cuenta || 'Ahorros',
       banco_cuenta: f.banco_cuenta || m.banco_cuenta || null,
@@ -2110,13 +2132,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         whatsapp: fincaData.whatsapp || null,
         activo: fincaData.activo !== undefined ? fincaData.activo : true,
         // Campos profesionales extendidos
-        habitaciones: fincaData.habitaciones !== undefined ? Number(fincaData.habitaciones) : 3,
-        camas: fincaData.camas !== undefined ? Number(fincaData.camas) : 5,
-        banos: fincaData.banos !== undefined ? Number(fincaData.banos) : 2,
+        habitaciones: fincaData.habitaciones !== undefined && fincaData.habitaciones !== null ? Number(fincaData.habitaciones) : 3,
+        camas: fincaData.camas !== undefined && fincaData.camas !== null ? Number(fincaData.camas) : 5,
+        banos: fincaData.banos !== undefined && fincaData.banos !== null ? Number(fincaData.banos) : 2,
         checkin_hora: fincaData.checkin_hora || '15:00',
         checkout_hora: fincaData.checkout_hora || '13:00',
         politica_mascotas: fincaData.politica_mascotas || 'permitido',
-        valor_mascota: fincaData.valor_mascota !== undefined ? Number(fincaData.valor_mascota) : 0,
+        valor_mascota: fincaData.valor_mascota !== undefined && fincaData.valor_mascota !== null ? Number(fincaData.valor_mascota) : 0,
         politica_musica: fincaData.politica_musica || 'moderada',
         precio_finca_completa: Number(fincaData.precio_finca_completa) || 0,
         deposito_garantia: Number(fincaData.deposito_garantia) || 0,
@@ -2144,15 +2166,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         let intentos = 0;
         let resUpdate: any;
-        while (intentos < 6) {
+        while (intentos < 12) {
           intentos++;
-          resUpdate = await supabase.from('fincas').update(payloadSeguro).eq('id', targetId).select('id').single();
+          resUpdate = await supabase.from('fincas').update(payloadSeguro).eq('id', targetId).select('id');
           if (!resUpdate.error) break;
 
-          const matchCol = resUpdate.error.message?.match(/'(\w+)' column of 'fincas'/i);
+          const matchCol = resUpdate.error.message?.match(/Could not find the '([^']+)' column/i) ||
+                           resUpdate.error.message?.match(/'([^']+)' column of 'fincas'/i) ||
+                           resUpdate.error.message?.match(/'([^']+)' column/i) ||
+                           resUpdate.error.message?.match(/column "([^"]+)" of relation/i) ||
+                           resUpdate.error.message?.match(/column "?([a-zA-Z0-9_]+)"? does not exist/i);
+
           if (matchCol && matchCol[1] && payloadSeguro[matchCol[1]] !== undefined) {
-            console.warn(`[AppContext] Columna '${matchCol[1]}' no presente en Supabase. Omitiendo y reintentando...`);
+            console.warn(`[AppContext] Columna '${matchCol[1]}' no presente en Supabase. Omitiendo y reintentando update...`);
             delete payloadSeguro[matchCol[1]];
+          } else if (resUpdate.error.message?.includes('column') || resUpdate.error.message?.includes('schema cache') || resUpdate.error.code === 'PGRST204') {
+            const coreCols = ['nombre', 'zona', 'capacidad', 'precio_pp', 'descripcion', 'estado', 'whatsapp', 'activo'];
+            Object.keys(payloadSeguro).forEach(k => {
+              if (!coreCols.includes(k)) delete payloadSeguro[k];
+            });
           } else {
             console.warn('[AppContext] Error no recuperable en update finca:', resUpdate.error);
             break;
@@ -2160,9 +2192,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
         if (resUpdate?.error) {
+          if (resUpdate.error.code === '42501' || resUpdate.error.message?.includes('row-level security')) {
+            throw new Error('Permisos insuficientes en Supabase (RLS). Tu sesión administrativa ha expirado o requiere reautenticación.');
+          }
           throw resUpdate.error;
         }
-        fincaId = resUpdate?.data?.id || targetId;
+        fincaId = resUpdate?.data?.[0]?.id || targetId;
       } else {
         // CREACIÓN DIRECTA DE NUEVA FINCA CON REINTENTO INTELIGENTE
         const payloadSeguro = { ...payloadExtendido };
@@ -2170,15 +2205,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         let intentos = 0;
         let resInsert: any;
-        while (intentos < 6) {
+        while (intentos < 12) {
           intentos++;
-          resInsert = await supabase.from('fincas').insert(payloadSeguro).select('id').single();
+          resInsert = await supabase.from('fincas').insert(payloadSeguro).select('id');
           if (!resInsert.error) break;
 
-          const matchCol = resInsert.error.message?.match(/'(\w+)' column of 'fincas'/i);
+          const matchCol = resInsert.error.message?.match(/Could not find the '([^']+)' column/i) ||
+                           resInsert.error.message?.match(/'([^']+)' column of 'fincas'/i) ||
+                           resInsert.error.message?.match(/'([^']+)' column/i) ||
+                           resInsert.error.message?.match(/column "([^"]+)" of relation/i) ||
+                           resInsert.error.message?.match(/column "?([a-zA-Z0-9_]+)"? does not exist/i);
+
           if (matchCol && matchCol[1] && payloadSeguro[matchCol[1]] !== undefined) {
             console.warn(`[AppContext] Columna '${matchCol[1]}' no presente en Supabase. Omitiendo y reintentando insert...`);
             delete payloadSeguro[matchCol[1]];
+          } else if (resInsert.error.message?.includes('column') || resInsert.error.message?.includes('schema cache') || resInsert.error.code === 'PGRST204') {
+            const coreCols = ['nombre', 'zona', 'capacidad', 'precio_pp', 'descripcion', 'estado', 'whatsapp', 'activo'];
+            Object.keys(payloadSeguro).forEach(k => {
+              if (!coreCols.includes(k)) delete payloadSeguro[k];
+            });
           } else {
             console.warn('[AppContext] Error no recuperable en insert finca:', resInsert.error);
             break;
@@ -2186,42 +2231,79 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
         if (resInsert?.error) {
+          if (resInsert.error.code === '42501' || resInsert.error.message?.includes('row-level security')) {
+            throw new Error('Permisos insuficientes en Supabase (RLS). Tu sesión administrativa ha expirado o requiere reautenticación.');
+          }
           throw resInsert.error;
         }
-        fincaId = resInsert?.data?.id;
+        fincaId = resInsert?.data?.[0]?.id;
+        if (!fincaId) {
+          throw new Error('No se pudo obtener el identificador de la nueva finca creada.');
+        }
       }
 
       // Persistir y consolidar metadatos extendidos con el ID de la finca
       guardarMetadatosFinca(fincaId, payloadExtendido);
 
-      // Actualización optimista inmediata en memoria de la lista de fincas
-      setFincas(prev => {
-        const existe = prev.some(f => f.id === fincaId);
-        if (existe) {
-          return prev.map(f => f.id === fincaId ? { ...f, ...payloadExtendido, id: fincaId } : f);
-        } else {
-          return [{ ...payloadExtendido, id: fincaId } as Finca, ...prev];
-        }
-      });
-
-      // Actualizar imágenes
-      if (imagenesUrls && imagenesUrls.length > 0) {
-        await supabase.from('finca_imagenes').delete().eq('finca_id', fincaId);
-        const imgInserts = imagenesUrls.map((url, idx) => ({
+      // Actualización optimista inmediata en memoria de la lista de fincas con datos relacionales completos
+      const fincaOptimista: Finca = {
+        ...payloadExtendido,
+        id: fincaId,
+        finca_imagenes: (imagenesUrls || []).map((url, idx) => ({
+          id: `opt-img-${Date.now()}-${idx}`,
           finca_id: fincaId,
           url,
           orden: idx,
           es_principal: idx === 0,
-        }));
-        await supabase.from('finca_imagenes').insert(imgInserts);
+        })),
+        finca_planes: (planesStr ? planesStr.split(',').map(p => p.trim()).filter(Boolean) : []).map((p, idx) => ({
+          id: `opt-plan-${Date.now()}-${idx}`,
+          finca_id: fincaId,
+          nombre: p,
+        })),
+        finca_amenidades: (amenidadesArr || []).map((a, idx) => ({
+          id: `opt-amenity-${Date.now()}-${idx}`,
+          finca_id: fincaId,
+          nombre: a.nombre,
+          icono: a.icono || 'check',
+        })),
+      };
+
+      setFincas(prev => {
+        const existe = prev.some(f => f.id === fincaId);
+        if (existe) {
+          return prev.map(f => (f.id === fincaId ? { ...f, ...fincaOptimista } : f));
+        } else {
+          return [fincaOptimista, ...prev];
+        }
+      });
+
+      // Actualizar imágenes en base de datos
+      try {
+        await supabase.from('finca_imagenes').delete().eq('finca_id', fincaId);
+        if (imagenesUrls && imagenesUrls.length > 0) {
+          const imgInserts = imagenesUrls.map((url, idx) => ({
+            finca_id: fincaId,
+            url,
+            orden: idx,
+            es_principal: idx === 0,
+          }));
+          await supabase.from('finca_imagenes').insert(imgInserts);
+        }
+      } catch (imgErr) {
+        console.warn('[AppContext] Error sincronizando imágenes de finca:', imgErr);
       }
 
       // Actualizar planes de alimentación
       if (planesStr !== undefined) {
-        await supabase.from('finca_planes').delete().eq('finca_id', fincaId);
-        const planes = planesStr.split(',').map(p => p.trim()).filter(Boolean);
-        if (planes.length > 0) {
-          await supabase.from('finca_planes').insert(planes.map(nombre => ({ finca_id: fincaId, nombre })));
+        try {
+          await supabase.from('finca_planes').delete().eq('finca_id', fincaId);
+          const planes = planesStr.split(',').map(p => p.trim()).filter(Boolean);
+          if (planes.length > 0) {
+            await supabase.from('finca_planes').insert(planes.map(nombre => ({ finca_id: fincaId, nombre })));
+          }
+        } catch (planErr) {
+          console.warn('[AppContext] Error sincronizando planes de finca:', planErr);
         }
       }
 
