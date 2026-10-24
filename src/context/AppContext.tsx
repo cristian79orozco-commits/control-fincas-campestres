@@ -12,7 +12,13 @@ import { calcularSaldo } from '../types';
 import { obtenerSiguienteConsecutivo } from '../utils/consecutivos';
 import { generarUUID, esUUID } from '../utils/uuid';
 import { CONFIGURACION_DEFAULT, setConfiguracionGlobal } from '../services/configuracion';
-import { CONTENIDO_SITIO_DEFAULT, setContenidoSitioGlobal, normalizeContenidoSitio } from '../services/contenidoSitio';
+import {
+  CONTENIDO_SITIO_DEFAULT,
+  setContenidoSitioGlobal,
+  normalizeContenidoSitio,
+  CAMPOS_EXTENDIDOS_PERSONALIZACION,
+  extraerCamposExtendidos,
+} from '../services/contenidoSitio';
 import type { DatosCotizacionPublica, ResultadoCotizacionPublica } from '../hooks/useCotizadorPublico';
 import {
   notificarNuevaCotizacion,
@@ -713,16 +719,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const cargarContenidoSitio = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('contenido_sitio')
-        .select('*')
-        .eq('id', 'principal')
-        .maybeSingle();
+      const [resContenido, resConfig] = await Promise.allSettled([
+        supabase
+          .from('contenido_sitio')
+          .select('*')
+          .eq('id', 'principal')
+          .maybeSingle(),
+        supabase
+          .from('configuracion_general')
+          .select('plantillas_comunicacion')
+          .eq('id', 'general')
+          .maybeSingle(),
+      ]);
 
-      if (!error && data) {
-        const normalizado = normalizeContenidoSitio(data);
+      let dataContenido: any = null;
+      if (resContenido.status === 'fulfilled' && !resContenido.value.error && resContenido.value.data) {
+        dataContenido = resContenido.value.data;
+      }
+
+      let backupExtra: any = null;
+      if (resConfig.status === 'fulfilled' && !resConfig.value.error && resConfig.value.data) {
+        backupExtra = (resConfig.value.data as any)?.plantillas_comunicacion?._personalizacion_sitio_extra;
+      }
+
+      if (dataContenido || backupExtra) {
+        const normalizado = normalizeContenidoSitio(dataContenido, backupExtra);
         setContenidoSitio(normalizado);
         setContenidoSitioGlobal(normalizado);
+        guardarCache('fc_contenido_sitio_v2', normalizado);
       }
     } catch (err) {
       console.warn('[AppContext] Error cargando contenido sitio:', err);
@@ -2656,18 +2680,101 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const guardarContenido = async (datos: Partial<ContenidoSitio>): Promise<{ success: boolean; error?: string }> => {
     setGuardandoContenido(true);
     try {
-      const actualizado = { ...contenidoSitio, ...datos };
+      // 1. Optimistic Update inmediato en memoria y almacenamiento local (<16ms)
+      const actualizado = normalizeContenidoSitio({ ...contenidoSitio, ...datos });
       setContenidoSitio(actualizado);
       setContenidoSitioGlobal(actualizado);
+      guardarCache('fc_contenido_sitio_v2', actualizado);
 
-      const { error } = await supabase
+      // 2. Extraer campos extendidos para respaldo seguro
+      const camposExtra = extraerCamposExtendidos(actualizado);
+
+      // 3. Preparar payload para Supabase (tabla contenido_sitio)
+      let payloadParaSupabase: Record<string, any> = { ...datos };
+      delete payloadParaSupabase.id;
+
+      // Intentar primero UPDATE directo en la fila principal
+      let resUpdate = await supabase
         .from('contenido_sitio')
-        .upsert({ id: 'principal', ...datos }, { onConflict: 'id' });
+        .update(payloadParaSupabase)
+        .eq('id', 'principal');
 
-      if (error) throw error;
+      let error = resUpdate.error;
+
+      // Reintento resiliente si alguna columna aún no existe en el schema cache de PostgreSQL
+      let intentos = 0;
+      while (error && error.message && intentos < 20) {
+        const msg = error.message.toLowerCase();
+        const esErrorColumna = msg.includes('column') || msg.includes('schema cache') || error.code === 'PGRST204';
+        if (!esErrorColumna) break;
+
+        intentos++;
+        console.warn(`[AppContext] Reintento ${intentos}/20 de guardarContenido sin columna:`, error.message);
+        const match = error.message.match(/Could not find the '([^']+)' column/i) ||
+                      error.message.match(/'([^']+)' column/i) ||
+                      error.message.match(/column "([^"]+)" of relation/i);
+        if (match && match[1]) {
+          delete payloadParaSupabase[match[1]];
+        } else {
+          for (const campo of CAMPOS_EXTENDIDOS_PERSONALIZACION) {
+            delete payloadParaSupabase[campo];
+          }
+        }
+
+        const reintento = await supabase
+          .from('contenido_sitio')
+          .update(payloadParaSupabase)
+          .eq('id', 'principal');
+        error = reintento.error;
+      }
+
+      // Si por alguna razón la fila no existía en contenido_sitio, ejecutar upsert seguro con payload sanitizado
+      if (error) {
+        console.warn('[AppContext] Fallback a upsert en contenido_sitio:', error.message);
+        const resUpsert = await supabase
+          .from('contenido_sitio')
+          .upsert({ id: 'principal', ...payloadParaSupabase }, { onConflict: 'id' });
+        error = resUpsert.error;
+      }
+
+      if (error) {
+        console.error('[AppContext] Error persistiendo contenido_sitio en Supabase:', error);
+        throw error;
+      }
+
+      // 4. Respaldo asíncrono de opciones extendidas en configuracion_general para sincronización multi-dispositivo
+      if (Object.keys(camposExtra).length > 0) {
+        (async () => {
+          try {
+            const { data: configActual } = await supabase
+              .from('configuracion_general')
+              .select('plantillas_comunicacion')
+              .eq('id', 'general')
+              .maybeSingle();
+
+            const plantillasExistentes = configActual?.plantillas_comunicacion || {};
+            const plantillasConPersonalizacion = {
+              ...plantillasExistentes,
+              _personalizacion_sitio_extra: {
+                ...(plantillasExistentes._personalizacion_sitio_extra || {}),
+                ...camposExtra,
+              },
+            };
+
+            await supabase
+              .from('configuracion_general')
+              .update({ plantillas_comunicacion: plantillasConPersonalizacion })
+              .eq('id', 'general');
+          } catch (backupErr) {
+            console.warn('[AppContext] Respaldo de personalizacion extra en segundo plano:', backupErr);
+          }
+        })();
+      }
+
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message };
+      console.error('[AppContext] Excepción en guardarContenido:', err);
+      return { success: false, error: err.message || 'Error inesperado al guardar' };
     } finally {
       setGuardandoContenido(false);
     }

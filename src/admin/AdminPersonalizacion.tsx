@@ -7,6 +7,7 @@ import {
   Sliders, LayoutGrid, List
 } from 'lucide-react';
 import type { ContenidoSitio, SeccionClave, BeneficioItem, FaqItem } from '../types';
+import { usePersonalizacionController } from '../hooks/usePersonalizacionController';
 
 interface AdminPersonalizacionProps {
   contenido: ContenidoSitio;
@@ -79,183 +80,32 @@ const SECCIONES_INFO: Record<
   },
 };
 
-export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = ({
-  contenido,
-  guardando,
-  onGuardar,
-  onRestablecer,
-  onVerSitioPublico,
-  showToast,
-  openConfirm,
-}) => {
-  // Asegurar que form tenga todas las secciones en orden_secciones
-  const asegurarOrdenCompleto = (c: ContenidoSitio): ContenidoSitio => {
-    const todas: SeccionClave[] = [
-      'banner', 'hero', 'destacados', 'graficos', 'estado',
-      'filtros', 'catalogo', 'comparador', 'menus', 'faq'
-    ];
-    const existentes = c.orden_secciones || [];
-    const faltantes = todas.filter(s => !existentes.includes(s));
-    return {
-      ...c,
-      orden_secciones: [...existentes, ...faltantes],
-      graficos_visible: c.graficos_visible ?? true,
-      graficos_titulo: c.graficos_titulo || 'Análisis Visual & Calculadora de Presupuesto',
-      graficos_subtitulo: c.graficos_subtitulo || 'Compara capacidades, tarifas y simula tu inversión con ahorro directo en tiempo real',
-      graficos_tipo: c.graficos_tipo || 'ambos',
-      comparador_visible: c.comparador_visible ?? true,
-      comparador_titulo: c.comparador_titulo || 'Comparador de Fincas',
-      comparador_subtitulo: c.comparador_subtitulo || 'Compara especificaciones, comodidades y tarifas lado a lado',
-      catalogo_vista_predeterminada: c.catalogo_vista_predeterminada || 'grid',
-      catalogo_mostrar_badges: c.catalogo_mostrar_badges ?? true,
-      catalogo_mostrar_precio_total: c.catalogo_mostrar_precio_total ?? true,
-    };
-  };
+export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = (props) => {
+  const {
+    form,
+    tabActiva,
+    setTabActiva,
+    hayCambios,
+    modalPreviewOpen,
+    setModalPreviewOpen,
+    previewDevice,
+    setPreviewDevice,
+    guardando,
+    handleChange,
+    handleGuardar,
+    handleRestablecer,
+    moverSeccion,
+    toggleVisibilidad,
+    esVisible,
+    handleAddBeneficio,
+    handleUpdateBeneficio,
+    handleRemoveBeneficio,
+    handleAddFaq,
+    handleUpdateFaq,
+    handleRemoveFaq,
+  } = usePersonalizacionController(props);
 
-  const [form, setForm] = useState<ContenidoSitio>(() => asegurarOrdenCompleto(contenido));
-  const [tabActiva, setTabActiva] = useState<
-    'orden' | 'hero' | 'destacados' | 'graficos' | 'busqueda' | 'menus' | 'faq' | 'footer'
-  >('orden');
-  const [hayCambios, setHayCambios] = useState(false);
-  const [modalPreviewOpen, setModalPreviewOpen] = useState(false);
-  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
-
-  useEffect(() => {
-    if (!hayCambios) {
-      setForm(asegurarOrdenCompleto(contenido));
-    }
-  }, [contenido, hayCambios]);
-
-  const handleChange = <K extends keyof ContenidoSitio>(campo: K, valor: ContenidoSitio[K]) => {
-    setForm(prev => ({ ...prev, [campo]: valor }));
-    setHayCambios(true);
-  };
-
-  const handleGuardar = async () => {
-    const res = await onGuardar(form);
-    if (res.success) {
-      showToast('Personalización del sitio público guardada correctamente', 'success');
-      setHayCambios(false);
-    } else {
-      showToast(res.error || 'Error al guardar los cambios', 'error');
-    }
-  };
-
-  const handleRestablecer = () => {
-    openConfirm(
-      '¿Restablecer contenido de fábrica?',
-      'Se restaurarán todos los textos, títulos, beneficios y preguntas frecuentes a los valores iniciales predeterminados.',
-      async () => {
-        const res = await onRestablecer();
-        if (res.success) {
-          showToast('Contenido restablecido a valores por defecto', 'info');
-          setHayCambios(false);
-        } else {
-          showToast(res.error || 'Error al restablecer', 'error');
-        }
-      }
-    );
-  };
-
-  // ---- Manejo del orden de secciones ----
-  const moverSeccion = (seccion: SeccionClave, direccion: 'arriba' | 'abajo') => {
-    const orden = [...form.orden_secciones];
-    const idx = orden.indexOf(seccion);
-    if (idx === -1) return;
-
-    if (direccion === 'arriba' && idx > 0) {
-      const temp = orden[idx - 1];
-      orden[idx - 1] = orden[idx];
-      orden[idx] = temp;
-    } else if (direccion === 'abajo' && idx < orden.length - 1) {
-      const temp = orden[idx + 1];
-      orden[idx + 1] = orden[idx];
-      orden[idx] = temp;
-    }
-
-    setForm(prev => ({ ...prev, orden_secciones: orden }));
-    setHayCambios(true);
-  };
-
-  const toggleVisibilidad = (seccion: SeccionClave) => {
-    let campo: keyof ContenidoSitio;
-    switch (seccion) {
-      case 'banner': campo = 'banner_visible'; break;
-      case 'hero': campo = 'hero_visible'; break;
-      case 'destacados': campo = 'destacados_visible'; break;
-      case 'graficos': campo = 'graficos_visible'; break;
-      case 'estado': campo = 'estado_visible'; break;
-      case 'filtros': campo = 'filtros_visible'; break;
-      case 'catalogo': campo = 'catalogo_visible'; break;
-      case 'comparador': campo = 'comparador_visible'; break;
-      case 'portal_cliente': campo = 'portal_cliente_visible'; break;
-      case 'menus': campo = 'menus_visible'; break;
-      case 'faq': campo = 'faq_visible'; break;
-      default: return;
-    }
-    const nuevoValor = !form[campo];
-    handleChange(campo, nuevoValor as any);
-  };
-
-  const esVisible = (seccion: SeccionClave): boolean => {
-    switch (seccion) {
-      case 'banner': return form.banner_visible;
-      case 'hero': return form.hero_visible;
-      case 'destacados': return form.destacados_visible;
-      case 'graficos': return form.graficos_visible ?? true;
-      case 'estado': return form.estado_visible;
-      case 'filtros': return form.filtros_visible;
-      case 'catalogo': return form.catalogo_visible;
-      case 'comparador': return form.comparador_visible ?? true;
-      case 'portal_cliente': return form.portal_cliente_visible ?? true;
-      case 'menus': return form.menus_visible;
-      case 'faq': return form.faq_visible;
-      default: return true;
-    }
-  };
-
-  // ---- Manejo de Beneficios Destacados ----
-  const handleAddBeneficio = () => {
-    const nuevo: BeneficioItem = {
-      id: `ben-${Date.now()}`,
-      icono: '✨',
-      titulo: 'Nueva Ventaja Exclusiva',
-      descripcion: 'Describe el beneficio para tus clientes o huéspedes.',
-    };
-    handleChange('destacados_items', [...form.destacados_items, nuevo]);
-  };
-
-  const handleUpdateBeneficio = (index: number, campo: keyof BeneficioItem, valor: string) => {
-    const updated = [...form.destacados_items];
-    updated[index] = { ...updated[index], [campo]: valor };
-    handleChange('destacados_items', updated);
-  };
-
-  const handleRemoveBeneficio = (index: number) => {
-    const updated = form.destacados_items.filter((_, i) => i !== index);
-    handleChange('destacados_items', updated);
-  };
-
-  // ---- Manejo de Preguntas Frecuentes (FAQ) ----
-  const handleAddFaq = () => {
-    const nuevo: FaqItem = {
-      id: `faq-${Date.now()}`,
-      pregunta: '¿Nueva pregunta frecuente?',
-      respuesta: 'Escribe aquí la respuesta clara y detallada para tus clientes.',
-    };
-    handleChange('faq_items', [...form.faq_items, nuevo]);
-  };
-
-  const handleUpdateFaq = (index: number, campo: keyof FaqItem, valor: string) => {
-    const updated = [...form.faq_items];
-    updated[index] = { ...updated[index], [campo]: valor };
-    handleChange('faq_items', updated);
-  };
-
-  const handleRemoveFaq = (index: number) => {
-    const updated = form.faq_items.filter((_, i) => i !== index);
-    handleChange('faq_items', updated);
-  };
+  const { onVerSitioPublico } = props;
 
   return (
     <div className="admin-personalizacion" style={{ display: 'grid', gap: '1.25rem' }}>

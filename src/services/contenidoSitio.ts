@@ -161,13 +161,41 @@ export const CONTENIDO_SITIO_DEFAULT: ContenidoSitio = {
   footer_whatsapp_cta: '¿Tienes alguna duda especial? Escríbenos directamente a WhatsApp',
 };
 
-export function normalizeContenidoSitio(raw: any): ContenidoSitio {
-  if (!raw) return CONTENIDO_SITIO_DEFAULT;
-  const merged: ContenidoSitio = { ...CONTENIDO_SITIO_DEFAULT, ...raw };
+export const CAMPOS_EXTENDIDOS_PERSONALIZACION = [
+  'graficos_visible',
+  'graficos_titulo',
+  'graficos_subtitulo',
+  'graficos_tipo',
+  'comparador_visible',
+  'comparador_titulo',
+  'comparador_subtitulo',
+  'portal_cliente_visible',
+  'portal_cliente_titulo',
+  'portal_cliente_subtitulo',
+  'catalogo_vista_predeterminada',
+  'catalogo_mostrar_badges',
+  'catalogo_mostrar_precio_total',
+  'personalizacion_visual',
+] as const;
+
+export function extraerCamposExtendidos(datos: Partial<ContenidoSitio>): Record<string, any> {
+  const extra: Record<string, any> = {};
+  for (const campo of CAMPOS_EXTENDIDOS_PERSONALIZACION) {
+    if (campo in datos && (datos as any)[campo] !== undefined) {
+      extra[campo] = (datos as any)[campo];
+    }
+  }
+  return extra;
+}
+
+export function normalizeContenidoSitio(raw: any, backupExtra?: any): ContenidoSitio {
+  if (!raw && !backupExtra) return CONTENIDO_SITIO_DEFAULT;
+  const source = { ...(backupExtra || {}), ...(raw || {}) };
+  const merged: ContenidoSitio = { ...CONTENIDO_SITIO_DEFAULT, ...source };
 
   // Garantizar que las nuevas secciones existan siempre en orden_secciones
-  const orden: SeccionClave[] = Array.isArray(raw.orden_secciones) && raw.orden_secciones.length > 0
-    ? [...raw.orden_secciones]
+  const orden: SeccionClave[] = Array.isArray(source.orden_secciones) && source.orden_secciones.length > 0
+    ? [...source.orden_secciones]
     : [...CONTENIDO_SITIO_DEFAULT.orden_secciones];
 
   if (!orden.includes('graficos')) {
@@ -189,17 +217,22 @@ export function normalizeContenidoSitio(raw: any): ContenidoSitio {
   }
 
   merged.orden_secciones = orden;
-  merged.graficos_visible = raw.graficos_visible ?? true;
-  merged.graficos_titulo = raw.graficos_titulo || CONTENIDO_SITIO_DEFAULT.graficos_titulo;
-  merged.graficos_subtitulo = raw.graficos_subtitulo || CONTENIDO_SITIO_DEFAULT.graficos_subtitulo;
-  merged.graficos_tipo = raw.graficos_tipo || 'ambos';
-  merged.comparador_visible = raw.comparador_visible ?? true;
-  merged.comparador_titulo = raw.comparador_titulo || CONTENIDO_SITIO_DEFAULT.comparador_titulo;
-  merged.comparador_subtitulo = raw.comparador_subtitulo || CONTENIDO_SITIO_DEFAULT.comparador_subtitulo;
-  merged.portal_cliente_visible = raw.portal_cliente_visible ?? true;
-  merged.catalogo_vista_predeterminada = raw.catalogo_vista_predeterminada || 'grid';
-  merged.catalogo_mostrar_badges = raw.catalogo_mostrar_badges ?? true;
-  merged.catalogo_mostrar_precio_total = raw.catalogo_mostrar_precio_total ?? true;
+  merged.graficos_visible = source.graficos_visible ?? true;
+  merged.graficos_titulo = source.graficos_titulo || CONTENIDO_SITIO_DEFAULT.graficos_titulo;
+  merged.graficos_subtitulo = source.graficos_subtitulo || CONTENIDO_SITIO_DEFAULT.graficos_subtitulo;
+  merged.graficos_tipo = source.graficos_tipo || 'ambos';
+  merged.comparador_visible = source.comparador_visible ?? true;
+  merged.comparador_titulo = source.comparador_titulo || CONTENIDO_SITIO_DEFAULT.comparador_titulo;
+  merged.comparador_subtitulo = source.comparador_subtitulo || CONTENIDO_SITIO_DEFAULT.comparador_subtitulo;
+  merged.portal_cliente_visible = source.portal_cliente_visible ?? true;
+  merged.catalogo_vista_predeterminada = source.catalogo_vista_predeterminada || 'grid';
+  merged.catalogo_mostrar_badges = source.catalogo_mostrar_badges ?? true;
+  merged.catalogo_mostrar_precio_total = source.catalogo_mostrar_precio_total ?? true;
+  merged.personalizacion_visual = {
+    ...CONTENIDO_SITIO_DEFAULT.personalizacion_visual,
+    ...(backupExtra?.personalizacion_visual || {}),
+    ...(raw?.personalizacion_visual || {}),
+  };
 
   return merged;
 }
@@ -230,3 +263,4 @@ export function setContenidoSitioGlobal(cfg: ContenidoSitio): void {
     // ignorar error de almacenamiento
   }
 }
+
