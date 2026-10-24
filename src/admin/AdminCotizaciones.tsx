@@ -1,79 +1,25 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   FileText, Plus, Edit3, Trash2, X, Save, ArrowRight,
   Calendar, Users, Utensils, Tag, MessageCircle, Download, Hash, Copy, Check, Eye, XCircle, AlertCircle
 } from 'lucide-react';
-import type { CotizacionDB, CotizacionEstado, Cliente, Finca, Menu } from '../types';
-import { generarPropuestaAlimentacion, generarDocCotizacion } from '../services/documentos';
+import type { CotizacionDB, CotizacionEstado, Cliente, Finca, Menu, ConfiguracionGeneral } from '../types';
+import { generarDocCotizacion } from '../services/documentos';
 import { WhatsAppModal } from '../components/WhatsAppModal';
-import {
-  plantillaCotizacion,
-  plantillaPedirAbonoCotizacion,
-  plantillaPropuestaAlimentacion,
-  plantillaCobroAlimentacion,
-  abrirWhatsApp,
-  generarUrlWhatsApp,
-} from '../services/whatsapp';
-import { calcularCotizacion } from '../utils/calcularCotizacion';
+import { abrirWhatsApp, generarUrlWhatsApp } from '../services/whatsapp';
 import { CurrencyInput } from '../components/CurrencyInput';
-import { useApp } from '../context/AppContext';
-import { getConfiguracionGlobal } from '../services/configuracion';
-import type { ConfiguracionGeneral } from '../types';
+import {
+  useCotizacionesController,
+  noches,
+  formatCOP,
+  formatFecha,
+  type UseCotizacionesControllerParams,
+} from './useCotizacionesController';
 
-interface AdminCotizacionesProps {
-  cotizaciones: CotizacionDB[];
-  clientes: Cliente[];
-  fincas: Finca[];
-  menus?: Menu[];
-  configuracion?: ConfiguracionGeneral;
-  onGuardar: (datos: Partial<CotizacionDB>) => Promise<{ success: boolean; id?: string; error?: string }>;
-  onCambiarEstado: (id: string, estado: CotizacionEstado) => Promise<{ success: boolean; error?: string }>;
-  onEliminar: (id: string) => Promise<{ success: boolean; error?: string }>;
-  onConvertirReserva?: (cotizacion: CotizacionDB) => void;
-  onRegistrarComunicacion?: (com: any) => void;
-  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
-  openConfirm: (title: string, message: string, onConfirm: () => void) => void;
-}
-
-type FiltroTab = 'pendientes' | 'confirmadas' | 'canceladas' | 'todas';
-
-const VACIO: Partial<CotizacionDB> = {
-  cliente_id: '',
-  finca_id: '',
-  fecha_inicio: '',
-  fecha_fin: '',
-  personas: 1,
-  menu_id: null,
-  cantidad_alimentacion: 1,
-  alimentacion: 'Sin alimentación',
-  precio_base_pp: 0,
-  subtotal_alojamiento: 0,
-  costo_alimentacion: 0,
-  descuento: 0,
-  recargo: 0,
-  total: 0,
-  estado: 'cotizada',
-  notas: '',
-};
-
-function noches(fi: string, ff: string): number {
-  if (!fi || !ff) return 1;
-  const d = new Date(ff + 'T00:00:00').getTime() - new Date(fi + 'T00:00:00').getTime();
-  return Math.max(1, Math.round(d / 86400000));
-}
-
-function formatCOP(v: number) {
-  return '$' + v.toLocaleString('es-CO') + ' COP';
-}
-
-function formatFecha(f?: string) {
-  if (!f) return '—';
-  const [y, m, d] = f.split('-');
-  return `${d}/${m}/${y}`;
-}
+export type AdminCotizacionesProps = UseCotizacionesControllerParams;
 
 // ─── Badge de consecutivo copiable ────────────────────────────────────────────
-const ConsecutivoBadge: React.FC<{ consecutivo: string }> = ({ consecutivo }) => {
+export const ConsecutivoBadge: React.FC<{ consecutivo: string }> = ({ consecutivo }) => {
   const [copiado, setCopiado] = useState(false);
   const consecutivoNum = consecutivo.match(/\d+/g)?.join('') || consecutivo.replace(/^[A-Za-z\-]+/, '');
   const copiar = async () => {
@@ -106,383 +52,48 @@ const ConsecutivoBadge: React.FC<{ consecutivo: string }> = ({ consecutivo }) =>
   );
 };
 
-export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = ({
-  cotizaciones,
-  clientes,
-  fincas,
-  menus = [],
-  configuracion: configProp,
-  onGuardar,
-  onCambiarEstado,
-  onEliminar,
-  onConvertirReserva,
-  onRegistrarComunicacion,
-  showToast,
-  openConfirm,
-}) => {
-  const { previsualizarFinca, configuracion: configApp, convertirCotizacionAReserva, navegarAAdmin, abrirComunicacionesConExpediente } = useApp();
-  const configuracion = configProp || configApp;
-  const [form, setForm] = useState<Partial<CotizacionDB>>(VACIO);
-  const [editando, setEditando] = useState(false);
-  const [guardando, setGuardando] = useState(false);
-  const [tabActiva, setTabActiva] = useState<FiltroTab>('pendientes');
-  const [modoAlimentacionPersonalizada, setModoAlimentacionPersonalizada] = useState(false);
-
-  // Modal para confirmar el pago del 50% y pasar a reserva
-  const [modalConfirmarReserva, setModalConfirmarReserva] = useState<{
-    abierto: boolean;
-    cotizacion: CotizacionDB | null;
-    anticipoFinca: number;
-    abonoAlimentacion: number;
-    alimentacionPagadaTotal: boolean;
-    metodoPagoAlimentacion: string;
-    guardando: boolean;
-  }>({
-    abierto: false,
-    cotizacion: null,
-    anticipoFinca: 0,
-    abonoAlimentacion: 0,
-    alimentacionPagadaTotal: false,
-    metodoPagoAlimentacion: 'Transferencia Bancolombia / Nequi',
-    guardando: false,
-  });
-
-  // Modal para WhatsApp
-  const [modalWaCotiz, setModalWaCotiz] = useState<{
-    abierto: boolean;
-    cotizacion?: CotizacionDB;
-    titulo: string;
-    nombreDoc?: string;
-    mensaje: string;
-    onGenerarPdf?: () => void;
-    tipo: 'cotizacion' | 'menu';
-  }>({
-    abierto: false,
-    titulo: '',
-    mensaje: '',
-    tipo: 'cotizacion',
-  });
-
-  const abrirNuevo = () => {
-    setForm(VACIO);
-    setModoAlimentacionPersonalizada(false);
-    setEditando(true);
-  };
-
-  const abrirEdicion = (c: CotizacionDB) => {
-    setForm({ ...c });
-    setModoAlimentacionPersonalizada(!c.menu_id && !!c.alimentacion && c.alimentacion !== 'Sin alimentación');
-    setEditando(true);
-  };
-
-  const cerrar = () => { setForm(VACIO); setEditando(false); };
-
-  // Recalcular subtotal usando la función compartida calcularCotizacion
-  const recalcular = (f: Partial<CotizacionDB>): Partial<CotizacionDB> => {
-    const n = noches(f.fecha_inicio || '', f.fecha_fin || '');
-    let menuPrecioPp = 0;
-    if (f.menu_id && !modoAlimentacionPersonalizada) {
-      const m = menus.find(x => x.id === f.menu_id);
-      if (m) {
-        menuPrecioPp = m.precio_pp || 0;
-      }
-    }
-
-    const { subtotalAlojamiento, costoAlimentacion, total } = calcularCotizacion({
-      noches: n,
-      personas: f.personas || 1,
-      precioPp: f.precio_base_pp || 0,
-      menuPrecioPp,
-      cantidadServicios: f.cantidad_alimentacion || n,
-      descuento: f.descuento || 0,
-      recargo: f.recargo || 0,
-    });
-
-    return {
-      ...f,
-      noches: n,
-      subtotal_alojamiento: subtotalAlojamiento,
-      costo_alimentacion: costoAlimentacion,
-      total,
-    };
-  };
-
-  const updateField = (campo: keyof CotizacionDB, valor: any) => {
-    setForm(prev => recalcular({ ...prev, [campo]: valor }));
-  };
-
-  // Al seleccionar menú
-  const handleMenuSelect = (menuId: string) => {
-    if (menuId === 'custom') {
-      setModoAlimentacionPersonalizada(true);
-      setForm(prev => ({ ...prev, menu_id: null, alimentacion: '' }));
-      return;
-    }
-    setModoAlimentacionPersonalizada(false);
-    if (!menuId) {
-      setForm(prev => recalcular({
-        ...prev,
-        menu_id: null,
-        alimentacion: 'Sin alimentación',
-        costo_alimentacion: 0,
-      }));
-      return;
-    }
-    const m = menus.find(x => x.id === menuId);
-    if (!m) return;
-    const n = noches(form.fecha_inicio || '', form.fecha_fin || '');
-    const cant = form.cantidad_alimentacion || n;
-    const costo = (m.precio_pp || 0) * (form.personas || 1) * cant;
-    setForm(prev => recalcular({
-      ...prev,
-      menu_id: m.id,
-      alimentacion: `${m.categoria}: ${m.nombre}`,
-      cantidad_alimentacion: cant,
-      costo_alimentacion: costo,
-    }));
-  };
-
-  // Al seleccionar finca, copiar precio_pp y validar capacidad mínima
-  const handleFincaChange = (fincaId: string) => {
-    const finca = fincas.find(f => f.id === fincaId);
-    const minPers = finca?.capacidad_minima || 1;
-    setForm(prev => recalcular({
-      ...prev,
-      finca_id: fincaId,
-      precio_base_pp: finca?.precio_pp || 0,
-      personas: Math.max(minPers, prev.personas || 1),
-    }));
-  };
-
-  // Descargar PDF de alimentación
-  const handleDescargarPdfAlimentacion = async (c: CotizacionDB) => {
-    let cantPersonas = c.personas || 4;
-    let cantServ = c.cantidad_alimentacion || c.noches || 1;
-    if (c.alimentacion) {
-      const match = c.alimentacion.match(/(\d+)\s*serv(?:\.|\w*)\s*×\s*(\d+)\s*pers/i);
-      if (match) {
-        cantServ = parseInt(match[1], 10) || cantServ;
-        cantPersonas = parseInt(match[2], 10) || cantPersonas;
-      }
-    }
-
-    const f = fincas.find(x => x.id === c.finca_id) || (c.fincas as any);
-    const m = menus.find(x => x.id === c.menu_id) || (c.alimentacion && c.alimentacion !== 'Sin alimentación' ? {
-      id: c.menu_id || 'cotiz-menu',
-      nombre: c.alimentacion,
-      categoria: 'Almuerzo' as const,
-      precio_pp: (c.costo_alimentacion || 0) / Math.max(1, cantPersonas * cantServ),
-      activo: true,
-    } : null);
-
-    if (!m) {
-      showToast('Esta cotización no incluye servicio de alimentación', 'info');
-      return;
-    }
-
-    try {
-      await generarPropuestaAlimentacion({
-        menu: m,
-        cliente: c.clientes,
-        finca: f,
-        personas: cantPersonas,
-        cantidadServicios: cantServ,
-        consecutivo: c.consecutivo,
-        tituloDocumento: 'DETALLE Y COBRO DE ALIMENTACIÓN',
-        config: configuracion || getConfiguracionGlobal(),
-      });
-      showToast('Detalle de alimentación descargado en PDF ✅', 'success');
-    } catch {
-      showToast('Error generando PDF de propuesta de alimentación', 'error');
-    }
-  };
-
-  // 1. Pedir Abono Finca (50%) -> Cuenta del propietario
-  const handleAbrirPedirAbono = (c: CotizacionDB) => {
-    const f = fincas.find(x => x.id === c.finca_id) || (c.fincas as any);
-    const bancosInfo = f?.banco_cuenta ? {
-      banco: f.banco_nombre || 'Bancolombia',
-      tipoCuenta: f.banco_tipo_cuenta || 'Ahorros',
-      cuenta: f.banco_cuenta,
-      titular: f.banco_titular || 'Propietario de la Finca',
-      nit: f.banco_identificacion || undefined,
-    } : null;
-
-    setModalWaCotiz({
-      abierto: true,
-      cotizacion: c,
-      titulo: `Solicitud de Separación (50% Finca) · ${f?.nombre || c.fincas?.nombre || 'Finca'}`,
-      mensaje: plantillaPedirAbonoCotizacion(c, f, c.clientes, bancosInfo, 50),
-      nombreDoc: 'Cotización Oficial y Separación (PDF)',
-      onGenerarPdf: () => generarDocCotizacion(c, configuracion || getConfiguracionGlobal(), f),
-      tipo: 'cotizacion',
-    });
-  };
-
-  // 2. Cobrar Planes de Alimentación -> Cuenta de la Administración
-  const handleAbrirCobroAlimentacion = (c: CotizacionDB) => {
-    const cfg = configuracion || getConfiguracionGlobal();
-    const iden = (cfg as any)?.banco_identificacion ? (cfg as any).banco_identificacion.trim() : undefined;
-    const bancosAdmin = cfg?.banco_cuenta ? {
-      banco: cfg.banco_nombre || 'Bancolombia',
-      tipoCuenta: cfg.banco_tipo_cuenta || 'Ahorros',
-      cuenta: cfg.banco_cuenta,
-      titular: cfg.banco_titular || 'Administración Paraíso Terrenal',
-      nit: iden || undefined,
-    } : null;
-
-    setModalWaCotiz({
-      abierto: true,
-      cotizacion: c,
-      titulo: `Cobro de Alimentación (Paraíso Terrenal) · ${c.fincas?.nombre || 'Finca'}`,
-      mensaje: plantillaCobroAlimentacion(c, c.fincas, c.clientes, bancosAdmin),
-      nombreDoc: 'Detalle de Alimentación (PDF)',
-      onGenerarPdf: () => handleDescargarPdfAlimentacion(c),
-      tipo: 'menu',
-    });
-  };
-
-  // 3. Flujo guiado: Iniciar paso a reserva
-  const handleIniciarPasoAReserva = (c: CotizacionDB) => {
-    const valorAlojamiento = (c.subtotal_alojamiento && c.subtotal_alojamiento > 0)
-      ? c.subtotal_alojamiento
-      : Math.max(0, (c.total || 0) - (c.costo_alimentacion || 0));
-    const anticipoSugerido = Math.round(valorAlojamiento * 0.5);
-
-    setModalConfirmarReserva({
-      abierto: true,
-      cotizacion: c,
-      anticipoFinca: anticipoSugerido,
-      abonoAlimentacion: 0,
-      alimentacionPagadaTotal: false,
-      metodoPagoAlimentacion: 'Transferencia Bancolombia / Nequi',
-      guardando: false,
-    });
-  };
-
-  // Confirmar el paso a reserva
-  const handleConfirmarPasoAReserva = async () => {
-    if (!modalConfirmarReserva.cotizacion) return;
-    setModalConfirmarReserva(prev => ({ ...prev, guardando: true }));
-    const c = modalConfirmarReserva.cotizacion;
-    const anticipoFinca = modalConfirmarReserva.anticipoFinca;
-    const abonoAlimentacion = modalConfirmarReserva.abonoAlimentacion;
-    const alimentacionPagadaTotal = modalConfirmarReserva.alimentacionPagadaTotal;
-    const metodo = modalConfirmarReserva.metodoPagoAlimentacion;
-
-    try {
-      const res = await convertirCotizacionAReserva(c, anticipoFinca, {
-        abonoAlimentacion,
-        pagadaTotal: alimentacionPagadaTotal,
-        metodo,
-      });
-      setModalConfirmarReserva({
-        abierto: false,
-        cotizacion: null,
-        anticipoFinca: 0,
-        abonoAlimentacion: 0,
-        alimentacionPagadaTotal: false,
-        metodoPagoAlimentacion: 'Transferencia Bancolombia / Nequi',
-        guardando: false,
-      });
-      if (res.success) {
-        showToast(`✓ ¡Cotización #${c.consecutivo || ''} convertida en Reserva Activa con éxito!`, 'success');
-        if (onConvertirReserva) {
-          onConvertirReserva(c);
-        }
-      } else {
-        showToast(`Error al convertir: ${res.error}`, 'error');
-      }
-    } catch (err: any) {
-      setModalConfirmarReserva(prev => ({ ...prev, guardando: false }));
-      showToast(`Error: ${err.message || 'No se pudo crear la reserva'}`, 'error');
-    }
-  };
-
-  // 4. Cancelar cotización (si el cliente no consigna el dinero)
-  const handleCancelarCotizacion = (c: CotizacionDB) => {
-    openConfirm(
-      '¿Cancelar cotización?',
-      `¿Deseas marcar la cotización #${c.consecutivo || ''} como cancelada por falta de pago? Se conservará en el historial de canceladas.`,
-      async () => {
-        const res = await onCambiarEstado(c.id, 'cancelada');
-        if (res.success) {
-          showToast(`Cotización #${c.consecutivo || ''} marcada como cancelada`, 'info');
-        } else {
-          showToast(`Error: ${res.error}`, 'error');
-        }
-      }
-    );
-  };
-
-  const handleEliminarDefinitivo = (c: CotizacionDB) => {
-    openConfirm(
-      '¿Eliminar definitivamente?',
-      'Esta acción eliminará de forma permanente el registro del historial.',
-      async () => {
-        const res = await onEliminar(c.id);
-        if (res.success) showToast('Cotización eliminada del historial', 'info');
-        else showToast(`Error: ${res.error}`, 'error');
-      }
-    );
-  };
-
-  const handleGuardar = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.finca_id) { showToast('Selecciona una finca', 'error'); return; }
-    if (!form.fecha_inicio || !form.fecha_fin) { showToast('Las fechas son obligatorias', 'error'); return; }
-    setGuardando(true);
-    const res = await onGuardar(form);
-    setGuardando(false);
-    if (res.success) {
-      showToast(form.id ? 'Cotización actualizada ✅' : 'Cotización creada ✅', 'success');
-      cerrar();
-    } else {
-      showToast(`Error: ${res.error}`, 'error');
-    }
-  };
-
-  // Filtrado lógico por pestañas
-  const conteoPendientes = useMemo(() =>
-    cotizaciones.filter(c => ['borrador', 'cotizada', 'pendiente'].includes(c.estado)).length,
-    [cotizaciones]
-  );
-  const conteoConfirmadas = useMemo(() =>
-    cotizaciones.filter(c => c.estado === 'confirmada').length,
-    [cotizaciones]
-  );
-  const conteoCanceladas = useMemo(() =>
-    cotizaciones.filter(c => ['cancelada', 'vencida'].includes(c.estado)).length,
-    [cotizaciones]
-  );
-
-  const filtradas = useMemo(() => {
-    const list = cotizaciones.filter(c => {
-      if (tabActiva === 'pendientes') {
-        return ['borrador', 'cotizada', 'pendiente'].includes(c.estado);
-      }
-      if (tabActiva === 'confirmadas') {
-        return c.estado === 'confirmada';
-      }
-      if (tabActiva === 'canceladas') {
-        return ['cancelada', 'vencida'].includes(c.estado);
-      }
-      return true; // todas
-    });
-
-    // Orden de llegada estricto: las últimas cotizaciones recibidas siempre arriba
-    return [...list].sort((a, b) => {
-      const fechaB = new Date(b.created_at || '').getTime();
-      const fechaA = new Date(a.created_at || '').getTime();
-      if (!isNaN(fechaB) && !isNaN(fechaA) && fechaB !== fechaA) {
-        return fechaB - fechaA;
-      }
-      const numB = parseInt(String(b.consecutivo || '').replace(/\D/g, ''), 10) || 0;
-      const numA = parseInt(String(a.consecutivo || '').replace(/\D/g, ''), 10) || 0;
-      if (numB !== numA) return numB - numA;
-      return new Date(b.fecha_inicio || '').getTime() - new Date(a.fecha_inicio || '').getTime();
-    });
-  }, [cotizaciones, tabActiva]);
+export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
+  const {
+    cotizaciones,
+    cotizacionesFiltradas: filtradas,
+    clientes,
+    fincas,
+    menus,
+    configuracion,
+    conteoPendientes,
+    conteoConfirmadas,
+    conteoCanceladas,
+    form,
+    editando,
+    guardando,
+    modoAlimentacionPersonalizada,
+    abrirNuevo,
+    abrirEdicion,
+    cerrar,
+    updateField,
+    handleMenuSelect,
+    handleFincaChange,
+    handleGuardar,
+    modalConfirmarReserva,
+    setModalConfirmarReserva,
+    modalWaCotiz,
+    setModalWaCotiz,
+    handleCambiarEstado,
+    handleCancelarCotizacion,
+    handleEliminarDefinitivo,
+    handleIniciarPasoAReserva,
+    handleConfirmarPasoAReserva,
+    handleAbrirPedirAbono,
+    handleAbrirCobroAlimentacion,
+    handleDescargarPdfAlimentacion,
+    tabActiva,
+    setTabActiva,
+    onRegistrarComunicacion,
+    showToast,
+    openConfirm,
+    previsualizarFinca,
+    abrirComunicacionesConExpediente,
+  } = useCotizacionesController(props);
 
   const fincaSeleccionada = fincas.find(f => f.id === form.finca_id);
 

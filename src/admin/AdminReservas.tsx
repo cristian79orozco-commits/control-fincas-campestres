@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   ClipboardList, Plus, Edit3, Trash2, X, Save, CreditCard,
   Calendar, Users, DollarSign, ChevronDown, ChevronUp, FileCheck, MessageCircle,
@@ -24,6 +24,16 @@ import { generarDocSeparacion, generarPazYSalvo, generarEstadoCuenta, generarPro
 import { CurrencyInput } from '../components/CurrencyInput';
 import { useApp } from '../context/AppContext';
 import { getConfiguracionGlobal } from '../services/configuracion';
+import {
+  useReservasController,
+  ESTADOS_RESERVA,
+  TIPOS_PAGO,
+  ESTADO_COLORS,
+  formatCOP,
+  formatFecha,
+  FORM_VACIO,
+  PAGO_VACIO,
+} from './useReservasController';
 
 interface AdminReservasProps {
   reservas: Reserva[];
@@ -50,42 +60,6 @@ interface AdminReservasProps {
   cotizacionInicial?: CotizacionDB | null;
   onCotizacionInicialUsada?: () => void;
 }
-
-const ESTADOS_RESERVA: ReservaEstado[] = ['activa', 'completada', 'cancelada', 'no_show'];
-const TIPOS_PAGO: { valor: PagoTipo; label: string }[] = [
-  { valor: 'separacion', label: 'Separación' },
-  { valor: 'abono', label: 'Abono' },
-  { valor: 'pago_total', label: 'Pago total' },
-  { valor: 'devolucion', label: 'Devolución' },
-];
-
-const ESTADO_COLORS: Record<ReservaEstado, string> = {
-  activa: 's-avail',
-  completada: 's-avail',
-  cancelada: 's-busy',
-  no_show: 's-busy',
-};
-
-function formatCOP(v: number) { return '$' + v.toLocaleString('es-CO') + ' COP'; }
-function formatFecha(f?: string) {
-  if (!f) return '—';
-  const [y, m, d] = f.split('-');
-  return `${d}/${m}/${y}`;
-}
-
-const FORM_VACIO: Partial<Reserva> = {
-  cliente_id: '',
-  finca_id: '',
-  fecha_inicio: '',
-  fecha_fin: '',
-  personas: 1,
-  valor_total: 0,
-  separacion: 0,
-  estado: 'activa',
-  observaciones: '',
-};
-
-const PAGO_VACIO = { tipo: 'abono' as PagoTipo, fecha: new Date().toISOString().split('T')[0], valor: 0, observacion: '' };
 
 // ─── Badge de consecutivo copiable ────────────────────────────────────────────
 export const ConsecutivoBadge: React.FC<{ consecutivo: string }> = ({ consecutivo }) => {
@@ -121,314 +95,67 @@ export const ConsecutivoBadge: React.FC<{ consecutivo: string }> = ({ consecutiv
   );
 };
 
-export const AdminReservas: React.FC<AdminReservasProps> = ({
-  reservas,
-  clientes,
-  fincas,
-  cotizaciones,
-  onGuardar,
-  onCambiarEstado,
-  onEliminar,
-  onRegistrarPago,
-  onEliminarPago,
-  onRegistrarComunicacion,
-  showToast,
-  openConfirm,
-  cotizacionInicial,
-  onCotizacionInicialUsada,
-  configuracion,
-  userEmail,
-  onCerrarReserva,
-  onReabrirReserva,
-}) => {
-  const { abrirComunicacionesConExpediente } = useApp();
-  const [form, setForm] = useState<Partial<Reserva>>(FORM_VACIO);
-  const [editando, setEditando] = useState(false);
-  const [guardando, setGuardando] = useState(false);
-  const [reservaExpandida, setReservaExpandida] = useState<string | null>(null);
-  const [pagoForm, setPagoForm] = useState<typeof PAGO_VACIO>(PAGO_VACIO);
-  const [pagoReservaId, setPagoReservaId] = useState<string | null>(null);
-  const [destinoAbono, setDestinoAbono] = useState<'alojamiento' | 'alimentacion'>('alojamiento');
-  const [metodoPagoAbono, setMetodoPagoAbono] = useState<string>('Transferencia Bancolombia / Nequi');
-  const [guardandoPago, setGuardandoPago] = useState(false);
-  type FiltroReservaTab = 'activas' | 'completadas' | 'canceladas' | 'todas';
-  const [tabReservaActiva, setTabReservaActiva] = useState<FiltroReservaTab>('activas');
-  const [reservaParaCierre, setReservaParaCierre] = useState<Reserva | null>(null);
-  const [reservaParaExpediente, setReservaParaExpediente] = useState<Reserva | null>(null);
-  const [modalWaReserva, setModalWaReserva] = useState<{
-    abierto: boolean;
-    reserva?: Reserva;
-    titulo: string;
-    nombreDoc?: string;
-    mensaje: string;
-    onGenerarPdf?: () => void;
-    tipo: any;
-  }>({
-    abierto: false,
-    titulo: '',
-    mensaje: '',
-    tipo: 'recordatorio_pago',
-  });
+export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
+  const {
+    reservas,
+    reservasFiltradas,
+    conteos,
+    clientes,
+    fincas,
+    cotizaciones,
+    configuracion,
+    userEmail,
 
-  const { cambiarEstadoAlimentacionReserva } = useApp();
+    // Formulario
+    form,
+    setForm,
+    editando,
+    guardando,
+    abrirNuevo,
+    abrirEdicion,
+    cerrar,
+    handleGuardar,
 
-  // Abrir WhatsApp para cobrar alimentación (cuando aplica)
-  const handleAbrirCobroAlimentacion = (r: Reserva) => {
-    const cfg = configuracion || getConfiguracionGlobal();
-    const iden = (cfg as any)?.banco_identificacion ? (cfg as any).banco_identificacion.trim() : undefined;
-    const bancosAdmin = cfg?.banco_cuenta ? {
-      banco: cfg.banco_nombre || 'Bancolombia',
-      tipoCuenta: cfg.banco_tipo_cuenta || 'Ahorros',
-      cuenta: cfg.banco_cuenta,
-      titular: cfg.banco_titular || 'Administración Paraíso Terrenal',
-      nit: iden || undefined,
-    } : null;
+    // Pagos
+    pagoForm,
+    setPagoForm,
+    pagoReservaId,
+    setPagoReservaId,
+    destinoAbono,
+    setDestinoAbono,
+    metodoPagoAbono,
+    setMetodoPagoAbono,
+    guardandoPago,
+    handleRegistrarPago,
+    handleEliminarPago,
+    handleAbrirModalPago,
 
-    const f = fincas.find(x => x.id === r.finca_id) || r.fincas;
+    // Estado & Acciones Optimistas
+    handleEstado,
+    handleEliminar,
+    handleAbrirCobroAlimentacion,
 
-    let cantPersonas = r.personas || 4;
-    let cantServ = (r as any).cantidad_alimentacion || 1;
-    if (r.alimentacion) {
-      const match = r.alimentacion.match(/(\d+)\s*serv(?:\.|\w*)\s*×\s*(\d+)\s*pers/i);
-      if (match) {
-        cantServ = parseInt(match[1], 10) || cantServ;
-        cantPersonas = parseInt(match[2], 10) || cantPersonas;
-      }
-    }
+    // Pestañas y vistas
+    tabReservaActiva,
+    setTabReservaActiva,
+    reservaExpandida,
+    setReservaExpandida,
 
-    const onGenPdf = async () => {
-      const m = (r.alimentacion && r.alimentacion !== 'Sin alimentación' ? {
-        id: 'res-menu',
-        nombre: r.alimentacion,
-        categoria: 'Almuerzo' as const,
-        precio_pp: (r.costo_alimentacion || 0) / Math.max(1, cantPersonas * cantServ),
-        activo: true,
-      } : null);
+    // Modales
+    reservaParaCierre,
+    setReservaParaCierre,
+    reservaParaExpediente,
+    setReservaParaExpediente,
+    modalWaReserva,
+    setModalWaReserva,
 
-      if (!m) return;
-      try {
-        await generarPropuestaAlimentacion({
-          menu: m,
-          cliente: r.clientes,
-          finca: f,
-          personas: cantPersonas,
-          cantidadServicios: cantServ,
-          consecutivo: r.consecutivo,
-          tituloDocumento: 'DETALLE Y COBRO DE ALIMENTACIÓN',
-          config: configuracion,
-        });
-        showToast('Detalle de alimentación descargado en PDF ✅', 'success');
-      } catch {
-        showToast('Error generando PDF de alimentación', 'error');
-      }
-    };
-
-    setModalWaReserva({
-      abierto: true,
-      reserva: r,
-      titulo: `Cobro de Alimentación (Paraíso Terrenal) · ${f?.nombre || r.fincas?.nombre || 'Finca'}`,
-      mensaje: plantillaCobroAlimentacion(r, f, r.clientes, bancosAdmin),
-      nombreDoc: 'Detalle de Alimentación (PDF)',
-      onGenerarPdf: onGenPdf,
-      tipo: 'cobro_alimentacion',
-    });
-  };
-
-  // Abrir modal unificado de pago/abono
-  const handleAbrirModalPago = (r: Reserva) => {
-    const f = desglosarFinanzasReserva(r);
-    setPagoReservaId(r.id);
-    if (f.saldoAlimentacionAdmin > 0 && f.saldoFincaCheckIn === 0) {
-      setDestinoAbono('alimentacion');
-      setPagoForm({
-        tipo: 'abono',
-        fecha: new Date().toISOString().split('T')[0],
-        valor: f.saldoAlimentacionAdmin,
-        observacion: 'Abono de alimentación - Administración',
-      });
-    } else {
-      setDestinoAbono('alojamiento');
-      setPagoForm({
-        tipo: 'abono',
-        fecha: new Date().toISOString().split('T')[0],
-        valor: f.saldoFincaCheckIn > 0 ? f.saldoFincaCheckIn : calcularSaldo(r),
-        observacion: 'Abono de alojamiento - Propietario',
-      });
-    }
-  };
-
-  // Si llega cotización pre-cargada, abrir formulario con sus datos y preservar consecutivo
-  React.useEffect(() => {
-    if (cotizacionInicial) {
-      setForm({
-        cotizacion_id: cotizacionInicial.id,
-        consecutivo: cotizacionInicial.consecutivo
-          ? (cotizacionInicial.consecutivo.match(/\d+/g)?.join('') || cotizacionInicial.consecutivo.replace(/^[A-Za-z\-]+/, ''))
-          : undefined,
-        cliente_id: cotizacionInicial.cliente_id || '',
-        finca_id: cotizacionInicial.finca_id,
-        fecha_inicio: cotizacionInicial.fecha_inicio,
-        fecha_fin: cotizacionInicial.fecha_fin,
-        personas: cotizacionInicial.personas,
-        valor_total: cotizacionInicial.total,
-        separacion: Math.round((cotizacionInicial.total || 0) * 0.5),
-        menu_id: cotizacionInicial.menu_id || null,
-        alimentacion: cotizacionInicial.alimentacion || null,
-        costo_alimentacion: cotizacionInicial.costo_alimentacion || 0,
-        estado: 'activa',
-        observaciones: cotizacionInicial.alimentacion && cotizacionInicial.alimentacion !== 'Sin alimentación'
-          ? `Incluye menú: ${cotizacionInicial.alimentacion}`
-          : '',
-      });
-      setEditando(true);
-      onCotizacionInicialUsada?.();
-    }
-  }, [cotizacionInicial]);
-
-  const abrirNuevo = () => { setForm(FORM_VACIO); setEditando(true); };
-  const abrirEdicion = (r: Reserva) => { setForm({ ...r }); setEditando(true); };
-  const cerrar = () => { setForm(FORM_VACIO); setEditando(false); };
-
-  const handleGuardar = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.cliente_id) { showToast('Selecciona un cliente', 'error'); return; }
-    if (!form.finca_id) { showToast('Selecciona una finca', 'error'); return; }
-    if (!form.fecha_inicio || !form.fecha_fin) { showToast('Las fechas son obligatorias', 'error'); return; }
-    setGuardando(true);
-    const res = await onGuardar(form);
-    setGuardando(false);
-    if (res.success) {
-      showToast(form.id ? 'Reserva actualizada ✅' : 'Reserva creada ✅', 'success');
-      cerrar();
-    } else {
-      showToast(`Error: ${res.error}`, 'error');
-    }
-  };
-
-  const handleEstado = async (id: string, estado: ReservaEstado) => {
-    const res = await onCambiarEstado(id, estado);
-    if (res.success) showToast(`Estado: ${estado}`, 'success');
-    else showToast(`Error: ${res.error}`, 'error');
-  };
-
-  const handleEliminar = (r: Reserva) => {
-    openConfirm(
-      '¿Eliminar reserva?',
-      'Se eliminarán también todos los pagos asociados. Esta acción es irreversible.',
-      async () => {
-        const res = await onEliminar(r.id);
-        if (res.success) showToast('Reserva eliminada', 'info');
-        else showToast(`Error: ${res.error}`, 'error');
-      }
-    );
-  };
-
-  const handleRegistrarPago = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pagoReservaId) return;
-    if (!pagoForm.valor || pagoForm.valor <= 0) {
-      showToast('El valor debe ser mayor a cero', 'error');
-      return;
-    }
-    const r = reservas.find(res => res.id === pagoReservaId);
-    if (!r) return;
-
-    setGuardandoPago(true);
-
-    if (destinoAbono === 'alimentacion') {
-      const desglose = desglosarFinanzasReserva(r);
-      const monto = pagoForm.valor;
-      const nuevoTotalPagadoAlim = desglose.pagadoAlimentacion + monto;
-      const esPagadaTotal = nuevoTotalPagadoAlim >= desglose.costoAlimentacion;
-
-      const res = await cambiarEstadoAlimentacionReserva(
-        r.id,
-        esPagadaTotal ? 'pagada' : 'parcial',
-        {
-          metodo: metodoPagoAbono,
-          notas: pagoForm.observacion || undefined,
-          monto,
-        }
-      );
-      setGuardandoPago(false);
-      if (res.success) {
-        showToast(esPagadaTotal ? '¡Alimentación liquidada totalmente! 🍽️✅' : 'Abono a alimentación registrado 🍽️✅', 'success');
-        setPagoForm(PAGO_VACIO);
-        setPagoReservaId(null);
-      } else {
-        showToast(`Error al registrar alimentación: ${res.error}`, 'error');
-      }
-    } else {
-      const res = await onRegistrarPago(pagoReservaId, {
-        ...pagoForm,
-        observacion: pagoForm.observacion || 'Abono de alojamiento - Propietario',
-      });
-      setGuardandoPago(false);
-      if (res.success) {
-        showToast('Abono registrado con éxito ✅', 'success');
-        setPagoForm(PAGO_VACIO);
-        setPagoReservaId(null);
-      } else {
-        showToast(`Error: ${res.error}`, 'error');
-      }
-    }
-  };
-
-  const handleEliminarPago = (p: Pago) => {
-    openConfirm(
-      '¿Eliminar pago?',
-      `Se eliminará el registro de ${formatCOP(p.valor)} (${p.tipo}).`,
-      async () => {
-        const res = await onEliminarPago(p.id);
-        if (res.success) showToast('Pago eliminado', 'info');
-        else showToast(`Error: ${res.error}`, 'error');
-      }
-    );
-  };
-
-  // Deduplicación inteligente por cotizacion_id y por ID para eliminar cualquier borrador accidental
-  const reservasUnicas = useMemo(() => {
-    const cotizVistas = new Set<string>();
-    const idsVistos = new Set<string>();
-    const lista: Reserva[] = [];
-
-    for (const r of reservas) {
-      if (idsVistos.has(r.id)) continue;
-      if (r.cotizacion_id) {
-        if (cotizVistas.has(r.cotizacion_id)) continue;
-        cotizVistas.add(r.cotizacion_id);
-      }
-      idsVistos.add(r.id);
-      lista.push(r);
-    }
-    return lista;
-  }, [reservas]);
-
-  const conteoActivas = useMemo(() => reservasUnicas.filter(r => r.estado === 'activa').length, [reservasUnicas]);
-  const conteoCompletadas = useMemo(() => reservasUnicas.filter(r => r.estado === 'completada').length, [reservasUnicas]);
-  const conteoCanceladas = useMemo(() => reservasUnicas.filter(r => ['cancelada', 'no_show'].includes(r.estado)).length, [reservasUnicas]);
-
-  const filtradas = useMemo(() => {
-    const list = reservasUnicas.filter(r => {
-      if (tabReservaActiva === 'activas') return r.estado === 'activa';
-      if (tabReservaActiva === 'completadas') return r.estado === 'completada';
-      if (tabReservaActiva === 'canceladas') return ['cancelada', 'no_show'].includes(r.estado);
-      return true; // todas
-    });
-
-    // Orden de llegada estricto: las últimas reservas recibidas siempre arriba
-    return [...list].sort((a, b) => {
-      const fechaB = new Date(b.created_at || '').getTime();
-      const fechaA = new Date(a.created_at || '').getTime();
-      if (!isNaN(fechaB) && !isNaN(fechaA) && fechaB !== fechaA) {
-        return fechaB - fechaA;
-      }
-      const numB = parseInt(String(b.consecutivo || '').replace(/\D/g, ''), 10) || 0;
-      const numA = parseInt(String(a.consecutivo || '').replace(/\D/g, ''), 10) || 0;
-      if (numB !== numA) return numB - numA;
-      return new Date(b.fecha_inicio || '').getTime() - new Date(a.fecha_inicio || '').getTime();
-    });
-  }, [reservasUnicas, tabReservaActiva]);
+    // Callbacks
+    onCerrarReserva,
+    onReabrirReserva,
+    onRegistrarComunicacion,
+    showToast,
+    abrirComunicacionesConExpediente,
+  } = useReservasController(props);
 
   return (
     <div className="panel">
@@ -438,7 +165,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
             <ClipboardList size={18} /> Reservas
           </div>
           <div className="text-xs text-muted mt-1">
-            {conteoActivas} activa{conteoActivas !== 1 ? 's' : ''} en curso · {reservas.length} en total
+            {conteos.activas} activa{conteos.activas !== 1 ? 's' : ''} en curso · {reservas.length} en total
           </div>
         </div>
         <button className="btn btn-primary btn-sm" onClick={abrirNuevo}>
@@ -454,7 +181,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
           style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}
         >
           🟢 Reservas Activas
-          {conteoActivas > 0 && (
+          {conteos.activas > 0 && (
             <span style={{
               background: tabReservaActiva === 'activas' ? 'rgba(255,255,255,0.25)' : 'var(--success, #16a34a)',
               color: '#fff',
@@ -463,7 +190,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
               fontSize: '0.68rem',
               fontWeight: 700,
             }}>
-              {conteoActivas}
+              {conteos.activas}
             </span>
           )}
         </button>
@@ -473,7 +200,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
           onClick={() => setTabReservaActiva('completadas')}
           style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
         >
-          🏁 Completadas / Historial ({conteoCompletadas})
+          🏁 Completadas / Historial ({conteos.completadas})
         </button>
 
         <button
@@ -481,7 +208,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
           onClick={() => setTabReservaActiva('canceladas')}
           style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
         >
-          ❌ Canceladas ({conteoCanceladas})
+          ❌ Canceladas ({conteos.canceladas})
         </button>
 
         <button
@@ -959,12 +686,12 @@ export const AdminReservas: React.FC<AdminReservasProps> = ({
 
       {/* Lista de reservas */}
       <div className="avail-table">
-        {filtradas.length === 0 ? (
+        {reservasFiltradas.length === 0 ? (
           <p className="text-muted text-sm" style={{ textAlign: 'center', padding: '1.5rem' }}>
             No hay reservas{tabReservaActiva !== 'todas' ? ` en la categoría "${tabReservaActiva}"` : ''}.
           </p>
         ) : (
-          filtradas.map(r => {
+          reservasFiltradas.map(r => {
             const saldo = calcularSaldo(r);
             const totalPagado = (r.valor_total) - saldo;
             const desglose = desglosarFinanzasReserva(r);
