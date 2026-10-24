@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React from 'react';
 import {
   ChevronLeft, ChevronRight, CheckCircle, XCircle, User, Lock, Calendar,
-  CreditCard, FileText, MessageCircle, FileCheck, Check, Copy, Hash,
+  CreditCard, FileText, MessageCircle, FileCheck, Check,
   ChevronDown, ChevronUp, AlertTriangle, UtensilsCrossed, Sparkles, Building2,
-  Clock, X, Save, Search, Percent, ShieldCheck, CheckSquare, Info, ExternalLink
+  Clock, X, Save, Search, Percent, CheckSquare
 } from 'lucide-react';
 import type {
   Finca, BloqueoDisponibilidad, Reserva, Cliente, CotizacionDB,
@@ -26,8 +26,17 @@ import {
   generarUrlWhatsApp,
 } from '../services/whatsapp';
 import { generarDocSeparacion, generarPazYSalvo, generarEstadoCuenta } from '../services/documentos';
+import {
+  useCalendarController,
+  MESES,
+  DIAS_SEMANA,
+  TIPOS_PAGO,
+  PAGO_VACIO,
+  formatCOP,
+  formatFecha,
+} from './useCalendarController';
 
-interface AdminCalendarProps {
+export interface AdminCalendarProps {
   fincas: Finca[];
   bloquesAdmin: BloqueoDisponibilidad[];
   reservas?: Reserva[];
@@ -54,314 +63,85 @@ interface AdminCalendarProps {
   openConfirm?: (title: string, message: string, onConfirm: () => void) => void;
 }
 
-const MESES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-];
+/**
+ * Capa Visual (Dumb UI) del Calendario de Disponibilidad
+ * - Cuadrícula mensual idéntica optimizada a 60 FPS
+ * - Consume el estado, navegación y cálculo de fechas desde useCalendarController
+ * - Preserva contratos de Supabase: onMarcarDias, onEliminarBloqueo, pagos y reservas
+ */
+export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
+  const {
+    // Fechas y matriz
+    anio,
+    mes,
+    offset,
+    handlePrevMonth,
+    handleNextMonth,
+    handleIrAHoy,
+    diasDelMesGrid,
 
-const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    // Fincas y filtros
+    fincas,
+    selectedFincaId,
+    fincaActual,
+    busquedaFinca,
+    setBusquedaFinca,
+    fincasFiltradasMenu,
+    conteoPorFinca,
+    handleSeleccionarFinca,
 
-const TIPOS_PAGO: { valor: PagoTipo; label: string }[] = [
-  { valor: 'separacion', label: 'Separación' },
-  { valor: 'abono', label: 'Abono' },
-  { valor: 'pago_total', label: 'Pago total' },
-  { valor: 'devolucion', label: 'Devolución' },
-];
+    // Selección e inspección
+    fechasSeleccionadas,
+    setFechasSeleccionadas,
+    fechaInspeccionada,
+    setFechaInspeccionada,
+    nombreCliente,
+    setNombreCliente,
+    procesando,
+    toggleDia,
+    handleSeleccionarFinesDeSemana,
+    handleLiberarBloqueoRapido,
+    handleMarcar,
 
-const PAGO_VACIO = {
-  tipo: 'abono' as PagoTipo,
-  fecha: new Date().toISOString().split('T')[0],
-  valor: 0,
-  observacion: ''
-};
+    // Métricas
+    metricasMes,
+    reservasPorFecha,
+    bloqueosPorFecha,
 
-function formatCOP(v: number) {
-  return '$' + (v || 0).toLocaleString('es-CO') + ' COP';
-}
+    // Reservas activas y listado
+    filtroFincaReservas,
+    setFiltroFincaReservas,
+    reservasActivas,
+    reservas,
+    reservaExpandida,
+    setReservaExpandida,
 
-function formatFecha(f?: string) {
-  if (!f) return '—';
-  const [y, m, d] = f.split('-');
-  return `${d}/${m}/${y}`;
-}
+    // Pagos
+    pagoReservaId,
+    setPagoReservaId,
+    pagoForm,
+    setPagoForm,
+    guardandoPago,
+    handleRegistrarPago,
+    handleEliminarPagoClick,
 
-export const AdminCalendar: React.FC<AdminCalendarProps> = ({
-  fincas,
-  bloquesAdmin,
-  reservas = [],
-  clientes = [],
-  cotizaciones = [],
-  menus = [],
-  configuracion,
-  userEmail,
-  onMarcarDias,
-  onEliminarBloqueo,
-  onGuardarReserva,
-  onCambiarEstadoReserva,
-  onRegistrarPago,
-  onEliminarPago,
-  onCerrarReserva,
-  onReabrirReserva,
-  onEliminarReserva,
-  onRegistrarComunicacion,
-  showToast,
-  openConfirm,
-}) => {
-  // Preseleccionar la primera finca por defecto para que el calendario grande SIEMPRE se muestre de inmediato
-  const [selectedFincaId, setSelectedFincaId] = useState<string>(() => {
-    return fincas[0]?.id || '';
-  });
+    // Modales
+    reservaParaCierre,
+    setReservaParaCierre,
+    reservaParaExpediente,
+    setReservaParaExpediente,
+    modalWaReserva,
+    setModalWaReserva,
 
-  const [currentDate, setCurrentDate] = useState(() => new Date());
-  const [fechasSeleccionadas, setFechasSeleccionadas] = useState<Set<string>>(new Set());
-  const [nombreCliente, setNombreCliente] = useState('');
-  const [procesando, setProcesando] = useState(false);
-  const [busquedaFinca, setBusquedaFinca] = useState('');
-  const [fechaInspeccionada, setFechaInspeccionada] = useState<string | null>(null);
-
-  // Estados de interfaz de reservas inferiores
-  const [filtroFincaReservas, setFiltroFincaReservas] = useState<'esta_finca' | 'todas'>('esta_finca');
-  const [reservaExpandida, setReservaExpandida] = useState<string | null>(null);
-  const [pagoReservaId, setPagoReservaId] = useState<string | null>(null);
-  const [pagoForm, setPagoForm] = useState<typeof PAGO_VACIO>(PAGO_VACIO);
-  const [guardandoPago, setGuardandoPago] = useState(false);
-  const [reservaParaCierre, setReservaParaCierre] = useState<Reserva | null>(null);
-  const [reservaParaExpediente, setReservaParaExpediente] = useState<Reserva | null>(null);
-
-  const [modalWaReserva, setModalWaReserva] = useState<{
-    abierto: boolean;
-    reserva?: Reserva;
-    titulo: string;
-    nombreDoc?: string;
-    mensaje: string;
-    onGenerarPdf?: () => void;
-    tipo: any;
-  }>({
-    abierto: false,
-    titulo: '',
-    mensaje: '',
-    tipo: 'general',
-  });
-
-  // Asegurar que si fincas cargan de forma asíncrona, se preseleccione la primera automáticamente
-  useEffect(() => {
-    if (!selectedFincaId && fincas.length > 0) {
-      setSelectedFincaId(fincas[0].id);
-    }
-  }, [fincas, selectedFincaId]);
-
-  const anio = currentDate.getFullYear();
-  const mes = currentDate.getMonth();
-
-  const handlePrevMonth = () => setCurrentDate(new Date(anio, mes - 1, 1));
-  const handleNextMonth = () => setCurrentDate(new Date(anio, mes + 1, 1));
-  const handleIrAHoy = () => setCurrentDate(new Date());
-
-  const diasMes = new Date(anio, mes + 1, 0).getDate();
-  const primerDiaSemana = new Date(anio, mes, 1).getDay();
-  const offset = primerDiaSemana === 0 ? 6 : primerDiaSemana - 1;
-
-  const hoyStr = useMemo(() => new Date().toISOString().split('T')[0], []);
-
-  // Finca seleccionada actual
-  const fincaActual = useMemo(() => {
-    return fincas.find(f => f.id === selectedFincaId) || fincas[0] || null;
-  }, [fincas, selectedFincaId]);
-
-  // Mapa de fechas ocupadas y detalle de reservas para la finca actualmente seleccionada
-  const { ocupadosSet, reservasPorFecha, bloqueosPorFecha } = useMemo(() => {
-    const set = new Set<string>();
-    const resMap = new Map<string, Reserva>();
-    const bloqMap = new Map<string, BloqueoDisponibilidad>();
-
-    if (!selectedFincaId) return { ocupadosSet: set, reservasPorFecha: resMap, bloqueosPorFecha: bloqMap };
-
-    // 1. Bloqueos administrativos en Supabase
-    bloquesAdmin
-      .filter(b => b.finca_id === selectedFincaId && b.estado === 'ocupado')
-      .forEach(b => {
-        const d = new Date(b.fecha_inicio + 'T00:00:00');
-        const fin = new Date(b.fecha_fin + 'T00:00:00');
-        while (d <= fin) {
-          const iso = d.toISOString().split('T')[0];
-          set.add(iso);
-          bloqMap.set(iso, b);
-          d.setDate(d.getDate() + 1);
-        }
-      });
-
-    // 2. Reservas activas asociadas a la finca
-    reservas
-      .filter(r => r.finca_id === selectedFincaId && r.estado === 'activa')
-      .forEach(r => {
-        const d = new Date(r.fecha_inicio + 'T00:00:00');
-        const fin = new Date(r.fecha_fin + 'T00:00:00');
-        while (d <= fin) {
-          const iso = d.toISOString().split('T')[0];
-          set.add(iso);
-          resMap.set(iso, r);
-          d.setDate(d.getDate() + 1);
-        }
-      });
-
-    return { ocupadosSet: set, reservasPorFecha: resMap, bloqueosPorFecha: bloqMap };
-  }, [bloquesAdmin, reservas, selectedFincaId]);
-
-  // Reservas activas para mostrar en el listado inferior
-  const reservasActivas = useMemo(() => {
-    return reservas.filter(r => {
-      if (r.estado !== 'activa') return false;
-      if (filtroFincaReservas === 'esta_finca' && selectedFincaId) {
-        return r.finca_id === selectedFincaId;
-      }
-      return true;
-    });
-  }, [reservas, filtroFincaReservas, selectedFincaId]);
-
-  // Conteo de reservas activas por finca para mostrar en los chips
-  const conteoPorFinca = useMemo(() => {
-    const map: Record<string, number> = {};
-    fincas.forEach(f => {
-      map[f.id] = reservas.filter(r => r.finca_id === f.id && r.estado === 'activa').length;
-    });
-    return map;
-  }, [fincas, reservas]);
-
-  // Fincas filtradas para la ventana menú estática
-  const fincasFiltradasMenu = useMemo(() => {
-    if (!busquedaFinca.trim()) return fincas;
-    const q = busquedaFinca.toLowerCase();
-    return fincas.filter(f =>
-      f.nombre.toLowerCase().includes(q) ||
-      (f.zona && f.zona.toLowerCase().includes(q))
-    );
-  }, [fincas, busquedaFinca]);
-
-  // Métricas objetivas de ocupación para el mes visible
-  const metricasMes = useMemo(() => {
-    let ocupados = 0;
-    for (let dia = 1; dia <= diasMes; dia++) {
-      const fStr = `${anio}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-      if (ocupadosSet.has(fStr)) ocupados++;
-    }
-    const libres = diasMes - ocupados;
-    const porcentaje = diasMes > 0 ? Math.round((ocupados / diasMes) * 100) : 0;
-    return { diasMes, ocupados, libres, porcentaje };
-  }, [anio, mes, diasMes, ocupadosSet]);
-
-  const toggleDia = (fechaStr: string) => {
-    setFechasSeleccionadas(prev => {
-      const next = new Set(prev);
-      if (next.has(fechaStr)) next.delete(fechaStr);
-      else next.add(fechaStr);
-      return next;
-    });
-    setFechaInspeccionada(fechaStr);
-  };
-
-  // Atajo: Seleccionar fines de semana (Viernes, Sábado y Domingo)
-  const handleSeleccionarFinesDeSemana = () => {
-    const nuevos = new Set(fechasSeleccionadas);
-    for (let dia = 1; dia <= diasMes; dia++) {
-      const dateObj = new Date(anio, mes, dia);
-      const dayOfWeek = dateObj.getDay(); // 0 = Dom, 5 = Vie, 6 = Sáb
-      if (dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0) {
-        const fStr = `${anio}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-        nuevos.add(fStr);
-      }
-    }
-    setFechasSeleccionadas(nuevos);
-    showToast('Fines de semana (Vie-Sáb-Dom) seleccionados', 'info');
-  };
-
-  // Liberar fecha individual directamente desde el inspector de fecha
-  const handleLiberarBloqueoRapido = async (bloqueo: BloqueoDisponibilidad) => {
-    setProcesando(true);
-    let res: { success: boolean; error?: string };
-    if (onEliminarBloqueo) {
-      res = await onEliminarBloqueo(bloqueo.id);
-    } else {
-      res = await onMarcarDias(selectedFincaId, [bloqueo.fecha_inicio], 'libre');
-    }
-    setProcesando(false);
-
-    if (res.success) {
-      showToast('Bloqueo eliminado y fecha liberada ✅', 'success');
-      setFechaInspeccionada(null);
-      setFechasSeleccionadas(prev => {
-        const next = new Set(prev);
-        next.delete(bloqueo.fecha_inicio);
-        return next;
-      });
-    } else {
-      showToast(`Error: ${res.error}`, 'error');
-    }
-  };
-
-  const handleMarcar = async (estado: 'ocupado' | 'libre') => {
-    if (!selectedFincaId) {
-      showToast('Selecciona una finca primero', 'error');
-      return;
-    }
-    if (!fechasSeleccionadas.size) {
-      showToast('Selecciona al menos un día en el calendario', 'error');
-      return;
-    }
-
-    setProcesando(true);
-    const res = await onMarcarDias(
-      selectedFincaId,
-      Array.from(fechasSeleccionadas),
-      estado,
-      nombreCliente.trim() || undefined
-    );
-    setProcesando(false);
-
-    if (res.success) {
-      showToast(`Días marcados como "${estado}" correctamente ✅`, 'success');
-      setFechasSeleccionadas(new Set());
-      setNombreCliente('');
-    } else {
-      showToast(`Error: ${res.error}`, 'error');
-    }
-  };
-
-  // Registrar abono desde el listado inferior
-  const handleRegistrarPago = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pagoReservaId || !onRegistrarPago) return;
-    if (!pagoForm.valor || pagoForm.valor <= 0) {
-      showToast('El valor debe ser mayor a cero', 'error');
-      return;
-    }
-    setGuardandoPago(true);
-    const res = await onRegistrarPago(pagoReservaId, pagoForm);
-    setGuardandoPago(false);
-    if (res.success) {
-      showToast('Pago registrado correctamente ✅', 'success');
-      setPagoForm(PAGO_VACIO);
-      setPagoReservaId(null);
-    } else {
-      showToast(`Error: ${res.error}`, 'error');
-    }
-  };
-
-  const handleEliminarPagoClick = (p: Pago) => {
-    if (!onEliminarPago) return;
-    if (openConfirm) {
-      openConfirm(
-        '¿Eliminar pago?',
-        `Se eliminará el registro de ${formatCOP(p.valor)} (${p.tipo}).`,
-        async () => {
-          const res = await onEliminarPago(p.id);
-          if (res.success) showToast('Pago eliminado', 'info');
-          else showToast(`Error: ${res.error}`, 'error');
-        }
-      );
-    } else {
-      onEliminarPago(p.id).then(() => showToast('Pago eliminado', 'info'));
-    }
-  };
+    // Callbacks y dependencias
+    onCerrarReserva,
+    onReabrirReserva,
+    onEliminarPago,
+    onRegistrarComunicacion,
+    showToast,
+    userEmail,
+    configuracion,
+  } = useCalendarController(props);
 
   return (
     <div className="admin-big-cal-wrapper">
@@ -446,11 +226,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
                 <div
                   key={f.id}
                   className={`admin-finca-menu-item ${esActiva ? 'active' : ''}`}
-                  onClick={() => {
-                    setSelectedFincaId(f.id);
-                    setFechasSeleccionadas(new Set());
-                    setFechaInspeccionada(null);
-                  }}
+                  onClick={() => handleSeleccionarFinca(f.id)}
                   role="button"
                   tabIndex={0}
                   title={`Seleccionar ${f.nombre}`}
@@ -598,125 +374,93 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
               />
             ))}
 
-            {/* Días del mes */}
-            {Array.from({ length: diasMes }).map((_, i) => {
-              const diaNum = i + 1;
-              const fechaStr = `${anio}-${String(mes + 1).padStart(2, '0')}-${String(diaNum).padStart(2, '0')}`;
-              const esOcupado = ocupadosSet.has(fechaStr);
-              const esSeleccionado = fechasSeleccionadas.has(fechaStr);
-              const esHoy = fechaStr === hoyStr;
-
-              // Obtener reserva o bloqueo vinculado para mostrar detalles
-              const reservaVinculada = reservasPorFecha.get(fechaStr);
-              const bloqueoVinculado = bloqueosPorFecha.get(fechaStr);
-
-              let clienteEtiqueta = '';
-              let consecutivoTexto = '';
-
-              if (reservaVinculada) {
-                const nom = reservaVinculada.clientes
-                  ? `${reservaVinculada.clientes.nombre} ${reservaVinculada.clientes.apellido || ''}`.trim()
-                  : 'Reserva activa';
-                clienteEtiqueta = nom;
-                consecutivoTexto = reservaVinculada.consecutivo ? `#${reservaVinculada.consecutivo}` : '';
-              } else if (bloqueoVinculado?.notas) {
-                clienteEtiqueta = bloqueoVinculado.notas;
-              }
-
-              let cls = 'admin-cal-day-large';
-              if (esSeleccionado) cls += ' selected';
-              else if (bloqueoVinculado) cls += ' busy-admin';
-              else if (esOcupado) cls += ' busy';
-              else cls += ' free';
-              if (esHoy) cls += ' today';
-
-              return (
-                <div
-                  key={fechaStr}
-                  className={cls}
-                  onClick={() => toggleDia(fechaStr)}
-                  title={`${fechaStr}: ${esOcupado ? `Ocupado (${clienteEtiqueta || 'Bloqueado'})` : 'Disponible / Libre'}`}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
-                      {diaNum}
+            {/* Días del mes usando el modelo optimizado del controller */}
+            {diasDelMesGrid.map(dia => (
+              <div
+                key={dia.fechaStr}
+                className={dia.className}
+                onClick={() => toggleDia(dia.fechaStr)}
+                title={`${dia.fechaStr}: ${dia.esOcupado ? `Ocupado (${dia.clienteEtiqueta || 'Bloqueado'})` : 'Disponible / Libre'}`}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                    {dia.diaNum}
+                  </span>
+                  {dia.esHoy && (
+                    <span
+                      style={{
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        padding: '0.1rem 0.35rem',
+                        borderRadius: '4px',
+                        background: 'var(--primary)',
+                        color: '#fff',
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      HOY
                     </span>
-                    {esHoy && (
-                      <span
-                        style={{
-                          fontSize: '0.62rem',
-                          fontWeight: 700,
-                          padding: '0.1rem 0.35rem',
-                          borderRadius: '4px',
-                          background: 'var(--primary)',
-                          color: '#fff',
-                          letterSpacing: '0.02em',
-                        }}
-                      >
-                        HOY
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Micro-indicador de color para móviles */}
-                  <div className={`cal-mobile-indicator ${esOcupado ? (bloqueoVinculado ? 'busy-admin' : 'busy') : 'free'}`} />
-
-                  {/* Contenido enriquecido para PC */}
-                  <div className="desktop-cal-content" style={{ marginTop: '0.35rem', fontSize: '0.72rem', overflow: 'hidden' }}>
-                    {reservaVinculada ? (
-                      <div
-                        style={{
-                          padding: '0.2rem 0.35rem',
-                          borderRadius: '4px',
-                          background: 'rgba(239, 68, 68, 0.15)',
-                          color: 'var(--danger)',
-                          fontWeight: 600,
-                          lineHeight: 1.2,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {consecutivoTexto && (
-                          <span style={{ fontFamily: 'monospace', marginRight: '0.2rem' }}>
-                            {consecutivoTexto}
-                          </span>
-                        )}
-                        {clienteEtiqueta || 'Reserva'}
-                      </div>
-                    ) : bloqueoVinculado ? (
-                      <div
-                        style={{
-                          padding: '0.2rem 0.35rem',
-                          borderRadius: '4px',
-                          background: 'rgba(245, 158, 11, 0.18)',
-                          color: '#b45309',
-                          fontWeight: 600,
-                          lineHeight: 1.2,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        🔒 {bloqueoVinculado.notas || 'Bloqueo'}
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          padding: '0.15rem 0.35rem',
-                          borderRadius: '4px',
-                          color: 'var(--success)',
-                          fontWeight: 500,
-                          fontSize: '0.68rem',
-                        }}
-                      >
-                        Disponible
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
-              );
-            })}
+
+                {/* Micro-indicador de color para móviles */}
+                <div className={`cal-mobile-indicator ${dia.esOcupado ? (dia.bloqueoVinculado ? 'busy-admin' : 'busy') : 'free'}`} />
+
+                {/* Contenido enriquecido para PC */}
+                <div className="desktop-cal-content" style={{ marginTop: '0.35rem', fontSize: '0.72rem', overflow: 'hidden' }}>
+                  {dia.reservaVinculada ? (
+                    <div
+                      style={{
+                        padding: '0.2rem 0.35rem',
+                        borderRadius: '4px',
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        color: 'var(--danger)',
+                        fontWeight: 600,
+                        lineHeight: 1.2,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {dia.consecutivoTexto && (
+                        <span style={{ fontFamily: 'monospace', marginRight: '0.2rem' }}>
+                          {dia.consecutivoTexto}
+                        </span>
+                      )}
+                      {dia.clienteEtiqueta || 'Reserva'}
+                    </div>
+                  ) : dia.bloqueoVinculado ? (
+                    <div
+                      style={{
+                        padding: '0.2rem 0.35rem',
+                        borderRadius: '4px',
+                        background: 'rgba(245, 158, 11, 0.18)',
+                        color: '#b45309',
+                        fontWeight: 600,
+                        lineHeight: 1.2,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      🔒 {dia.bloqueoVinculado.notas || 'Bloqueo'}
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        padding: '0.15rem 0.35rem',
+                        borderRadius: '4px',
+                        color: 'var(--success)',
+                        fontWeight: 500,
+                        fontSize: '0.68rem',
+                      }}
+                    >
+                      Disponible
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -1047,7 +791,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
                       </div>
                     </div>
 
-                    {/* Botones de acción unificados (misma lógica que ya funciona) */}
+                    {/* Botones de acción unificados */}
                     <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
                       {/* 1. Registrar Abono */}
                       <button
@@ -1328,3 +1072,5 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = ({
     </div>
   );
 };
+
+export default AdminCalendar;
