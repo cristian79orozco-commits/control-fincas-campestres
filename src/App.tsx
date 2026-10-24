@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { Catalog } from './components/Catalog';
@@ -141,9 +141,9 @@ export const App: React.FC = () => {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  const handleSelectFinca = (id: string) => {
+  const handleSelectFinca = useCallback((id: string) => {
     previsualizarFinca(id);
-  };
+  }, [previsualizarFinca]);
 
   const handleSaveWaNumber = (num: string) => {
     setWaNumberGlobal(num);

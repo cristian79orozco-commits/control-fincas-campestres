@@ -30,7 +30,7 @@ function formatCOP(v: number) {
   return '$' + (v || 0).toLocaleString('es-CO') + ' COP';
 }
 
-export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
+export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
   finca,
   fechaInicio,
   fechaFin,
@@ -664,4 +664,6 @@ export const QuoteCalculator: React.FC<QuoteCalculatorProps> = ({
       )}
     </div>
   );
-};
+});
+
+QuoteCalculator.displayName = 'QuoteCalculator';

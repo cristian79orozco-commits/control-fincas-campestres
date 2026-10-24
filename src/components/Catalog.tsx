@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useCallback } from 'react';
 import {
   Filter, X, Search, Sparkles, Dog, Check, ChevronDown, ChevronUp,
   MapPin, Users, Bed, Bath, Calendar, MessageCircle, ArrowRight,
@@ -44,6 +44,230 @@ const SkeletonFincaItem: React.FC = () => (
   </div>
 );
 
+// ─── Componente de Lista Compacta Memoizado (Cero re-renders innecesarios) ─────
+interface FincaListItemProps {
+  finca: Finca;
+  onSelect: (fincaId: string) => void;
+  mostrarPrecioTotal?: boolean;
+}
+
+const FincaListItem = React.memo<FincaListItemProps>(({ finca, onSelect, mostrarPrecioTotal = true }) => {
+  const isEnComparacion = useClientStore(useCallback(s => s.fincasComparar.includes(finca.id), [finca.id]));
+  const toggleCompararFinca = useClientStore(s => s.toggleCompararFinca);
+
+  const images = useMemo(() => [...(finca.finca_imagenes || [])].sort((a, b) => a.orden - b.orden), [finca.finca_imagenes]);
+  const primeraFoto = images[0]?.url || '';
+  const totalFotos = images.length;
+  const precioPp = Number(finca.precio_pp) || 0;
+  const precioFincaCompleta = Number(finca.precio_finca_completa) || 0;
+
+  return (
+    <div
+      onClick={() => onSelect(finca.id)}
+      className="card-pro finca-list-interactive-item"
+      role="button"
+      tabIndex={0}
+      style={{
+        padding: '0.95rem 1.15rem',
+        display: 'flex',
+        gap: '1.15rem',
+        alignItems: 'center',
+        cursor: 'pointer',
+        borderRadius: 'var(--rad-sm, 14px)',
+        transition: 'all 0.25s ease',
+        border: `1.5px solid ${isEnComparacion ? 'var(--primary)' : 'var(--border)'}`,
+      }}
+    >
+      {/* Miniatura */}
+      <div
+        style={{
+          width: '96px',
+          height: '96px',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          flexShrink: 0,
+          position: 'relative',
+          background: 'var(--surface-2)',
+        }}
+      >
+        {primeraFoto ? (
+          <img
+            src={primeraFoto}
+            alt={finca.nombre}
+            loading="lazy"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+            <Home size={28} />
+          </div>
+        )}
+        {totalFotos > 1 && (
+          <span
+            style={{
+              position: 'absolute',
+              bottom: '4px',
+              right: '4px',
+              background: 'rgba(20, 18, 16, 0.75)',
+              color: 'var(--text)',
+              fontSize: '0.62rem',
+              fontWeight: 700,
+              padding: '0.12rem 0.4rem',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '3px',
+              backdropFilter: 'blur(4px)',
+            }}
+          >
+            <ImageIcon size={9} /> {totalFotos}
+          </span>
+        )}
+      </div>
+
+      {/* Información condensada */}
+      <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+            {finca.nombre}
+          </h3>
+          <span className="badge-pro-avail" style={{ fontSize: '0.68rem' }}>
+            <span className="pulse-dot" />
+            Disponible
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+          <MapPin size={13} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+          <span>{finca.zona || 'Santa Elena, Valle'}</span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+              padding: '0.18rem 0.5rem',
+              borderRadius: '6px',
+              fontWeight: 600,
+              color: 'var(--text)',
+            }}
+          >
+            <Users size={12} style={{ color: 'var(--primary)' }} />
+            {finca.capacidad_minima ? `${finca.capacidad_minima} - ${finca.capacidad}` : `Hasta ${finca.capacidad}`} pers.
+          </span>
+          {finca.habitaciones && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border)',
+                padding: '0.18rem 0.5rem',
+                borderRadius: '6px',
+              }}
+            >
+              <Bed size={12} style={{ color: 'var(--primary)' }} /> {finca.habitaciones} habs
+            </span>
+          )}
+          {finca.politica_mascotas === 'permitido' && (
+            <span
+              style={{
+                color: 'var(--success)',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: 'color-mix(in srgb, var(--success) 12%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)',
+                padding: '0.18rem 0.5rem',
+                borderRadius: '6px',
+              }}
+            >
+              <Dog size={12} /> Pet Friendly
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Tarifa y Botones de Acción */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          justifyContent: 'center',
+          gap: '0.45rem',
+          flexShrink: 0,
+          paddingLeft: '1rem',
+          borderLeft: '1px solid var(--border)',
+        }}
+      >
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: '0.64rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.04em' }}>
+            Tarifa /pp noche
+          </div>
+          <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--primary)', marginTop: '2px' }}>
+            {formatCOP(precioPp)}
+          </div>
+          {mostrarPrecioTotal && precioFincaCompleta > 0 && (
+            <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+              O completa: <strong style={{ color: 'var(--text)' }}>{formatCOP(precioFincaCompleta)}</strong>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleCompararFinca(finca.id);
+            }}
+            title={isEnComparacion ? 'Quitar del comparador' : 'Comparar con otras fincas'}
+            style={{
+              padding: '0.42rem',
+              borderRadius: 'var(--rad-xs, 6px)',
+              border: `1.5px solid ${isEnComparacion ? 'var(--primary)' : 'var(--border)'}`,
+              background: isEnComparacion ? 'var(--primary-bg)' : 'var(--surface-2)',
+              color: isEnComparacion ? 'var(--primary)' : 'var(--text-muted)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {isEnComparacion ? <Check size={14} /> : <Scale size={14} />}
+          </button>
+
+          <button
+            type="button"
+            className="btn-pro-primary"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect(finca.id);
+            }}
+            style={{
+              padding: '0.45rem 0.95rem',
+              fontSize: '0.78rem',
+            }}
+          >
+            <span>Cotizar</span>
+            <ArrowRight size={13} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+FincaListItem.displayName = 'FincaListItem';
+
 const AMENIDADES_FILTRO = [
   'Piscina',
   'Jacuzzi',
@@ -53,7 +277,7 @@ const AMENIDADES_FILTRO = [
   'Billar / Juegos',
 ];
 
-export const Catalog: React.FC<CatalogProps> = ({
+const CatalogComponent: React.FC<CatalogProps> = ({
   fincas,
   loading,
   bloquesAdmin,
@@ -62,20 +286,27 @@ export const Catalog: React.FC<CatalogProps> = ({
   waNumber,
   onOpenPortalHuesped,
 }) => {
-  const store = useClientStore();
-  const {
-    busquedaTexto, setBusquedaTexto,
-    fechaEntrada, setFechaEntrada,
-    fechaSalida, setFechaSalida,
-    personas, setPersonas,
-    amenidades, toggleAmenidad,
-    soloPetFriendly, setSoloPetFriendly,
-    ordenPor, setOrdenPor,
-    vistaModo, setVistaModo,
-    filtrosAvanzadosOpen, setFiltrosAvanzadosOpen,
-    limpiarFiltros,
-    fincasComparar,
-  } = store;
+  // Selectores atómicos de Zustand para eliminar re-renders masivos
+  const busquedaTexto = useClientStore(s => s.busquedaTexto);
+  const setBusquedaTexto = useClientStore(s => s.setBusquedaTexto);
+  const fechaEntrada = useClientStore(s => s.fechaEntrada);
+  const setFechaEntrada = useClientStore(s => s.setFechaEntrada);
+  const fechaSalida = useClientStore(s => s.fechaSalida);
+  const setFechaSalida = useClientStore(s => s.setFechaSalida);
+  const personas = useClientStore(s => s.personas);
+  const setPersonas = useClientStore(s => s.setPersonas);
+  const amenidades = useClientStore(s => s.amenidades);
+  const toggleAmenidad = useClientStore(s => s.toggleAmenidad);
+  const soloPetFriendly = useClientStore(s => s.soloPetFriendly);
+  const setSoloPetFriendly = useClientStore(s => s.setSoloPetFriendly);
+  const zona = useClientStore(s => s.zona);
+  const ordenPor = useClientStore(s => s.ordenPor);
+  const setOrdenPor = useClientStore(s => s.setOrdenPor);
+  const vistaModo = useClientStore(s => s.vistaModo);
+  const setVistaModo = useClientStore(s => s.setVistaModo);
+  const filtrosAvanzadosOpen = useClientStore(s => s.filtrosAvanzadosOpen);
+  const setFiltrosAvanzadosOpen = useClientStore(s => s.setFiltrosAvanzadosOpen);
+  const limpiarFiltros = useClientStore(s => s.limpiarFiltros);
 
   // Sincronizar vista predeterminada según configuración del administrador
   useEffect(() => {
@@ -84,10 +315,24 @@ export const Catalog: React.FC<CatalogProps> = ({
     }
   }, [contenido?.catalogo_vista_predeterminada, setVistaModo]);
 
-  // Filtrado reactivo optimizado con Lodash
+  // Handler memoizado estable para evitar romper el React.memo de las tarjetas
+  const handleSelectFinca = useCallback((fincaId: string) => {
+    onSelectFinca(fincaId);
+  }, [onSelectFinca]);
+
+  // Filtrado reactivo memoizado con dependencias atómicas exactas
   const fincasFiltradas = useMemo(() => {
-    return filtrarFincasCliente(fincas, bloquesAdmin, store);
-  }, [fincas, bloquesAdmin, store]);
+    return filtrarFincasCliente(fincas, bloquesAdmin, {
+      busquedaTexto,
+      fechaEntrada,
+      fechaSalida,
+      personas,
+      amenidades,
+      soloPetFriendly,
+      zona,
+      ordenPor,
+    } as any);
+  }, [fincas, bloquesAdmin, busquedaTexto, fechaEntrada, fechaSalida, personas, amenidades, soloPetFriendly, zona, ordenPor]);
 
   const hayFiltrosActivos = !!(
     busquedaTexto ||
@@ -608,7 +853,7 @@ export const Catalog: React.FC<CatalogProps> = ({
                 <FincaCard3D
                   key={f.id}
                   finca={f}
-                  onSelect={onSelectFinca}
+                  onSelect={handleSelectFinca}
                   mostrarPrecioTotal={mostrarPrecioTotal}
                   mostrarBadges={mostrarBadges}
                 />
@@ -617,183 +862,14 @@ export const Catalog: React.FC<CatalogProps> = ({
           ) : (
             /* ─── VISTA 2: LISTA COMPACTA EJECUTIVA CARD PRO ─── */
             <div className="fincas-scroll-viewport" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              {fincasFiltradas.map(f => {
-                const primeraFoto = f.finca_imagenes?.[0]?.url || '';
-                const totalFotos = f.finca_imagenes?.length || 0;
-                return (
-                  <div
-                    key={f.id}
-                    onClick={() => onSelectFinca(f.id)}
-                    className="card-pro finca-list-interactive-item"
-                    role="button"
-                    tabIndex={0}
-                    style={{
-                      padding: '0.95rem 1.15rem',
-                      display: 'flex',
-                      gap: '1.15rem',
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                      borderRadius: 'var(--rad-sm, 14px)',
-                      transition: 'all 0.25s ease',
-                    }}
-                  >
-                    {/* Miniatura */}
-                    <div
-                      style={{
-                        width: '96px',
-                        height: '96px',
-                        borderRadius: '12px',
-                        overflow: 'hidden',
-                        flexShrink: 0,
-                        position: 'relative',
-                        background: 'var(--surface-2)',
-                      }}
-                    >
-                      {primeraFoto ? (
-                        <img
-                          src={primeraFoto}
-                          alt={f.nombre}
-                          loading="lazy"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      ) : (
-                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                          <Home size={28} />
-                        </div>
-                      )}
-                      {totalFotos > 1 && (
-                        <span
-                          style={{
-                            position: 'absolute',
-                            bottom: '4px',
-                            right: '4px',
-                            background: 'rgba(20, 18, 16, 0.75)',
-                            color: 'var(--text)',
-                            fontSize: '0.62rem',
-                            fontWeight: 700,
-                            padding: '0.12rem 0.4rem',
-                            borderRadius: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            backdropFilter: 'blur(4px)',
-                          }}
-                        >
-                          <ImageIcon size={9} /> {totalFotos}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Información condensada */}
-                    <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text)', letterSpacing: '-0.01em' }}>
-                          {f.nombre}
-                        </h3>
-                        <span className="badge-pro-avail" style={{ fontSize: '0.68rem' }}>
-                          <span className="pulse-dot" />
-                          Disponible
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        <MapPin size={13} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                        <span>{f.zona || 'Santa Elena, Valle'}</span>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            background: 'var(--surface-2)',
-                            border: '1px solid var(--border)',
-                            padding: '0.18rem 0.5rem',
-                            borderRadius: '6px',
-                            fontWeight: 600,
-                            color: 'var(--text)',
-                          }}
-                        >
-                          <Users size={12} style={{ color: 'var(--primary)' }} />
-                          {f.capacidad_minima ? `${f.capacidad_minima} - ${f.capacidad}` : `Hasta ${f.capacidad}`} pers.
-                        </span>
-                        {f.habitaciones && (
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              background: 'var(--surface-2)',
-                              border: '1px solid var(--border)',
-                              padding: '0.18rem 0.5rem',
-                              borderRadius: '6px',
-                            }}
-                          >
-                            <Bed size={12} style={{ color: 'var(--primary)' }} /> {f.habitaciones} habs
-                          </span>
-                        )}
-                        {f.politica_mascotas === 'permitido' && (
-                          <span
-                            style={{
-                              color: 'var(--success)',
-                              fontWeight: 600,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              background: 'color-mix(in srgb, var(--success) 12%, transparent)',
-                              border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)',
-                              padding: '0.18rem 0.5rem',
-                              borderRadius: '6px',
-                            }}
-                          >
-                            <Dog size={12} /> Pet Friendly
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Tarifa y Botón Cotizar Pro */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'flex-end',
-                        justifyContent: 'center',
-                        gap: '0.45rem',
-                        flexShrink: 0,
-                        paddingLeft: '1rem',
-                        borderLeft: '1px solid var(--border)',
-                      }}
-                    >
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '0.64rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.04em' }}>
-                          Tarifa /pp noche
-                        </div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--primary)', marginTop: '2px' }}>
-                          {formatCOP(Number(f.precio_pp) || 0)}
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="btn-pro-primary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectFinca(f.id);
-                        }}
-                        style={{
-                          padding: '0.45rem 0.95rem',
-                          fontSize: '0.78rem',
-                        }}
-                      >
-                        <span>Cotizar</span>
-                        <ArrowRight size={13} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+              {fincasFiltradas.map(f => (
+                <FincaListItem
+                  key={f.id}
+                  finca={f}
+                  onSelect={handleSelectFinca}
+                  mostrarPrecioTotal={mostrarPrecioTotal}
+                />
+              ))}
             </div>
           )}
         </section>
@@ -801,3 +877,6 @@ export const Catalog: React.FC<CatalogProps> = ({
     </div>
   );
 };
+
+export const Catalog = React.memo<CatalogProps>(CatalogComponent);
+Catalog.displayName = 'Catalog';

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Eye, Users, MapPin, Sparkles, ChevronDown, ChevronUp,
   Bed, Bath, Clock, Check, Dog, Volume2, Image as ImageIcon, ArrowRight
@@ -18,12 +18,20 @@ const estadoMap: Record<string, { cls: string; lbl: string; dot: string }> = {
   fin_de_semana: { cls: 's-info', lbl: 'Fin de semana', dot: 'var(--primary)' },
 };
 
-export const FincaCard: React.FC<FincaCardProps> = ({ finca, onSelect, defaultExpanded = false }) => {
+export const FincaCard = React.memo<FincaCardProps>(({ finca, onSelect, defaultExpanded = false }) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
-  const images = [...(finca.finca_imagenes || [])].sort((a, b) => a.orden - b.orden);
-  const mainImage = images.find(i => i.es_principal)?.url || images[0]?.url ||
-    'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80';
+  const images = useMemo(() => {
+    return [...(finca.finca_imagenes || [])].sort((a, b) => a.orden - b.orden);
+  }, [finca.finca_imagenes]);
+
+  const mainImage = useMemo(() => {
+    return (
+      images.find(i => i.es_principal)?.url ||
+      images[0]?.url ||
+      'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80'
+    );
+  }, [images]);
 
   const previewImages = images.slice(0, 4);
 
@@ -319,4 +327,6 @@ export const FincaCard: React.FC<FincaCardProps> = ({ finca, onSelect, defaultEx
       )}
     </article>
   );
-};
+});
+
+FincaCard.displayName = 'FincaCard';

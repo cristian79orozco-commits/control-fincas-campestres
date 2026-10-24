@@ -15,7 +15,7 @@ const MESES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
-export const CalendarPicker: React.FC<CalendarPickerProps> = ({
+export const CalendarPicker = React.memo<CalendarPickerProps>(({
   bloques,
   fechaInicio,
   fechaFin,
@@ -277,4 +277,6 @@ export const CalendarPicker: React.FC<CalendarPickerProps> = ({
       )}
     </div>
   );
-};
+});
+
+CalendarPicker.displayName = 'CalendarPicker';

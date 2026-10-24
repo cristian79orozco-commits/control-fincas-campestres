@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Users,
@@ -27,7 +27,7 @@ function formatCOP(v: number): string {
   return '$' + Math.round(v || 0).toLocaleString('es-CO') + ' COP';
 }
 
-export const FincaCard3D: React.FC<FincaCard3DProps> = ({
+export const FincaCard3D = React.memo<FincaCard3DProps>(({
   finca,
   onSelect,
   mostrarPrecioTotal = true,
@@ -38,23 +38,30 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
   const [rotateY, setRotateY] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
 
-  const { fincasComparar, toggleCompararFinca, favoritos, toggleFavorito } = useClientStore();
+  // Selectores atómicos de grano fino para eliminar re-renders masivos
+  const isEnComparacion = useClientStore(useCallback((s) => s.fincasComparar.includes(finca.id), [finca.id]));
+  const isFavorito = useClientStore(useCallback((s) => s.favoritos.includes(finca.id), [finca.id]));
+  const toggleCompararFinca = useClientStore((s) => s.toggleCompararFinca);
+  const toggleFavorito = useClientStore((s) => s.toggleFavorito);
 
-  const isEnComparacion = fincasComparar.includes(finca.id);
-  const isFavorito = favoritos.includes(finca.id);
+  const images = useMemo(() => {
+    return [...(finca.finca_imagenes || [])].sort((a, b) => a.orden - b.orden);
+  }, [finca.finca_imagenes]);
 
-  const images = [...(finca.finca_imagenes || [])].sort((a, b) => a.orden - b.orden);
-  const mainImage =
-    images.find((i) => i.es_principal)?.url ||
-    images[0]?.url ||
-    'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80';
+  const mainImage = useMemo(() => {
+    return (
+      images.find((i) => i.es_principal)?.url ||
+      images[0]?.url ||
+      'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80'
+    );
+  }, [images]);
 
   const totalFotos = images.length;
   const precioPp = Number(finca.precio_pp) || 0;
   const precioFincaCompleta = Number(finca.precio_finca_completa) || 0;
 
   // Manejo de inclinación 3D sutil
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -67,13 +74,13 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
 
     setRotateX(rX);
     setRotateY(rY);
-  };
+  }, []);
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = useCallback(() => {
     setRotateX(0);
     setRotateY(0);
     setIsHovered(false);
-  };
+  }, []);
 
   return (
     <motion.div
@@ -456,4 +463,6 @@ export const FincaCard3D: React.FC<FincaCard3DProps> = ({
       </div>
     </motion.div>
   );
-};
+});
+
+FincaCard3D.displayName = 'FincaCard3D';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   ArrowLeft, MapPin, Users, Check, Sparkles, Image as ImageIcon,
   Bed, Bath, Clock, ShieldAlert, Dog, Volume2, Calendar, Calculator,
@@ -37,7 +37,7 @@ const DEFAULT_FALLBACK_IMAGES = [
   'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=800&q=80',
 ];
 
-export const FincaDetail: React.FC<FincaDetailProps> = ({
+const FincaDetailComponent: React.FC<FincaDetailProps> = ({
   finca,
   bloques,
   waNumberGlobal,
@@ -79,29 +79,29 @@ export const FincaDetail: React.FC<FincaDetailProps> = ({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
-  // Recopilación de imágenes
-  const fincaImages = (finca.finca_imagenes || []).sort((a, b) => a.orden - b.orden);
-  const imagesList = fincaImages.length > 0
-    ? fincaImages.map(i => i.url)
-    : DEFAULT_FALLBACK_IMAGES;
+  // Recopilación de imágenes memoizada para estabilidad de referencias
+  const imagesList = useMemo(() => {
+    const fincaImages = [...(finca.finca_imagenes || [])].sort((a, b) => a.orden - b.orden);
+    return fincaImages.length > 0 ? fincaImages.map(i => i.url) : DEFAULT_FALLBACK_IMAGES;
+  }, [finca.finca_imagenes]);
 
-  const openLightbox = (index: number) => {
+  const openLightbox = useCallback((index: number) => {
     setLightboxIndex(index);
     setLightboxOpen(true);
-  };
+  }, []);
 
   const estadoInfo = estadoMap[finca.estado] || { cls: 's-info', lbl: finca.estado };
   const precioFormatted = finca.precio_pp ? Number(finca.precio_pp).toLocaleString('es-CO') : '0';
 
-  const handleRangeSelect = (inicio: string, fin: string) => {
+  const handleRangeSelect = useCallback((inicio: string, fin: string) => {
     setFechaInicio(inicio);
     setFechaFin(fin);
-  };
+  }, []);
 
-  const handleClearRange = () => {
+  const handleClearRange = useCallback(() => {
     setFechaInicio('');
     setFechaFin('');
-  };
+  }, []);
 
   // Cálculo de noches para badges y resumen
   const nochesEstadia = useMemo(() => {
@@ -119,22 +119,22 @@ export const FincaDetail: React.FC<FincaDetailProps> = ({
   }, [finca.precio_pp, nochesEstadia, personas]);
 
   // Controles de foto móvil
-  const handlePrevMobilePhoto = (e: React.MouseEvent) => {
+  const handlePrevMobilePhoto = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setMobilePhotoIndex(prev => (prev === 0 ? imagesList.length - 1 : prev - 1));
-  };
+  }, [imagesList.length]);
 
-  const handleNextMobilePhoto = (e: React.MouseEvent) => {
+  const handleNextMobilePhoto = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setMobilePhotoIndex(prev => (prev === imagesList.length - 1 ? 0 : prev + 1));
-  };
+  }, [imagesList.length]);
 
-  const scrollToTabs = () => {
+  const scrollToTabs = useCallback(() => {
     const el = document.getElementById('mobile-tabs-bar');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-  };
+  }, []);
 
   return (
     <>
@@ -154,7 +154,8 @@ export const FincaDetail: React.FC<FincaDetailProps> = ({
               >
                 <ArrowLeft size={13} /> Catálogo
               </button>
-              <span className={`status-badge ${estadoInfo.cls}`} style={{ fontSize: '0.7rem' }}>
+              <span className={`status-badge ${estadoInfo.cls}`} style={{ fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <span className="pulse-dot" />
                 {estadoInfo.lbl}
               </span>
             </div>
@@ -658,7 +659,10 @@ export const FincaDetail: React.FC<FincaDetailProps> = ({
                   <strong className="text-primary">${precioFormatted} /pp noche</strong>
                 </div>
               </div>
-              <span className={`status-badge ${estadoInfo.cls}`}>{estadoInfo.lbl}</span>
+              <span className={`status-badge ${estadoInfo.cls}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <span className="pulse-dot" />
+                {estadoInfo.lbl}
+              </span>
             </div>
 
             {/* Galería de imágenes estilo mosaico */}
@@ -897,3 +901,6 @@ export const FincaDetail: React.FC<FincaDetailProps> = ({
     </>
   );
 };
+
+export const FincaDetail = React.memo<FincaDetailProps>(FincaDetailComponent);
+FincaDetail.displayName = 'FincaDetail';
