@@ -1,8 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React from 'react';
+import { motion } from 'framer-motion';
 import {
   DollarSign,
-  TrendingUp,
   AlertTriangle,
   Clock,
   UtensilsCrossed,
@@ -12,24 +11,13 @@ import {
   ClipboardList,
   RotateCcw,
   RefreshCw,
-  Sparkles,
   ArrowRight,
-  ShieldCheck
 } from 'lucide-react';
 import type { Finca, Cliente, CotizacionDB, Reserva, AdminSection, Menu as MenuType } from '../../types';
-import { useAdminDashboardStore, DashboardPeriodo } from '../../store/useAdminDashboardStore';
-import { useApp } from '../../context/AppContext';
-import {
-  filtrarDatosPorPeriodoYFinca,
-  calcularMetricasDashboard,
-  generarSerieMensualFinanzas,
-  calcularRendimientoFincas,
-  calcularEmbudoCotizaciones,
-  getFechaHoyLocal,
-} from '../../utils/dashboardMetrics';
 import { DashboardCharts } from './DashboardCharts';
+import { useAdminOverviewController } from './useAdminOverviewController';
 
-interface AdminDashboardOverviewProps {
+export interface AdminDashboardOverviewProps {
   fincas?: Finca[];
   reservas?: Reserva[];
   cotizaciones?: CotizacionDB[];
@@ -40,101 +28,37 @@ interface AdminDashboardOverviewProps {
   userEmail?: string | null;
 }
 
-function formatCOP(v: number): string {
-  const num = typeof v === 'number' && !isNaN(v) ? v : 0;
-  return '$' + Math.round(num).toLocaleString('es-CO');
-}
-
-export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
-  fincas = [],
-  reservas = [],
-  cotizaciones = [],
-  clientes = [],
-  menus = [],
-  metricasReservas = { total: 0, activas: 0, llegasHoy: 0, salenHoy: 0 },
-  navigateTo,
-  userEmail,
-}) => {
-  const { periodo, setPeriodo, fincaId, setFincaId, tabActiva, setTabActiva, resetFiltros } =
-    useAdminDashboardStore();
-
-  const { recargarTodo, loading: globalLoading, showToast } = useApp();
-  const [sincronizando, setSincronizando] = useState(false);
-
-  const hoyStr = getFechaHoyLocal();
-
-  // 1. Filtrado dinámico 100% centralizado con Lodash y Zustand
-  const { reservas: reservasFiltradas, cotizaciones: cotizacionesFiltradas } = useMemo(() => {
-    return filtrarDatosPorPeriodoYFinca(reservas || [], cotizaciones || [], periodo, fincaId);
-  }, [reservas, cotizaciones, periodo, fincaId]);
-
-  // 2. Cálculo de métricas consolidadas en tiempo real
-  const metricas = useMemo(() => {
-    return calcularMetricasDashboard(reservasFiltradas || [], cotizacionesFiltradas || [], metricasReservas);
-  }, [reservasFiltradas, cotizacionesFiltradas, metricasReservas]);
-
-  // 3. Gráficos estadísticos
-  const serieFinanzas = useMemo(() => {
-    return generarSerieMensualFinanzas(reservas || []);
-  }, [reservas]);
-
-  const rendimientoFincas = useMemo(() => {
-    return calcularRendimientoFincas(fincas || [], reservas || []);
-  }, [fincas, reservas]);
-
-  const embudoCotizaciones = useMemo(() => {
-    return calcularEmbudoCotizaciones(cotizaciones || []);
-  }, [cotizaciones]);
-
-  // Reservas activas para la agenda operativa
-  const proximasLlegadas = useMemo(() => {
-    const safeReservas = Array.isArray(reservas) ? reservas : [];
-    return safeReservas
-      .filter((r) => r && r.estado === 'activa' && r.fecha_inicio && r.fecha_inicio >= hoyStr)
-      .sort((a, b) => (a.fecha_inicio || '').localeCompare(b.fecha_inicio || ''))
-      .slice(0, 5);
-  }, [reservas, hoyStr]);
-
-  // Fecha legible en español
-  const fechaHoyLegible = useMemo(() => {
-    try {
-      const d = new Date();
-      return d.toLocaleDateString('es-CO', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
-    } catch {
-      return 'Fecha del sistema';
-    }
-  }, []);
-
-  const handleSincronizarEnVivo = async () => {
-    setSincronizando(true);
-    try {
-      if (recargarTodo) {
-        await recargarTodo();
-      }
-      if (showToast) {
-        showToast('✓ Base de datos sincronizada con éxito en tiempo real', 'success');
-      }
-    } catch (e) {
-      if (showToast) {
-        showToast('Error sincronizando datos con Supabase', 'error');
-      }
-    } finally {
-      setSincronizando(false);
-    }
-  };
-
-  const PERIODOS_OPCIONES: { id: DashboardPeriodo; label: string }[] = [
-    { id: 'mes_actual', label: 'Este Mes' },
-    { id: '30dias', label: 'Últimos 30d' },
-    { id: '7dias', label: 'Últimos 7d' },
-    { id: 'ano_actual', label: 'Este Año' },
-    { id: 'todos', label: 'Histórico Completo' },
-  ];
+/**
+ * Capa Visual (Dumb UI) del Dashboard Ejecutivo
+ * Sigue estrictamente la arquitectura de 4 capas:
+ * - Cero lógica de negocio o queries directas a la base de datos en el JSX
+ * - Toda la lógica, memoización de métricas y cálculos derivados residen en useAdminOverviewController
+ * - Renderizado óptimo a 60 FPS con datos listos para pintar
+ */
+export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = (props) => {
+  const {
+    periodo,
+    fincaId,
+    tabActiva,
+    filtrosModificados,
+    periodosOpciones,
+    fincas,
+    fechaHoyLegible,
+    sincronizando,
+    metricas,
+    totalReservasActivas,
+    serieFinanzas,
+    rendimientoFincas,
+    embudoCotizaciones,
+    proximasLlegadas,
+    handleSincronizarEnVivo,
+    handleCambiarPeriodo,
+    handleCambiarFinca,
+    handleCambiarTab,
+    handleResetFiltros,
+    navigateTo,
+    formatCOP,
+  } = useAdminOverviewController(props);
 
   return (
     <div style={{ display: 'grid', gap: '1.35rem' }}>
@@ -183,7 +107,7 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
             type="button"
             className="btn btn-sm"
             onClick={handleSincronizarEnVivo}
-            disabled={sincronizando || globalLoading}
+            disabled={sincronizando}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             style={{
@@ -196,20 +120,20 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
             }}
             title="Recargar datos directamente desde Supabase en tiempo real"
           >
-            <RefreshCw size={13} className={sincronizando || globalLoading ? 'animate-spin' : ''} />
-            <span>{sincronizando || globalLoading ? 'Sincronizando…' : 'Actualizar'}</span>
+            <RefreshCw size={13} className={sincronizando ? 'animate-spin' : ''} />
+            <span>{sincronizando ? 'Sincronizando…' : 'Actualizar'}</span>
           </motion.button>
 
           {/* Selector de periodo */}
           <div style={{ display: 'inline-flex', background: 'var(--surface-2)', padding: '0.2rem', borderRadius: '10px', gap: '0.15rem' }}>
-            {PERIODOS_OPCIONES.map((p) => {
+            {periodosOpciones.map((p) => {
               const isActive = periodo === p.id;
               return (
                 <motion.button
                   key={p.id}
                   type="button"
                   className="btn btn-sm"
-                  onClick={() => setPeriodo(p.id)}
+                  onClick={() => handleCambiarPeriodo(p.id)}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   style={{
@@ -233,7 +157,7 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
           {/* Selector de finca */}
           <select
             value={fincaId}
-            onChange={(e) => setFincaId(e.target.value)}
+            onChange={(e) => handleCambiarFinca(e.target.value)}
             style={{
               padding: '0.4rem 0.75rem',
               borderRadius: '8px',
@@ -246,19 +170,19 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
               outline: 'none',
             }}
           >
-            <option value="todas">Todas las Fincas ({(fincas || []).length})</option>
-            {(fincas || []).map((f) => (
+            <option value="todas">Todas las Fincas ({fincas.length})</option>
+            {fincas.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.nombre}
               </option>
             ))}
           </select>
 
-          {(periodo !== 'mes_actual' || fincaId !== 'todas') && (
+          {filtrosModificados && (
             <motion.button
               type="button"
               className="btn btn-sm"
-              onClick={resetFiltros}
+              onClick={handleResetFiltros}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               title="Restablecer filtros a este mes y todas las fincas"
@@ -274,7 +198,7 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, staggerChildren: 0.05 }}
+        transition={{ duration: 0.35 }}
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(215px, 1fr))',
@@ -520,7 +444,7 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
         ingresosAlimentacion={metricas.ingresosAlimentacionAdmin}
         saldoPendiente={metricas.totalSaldoPendiente}
         tabActiva={tabActiva}
-        onCambiarTab={setTabActiva}
+        onCambiarTab={handleCambiarTab}
       />
 
       {/* ===== 4. SECCIÓN ESPECIALIZADA: RENDIMIENTO GASTRONÓMICO & MENÚS (ADMIN) ===== */}
@@ -613,92 +537,73 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
               onClick={() => navigateTo('reservas')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
             >
-              Ver todas ({(reservas || []).filter((r) => r && r.estado === 'activa').length}) →
+              Ver todas ({totalReservasActivas}) →
             </button>
           </div>
 
           <div style={{ display: 'grid', gap: '0.55rem' }}>
-            {proximasLlegadas.map((r) => {
-              const clienteNombre = r.clientes
-                ? `${r.clientes.nombre || ''} ${r.clientes.apellido || ''}`.trim()
-                : (r.cliente_snapshot?.nombre || 'Cliente no registrado');
-
-              const fechaPartes = (r.fecha_inicio || '').split('-');
-              const diaMes = fechaPartes.length === 3 ? `${fechaPartes[2]}/${fechaPartes[1]}` : (r.fecha_inicio || '—');
-              const esHoy = r.fecha_inicio === hoyStr;
-
-              let numNoches = 1;
-              if (r.fecha_inicio && r.fecha_fin) {
-                const d1 = new Date(r.fecha_inicio + 'T00:00:00');
-                const d2 = new Date(r.fecha_fin + 'T00:00:00');
-                if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
-                  numNoches = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)));
-                }
-              }
-
-              return (
-                <div
-                  key={r.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '0.8rem 1.1rem',
-                    background: esHoy ? 'color-mix(in srgb, var(--primary) 7%, var(--surface))' : 'var(--surface-2)',
-                    border: esHoy ? '1px solid var(--primary)' : '1px solid var(--border)',
-                    borderRadius: '10px',
-                    gap: '1rem',
-                    flexWrap: 'wrap',
-                    transition: 'border-color 0.2s ease',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem' }}>
-                    <div
-                      style={{
-                        padding: '0.35rem 0.65rem',
-                        background: esHoy ? 'var(--primary)' : 'var(--surface)',
-                        color: esHoy ? '#ffffff' : 'var(--text)',
-                        borderRadius: '8px',
-                        textAlign: 'center',
-                        fontWeight: 700,
-                        fontSize: '0.85rem',
-                      }}
-                    >
-                      {diaMes}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.94rem', color: 'var(--text)' }}>
-                        {r.fincas?.nombre || r.finca_snapshot?.nombre || 'Finca'}
-                      </div>
-                      <div className="text-xs text-muted">
-                        {clienteNombre} · {r.personas || 1} personas · {numNoches} noche(s)
-                      </div>
-                    </div>
+            {proximasLlegadas.map((llegada) => (
+              <div
+                key={llegada.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '0.8rem 1.1rem',
+                  background: llegada.esHoy ? 'color-mix(in srgb, var(--primary) 7%, var(--surface))' : 'var(--surface-2)',
+                  border: llegada.esHoy ? '1px solid var(--primary)' : '1px solid var(--border)',
+                  borderRadius: '10px',
+                  gap: '1rem',
+                  flexWrap: 'wrap',
+                  transition: 'border-color 0.2s ease',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem' }}>
+                  <div
+                    style={{
+                      padding: '0.35rem 0.65rem',
+                      background: llegada.esHoy ? 'var(--primary)' : 'var(--surface)',
+                      color: llegada.esHoy ? '#ffffff' : 'var(--text)',
+                      borderRadius: '8px',
+                      textAlign: 'center',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                    }}
+                  >
+                    {llegada.diaMes}
                   </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span className="font-dashboard tabular-nums" style={{ fontWeight: 700, fontSize: '0.9rem' }}>
-                      {formatCOP(r.valor_total || 0)}
-                    </span>
-                    {esHoy && (
-                      <span className="dashboard-glow-badge" style={{ background: '#16a34a', color: '#ffffff' }}>
-                        ¡LLEGA HOY!
-                      </span>
-                    )}
-                    <motion.button
-                      type="button"
-                      className="btn btn-sm"
-                      onClick={() => navigateTo('reservas')}
-                      whileHover={{ scale: 1.03 }}
-                      whileTap={{ scale: 0.97 }}
-                      title="Gestionar reserva"
-                    >
-                      Gestionar
-                    </motion.button>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.94rem', color: 'var(--text)' }}>
+                      {llegada.fincaNombre}
+                    </div>
+                    <div className="text-xs text-muted">
+                      {llegada.clienteNombre} · {llegada.personas} personas · {llegada.numNoches} noche(s)
+                    </div>
                   </div>
                 </div>
-              );
-            })}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <span className="font-dashboard tabular-nums" style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                    {llegada.valorTotalFormateado}
+                  </span>
+                  {llegada.esHoy && (
+                    <span className="dashboard-glow-badge" style={{ background: '#16a34a', color: '#ffffff' }}>
+                      ¡LLEGA HOY!
+                    </span>
+                  )}
+                  <motion.button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => navigateTo('reservas')}
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    title="Gestionar reserva"
+                  >
+                    Gestionar
+                  </motion.button>
+                </div>
+              </div>
+            ))}
           </div>
         </motion.div>
       )}

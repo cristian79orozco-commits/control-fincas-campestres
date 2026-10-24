@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import {
   LayoutDashboard, LogOut, Lock, LogIn, ShieldCheck, Database,
   Home, Users, FileText, ClipboardList, Calendar, MessageCircle,
@@ -6,18 +6,27 @@ import {
   Palette, History, Globe, Bell, BellRing, BellOff, Volume2, VolumeX, Laptop
 } from 'lucide-react';
 import { AdminFincaForm } from './AdminFincaForm';
-import { AdminCalendar } from './AdminCalendar';
 import { AdminWaConfig } from './AdminWaConfig';
-import { AdminComunicaciones } from './AdminComunicaciones';
 import { AdminClientes } from './AdminClientes';
 import { AdminCotizaciones } from './AdminCotizaciones';
 import { AdminReservas } from './AdminReservas';
 import { AdminMenus } from './AdminMenus';
 import { AdminHistorial } from './AdminHistorial';
-import { AdminConfiguracion } from './AdminConfiguracion';
 import { AdminPersonalizacion } from './AdminPersonalizacion';
 import { AdminDashboardOverview } from './dashboard/AdminDashboardOverview';
+import { AdminSectionSkeleton } from './AdminSectionSkeleton';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+
+// Carga perezosa (Lazy Loading) de módulos pesados para optimizar el bundle inicial (Módulo 1)
+const AdminCalendar = lazy(() =>
+  import('./AdminCalendar').then(module => ({ default: module.AdminCalendar }))
+);
+const AdminComunicaciones = lazy(() =>
+  import('./AdminComunicaciones').then(module => ({ default: module.AdminComunicaciones }))
+);
+const AdminConfiguracion = lazy(() =>
+  import('./AdminConfiguracion').then(module => ({ default: module.AdminConfiguracion }))
+);
 import { useApp } from '../context/AppContext';
 import {
   obtenerEstadoPermisoNotificaciones,
@@ -553,28 +562,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* ===== SECCIÓN: DISPONIBILIDAD ===== */}
           {activeSection === 'disponibilidad' && (
             <div style={{ display: 'grid', gap: '1rem' }}>
-              <AdminCalendar
-                fincas={fincas}
-                bloquesAdmin={bloquesAdmin}
-                reservas={reservas}
-                clientes={clientes}
-                cotizaciones={cotizaciones}
-                menus={menus}
-                configuracion={configuracion}
-                userEmail={userEmail}
-                onMarcarDias={onMarcarDiasAdmin}
-                onEliminarBloqueo={onEliminarBloqueo}
-                onGuardarReserva={onGuardarReserva}
-                onCambiarEstadoReserva={onCambiarEstadoReserva}
-                onRegistrarPago={onRegistrarPago}
-                onEliminarPago={onEliminarPago}
-                onCerrarReserva={onCerrarReserva}
-                onReabrirReserva={onReabrirReserva}
-                onEliminarReserva={onEliminarReserva}
-                onRegistrarComunicacion={onRegistrarComunicacion}
-                showToast={showToast}
-                openConfirm={openConfirm}
-              />
+              <ErrorBoundary fallbackTitle="Módulo de Calendario y Disponibilidad">
+                <Suspense fallback={<AdminSectionSkeleton variant="calendar" />}>
+                  <AdminCalendar
+                    fincas={fincas}
+                    bloquesAdmin={bloquesAdmin}
+                    reservas={reservas}
+                    clientes={clientes}
+                    cotizaciones={cotizaciones}
+                    menus={menus}
+                    configuracion={configuracion}
+                    userEmail={userEmail}
+                    onMarcarDias={onMarcarDiasAdmin}
+                    onEliminarBloqueo={onEliminarBloqueo}
+                    onGuardarReserva={onGuardarReserva}
+                    onCambiarEstadoReserva={onCambiarEstadoReserva}
+                    onRegistrarPago={onRegistrarPago}
+                    onEliminarPago={onEliminarPago}
+                    onCerrarReserva={onCerrarReserva}
+                    onReabrirReserva={onReabrirReserva}
+                    onEliminarReserva={onEliminarReserva}
+                    onRegistrarComunicacion={onRegistrarComunicacion}
+                    showToast={showToast}
+                    openConfirm={openConfirm}
+                  />
+                </Suspense>
+              </ErrorBoundary>
             </div>
           )}
 
@@ -669,43 +682,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* ===== SECCIÓN: COMUNICACIONES Y WHATSAPP (FASE 3) ===== */}
           {activeSection === 'whatsapp' && (
-            <AdminComunicaciones
-              currentWaNumber={currentWaNumber}
-              onSaveWaNumber={onSaveWaNumber}
-              clientes={clientes}
-              fincas={fincas}
-              reservas={reservas}
-              cotizaciones={cotizaciones}
-              menus={menus}
-              comunicaciones={comunicaciones}
-              onRegistrarComunicacion={onRegistrarComunicacion || (async () => {})}
-              onLimpiarHistorial={onLimpiarHistorialComunicaciones}
-              configuracion={configuracion}
-              onGuardarConfiguracion={onGuardarConfiguracion}
-              showToast={showToast}
-              expedienteInicial={expedienteComunicaciones}
-              onExpedienteInicialCargado={() => setExpedienteComunicaciones(null)}
-            />
+            <ErrorBoundary fallbackTitle="Centro de Comunicaciones & WhatsApp">
+              <Suspense fallback={<AdminSectionSkeleton variant="comunicaciones" />}>
+                <AdminComunicaciones
+                  currentWaNumber={currentWaNumber}
+                  onSaveWaNumber={onSaveWaNumber}
+                  clientes={clientes}
+                  fincas={fincas}
+                  reservas={reservas}
+                  cotizaciones={cotizaciones}
+                  menus={menus}
+                  comunicaciones={comunicaciones}
+                  onRegistrarComunicacion={onRegistrarComunicacion || (async () => {})}
+                  onLimpiarHistorial={onLimpiarHistorialComunicaciones}
+                  configuracion={configuracion}
+                  onGuardarConfiguracion={onGuardarConfiguracion}
+                  showToast={showToast}
+                  expedienteInicial={expedienteComunicaciones}
+                  onExpedienteInicialCargado={() => setExpedienteComunicaciones(null)}
+                />
+              </Suspense>
+            </ErrorBoundary>
           )}
 
           {/* ===== SECCIÓN: CONFIGURACIÓN GENERAL (FASE 4) ===== */}
           {activeSection === 'configuracion' && configuracion && (
-            <AdminConfiguracion
-              config={configuracion}
-              guardando={guardandoConfig}
-              onGuardar={onGuardarConfiguracion || (async () => ({ success: false, error: 'No configurado' }))}
-              onRestablecer={onRestablecerConfiguracion || (async () => ({ success: false, error: 'No configurado' }))}
-              onSaveWaNumber={onSaveWaNumber}
-              showToast={showToast}
-              openConfirm={openConfirm}
-            />
+            <ErrorBoundary fallbackTitle="Módulo de Configuración General">
+              <Suspense fallback={<AdminSectionSkeleton variant="configuracion" />}>
+                <AdminConfiguracion
+                  config={configuracion}
+                  guardando={guardandoConfig}
+                  onGuardar={onGuardarConfiguracion || (async () => ({ success: false, error: 'No configurado' }))}
+                  onRestablecer={onRestablecerConfiguracion || (async () => ({ success: false, error: 'No configurado' }))}
+                  onSaveWaNumber={onSaveWaNumber}
+                  showToast={showToast}
+                  openConfirm={openConfirm}
+                />
+              </Suspense>
+            </ErrorBoundary>
           )}
 
           {/* Fallback si la configuración aún está cargando */}
           {activeSection === 'configuracion' && !configuracion && (
-            <div className="panel" style={{ padding: '3rem', textAlign: 'center' }}>
-              <div className="text-muted">Cargando configuración general...</div>
-            </div>
+            <AdminSectionSkeleton variant="configuracion" mensaje="Cargando configuración general..." />
           )}
 
           {/* ===== SECCIÓN: PERSONALIZACIÓN DEL SITIO PÚBLICO (FASE 5) ===== */}
