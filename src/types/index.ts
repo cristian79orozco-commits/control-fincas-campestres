@@ -400,6 +400,24 @@ export interface PlantillasPdfPersonalizadas {
   pie_firma_cargo?: string;
   firma_digital_url?: string | null;
   pie_firma_cliente?: string;
+
+  // Mapeo, escala y posición de la firma digital (Fase PDF Pro)
+  firma_posicion?: 'centro' | 'izquierda' | 'derecha';
+  firma_escala?: number; // Factor de escala (ej: 0.5 a 1.5, default: 1.0)
+  firma_ancho_mm?: number; // Ancho base en milímetros (default: 48)
+  firma_alto_mm?: number; // Alto base en milímetros (default: 16)
+  firma_mostrar_linea?: boolean; // Mostrar línea sobre la que apoya la firma (default: true)
+  firma_mostrar_cargo?: boolean; // Mostrar nombre/cargo bajo la firma (default: true)
+  firma_mostrar_leyenda?: boolean; // Mostrar "Firma Autorizada Paraíso Terrenal" (default: true)
+  firma_leyenda_personalizada?: string;
+
+  // Personalización visual y rediseño dinámico de documentos PDF
+  tema_color_primario?: string; // Color institucional en HEX (default: #1a6b5e)
+  tema_color_acento?: string; // Color de acento/filete en HEX (default: #d4ac3f)
+  estilo_encabezado?: 'corporativo' | 'moderno' | 'clasico' | 'minimalista';
+  mostrar_marca_agua?: boolean;
+  texto_marca_agua?: string; // Ej: "CONFIRMADA", "COTIZACIÓN", "COPIA OFICIAL"
+  tamano_fuente_cuerpo?: 'compacto' | 'estandar' | 'amplio';
 }
 
 export interface ConfiguracionGeneral {

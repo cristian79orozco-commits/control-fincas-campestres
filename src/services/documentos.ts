@@ -26,7 +26,7 @@ import {
   obtenerNombreFincaHistorico,
   obtenerContactoClienteHistorico,
 } from '../types';
-import { getConfiguracionGlobal } from './configuracion';
+import { getConfiguracionGlobal, setConfiguracionGlobal } from './configuracion';
 import { formatearConsecutivoConPrefijo, formatearConsecutivoSimple } from '../utils/consecutivos';
 import { LOGO_EMPRESA_BASE64, LOGO_FORMAT } from '../assets/logoBase64';
 
@@ -68,6 +68,7 @@ export interface PropuestaAlimentacionDatos {
   config?: ConfiguracionGeneral;
   consecutivo?: string | number | null;
   tituloDocumento?: string;
+  autoDescargar?: boolean;
 }
 
 // ---------------------------------------------------------------
@@ -276,6 +277,23 @@ export function predescargarFirma(url?: string | null) {
  *   salta automáticamente a una nueva página y dibuja el membrete, garantizando
  *   que la firma nunca colisione con el pie independientemente de la cantidad de texto.
  */
+export function parseHexRgb(hex?: string | null, fallback: [number, number, number] = [26, 107, 94]): [number, number, number] {
+  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return fallback;
+  const clean = hex.replace('#', '').trim();
+  if (clean.length === 6) {
+    const r = parseInt(clean.slice(0, 2), 16);
+    const g = parseInt(clean.slice(2, 4), 16);
+    const b = parseInt(clean.slice(4, 6), 16);
+    if (!isNaN(r) && !isNaN(g) && !isNaN(b)) return [r, g, b];
+  }
+  return fallback;
+}
+
+/**
+ * Estampa de manera elegante, mapeada y adaptable el bloque de firma de la Administración.
+ * Soporta alineación dinámica (centro, izquierda, derecha), escala proporcional (0.5 a 1.5),
+ * preservación de relación de aspecto de la firma manuscrita, y alternancia de leyenda/línea.
+ */
 function dibujarBloqueFirmaAdmin(
   doc: jsPDF,
   x: number,
@@ -294,13 +312,17 @@ function dibujarBloqueFirmaAdmin(
   const altoPagina = doc.internal.pageSize.getHeight();
   const centroX = anchoPagina / 2;
 
+  const colorPrimario = parseHexRgb(plantillas.tema_color_primario, [26, 107, 94]);
+  const posicion = plantillas.firma_posicion || 'centro';
+  const escala = Math.max(0.4, Math.min(2.0, plantillas.firma_escala ?? 1.0));
+  const anchoBase = (plantillas.firma_ancho_mm || 48) * escala;
+  const altoBase = (plantillas.firma_alto_mm || 16) * escala;
+
   const altoPie = 15;
   const yTopeInferior = altoPagina - altoPie; // 282 mm en A4
-  const espacioRequeridoFirma = 28; // Espacio vertical para imagen, línea y dos textos centrados
+  const espacioRequeridoFirma = Math.max(28, altoBase + 14);
 
   // 1. Control dinámico de desbordamiento de página (Page Overflow Protection)
-  // Si la posición Y actual más el bloque de firma supera el margen de seguridad,
-  // se traslada limpiamente a una nueva página con membrete corporativo
   if (y + espacioRequeridoFirma > yTopeInferior - 2) {
     doc.addPage();
     if (tituloDocParaNuevaPagina) {
@@ -310,25 +332,40 @@ function dibujarBloqueFirmaAdmin(
       y = 48;
     }
   } else {
-    // Si hay espacio en la página actual, separar armónicamente sin apretar contra el pie
     const maxPermitido = yTopeInferior - espacioRequeridoFirma - 3;
     y = Math.min(Math.max(y + 4, y + 6), maxPermitido);
   }
 
-  // 2. Título de la sección de firma (centrado si existe)
+  // 2. Título de la sección de firma si existe
   if (tituloEncabezado && tituloEncabezado.trim().length > 0) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.setTextColor(26, 107, 94); // Verde corporativo
-    doc.text(sanearTextoParaPdf(tituloEncabezado), centroX, y, { align: 'center' });
+    doc.setTextColor(...colorPrimario);
+    let xTitulo = centroX;
+    let alignTitulo: 'center' | 'left' | 'right' = 'center';
+    if (posicion === 'izquierda') {
+      xTitulo = 14;
+      alignTitulo = 'left';
+    } else if (posicion === 'derecha') {
+      xTitulo = anchoPagina - 14;
+      alignTitulo = 'right';
+    }
+    doc.text(sanearTextoParaPdf(tituloEncabezado), xTitulo, y, { align: alignTitulo });
     y += 3.5;
   }
 
-  const anchoFirma = 48;
-  const altoFirma = 16;
-  const xFirma = centroX - (anchoFirma / 2);
+  const anchoFirma = anchoBase;
+  const altoFirma = altoBase;
+
+  let xFirma = centroX - (anchoFirma / 2);
+  if (posicion === 'izquierda') {
+    xFirma = 14;
+  } else if (posicion === 'derecha') {
+    xFirma = anchoPagina - 14 - anchoFirma;
+  }
+
   const yFirma = y;
-  const yLinea = yFirma + altoFirma + 0.8; // La línea apoya inmediatamente bajo el trazo
+  const yLinea = yFirma + altoFirma + 0.8;
 
   // 3. Estampa de la imagen de la firma manuscrita transparente
   if (firmaUrl && typeof firmaUrl === 'string' && firmaUrl.trim().length > 0) {
@@ -350,49 +387,72 @@ function dibujarBloqueFirmaAdmin(
     }
   }
 
-  // 4. Línea de firma centrada (Idéntica a la vista previa del sistema)
-  const anchoFinalLinea = Math.max(anchoLinea || 80, 75);
-  const xLineaInicio = centroX - (anchoFinalLinea / 2);
-  const xLineaFin = centroX + (anchoFinalLinea / 2);
-  doc.setDrawColor(30, 27, 19);
-  doc.setLineWidth(0.6);
-  doc.line(xLineaInicio, yLinea, xLineaFin, yLinea);
+  // 4. Línea de firma
+  const anchoFinalLinea = Math.max(anchoLinea || 80, anchoFirma + 16, 75);
+  let xLineaInicio = centroX - (anchoFinalLinea / 2);
+  let xLineaFin = centroX + (anchoFinalLinea / 2);
+  let xTexto = centroX;
+  let alignTexto: 'center' | 'left' | 'right' = 'center';
 
-  // 5. Nombre / Cargo institucional centrado (Verde esmeralda #1a6b5e en negrita)
+  if (posicion === 'izquierda') {
+    xLineaInicio = 14;
+    xLineaFin = 14 + anchoFinalLinea;
+    xTexto = 14 + (anchoFinalLinea / 2);
+  } else if (posicion === 'derecha') {
+    xLineaInicio = anchoPagina - 14 - anchoFinalLinea;
+    xLineaFin = anchoPagina - 14;
+    xTexto = anchoPagina - 14 - (anchoFinalLinea / 2);
+  }
+
+  if (plantillas.firma_mostrar_linea !== false) {
+    doc.setDrawColor(30, 27, 19);
+    doc.setLineWidth(0.6);
+    doc.line(xLineaInicio, yLinea, xLineaFin, yLinea);
+  }
+
+  // 5. Nombre / Cargo institucional
   const textoFirma = pieTexto || plantillas.pie_firma_admin || (config.nombre_empresa ? `Administración • ${config.nombre_empresa}` : 'Administración • Paraíso Terrenal');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(26, 107, 94);
-  doc.text(sanearTextoParaPdf(textoFirma), centroX, yLinea + 4.5, { align: 'center' });
+  if (plantillas.firma_mostrar_cargo !== false) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...colorPrimario);
+    doc.text(sanearTextoParaPdf(textoFirma), xTexto, yLinea + 4.5, { align: alignTexto });
+  }
 
-  // 6. Leyenda inferior centrada ("Firma Autorizada Paraíso Terrenal" en gris #64748b)
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.8);
-  doc.setTextColor(100, 116, 139);
-  doc.text('Firma Autorizada Paraíso Terrenal', centroX, yLinea + 8.5, { align: 'center' });
+  // 6. Leyenda inferior de verificación
+  if (plantillas.firma_mostrar_leyenda !== false) {
+    const leyenda = plantillas.firma_leyenda_personalizada || 'Firma Autorizada Paraíso Terrenal';
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(sanearTextoParaPdf(leyenda), xTexto, yLinea + 8.5, { align: alignTexto });
+  }
 
   doc.setTextColor(30, 27, 19);
   return yLinea + 12;
 }
 
 // ---------------------------------------------------------------
-// Encabezado corporativo adaptable (Fase 4 - Logo Paraíso Terrenal)
+// Encabezado corporativo adaptable (Fase 4 y Fase PDF Pro)
 // ---------------------------------------------------------------
 function encabezado(doc: jsPDF, titulo: string, numero?: string, configParam?: ConfiguracionGeneral) {
   const config = configParam || getConfiguracionGlobal();
+  const plantillas = config.plantillas_pdf || {};
   const ancho = doc.internal.pageSize.getWidth();
 
-  // Franja verde institucional (esmeralda corporativo)
-  doc.setFillColor(26, 107, 94);
+  const colorPrimario = parseHexRgb(plantillas.tema_color_primario, [26, 107, 94]);
+  const colorAcento = parseHexRgb(plantillas.tema_color_acento, [212, 172, 63]);
+
+  // Franja institucional (personalizable)
+  doc.setFillColor(...colorPrimario);
   doc.rect(0, 0, ancho, 42, 'F');
 
-  // Filete dorado inferior para acabado de papelería de lujo
-  doc.setDrawColor(212, 172, 63);
+  // Filete de acento inferior para papelería de lujo
+  doc.setDrawColor(...colorAcento);
   doc.setLineWidth(0.8);
   doc.line(0, 42, ancho, 42);
 
   // Tarjeta / Emblema contenedor del Logo oficial
-  // Fondo marfil cálido (#FAF7EE) con borde sutil para destacar el logo sobre el verde
   doc.setFillColor(250, 247, 238);
   doc.setDrawColor(219, 212, 195);
   doc.roundedRect(12, 5.5, 31, 31, 2.5, 2.5, 'FD');
@@ -515,24 +575,65 @@ function fila(doc: jsPDF, y: number, izq: string, der: string, negrita = false):
   return y + 7;
 }
 
+/**
+ * Dibuja una marca de agua diagonal con opacidad suave en todas las páginas del PDF
+ */
+export function dibujarMarcaDeAgua(doc: jsPDF, texto: string, colorHex?: string) {
+  if (!texto || !texto.trim()) return;
+  const ancho = doc.internal.pageSize.getWidth();
+  const alto = doc.internal.pageSize.getHeight();
+  const color = parseHexRgb(colorHex, [26, 107, 94]);
+  const numPaginas = doc.getNumberOfPages();
+
+  for (let i = 1; i <= numPaginas; i++) {
+    doc.setPage(i);
+    try {
+      doc.saveGraphicsState();
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(40);
+      // Color muy suave (mezcla al 92% con blanco para simular opacidad sin depender de GState)
+      const rWatermark = Math.round(255 - (255 - color[0]) * 0.12);
+      const gWatermark = Math.round(255 - (255 - color[1]) * 0.12);
+      const bWatermark = Math.round(255 - (255 - color[2]) * 0.12);
+      doc.setTextColor(rWatermark, gWatermark, bWatermark);
+      doc.text(sanearTextoParaPdf(texto.toUpperCase()), ancho / 2, alto / 2, {
+        align: 'center',
+        angle: 45,
+      });
+      doc.restoreGraphicsState();
+    } catch {
+      // Ignorar si saveGraphicsState no está disponible
+    }
+  }
+}
+
 // ---------------------------------------------------------------
 // PIE DE PÁGINA INSTITUCIONAL MULTIPÁGINA
-// Estampa el pie verde esmeralda y filete dorado en todas las páginas
+// Estampa el pie de página y filete con los colores del tema oficial
 // ---------------------------------------------------------------
 function pie(doc: jsPDF, configParam?: ConfiguracionGeneral) {
   const config = configParam || getConfiguracionGlobal();
+  const plantillas = config.plantillas_pdf || {};
   const ancho = doc.internal.pageSize.getWidth();
   const alto = doc.internal.pageSize.getHeight();
   const totalPaginas = doc.getNumberOfPages();
 
+  const colorPrimario = parseHexRgb(plantillas.tema_color_primario, [26, 107, 94]);
+  const colorAcento = parseHexRgb(plantillas.tema_color_acento, [212, 172, 63]);
+
+  // Si tiene marca de agua activa
+  if (plantillas.mostrar_marca_agua && plantillas.texto_marca_agua) {
+    dibujarMarcaDeAgua(doc, plantillas.texto_marca_agua, plantillas.tema_color_primario);
+  }
+
   for (let p = 1; p <= totalPaginas; p++) {
     doc.setPage(p);
 
-    doc.setFillColor(26, 107, 94);
+    doc.setFillColor(...colorPrimario);
     doc.rect(0, alto - 15, ancho, 15, 'F');
 
-    // Filete dorado superior en pie de página
-    doc.setDrawColor(212, 172, 63);
+    // Filete de acento superior en pie de página
+    doc.setDrawColor(...colorAcento);
     doc.setLineWidth(0.5);
     doc.line(0, alto - 15, ancho, alto - 15);
 
@@ -562,6 +663,101 @@ function pie(doc: jsPDF, configParam?: ConfiguracionGeneral) {
   doc.setTextColor(30, 27, 19);
 }
 
+/**
+ * Consulta y extrae el estado más reciente y fresco directamente de Supabase
+ * antes de generar o previsualizar cualquier documento PDF, garantizando que nunca
+ * se emita papelería con datos desactualizados, firmas cacheadas obsoletas o saldos vencidos.
+ */
+export async function obtenerEstadoFrescoParaDocumento(params: {
+  tipo: 'cotizacion' | 'separacion' | 'abono' | 'estado_cuenta' | 'paz_salvo' | 'menu';
+  reservaId?: string;
+  cotizacionId?: string;
+  configActual?: ConfiguracionGeneral;
+}): Promise<{
+  configFresco: ConfiguracionGeneral;
+  reservaFresca?: Reserva | null;
+  cotizacionFresca?: CotizacionDB | null;
+  fincaFresca?: Finca | null;
+  clienteFresco?: Cliente | null;
+}> {
+  let configFresco: ConfiguracionGeneral = params.configActual ? { ...params.configActual } : getConfiguracionGlobal();
+
+  try {
+    const { supabase } = await import('./supabase');
+
+    // 1. Obtener fila más reciente de configuracion_general
+    try {
+      const { data: dbConfig } = await supabase
+        .from('configuracion_general')
+        .select('*')
+        .eq('id', 'general')
+        .maybeSingle();
+
+      if (dbConfig) {
+        const plantillasExt = dbConfig.plantillas_pdf || dbConfig.plantillas_comunicacion?._plantillas_pdf || {};
+        configFresco = {
+          ...configFresco,
+          ...dbConfig,
+          plantillas_pdf: {
+            ...(configFresco.plantillas_pdf || {}),
+            ...plantillasExt,
+            firma_digital_url: dbConfig.firma_digital_url || plantillasExt.firma_digital_url || configFresco.firma_digital_url || '',
+          },
+        };
+        setConfiguracionGlobal(configFresco);
+      }
+    } catch (cfgErr) {
+      console.warn('[documentos] Aviso al refrescar configuración en BD:', cfgErr);
+    }
+
+    // 2. Precargar firma digital fresca
+    const firmaUrl = configFresco.firma_digital_url || configFresco.plantillas_pdf?.firma_digital_url;
+    if (firmaUrl) {
+      await precargarFirmaDataUrl(firmaUrl);
+    }
+
+    let reservaFresca: Reserva | null = null;
+    let cotizacionFresca: CotizacionDB | null = null;
+    let fincaFresca: Finca | null = null;
+    let clienteFresco: Cliente | null = null;
+
+    // 3. Reserva con pagos y finca actualizada
+    if (params.reservaId) {
+      const { data: resData } = await supabase
+        .from('reservas')
+        .select('*, clientes(*), fincas(*), pagos(*)')
+        .eq('id', params.reservaId)
+        .maybeSingle();
+
+      if (resData) {
+        reservaFresca = resData as Reserva;
+        fincaFresca = resData.fincas as Finca;
+        clienteFresco = resData.clientes as Cliente;
+      }
+    }
+
+    // 4. Cotización con cliente y finca actualizada
+    if (params.cotizacionId) {
+      const { data: cotData } = await supabase
+        .from('cotizaciones')
+        .select('*, clientes(*), fincas(*)')
+        .eq('id', params.cotizacionId)
+        .maybeSingle();
+
+      if (cotData) {
+        cotizacionFresca = cotData as CotizacionDB;
+        fincaFresca = cotData.fincas as Finca;
+        clienteFresco = cotData.clientes as Cliente;
+      }
+    }
+
+    return { configFresco, reservaFresca, cotizacionFresca, fincaFresca, clienteFresco };
+  } catch (err) {
+    console.warn('[documentos] Excepción en obtenerEstadoFrescoParaDocumento:', err);
+    return { configFresco };
+  }
+}
+
 // ================================================================
 // ================================================================
 // 1. DOCUMENTO DE SEPARACIÓN
@@ -569,7 +765,8 @@ function pie(doc: jsPDF, configParam?: ConfiguracionGeneral) {
 export function generarDocSeparacion(
   reserva: Reserva,
   configParam?: ConfiguracionGeneral,
-  fincaParam?: Finca | Pick<Finca, 'id' | 'nombre'> | any | null
+  fincaParam?: Finca | Pick<Finca, 'id' | 'nombre'> | any | null,
+  autoDescargar: boolean = true
 ): ResultadoDocumentoPdf {
   const config = configParam || getConfiguracionGlobal();
   const plantillasPdf = config.plantillas_pdf || {};
@@ -726,7 +923,9 @@ export function generarDocSeparacion(
 
   pie(doc, config);
   const nombreArchivo = `Separacion_${num}.pdf`;
-  doc.save(nombreArchivo);
+  if (autoDescargar) {
+    doc.save(nombreArchivo);
+  }
   const blob = doc.output('blob');
   return { doc, num, blob, nombreArchivo };
 }
@@ -734,7 +933,12 @@ export function generarDocSeparacion(
 // ================================================================
 // 2. COMPROBANTE DE ABONO
 // ================================================================
-export function generarComprobantePago(reserva: Reserva, pago: Pago, configParam?: ConfiguracionGeneral): ResultadoDocumentoPdf {
+export function generarComprobantePago(
+  reserva: Reserva,
+  pago: Pago,
+  configParam?: ConfiguracionGeneral,
+  autoDescargar: boolean = true
+): ResultadoDocumentoPdf {
   const config = configParam || getConfiguracionGlobal();
   const plantillasPdf = config.plantillas_pdf || {};
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -810,7 +1014,9 @@ export function generarComprobantePago(reserva: Reserva, pago: Pago, configParam
 
   pie(doc, config);
   const nombreArchivo = `Abono_${num}.pdf`;
-  doc.save(nombreArchivo);
+  if (autoDescargar) {
+    doc.save(nombreArchivo);
+  }
   const blob = doc.output('blob');
   return { doc, num, blob, nombreArchivo };
 }
@@ -818,7 +1024,11 @@ export function generarComprobantePago(reserva: Reserva, pago: Pago, configParam
 // ================================================================
 // 3. ESTADO DE CUENTA
 // ================================================================
-export function generarEstadoCuenta(reserva: Reserva, configParam?: ConfiguracionGeneral): ResultadoDocumentoPdf {
+export function generarEstadoCuenta(
+  reserva: Reserva,
+  configParam?: ConfiguracionGeneral,
+  autoDescargar: boolean = true
+): ResultadoDocumentoPdf {
   const config = configParam || getConfiguracionGlobal();
   const plantillasPdf = config.plantillas_pdf || {};
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -951,7 +1161,9 @@ export function generarEstadoCuenta(reserva: Reserva, configParam?: Configuracio
 
   pie(doc, config);
   const nombreArchivo = `EstadoCuenta_${num}.pdf`;
-  doc.save(nombreArchivo);
+  if (autoDescargar) {
+    doc.save(nombreArchivo);
+  }
   const blob = doc.output('blob');
   return { doc, num, blob, nombreArchivo };
 }
@@ -959,7 +1171,11 @@ export function generarEstadoCuenta(reserva: Reserva, configParam?: Configuracio
 // ================================================================
 // 4. PAZ Y SALVO
 // ================================================================
-export function generarPazYSalvo(reserva: Reserva, configParam?: ConfiguracionGeneral): ResultadoDocumentoPdf | null {
+export function generarPazYSalvo(
+  reserva: Reserva,
+  configParam?: ConfiguracionGeneral,
+  autoDescargar: boolean = true
+): ResultadoDocumentoPdf | null {
   const config = configParam || getConfiguracionGlobal();
   const plantillasPdf = config.plantillas_pdf || {};
   const saldo = calcularSaldo(reserva);
@@ -1037,7 +1253,9 @@ export function generarPazYSalvo(reserva: Reserva, configParam?: ConfiguracionGe
 
   pie(doc, config);
   const nombreArchivo = `PazYSalvo_${num}.pdf`;
-  doc.save(nombreArchivo);
+  if (autoDescargar) {
+    doc.save(nombreArchivo);
+  }
   const blob = doc.output('blob');
   return { doc, num, blob, nombreArchivo };
 }
@@ -1306,7 +1524,9 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
   pie(doc, config);
 
   const nombreArchivo = `Propuesta_Menu_${num}.pdf`;
-  doc.save(nombreArchivo);
+  if (datos.autoDescargar !== false) {
+    doc.save(nombreArchivo);
+  }
   const blob = doc.output('blob');
   return { doc, num, blob, nombreArchivo };
 }
@@ -1317,7 +1537,8 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
 export function generarDocCotizacion(
   cotizacion: CotizacionDB,
   configParam?: ConfiguracionGeneral,
-  fincaParam?: Finca | Pick<Finca, 'id' | 'nombre'> | any | null
+  fincaParam?: Finca | Pick<Finca, 'id' | 'nombre'> | any | null,
+  autoDescargar: boolean = true
 ): ResultadoDocumentoPdf {
   const config = configParam || getConfiguracionGlobal();
   const plantillasPdf = config.plantillas_pdf || {};
@@ -1505,7 +1726,9 @@ export function generarDocCotizacion(
 
   pie(doc, config);
   const nombreArchivo = `Cotizacion_${num}.pdf`;
-  doc.save(nombreArchivo);
+  if (autoDescargar) {
+    doc.save(nombreArchivo);
+  }
   const blob = doc.output('blob');
   return { doc, num, blob, nombreArchivo };
 }
@@ -1734,5 +1957,156 @@ export function generarExpedienteCompleto(
   pie(doc, config);
   const nombreArchivo = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8);
   doc.save(`Expediente_${nombreArchivo}.pdf`);
+}
+
+/**
+ * Genera el Blob y DataURL de un documento de muestra o real en memoria
+ * sin disparar descargas de archivos en el navegador, ideal para el visor interactivo.
+ */
+export async function generarPreviewBlobAsync(
+  tipo: 'cotizacion' | 'separacion' | 'abono' | 'estado_cuenta' | 'paz_salvo' | 'menu' | 'membrete',
+  config: ConfiguracionGeneral,
+  datosDemo?: {
+    reserva?: any;
+    cotizacion?: any;
+    finca?: any;
+    cliente?: any;
+    menu?: any;
+  }
+): Promise<{ blob: Blob; blobUrl: string; num: string; nombreArchivo: string }> {
+  const firmaUrl = config.firma_digital_url || config.plantillas_pdf?.firma_digital_url;
+  if (firmaUrl && typeof firmaUrl === 'string' && firmaUrl.trim().length > 0) {
+    await precargarFirmaDataUrl(firmaUrl);
+  }
+
+  const clienteEfectivo = datosDemo?.cliente || {
+    id: 'demo-cli',
+    nombre: 'Carlos',
+    apellido: 'Rodríguez',
+    whatsapp: config.whatsapp || '573176827093',
+    telefono: config.telefono || '+57 317 682 7093',
+    correo: config.correo || 'cliente@ejemplo.com',
+    activo: true,
+  };
+
+  const fincaEfectiva = datosDemo?.finca || {
+    id: 'demo-finca',
+    nombre: 'Finca Villa Paraíso Campestre',
+    zona: 'Santa Elena, Valle del Cauca',
+    capacidad: 20,
+    precio_pp: 75000,
+    banco_nombre: 'Bancolombia',
+    banco_tipo_cuenta: 'Ahorros',
+    banco_cuenta: '315-998877-01',
+    banco_titular: 'Propietario Finca Villa Paraíso',
+    banco_identificacion: '1.118.234.567',
+    estado: 'disponible',
+    activo: true,
+  };
+
+  const reservaEfectiva = datosDemo?.reserva || {
+    id: 'demo-reserva-1001',
+    consecutivo: '1001',
+    cliente_id: 'demo-cli',
+    finca_id: 'demo-finca',
+    fecha_inicio: '2026-11-15',
+    fecha_fin: '2026-11-17',
+    personas: 12,
+    valor_total: 2280000,
+    separacion: 900000,
+    costo_alimentacion: 480000,
+    alimentacion: 'Asado campestre gourmet + Desayuno típico',
+    estado: 'activa',
+    clientes: clienteEfectivo,
+    fincas: fincaEfectiva,
+    pagos: [
+      {
+        id: 'demo-pago-01',
+        reserva_id: 'demo-reserva-1001',
+        tipo: 'separacion',
+        fecha: '2026-10-01',
+        valor: 900000,
+        observacion: 'Transferencia Bancolombia - Separación 50% Finca',
+      },
+    ],
+  };
+
+  let resultado: ResultadoDocumentoPdf;
+
+  if (tipo === 'cotizacion' || tipo === 'membrete') {
+    const cotDemo = datosDemo?.cotizacion || {
+      id: 'demo-cot-1001',
+      consecutivo: '1001',
+      cliente_id: 'demo-cli',
+      finca_id: 'demo-finca',
+      fecha_inicio: '2026-11-15',
+      fecha_fin: '2026-11-17',
+      personas: 12,
+      subtotal_alojamiento: 1800000,
+      costo_alimentacion: 480000,
+      descuento: 0,
+      recargo: 0,
+      total: 2280000,
+      estado: 'cotizada',
+      clientes: clienteEfectivo,
+      fincas: fincaEfectiva,
+      alimentacion: 'Asado campestre gourmet + Desayuno típico campesino',
+    };
+    resultado = generarDocCotizacion(cotDemo, config, fincaEfectiva, false);
+  } else if (tipo === 'separacion') {
+    resultado = generarDocSeparacion(reservaEfectiva, config, fincaEfectiva, false);
+  } else if (tipo === 'abono') {
+    resultado = generarComprobantePago(reservaEfectiva, reservaEfectiva.pagos[0], config, false);
+  } else if (tipo === 'estado_cuenta') {
+    resultado = generarEstadoCuenta(reservaEfectiva, config, false);
+  } else if (tipo === 'paz_salvo') {
+    const resPagada = {
+      ...reservaEfectiva,
+      pagos: [
+        ...reservaEfectiva.pagos,
+        {
+          id: 'demo-pago-02',
+          reserva_id: 'demo-reserva-1001',
+          tipo: 'pago_total',
+          fecha: '2026-10-10',
+          valor: 1380000,
+          observacion: 'Saldo de alojamiento y comida liquidado 100%',
+        },
+      ],
+    };
+    const resPs = generarPazYSalvo(resPagada, config, false);
+    if (!resPs) throw new Error('No se pudo generar Paz y Salvo');
+    resultado = resPs;
+  } else if (tipo === 'menu') {
+    const demoMenu = datosDemo?.menu || {
+      id: 'demo-menu-1',
+      nombre: 'Sancocho Tradicional de Gallina en Leña',
+      categoria: 'Almuerzo',
+      precio_pp: 35000,
+      descripcion: 'Cocido tradicional en leña con plátano verde, yuca campesina, papa pastusa y mazorca tierna. Acompañado de arroz, ensalada y limonada natural con panela.',
+      activo: true,
+    };
+    resultado = await generarPropuestaAlimentacion({
+      menu: demoMenu,
+      cliente: clienteEfectivo,
+      finca: fincaEfectiva,
+      personas: 12,
+      cantidadServicios: 1,
+      consecutivo: '1001',
+      tituloDocumento: config.plantillas_pdf?.titulo_propuesta_menu || 'PROPUESTA DE SERVICIO GASTRONÓMICO',
+      config,
+      autoDescargar: false,
+    });
+  } else {
+    resultado = generarDocCotizacion(datosDemo?.cotizacion || {}, config, fincaEfectiva, false);
+  }
+
+  const blobUrl = URL.createObjectURL(resultado.blob);
+  return {
+    blob: resultado.blob,
+    blobUrl,
+    num: resultado.num,
+    nombreArchivo: resultado.nombreArchivo,
+  };
 }
 

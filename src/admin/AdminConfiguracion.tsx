@@ -21,6 +21,10 @@ import {
   firmaDataUrlCache,
 } from '../services/documentos';
 import { procesarFirmaTransparente, formatearBytes } from '../utils/imageOptimizer';
+import { PdfStudioViewer } from './configuracion/PdfStudioViewer';
+import { PdfSignatureMapper } from './configuracion/PdfSignatureMapper';
+import { PdfStyleCustomizer } from './configuracion/PdfStyleCustomizer';
+import { usePdfConfigController, type DocumentoSubTab } from '../hooks/usePdfConfigController';
 
 interface AdminConfiguracionProps {
   config: ConfiguracionGeneral;
@@ -33,7 +37,6 @@ interface AdminConfiguracionProps {
 }
 
 type MainTab = 'empresa' | 'plantillas' | 'cuentas';
-type DocumentoSubTab = 'cotizacion' | 'separacion' | 'abono' | 'estado_cuenta' | 'paz_salvo' | 'menu' | 'membrete';
 
 export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
   config,
@@ -46,9 +49,6 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
 }) => {
   // Navegación principal en 3 pilares
   const [activeTab, setActiveTab] = useState<MainTab>('empresa');
-  
-  // Sub-pestaña activa dentro del Editor de Plantillas PDF
-  const [docSubTab, setDocSubTab] = useState<DocumentoSubTab>('cotizacion');
 
   // Estado del formulario reactivo local
   const [formData, setFormData] = useState<ConfiguracionGeneral>(() => ({
@@ -114,7 +114,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
     });
   };
 
-  const handlePlantillaPdfChange = (campo: keyof PlantillasPdfPersonalizadas, valor: string) => {
+  const handlePlantillaPdfChange = (campo: keyof PlantillasPdfPersonalizadas, valor: any) => {
     setFormData(prev => {
       const updated = {
         ...prev,
@@ -127,6 +127,27 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
       return updated;
     });
   };
+
+  // Controlador desacoplado del estudio de PDFs (Capa 2 Arquitectura)
+  const {
+    docSubTab,
+    setDocSubTab,
+    viewerMode,
+    setViewerMode,
+    zoomLevel,
+    zoomIn,
+    zoomOut,
+    zoomReset,
+    sincronizandoBD,
+    generandoPreviewPdf,
+    previewPdfBlobUrl,
+    refrescarDatosDesdeBD,
+  } = usePdfConfigController({
+    formData,
+    onChangeCampo: handleChange,
+    onChangePlantilla: handlePlantillaPdfChange,
+    showToast,
+  });
 
   const handleRedesChange = (red: 'facebook' | 'instagram' | 'tiktok', valor: string) => {
     setFormData(prev => {
@@ -876,7 +897,8 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                   { id: 'estado_cuenta', label: 'Estado de Cuenta', icon: '📊' },
                   { id: 'paz_salvo', label: 'Paz y Salvo', icon: '🏅' },
                   { id: 'menu', label: 'Propuesta de Menú', icon: '🍽️' },
-                  { id: 'membrete', label: 'Membrete & Pie General', icon: '🏛️' },
+                  { id: 'membrete', label: 'Firma Digital & Membrete', icon: '✍️' },
+                  { id: 'diseno', label: 'Estilos & Paleta PDF', icon: '🎨' },
                 ].map(item => (
                   <button
                     key={item.id}
@@ -1183,8 +1205,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                   </>
                 )}
 
-                {/* 7. MEMBRETE Y PIE GENERAL */}
-                {/* 7. MEMBRETE Y PIE GENERAL (INCLUYE FIRMA DIGITAL) */}
+                {/* 7. MEMBRETE Y PIE GENERAL (INCLUYE FIRMA DIGITAL CALIBRADA) */}
                 {docSubTab === 'membrete' && (
                   <>
                     <div className="panel-header">
@@ -1194,159 +1215,25 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                       <span className="badge s-avail" style={{ fontSize: '0.68rem' }}>Aplica a Todos los Documentos</span>
                     </div>
 
-                    {/* BLOQUE PRINCIPAL: FIRMA DIGITAL DE ADMINISTRACIÓN */}
-                    <div style={{
-                      border: '1.5px dashed var(--border)',
-                      borderRadius: '12px',
-                      padding: '1.15rem',
-                      background: 'var(--surface)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.85rem'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                          <PenTool size={16} style={{ color: 'var(--primary)' }} />
-                          Firma Digital de la Administración (Paraíso Terrenal)
-                        </div>
-                        <span className="badge s-avail" style={{ fontSize: '0.68rem' }}>
-                          Fondo Transparente Recomendado (PNG)
-                        </span>
-                      </div>
+                    <PdfSignatureMapper
+                      firmaUrl={formData.firma_digital_url || plantillas.firma_digital_url || ''}
+                      plantillas={plantillas}
+                      subiendoFirma={subiendoFirma}
+                      infoFirmaOptimizada={infoFirmaOptimizada}
+                      onSubirFirma={handleSubirFirmaDigital}
+                      onEliminarFirma={handleEliminarFirmaDigital}
+                      onChangePlantilla={handlePlantillaPdfChange}
+                    />
 
-                      <p className="text-xs text-muted" style={{ margin: 0, lineHeight: 1.45 }}>
-                        Sube una imagen de tu firma manuscrita (preferiblemente PNG sin fondo o fondo blanco recortado). 
-                        El sistema la insertará de manera automática y ajustada sobre la línea de firma autorizada en todos los documentos PDF 
-                        (Cotizaciones, Separaciones, Comprobantes de Abono, Estados de Cuenta, Paz y Salvo y Menús). La firma del cliente ha sido 
-                        removida según la directriz operativa.
-                      </p>
-
-                      {/* Recuadro con patrón de transparencia tipo tablero para apreciar el PNG transparente */}
-                      <div style={{
-                        width: '100%',
-                        minHeight: '120px',
-                        borderRadius: '10px',
-                        border: '1px solid var(--border)',
-                        backgroundImage: `
-                          linear-gradient(45deg, #f1f5f9 25%, transparent 25%), 
-                          linear-gradient(-45deg, #f1f5f9 25%, transparent 25%), 
-                          linear-gradient(45deg, transparent 75%, #f1f5f9 75%), 
-                          linear-gradient(-45deg, transparent 75%, #f1f5f9 75%)
-                        `,
-                        backgroundSize: '16px 16px',
-                        backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
-                        backgroundColor: '#ffffff',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '1.25rem',
-                        position: 'relative',
-                        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.04)'
-                      }}>
-                        {formData.firma_digital_url || plantillas.firma_digital_url ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
-                            <img
-                              src={formData.firma_digital_url || plantillas.firma_digital_url || ''}
-                              alt="Firma Digital Oficial"
-                              style={{
-                                maxHeight: '80px',
-                                maxWidth: '240px',
-                                objectFit: 'contain',
-                                filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.15))'
-                              }}
-                            />
-                            <div style={{
-                              width: '180px',
-                              borderBottom: '1.5px solid #1e1b13',
-                              marginTop: '0.2rem'
-                            }} />
-                            <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#1e1b13', textAlign: 'center' }}>
-                              {plantillas.pie_firma_admin || 'Administración • Paraíso Terrenal'}
-                            </span>
-                            <span style={{ fontSize: '0.62rem', color: '#64748b' }}>Firma Autorizada Paraíso Terrenal</span>
-                          </div>
-                        ) : (
-                          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '0.85rem' }}>
-                            <Upload size={26} style={{ margin: '0 auto 0.4rem', opacity: 0.5, color: 'var(--primary)' }} />
-                            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>Sin firma digital configurada</div>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
-                              Haz clic en el botón inferior para cargar tu firma manuscrita
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Estado de optimización de la firma */}
-                      {infoFirmaOptimizada && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.45rem',
-                          background: 'rgba(21, 128, 61, 0.08)',
-                          color: '#15803d',
-                          border: '1px solid rgba(21, 128, 61, 0.25)',
-                          borderRadius: '6px',
-                          padding: '0.45rem 0.75rem',
-                          fontSize: '0.74rem',
-                          fontWeight: 600,
-                          marginTop: '0.35rem'
-                        }}>
-                          <Sparkles size={14} style={{ flexShrink: 0 }} />
-                          <span>{infoFirmaOptimizada}</span>
-                        </div>
-                      )}
-
-                      {/* Botones de acción */}
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '0.25rem' }}>
-                        <label className="btn btn-primary btn-sm" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', margin: 0 }}>
-                          <Upload size={14} />
-                          {subiendoFirma ? 'Procesando firma y retirando fondo...' : (formData.firma_digital_url || plantillas.firma_digital_url ? 'Cambiar Imagen de Firma' : 'Subir Firma Digital (PNG / JPG)')}
-                          <input
-                            type="file"
-                            accept="image/png,image/jpeg,image/webp"
-                            onChange={handleSubirFirmaDigital}
-                            style={{ display: 'none' }}
-                            disabled={subiendoFirma}
-                          />
-                        </label>
-
-                        {(formData.firma_digital_url || plantillas.firma_digital_url) && (
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            onClick={handleEliminarFirmaDigital}
-                            style={{ color: '#dc2626', borderColor: '#fca5a5' }}
-                          >
-                            <Trash2 size={14} /> Eliminar Firma
-                          </button>
-                        )}
-
-                        {hayCambios && (
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm"
-                            onClick={() => handleGuardar()}
-                            disabled={guardando}
-                            style={{ background: '#16a34a', borderColor: '#15803d', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-                          >
-                            <Save size={14} />
-                            {guardando ? 'Guardando...' : 'Guardar Firma Ahora'}
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Cargo o Nombre de quien firma */}
-                      <div className="field" style={{ marginTop: '0.4rem' }}>
-                        <label>Nombre y Cargo bajo la Línea de Firma</label>
-                        <input
-                          type="text"
-                          value={plantillas.pie_firma_admin || 'Administración • Paraíso Terrenal'}
-                          onChange={e => handlePlantillaPdfChange('pie_firma_admin', e.target.value)}
-                          placeholder="Ej: Administración • Paraíso Terrenal o Representante Legal"
-                        />
-                        <span className="text-xs text-muted">Texto impreso directamente debajo de la línea de firma en todos los documentos.</span>
-                      </div>
+                    <div className="field">
+                      <label>Nombre y Cargo bajo la Línea de Firma</label>
+                      <input
+                        type="text"
+                        value={plantillas.pie_firma_admin || 'Administración • Paraíso Terrenal'}
+                        onChange={e => handlePlantillaPdfChange('pie_firma_admin', e.target.value)}
+                        placeholder="Ej: Administración • Paraíso Terrenal o Representante Legal"
+                      />
+                      <span className="text-xs text-muted">Texto impreso directamente debajo de la línea de firma en todos los documentos.</span>
                     </div>
 
                     <div className="field">
@@ -1368,7 +1255,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                         onChange={e => handleChange('doc_pie_pagina', e.target.value)}
                         placeholder="Paraíso Terrenal • Fincas de Alquiler • Documento oficial generado automáticamente"
                       />
-                      <span className="text-xs text-muted">Aparece centrado en la franja esmeralda inferior de cada documento.</span>
+                      <span className="text-xs text-muted">Aparece centrado en la franja inferior de cada documento.</span>
                     </div>
 
                     <div className="field">
@@ -1383,272 +1270,45 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                     </div>
                   </>
                 )}
+
+                {/* 8. REDISEÑO VISUAL & PALETA CROMÁTICA PDF */}
+                {docSubTab === 'diseno' && (
+                  <>
+                    <div className="panel-header">
+                      <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Sparkles size={17} style={{ color: 'var(--primary)' }} /> Rediseño Visual & Acabados PDF
+                      </div>
+                      <span className="badge s-avail" style={{ fontSize: '0.68rem' }}>Suite de Estilos Pro</span>
+                    </div>
+
+                    <PdfStyleCustomizer
+                      formData={formData}
+                      plantillas={plantillas}
+                      onChangeCampo={handleChange}
+                      onChangePlantilla={handlePlantillaPdfChange}
+                    />
+                  </>
+                )}
               </div>
 
-              {/* COLUMNA 2: SIMULADOR VISUAL EN TIEMPO REAL CON FRAMER MOTION */}
-              <div className="panel" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <div>
-                  <div className="panel-header">
-                    <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Eye size={17} style={{ color: 'var(--primary)' }} /> Simulador Visual en Vivo del Documento
-                    </div>
-                    <span className="badge s-avail" style={{ fontSize: '0.68rem' }}>Reactivo</span>
-                  </div>
-
-                  {/* HOJA SIMULADA TIPO A4 CON MEMBRETE Y ESTILO OFICIAL */}
-                  <motion.div
-                    key={docSubTab}
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.2 }}
-                    style={{
-                      background: '#ffffff',
-                      color: '#1e1b13',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-                      border: '1px solid var(--border)',
-                      fontSize: '0.75rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                    }}
-                  >
-                    {/* Encabezado Esmeralda Institucional */}
-                    <div style={{
-                      background: '#1a6b5e',
-                      color: '#ffffff',
-                      padding: '1rem',
-                      borderBottom: '2.5px solid #d4ac3f',
-                      position: 'relative'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{
-                            width: '46px',
-                            height: '46px',
-                            borderRadius: '8px',
-                            background: '#FAF7EE',
-                            border: '1px solid #d4ac3f',
-                            overflow: 'hidden',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            <img
-                              src={formData.doc_logo_url || formData.logo_url || '/logo.png'}
-                              alt="Logo"
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.png'; }}
-                            />
-                          </div>
-                          <div>
-                            <div style={{ fontSize: '0.92rem', fontWeight: 700 }}>
-                              {formData.nombre_empresa || 'Paraíso Terrenal'}
-                            </div>
-                            <div style={{ fontSize: '0.68rem', fontStyle: 'italic', opacity: 0.9 }}>
-                              {formData.eslogan || 'Fincas de Alquiler · Experiencias exclusivas y descanso en la naturaleza'}
-                            </div>
-                            <div style={{ fontSize: '0.8rem', fontWeight: 700, marginTop: '0.35rem', color: '#fff', letterSpacing: '0.02em' }}>
-                              {docSubTab === 'cotizacion' && (plantillas.titulo_cotizacion || 'COTIZACIÓN FORMAL DE SERVICIOS')}
-                              {docSubTab === 'separacion' && (plantillas.titulo_separacion || 'DOCUMENTO DE SEPARACIÓN')}
-                              {docSubTab === 'abono' && (plantillas.titulo_abono || 'COMPROBANTE DE ABONO / PAGO')}
-                              {docSubTab === 'estado_cuenta' && (plantillas.titulo_estado_cuenta || 'ESTADO DE CUENTA CONSOLIDADO')}
-                              {docSubTab === 'paz_salvo' && (plantillas.titulo_paz_salvo || 'CERTIFICADO DE PAZ Y SALVO')}
-                              {docSubTab === 'menu' && (plantillas.titulo_propuesta_menu || 'PROPUESTA DE SERVICIO GASTRONÓMICO')}
-                              {docSubTab === 'membrete' && (formData.doc_encabezado || 'MEMBRETE INSTITUCIONAL')}
-                            </div>
-                            <div style={{ fontSize: '0.62rem', opacity: 0.85, marginTop: '0.1rem' }}>
-                              {formData.nit ? `NIT: ${formData.nit} • ` : ''}{formData.telefono || '+57 317 682 7093'} • {formData.ciudad || 'Santa Elena, Valle'}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Consecutivo Oficial */}
-                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <div style={{
-                            background: '#124c43',
-                            padding: '0.2rem 0.55rem',
-                            borderRadius: '4px',
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
-                            border: '1px solid rgba(255,255,255,0.25)'
-                          }}>
-                            # 1001
-                          </div>
-                          <div style={{ fontSize: '0.62rem', opacity: 0.85, marginTop: '0.2rem' }}>
-                            Emitido: {new Date().toLocaleDateString('es-CO')}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Franja de Cliente y Finca */}
-                    <div style={{
-                      background: '#f4f1ea',
-                      padding: '0.65rem 1rem',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      borderBottom: '1px solid #dbd4c3',
-                      fontSize: '0.72rem'
-                    }}>
-                      <div>
-                        <strong>Cliente:</strong> Carlos Rodríguez <br />
-                        <strong>Contacto:</strong> +57 317 682 7093
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <strong>Finca:</strong> Villa Paraíso Campestre <br />
-                        <strong>Huéspedes:</strong> 12 personas
-                      </div>
-                    </div>
-
-                    {/* Cuerpo Dinámico Simulado según documento */}
-                    <div style={{ padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                      {/* Simulación Paz y Salvo */}
-                      {docSubTab === 'paz_salvo' && (
-                        <div style={{
-                          background: '#d1ead9',
-                          color: '#1a6b5e',
-                          fontWeight: 700,
-                          textAlign: 'center',
-                          padding: '0.65rem',
-                          borderRadius: '6px',
-                          fontSize: '0.88rem'
-                        }}>
-                          ✓ PAGADO EN SU TOTALIDAD
-                        </div>
-                      )}
-
-                      {/* Simulación Cotización: Abono destacado y cuentas separadas */}
-                      {docSubTab === 'cotizacion' && (
-                        <>
-                          <div style={{
-                            background: '#fef9c3',
-                            border: '1px solid #ca8a04',
-                            color: '#a16207',
-                            padding: '0.45rem 0.65rem',
-                            borderRadius: '4px',
-                            fontWeight: 700,
-                            display: 'flex',
-                            justifyContent: 'space-between'
-                          }}>
-                            <span>{plantillas.instruccion_abono_cotizacion || 'ABONO REQUERIDO (50% ALOJAMIENTO):'}</span>
-                            <span>$900.000 COP</span>
-                          </div>
-
-                          {/* Cuenta 1: Finca */}
-                          <div style={{ background: '#f8f9f8', border: '1px solid #dbd4c3', padding: '0.45rem', borderRadius: '4px', fontSize: '0.68rem' }}>
-                            <div style={{ fontWeight: 700, color: '#1a6b5e' }}>1. CUENTA DEL PROPIETARIO (50% ALOJAMIENTO):</div>
-                            <div>Banco: Bancolombia • Ahorros N°: 315-998877-01 • Titular: Propietario Finca</div>
-                          </div>
-
-                          {/* Cuenta 2: Administración Paraíso Terrenal */}
-                          <div style={{ background: '#f4f8f6', border: '1px solid #1a6b5e', padding: '0.45rem', borderRadius: '4px', fontSize: '0.68rem' }}>
-                            <div style={{ fontWeight: 700, color: '#1a6b5e' }}>2. CUENTA ADMINISTRACIÓN (ALIMENTACIÓN PARAÍSO TERRENAL):</div>
-                            <div>
-                              Banco: {formData.banco_nombre || 'Bancolombia'} • {formData.banco_tipo_cuenta || 'Ahorros'} N°: {formData.banco_cuenta || 'Configura la cuenta en la pestaña 3'} • Titular: {formData.banco_titular || 'Paraíso Terrenal'}
-                            </div>
-                          </div>
-                        </>
-                      )}
-
-                      {/* Simulación Separación: Doble Balance */}
-                      {docSubTab === 'separacion' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.7rem' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #ccc', paddingBottom: '0.2rem' }}>
-                            <span>1. Alojamiento Finca (Total: $1.800.000):</span>
-                            <span><strong>Saldo Check-in: $900.000 COP</strong></span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #ccc', paddingBottom: '0.2rem' }}>
-                            <span>2. Alimentación Paraíso Terrenal ($480.000):</span>
-                            <span><strong>Saldo Comida: $480.000 COP</strong></span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Términos en miniatura */}
-                      <div style={{ fontSize: '0.64rem', color: '#555', fontStyle: 'italic', background: '#faf9f6', padding: '0.45rem', borderRadius: '4px' }}>
-                        {docSubTab === 'cotizacion' && (plantillas.vigencia_cotizacion ? plantillas.vigencia_cotizacion.slice(0, 160) + '...' : '• Vigencia de 5 días hábiles...')}
-                        {docSubTab === 'separacion' && (plantillas.clausulas_separacion ? plantillas.clausulas_separacion.slice(0, 160) + '...' : '• La separación bloquea la disponibilidad...')}
-                        {docSubTab === 'paz_salvo' && (plantillas.texto_paz_salvo || 'Se expide el presente paz y salvo...')}
-                        {docSubTab === 'menu' && (plantillas.condiciones_gastronomicas ? plantillas.condiciones_gastronomicas.slice(0, 160) + '...' : '• Preparación con ingredientes seleccionados...')}
-                        {docSubTab === 'abono' && (formData.textos_legales ? formData.textos_legales.slice(0, 160) + '...' : '• Válido como comprobante de pago...')}
-                        {docSubTab === 'estado_cuenta' && (formData.textos_legales ? formData.textos_legales.slice(0, 160) + '...' : '• Documento expedido de conformidad...')}
-                        {docSubTab === 'membrete' && 'Encabezado y pie aplicables a todos los documentos del sistema.'}
-                      </div>
-
-                      {/* Firma Oficial de Administración Simulada (Sin firma de cliente) */}
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        marginTop: '0.6rem',
-                        borderTop: '1px solid #f1f5f9',
-                        paddingTop: '0.5rem',
-                        fontSize: '0.65rem'
-                      }}>
-                        <div style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          textAlign: 'center'
-                        }}>
-                          {(formData.firma_digital_url || plantillas.firma_digital_url) ? (
-                            <img
-                              src={formData.firma_digital_url || plantillas.firma_digital_url || ''}
-                              alt="Firma Digital"
-                              style={{
-                                maxHeight: '38px',
-                                maxWidth: '130px',
-                                objectFit: 'contain',
-                                marginBottom: '-4px',
-                                filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.1))'
-                              }}
-                            />
-                          ) : (
-                            <div style={{ height: '24px' }} />
-                          )}
-                          <div style={{ width: '130px', borderBottom: '1.5px solid #1e1b13', marginBottom: '2px' }} />
-                          <span style={{ fontWeight: 700, color: '#1a6b5e', fontSize: '0.68rem' }}>
-                            {plantillas.pie_firma_admin || 'Administración • Paraíso Terrenal'}
-                          </span>
-                          <span style={{ fontSize: '0.55rem', color: '#64748b' }}>Firma Autorizada Paraíso Terrenal</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Pie de Página Esmeralda Institucional */}
-                    <div style={{
-                      background: '#1a6b5e',
-                      color: '#ffffff',
-                      padding: '0.5rem 1rem',
-                      textAlign: 'center',
-                      fontSize: '0.65rem',
-                      borderTop: '1px solid #d4ac3f'
-                    }}>
-                      <div>{formData.doc_pie_pagina || 'Paraíso Terrenal • Fincas de Alquiler • Documento oficial generado automáticamente'}</div>
-                      <div style={{ fontSize: '0.58rem', opacity: 0.85, marginTop: '0.1rem' }}>
-                        {formData.doc_contacto_info || 'WhatsApp: +57 317 682 7093 | reservas@fincascampestres.com'}
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  {/* Botón interactivo de descarga de prueba directa */}
-                  <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <span className="text-xs text-muted">
-                      Descarga el documento real emitido por jsPDF con tus ajustes actuales:
-                    </span>
-                    <button
-                      type="button"
-                      className="btn btn-secondary text-xs"
-                      onClick={() => emitirPrueba(docSubTab)}
-                      disabled={descargandoPrueba}
-                      style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                    >
-                      <Download size={14} /> {descargandoPrueba ? 'Generando PDF...' : `Descargar Muestra (${docSubTab.toUpperCase()})`}
-                    </button>
-                  </div>
-                </div>
-              </div>
+              {/* COLUMNA 2: VISOR INTERACTIVO Y NATIVO (APRYSE & SYNCFUSION SUITE PRO) */}
+              <PdfStudioViewer
+                docSubTab={docSubTab}
+                formData={formData}
+                viewerMode={viewerMode}
+                zoomLevel={zoomLevel}
+                sincronizandoBD={sincronizandoBD}
+                generandoPreviewPdf={generandoPreviewPdf}
+                previewPdfBlobUrl={previewPdfBlobUrl}
+                firmaUrl={formData.firma_digital_url || plantillas.firma_digital_url || ''}
+                descargandoPrueba={descargandoPrueba}
+                onSetViewerMode={setViewerMode}
+                onZoomIn={zoomIn}
+                onZoomOut={zoomOut}
+                onZoomReset={zoomReset}
+                onRefrescarBD={refrescarDatosDesdeBD}
+                onEmitirPrueba={emitirPrueba}
+              />
             </div>
           </motion.div>
         )}
