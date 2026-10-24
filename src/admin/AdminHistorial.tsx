@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   History, Search, Filter, Calendar, Home, Users, DollarSign,
@@ -16,209 +16,58 @@ import {
   obtenerNombreFincaHistorico,
   obtenerContactoClienteHistorico,
 } from '../types';
-import { useHistorial } from '../hooks/useHistorial';
-import { useApp } from '../context/AppContext';
-import { useAdminHistorialStore } from '../store/useAdminHistorialStore';
-import {
-  generarSerieHistorialTiempo,
-  generarDistribucionHistorialFincas,
-  generarDistribucionEstadosCierre
-} from '../utils/historialMetrics';
 import { HistorialCharts } from './historial/HistorialCharts';
 import { AdminExpedienteModal } from './AdminExpedienteModal';
 import { AdminCierreModal } from './AdminCierreModal';
-import { generarExpedienteCompleto } from '../services/documentos';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import {
+  useHistorialController,
+  MESES_HISTORIAL as MESES,
+  formatCOP,
+  formatFecha,
+  type UseHistorialControllerParams,
+} from './useHistorialController';
 
-interface AdminHistorialProps {
-  reservas: Reserva[];
-  fincas: Finca[];
-  clientes: Cliente[];
-  configuracion?: ConfiguracionGeneral;
-  userEmail?: string | null;
-  onCerrarReserva?: (
-    reservaId: string,
-    datosCierre: Partial<CierreReserva>,
-    pagoLiquidacion?: { valor: number; tipo: PagoTipo; observacion?: string }
-  ) => Promise<{ success: boolean; error?: string }>;
-  onReabrirReserva?: (reservaId: string) => Promise<{ success: boolean; error?: string }>;
-  onRegistrarComunicacion?: (com: any) => void;
-  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
-  openConfirm: (title: string, message: string, onConfirm: () => void) => void;
-}
+export type AdminHistorialProps = UseHistorialControllerParams;
 
-const MESES = [
-  { val: 'todos', label: 'Todos los meses' },
-  { val: '01', label: 'Enero' },
-  { val: '02', label: 'Febrero' },
-  { val: '03', label: 'Marzo' },
-  { val: '04', label: 'Abril' },
-  { val: '05', label: 'Mayo' },
-  { val: '06', label: 'Junio' },
-  { val: '07', label: 'Julio' },
-  { val: '08', label: 'Agosto' },
-  { val: '09', label: 'Septiembre' },
-  { val: '10', label: 'Octubre' },
-  { val: '11', label: 'Noviembre' },
-  { val: '12', label: 'Diciembre' },
-];
-
-function formatCOP(v: number): string {
-  const num = typeof v === 'number' && !isNaN(v) ? v : 0;
-  return '$' + Math.round(num).toLocaleString('es-CO');
-}
-
-function formatFecha(f?: string): string {
-  if (!f || typeof f !== 'string') return '—';
-  const partes = f.split('T')[0].split('-');
-  if (partes.length === 3) {
-    return `${partes[2]}/${partes[1]}/${partes[0]}`;
-  }
-  return f;
-}
-
-export const AdminHistorial: React.FC<AdminHistorialProps> = ({
-  reservas = [],
-  fincas = [],
-  clientes = [],
-  configuracion,
-  userEmail,
-  onCerrarReserva,
-  onReabrirReserva,
-  onRegistrarComunicacion,
-  showToast,
-  openConfirm,
-}) => {
+export const AdminHistorial: React.FC<AdminHistorialProps> = (props) => {
   const {
+    reservas,
+    fincas,
+    clientes,
     filtros,
     setFiltros,
     limpiarFiltros,
+    hayFiltrosActivos,
     reservasFiltradas,
     aniosDisponibles,
     metricas,
-  } = useHistorial(reservas, fincas, clientes);
-
-  const { chartTab, setChartTab, mostrarGraficos, toggleMostrarGraficos } = useAdminHistorialStore();
-  const { recargarTodo, loading: globalLoading } = useApp();
-  const [sincronizando, setSincronizando] = useState(false);
-
-  // Estados para modales
-  const [reservaParaExpediente, setReservaParaExpediente] = useState<Reserva | null>(null);
-  const [reservaParaCerrar, setReservaParaCerrar] = useState<Reserva | null>(null);
-  const [descargandoId, setDescargandoId] = useState<string | null>(null);
-
-  // Datos para los gráficos estadísticos
-  const serieTiempo = useMemo(() => {
-    return generarSerieHistorialTiempo(reservasFiltradas);
-  }, [reservasFiltradas]);
-
-  const distribucionFincas = useMemo(() => {
-    return generarDistribucionHistorialFincas(fincas, reservasFiltradas);
-  }, [fincas, reservasFiltradas]);
-
-  const estadosCierre = useMemo(() => {
-    return generarDistribucionEstadosCierre(reservasFiltradas);
-  }, [reservasFiltradas]);
-
-  const handleSincronizarEnVivo = async () => {
-    setSincronizando(true);
-    try {
-      if (recargarTodo) {
-        await recargarTodo();
-      }
-      showToast('✓ Registros históricos sincronizados con Supabase', 'success');
-    } catch {
-      showToast('Error sincronizando historial', 'error');
-    } finally {
-      setSincronizando(false);
-    }
-  };
-
-  // Exportar reporte a CSV
-  const handleExportarCsv = () => {
-    if (reservasFiltradas.length === 0) {
-      showToast('No hay registros para exportar', 'info');
-      return;
-    }
-
-    const encabezados = [
-      'Expediente',
-      'Finca',
-      'Cliente',
-      'Telefono',
-      'Fecha Llegada',
-      'Fecha Salida',
-      'Personas',
-      'Valor Total',
-      'Total Pagado',
-      'Saldo',
-      'Estado',
-      'Fecha Cierre',
-      'Responsable Cierre'
-    ];
-
-    const filas = reservasFiltradas.map(r => {
-      const saldo = calcularSaldo(r);
-      const pagado = (r.valor_total || 0) - saldo;
-      const cliNom = obtenerNombreClienteHistorico(r).replace(/"/g, '""');
-      const finNom = obtenerNombreFincaHistorico(r).replace(/"/g, '""');
-      const tel = (obtenerContactoClienteHistorico(r).whatsapp || obtenerContactoClienteHistorico(r).telefono || '').replace(/"/g, '""');
-      const responsable = (r.cerrada_por || r.cierre?.responsable || '').replace(/"/g, '""');
-
-      return [
-        `"EXP-${r.id.slice(0, 8).toUpperCase()}"`,
-        `"${finNom}"`,
-        `"${cliNom}"`,
-        `"${tel}"`,
-        `"${r.fecha_inicio || ''}"`,
-        `"${r.fecha_fin || ''}"`,
-        r.personas || 1,
-        r.valor_total || 0,
-        pagado,
-        saldo,
-        `"${r.estado || 'activa'}"`,
-        `"${r.fecha_cierre || ''}"`,
-        `"${responsable}"`
-      ].join(',');
-    });
-
-    const csvContent = '\uFEFF' + [encabezados.join(','), ...filas].join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Historial_Operaciones_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    showToast('Reporte CSV de operaciones descargado ✅', 'success');
-  };
-
-  const handleDescargaDirectaExpediente = (r: Reserva) => {
-    setDescargandoId(r.id);
-    setTimeout(() => {
-      try {
-        generarExpedienteCompleto(r, r.cierre, configuracion);
-        showToast('Expediente histórico PDF generado ✅', 'success');
-      } catch (err: any) {
-        showToast(`Error generando PDF: ${err.message || err}`, 'error');
-      } finally {
-        setDescargandoId(null);
-      }
-    }, 100);
-  };
-
-  const hayFiltrosActivos = Boolean(
-    filtros.busqueda ||
-    filtros.fechaDesde ||
-    filtros.fechaHasta ||
-    filtros.mes !== 'todos' ||
-    filtros.anio !== 'todos' ||
-    filtros.fincaId !== 'todas' ||
-    filtros.clienteId !== 'todos' ||
-    filtros.estado !== 'todas'
-  );
+    busquedaInput,
+    setBusquedaInput,
+    chartTab,
+    setChartTab,
+    mostrarGraficos,
+    toggleMostrarGraficos,
+    serieTiempo,
+    distribucionFincas,
+    estadosCierre,
+    sincronizando,
+    globalLoading,
+    handleSincronizarEnVivo,
+    handleExportarCsv,
+    handleDescargaDirectaExpediente,
+    descargandoId,
+    reservaParaExpediente,
+    setReservaParaExpediente,
+    reservaParaCerrar,
+    setReservaParaCerrar,
+    configuracion,
+    userEmail,
+    onCerrarReserva,
+    onReabrirReserva,
+    onRegistrarComunicacion,
+    showToast,
+  } = useHistorialController(props);
 
   return (
     <ErrorBoundary fallbackTitle="Error al cargar el Historial">
@@ -552,8 +401,8 @@ export const AdminHistorial: React.FC<AdminHistorialProps> = ({
               <div style={{ position: 'relative' }}>
                 <input
                   type="text"
-                  value={filtros.busqueda}
-                  onChange={(e) => setFiltros((p) => ({ ...p, busqueda: e.target.value }))}
+                  value={busquedaInput}
+                  onChange={(e) => setBusquedaInput(e.target.value)}
                   placeholder="Cliente, Finca, ID…"
                   style={{ fontSize: '0.8rem', paddingLeft: '1.9rem', borderRadius: '8px' }}
                 />
