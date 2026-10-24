@@ -1906,17 +1906,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const guardarCliente = async (datos: Partial<Cliente>): Promise<{ success: boolean; id?: string; error?: string }> => {
     try {
-      const isNew = !datos.id;
-      const cid = datos.id || generarUUID();
+      // Deduplicación y vinculación inteligente por número de teléfono
+      let cid = datos.id;
+      let clienteExistente: Cliente | undefined;
+      const telInput = (datos.telefono || datos.whatsapp || '').replace(/\D/g, '');
+      const telInputNorm = telInput.startsWith('57') && telInput.length === 12 ? telInput.slice(2) : telInput;
+
+      if (!cid && telInputNorm.length >= 7) {
+        clienteExistente = clientes.find(c => {
+          const cTel = (c.telefono || c.whatsapp || '').replace(/\D/g, '');
+          const cTelNorm = cTel.startsWith('57') && cTel.length === 12 ? cTel.slice(2) : cTel;
+          return cTelNorm.length >= 7 && cTelNorm === telInputNorm;
+        });
+
+        if (clienteExistente) {
+          cid = clienteExistente.id;
+        }
+      }
+
+      const isNew = !cid;
+      cid = cid || generarUUID();
 
       const clienteObj: Cliente = {
         id: cid,
-        nombre: datos.nombre || '',
-        apellido: datos.apellido || null,
-        telefono: datos.telefono || null,
-        whatsapp: datos.whatsapp || null,
-        correo: datos.correo || null,
-        observaciones: datos.observaciones || null,
+        nombre: datos.nombre || clienteExistente?.nombre || '',
+        apellido: datos.apellido !== undefined ? datos.apellido : (clienteExistente?.apellido || null),
+        telefono: datos.telefono || clienteExistente?.telefono || null,
+        whatsapp: datos.whatsapp || clienteExistente?.whatsapp || null,
+        correo: datos.correo || clienteExistente?.correo || null,
+        observaciones: datos.observaciones || clienteExistente?.observaciones || null,
         activo: true,
       };
 

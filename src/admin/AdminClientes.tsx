@@ -1,15 +1,12 @@
 import React from 'react';
 import {
   Users, Plus, Edit3, Trash2, Phone, Mail, MessageCircle, X, Save,
-  Search, Hash, History, Calendar, Check, Copy, Award, Home, Utensils,
-  DollarSign, Sparkles
+  Search, Hash, History, Check, Copy, Award, Sparkles, ChevronLeft,
+  ChevronRight, ArrowUpDown
 } from 'lucide-react';
-import type { Cliente, Reserva, CotizacionDB, Finca } from '../types';
 import { abrirWhatsApp, generarUrlWhatsApp } from '../services/whatsapp';
 import {
   useClientesController,
-  formatCOP,
-  calcularNoches,
   type UseClientesControllerParams,
 } from './useClientesController';
 
@@ -18,10 +15,19 @@ export type AdminClientesProps = UseClientesControllerParams;
 export const AdminClientes: React.FC<AdminClientesProps> = (props) => {
   const {
     clientes,
+    clientesConHistorial,
     filtrados,
     clienteSeleccionado,
     busqueda,
     setBusqueda,
+    paginaActual,
+    itemsPorPagina,
+    totalPaginas,
+    clientesPaginados,
+    irAPagina,
+    irAnterior,
+    irSiguiente,
+    cambiarItemsPorPagina,
     form,
     setForm,
     editando,
@@ -30,124 +36,184 @@ export const AdminClientes: React.FC<AdminClientesProps> = (props) => {
     abrirEdicion,
     cerrar,
     handleGuardar,
-    clienteDetalleId,
     setClienteDetalleId,
     copiadoId,
     copiarConsecutivo,
     handleEliminar,
   } = useClientesController(props);
 
+  const inicioRango = (paginaActual - 1) * itemsPorPagina + 1;
+  const finRango = Math.min(paginaActual * itemsPorPagina, filtrados.length);
+
   return (
-    <div className="panel">
-      <div className="panel-header">
+    <div className="relative overflow-hidden rounded-[var(--rad-md)] bg-[var(--surface)] border border-[var(--border)] p-5 md:p-6 shadow-[var(--sh-md)] transition-all duration-300">
+      {/* Luz ambiental sutil decorativa (High-End Fincas UI/UX) */}
+      <div className="pointer-events-none absolute -top-28 -right-28 h-56 w-56 rounded-full bg-[var(--accent)]/5 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-28 -left-28 h-56 w-56 rounded-full bg-[var(--primary)]/5 blur-3xl" />
+
+      {/* CABECERA DEL PANEL */}
+      <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-[var(--border)]">
         <div>
-          <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-            <Users size={18} /> Directorio de Clientes y Consecutivos
+          <div className="flex items-center gap-2.5 text-lg font-bold text-[var(--text)] font-['var(--font-dashboard)']">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20">
+              <Users size={18} />
+            </div>
+            <span>Directorio de Clientes y Consecutivos</span>
           </div>
-          <div className="text-xs text-muted mt-1">
-            {clientes.length} cliente{clientes.length !== 1 ? 's' : ''} registrados · Historial, seguimiento por consecutivo y cotizaciones
-          </div>
+          <p className="text-xs text-[var(--text-muted)] mt-1.5 leading-relaxed flex items-center gap-2 flex-wrap">
+            <span><strong>{clientesConHistorial.length}</strong> clientes consolidados por teléfono</span>
+            <span>•</span>
+            <span className="inline-flex items-center gap-1 text-[var(--primary)] font-medium">
+              <ArrowUpDown size={12} /> Ordenados del consecutivo más reciente al más antiguo
+            </span>
+          </p>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={abrirNuevo}>
-          <Plus size={14} /> Nuevo cliente
+
+        <button
+          onClick={abrirNuevo}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-[var(--rad-sm)] bg-[var(--accent)] text-[#141210] font-semibold text-xs tracking-wide shadow-[0_2px_10px_rgba(212,146,74,0.25)] transition-all duration-200 hover:brightness-110 hover:shadow-[0_4px_18px_rgba(212,146,74,0.4)] active:scale-[0.98]"
+        >
+          <Plus size={15} /> Nuevo cliente
         </button>
       </div>
 
-      {/* Buscador inteligente */}
-      <div style={{ padding: '0 0 1rem 0' }}>
-        <div className="field" style={{ position: 'relative', margin: 0 }}>
-          <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+      {/* BARRA DE BÚSQUEDA Y CONTROLES */}
+      <div className="relative z-10 py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-lg">
+          <Search
+            size={15}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none"
+          />
           <input
             type="text"
-            placeholder="Buscar por consecutivo (ej: 1001), nombre, celular o finca…"
+            placeholder="Buscar por consecutivo (#1001), nombre, celular o correo…"
             value={busqueda}
-            onChange={e => setBusqueda(e.target.value)}
-            style={{ paddingLeft: '2rem' }}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="w-full pl-9 pr-9 py-2.5 text-xs rounded-[var(--rad-xs)] bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] placeholder:text-[var(--text-muted)]/60 outline-none transition-all duration-200 focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] focus:shadow-[0_0_12px_rgba(212,146,74,0.2)]"
           />
+          {busqueda && (
+            <button
+              type="button"
+              onClick={() => setBusqueda('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text)] p-0.5"
+              title="Limpiar búsqueda"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
-        {busqueda && (
-          <div className="text-xs text-muted" style={{ marginTop: '0.35rem' }}>
-            Resultados de búsqueda: <strong>{filtrados.length}</strong> cliente{filtrados.length !== 1 ? 's' : ''} encontrado{filtrados.length !== 1 ? 's' : ''}
+
+        <div className="flex items-center justify-between sm:justify-end gap-3 text-xs text-[var(--text-muted)]">
+          {busqueda ? (
+            <span>
+              Encontrados: <strong className="text-[var(--text)]">{filtrados.length}</strong>
+            </span>
+          ) : (
+            <span>
+              Mostrando <strong className="text-[var(--text)]">{filtrados.length > 0 ? `${inicioRango} - ${finRango}` : '0'}</strong> de <strong className="text-[var(--text)]">{filtrados.length}</strong>
+            </span>
+          )}
+
+          <div className="flex items-center gap-1.5 pl-2 border-l border-[var(--border)]">
+            <span className="hidden md:inline">Filas:</span>
+            <select
+              value={itemsPorPagina}
+              onChange={(e) => cambiarItemsPorPagina(Number(e.target.value))}
+              className="bg-[var(--surface-2)] text-[var(--text)] text-xs border border-[var(--border)] rounded px-2 py-1 outline-none cursor-pointer focus:border-[var(--accent)]"
+            >
+              <option value={8}>8</option>
+              <option value={15}>15</option>
+              <option value={25}>25</option>
+            </select>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* TABLA PRINCIPAL DE 3 COLUMNAS SOLICITADAS + DETALLE DE COTIZACIÓN */}
-      <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--rad-xs)', background: 'var(--bg-card)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '780px' }}>
-          <thead>
-            <tr style={{ background: 'var(--surface-sunken)', borderBottom: '1px solid var(--border)', fontSize: '0.76rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              <th style={{ padding: '0.75rem 1rem', width: '22%' }}>Cliente / Nombre</th>
-              <th style={{ padding: '0.75rem 1rem', width: '18%' }}>Celular / WhatsApp</th>
-              <th style={{ padding: '0.75rem 1rem', width: '15%' }}>Consecutivo</th>
-              <th style={{ padding: '0.75rem 1rem', width: '30%' }}>Cotización (Finca, Días y Menú)</th>
-              <th style={{ padding: '0.75rem 1rem', width: '15%', textAlign: 'right' }}>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtrados.length === 0 ? (
+      {/* CONTENEDOR DE LA TABLA (BLINDADO CONTRA DESBORDES LATERALES Y VERTICALES) */}
+      <div className="relative z-10 w-full max-w-full overflow-hidden rounded-[var(--rad-sm)] border border-[var(--border)] bg-[var(--surface-2)]">
+        <div className="w-full overflow-x-auto max-h-[540px] overflow-y-auto">
+          <table className="w-full border-collapse text-left text-xs table-auto md:table-fixed">
+            <thead className="sticky top-0 z-20 bg-[var(--surface-3)] border-b border-[var(--border)] text-[0.72rem] text-[var(--text-muted)] uppercase tracking-wider font-semibold">
               <tr>
-                <td colSpan={5} style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  {busqueda ? `Sin resultados para "${busqueda}".` : 'No hay clientes registrados aún en el sistema.'}
-                </td>
+                <th className="py-3 px-4 w-[32%]">Cliente / Contacto</th>
+                <th className="py-3 px-4 w-[26%]">Celular / WhatsApp</th>
+                <th className="py-3 px-4 w-[27%]">Historial de Consecutivos</th>
+                <th className="py-3 px-4 w-[15%] text-right">Acciones</th>
               </tr>
-            ) : (
-              filtrados.map(item => {
-                const c = item.cliente;
-                const telWhatsApp = (c.whatsapp || c.telefono || '').replace(/\D/g, '');
-                const noches = calcularNoches(item.fechaInicio, item.fechaFin);
-
-                return (
-                  <tr
-                    key={c.id}
-                    style={{
-                      borderBottom: '1px solid var(--border)',
-                      transition: 'background 0.15s ease',
-                      fontSize: '0.82rem',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-sunken)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                  >
-                    {/* COLUMNA 1: NOMBRE DEL CLIENTE */}
-                    <td style={{ padding: '0.75rem 1rem', verticalAlign: 'top' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-                        <strong style={{ fontSize: '0.88rem', color: 'var(--text-main)' }}>
-                          {c.nombre} {c.apellido || ''}
-                        </strong>
-                        {item.esRecurrente && (
-                          <span className="status-badge s-avail" style={{ fontSize: '0.62rem', padding: '0.1rem 0.35rem' }}>
-                            <Award size={9} /> Frecuente
-                          </span>
-                        )}
-                        {item.esNuevoWeb && (
-                          <span style={{
-                            fontSize: '0.62rem',
-                            padding: '0.1rem 0.35rem',
-                            borderRadius: '4px',
-                            background: 'rgba(26, 107, 94, 0.10)',
-                            color: 'var(--primary)',
-                            fontWeight: 600,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.2rem'
-                          }}>
-                            <Sparkles size={9} /> Web
-                          </span>
-                        )}
+            </thead>
+            <tbody className="divide-y divide-[var(--border)]">
+              {filtrados.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-12 px-4 text-center text-[var(--text-muted)] text-sm">
+                    {busqueda ? (
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <Search size={22} className="opacity-40 text-[var(--accent)]" />
+                        <p>No se encontraron clientes con el término <strong>"{busqueda}"</strong>.</p>
+                        <button
+                          onClick={() => setBusqueda('')}
+                          className="text-xs text-[var(--primary)] hover:underline mt-1"
+                        >
+                          Limpiar filtro de búsqueda
+                        </button>
                       </div>
-                      {c.correo && (
-                        <div className="text-xs text-muted" style={{ marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <Mail size={10} /> {c.correo}
-                        </div>
-                      )}
-                    </td>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <Users size={24} className="opacity-40 text-[var(--text-muted)]" />
+                        <p>No hay clientes registrados aún en el directorio.</p>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ) : (
+                clientesPaginados.map((item) => {
+                  const c = item.cliente;
+                  const telWhatsApp = (c.whatsapp || c.telefono || '').replace(/\D/g, '');
+                  const tieneConsecutivos = item.consecutivos.length > 0;
 
-                    {/* COLUMNA 2: CELULAR / WHATSAPP */}
-                    <td style={{ padding: '0.75rem 1rem', verticalAlign: 'top' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                        {(c.telefono || c.whatsapp) ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                            <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-main)' }}>
+                  return (
+                    <tr
+                      key={c.id}
+                      className="transition-colors duration-150 hover:bg-[var(--surface-3)]/60 text-xs"
+                    >
+                      {/* COLUMNA 1: CLIENTE / CONTACTO */}
+                      <td className="py-3 px-4 align-middle">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <strong className="text-sm font-semibold text-[var(--text)]">
+                              {c.nombre} {c.apellido || ''}
+                            </strong>
+                            {item.esRecurrente && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[0.62rem] font-semibold bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/20">
+                                <Award size={10} /> Frecuente
+                              </span>
+                            )}
+                            {item.esNuevoWeb && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[0.62rem] font-semibold bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20">
+                                <Sparkles size={10} /> Web
+                              </span>
+                            )}
+                          </div>
+
+                          {c.correo && (
+                            <div className="text-[0.72rem] text-[var(--text-muted)] flex items-center gap-1.5 truncate max-w-[260px]">
+                              <Mail size={11} className="flex-shrink-0 opacity-70" />
+                              <span className="truncate">{c.correo}</span>
+                            </div>
+                          )}
+
+                          {c.observaciones && (
+                            <div className="text-[0.68rem] text-[var(--text-muted)]/80 italic truncate max-w-[280px]">
+                              {c.observaciones}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* COLUMNA 2: CELULAR / WHATSAPP (SIN BOTONES REDUNDANTES) */}
+                      <td className="py-3 px-4 align-middle">
+                        {c.telefono || c.whatsapp ? (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-xs font-semibold text-[var(--text)]">
                               {c.telefono || c.whatsapp}
                             </span>
                             {telWhatsApp && (
@@ -157,202 +223,272 @@ export const AdminClientes: React.FC<AdminClientesProps> = (props) => {
                                   e.preventDefault();
                                   abrirWhatsApp(telWhatsApp, '');
                                 }}
-                                className="btn btn-sm"
-                                title="Abrir chat de WhatsApp (Desktop PC / Web)"
-                                style={{
-                                  padding: '0.15rem 0.45rem',
-                                  fontSize: '0.68rem',
-                                  color: '#25d366',
-                                  borderColor: 'rgba(37, 211, 102, 0.35)',
-                                  background: 'rgba(37, 211, 102, 0.08)',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.25rem',
-                                  cursor: 'pointer',
-                                  textDecoration: 'none',
-                                }}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.68rem] font-medium text-[#25d366] bg-[#25d366]/10 border border-[#25d366]/30 hover:bg-[#25d366]/20 transition-all cursor-pointer"
+                                title="Abrir chat directo de WhatsApp"
                               >
                                 <MessageCircle size={11} /> WhatsApp
                               </a>
                             )}
                           </div>
                         ) : (
-                          <span className="text-xs text-muted" style={{ fontStyle: 'italic' }}>Sin teléfono</span>
+                          <span className="text-[0.72rem] text-[var(--text-muted)] italic">
+                            Sin celular registrado
+                          </span>
                         )}
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* COLUMNA 3: CONSECUTIVO */}
-                    <td style={{ padding: '0.75rem 1rem', verticalAlign: 'top' }}>
-                      {item.consecutivos.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                          {item.consecutivos.map(cons => (
-                            <button
-                              key={cons}
-                              type="button"
-                              onClick={() => copiarConsecutivo(cons)}
-                              title="Clic para copiar este consecutivo de seguimiento"
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.3rem',
-                                fontFamily: 'monospace',
-                                fontSize: '0.74rem',
-                                fontWeight: 700,
-                                padding: '0.15rem 0.5rem',
-                                background: copiadoId === cons ? 'rgba(34,197,94,0.12)' : 'rgba(26, 107, 94, 0.08)',
-                                color: copiadoId === cons ? '#16a34a' : 'var(--primary)',
-                                border: `1px solid ${copiadoId === cons ? 'rgba(34,197,94,0.4)' : 'rgba(26, 107, 94, 0.25)'}`,
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                width: 'fit-content',
-                                transition: 'all 0.15s ease',
-                              }}
-                            >
-                              {copiadoId === cons ? <Check size={10} /> : <Hash size={10} />}
-                              {cons}
-                              <Copy size={9} style={{ opacity: 0.5 }} />
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted" style={{ fontStyle: 'italic' }}>Sin consecutivo</span>
-                      )}
-                    </td>
+                      {/* COLUMNA 3: HISTORIAL DE CONSECUTIVOS VINCULADOS (ORDENADOS DEL MÁS RECIENTE AL MÁS ANTIGUO) */}
+                      <td className="py-3 px-4 align-middle">
+                        {tieneConsecutivos ? (
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {item.consecutivos.map((cons, index) => {
+                                const esElMasReciente = index === 0;
+                                const copiado = copiadoId === cons;
 
-                    {/* COLUMNA 4: DETALLE DE COTIZACIÓN (FINCA, DÍAS Y MENÚ) */}
-                    <td style={{ padding: '0.75rem 1rem', verticalAlign: 'top' }}>
-                      {item.fincaNombre || item.fechaInicio || item.menuNombre ? (
-                        <div style={{ display: 'grid', gap: '0.25rem', fontSize: '0.78rem' }}>
-                          {/* Finca */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-main)', fontWeight: 600 }}>
-                            <Home size={12} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                            <span>{item.fincaNombre || 'Finca por asignar'}</span>
+                                return (
+                                  <button
+                                    key={cons}
+                                    type="button"
+                                    onClick={() => copiarConsecutivo(cons)}
+                                    title={
+                                      esElMasReciente
+                                        ? `Consecutivo más reciente #${cons} (Clic para copiar)`
+                                        : `Consecutivo previo #${cons} (Clic para copiar)`
+                                    }
+                                    className={`inline-flex items-center gap-1 font-mono text-[0.72rem] font-bold px-2 py-0.5 rounded border transition-all cursor-pointer active:scale-95 ${
+                                      copiado
+                                        ? 'bg-[var(--success)]/20 text-[var(--success)] border-[var(--success)]'
+                                        : esElMasReciente
+                                        ? 'bg-[var(--primary)]/15 text-[var(--primary)] border-[var(--primary)]/40 hover:border-[var(--primary)] shadow-sm'
+                                        : 'bg-[var(--surface-3)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--text-muted)] hover:text-[var(--text)]'
+                                    }`}
+                                  >
+                                    {copiado ? (
+                                      <Check size={10} className="text-[var(--success)]" />
+                                    ) : (
+                                      <Hash size={10} className="opacity-60" />
+                                    )}
+                                    <span>{cons}</span>
+                                    <Copy size={9} className="opacity-40 ml-0.5" />
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <span className="text-[0.66rem] text-[var(--text-muted)]">
+                              {item.consecutivos.length === 1
+                                ? '1 estancia vinculada'
+                                : `${item.consecutivos.length} estancias vinculadas`}
+                            </span>
                           </div>
-
-                          {/* Días / Fechas */}
-                          {item.fechaInicio && item.fechaFin ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-muted)', fontSize: '0.74rem' }}>
-                              <Calendar size={11} style={{ flexShrink: 0 }} />
-                              <span>
-                                {item.fechaInicio} al {item.fechaFin} ({noches} noche{noches !== 1 ? 's' : ''})
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="text-xs text-muted" style={{ fontStyle: 'italic' }}>Fechas sin definir</div>
-                          )}
-
-                          {/* Menú / Plan de alimentación */}
-                          {item.menuNombre && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-muted)', fontSize: '0.74rem' }}>
-                              <Utensils size={11} style={{ flexShrink: 0, color: '#f59e0b' }} />
-                              <span>{item.menuNombre}</span>
-                            </div>
-                          )}
-
-                          {/* Personas y Total */}
-                          {(item.personas || item.totalEstimado) && (
-                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.15rem', flexWrap: 'wrap' }}>
-                              {item.personas && (
-                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                  👥 {item.personas} pers.
-                                </span>
-                              )}
-                              {item.totalEstimado && (
-                                <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--primary)' }}>
-                                  {formatCOP(item.totalEstimado)}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted" style={{ fontStyle: 'italic' }}>Sin cotización activa</span>
-                      )}
-                    </td>
-
-                    {/* COLUMNA 5: ACCIONES */}
-                    <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle', textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
-                        {(c.whatsapp || c.telefono) && (
-                          <a
-                            href={generarUrlWhatsApp(c.whatsapp || c.telefono || '', '')}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              abrirWhatsApp(c.whatsapp || c.telefono || '', '');
-                            }}
-                            className="btn btn-sm"
-                            title="Abrir chat de WhatsApp (Desktop PC / Web)"
-                            style={{ padding: '0.3rem 0.5rem', color: '#16a34a', borderColor: '#bbf7d0', background: '#f0fdf4', cursor: 'pointer' }}
-                          >
-                            <MessageCircle size={13} />
-                          </a>
+                        ) : (
+                          <span className="text-[0.72rem] text-[var(--text-muted)] italic">
+                            Sin reservas con consecutivo
+                          </span>
                         )}
-                        <button
-                          className="btn btn-sm"
-                          onClick={() => setClienteDetalleId(c.id)}
-                          title="Ver expediente e historial completo"
-                          style={{ fontSize: '0.75rem', padding: '0.3rem 0.55rem', gap: '0.25rem', fontWeight: 500 }}
-                        >
-                          <History size={12} /> Expediente
-                        </button>
-                        <button className="btn btn-sm" onClick={() => abrirEdicion(c)} title="Editar cliente" style={{ padding: '0.3rem 0.5rem' }}>
-                          <Edit3 size={13} />
-                        </button>
-                        <button className="btn btn-sm btn-danger" onClick={() => handleEliminar(c)} title="Eliminar cliente definitivamente" style={{ padding: '0.3rem 0.5rem' }}>
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                      </td>
 
-      {/* FORMULARIO EDITAR / NUEVO CLIENTE (MODAL) */}
-      {editando && (
-        <div className="modal-overlay" onClick={cerrar}>
-          <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px' }}>
-            <div className="modal-header">
-              <div className="panel-title">{form.id ? 'Editar cliente' : 'Nuevo cliente'}</div>
-              <button className="btn btn-sm" onClick={cerrar}><X size={14} /></button>
+                      {/* COLUMNA 4: ACCIONES (LIMPIAS Y SIN REDUNDANCIAS) */}
+                      <td className="py-3 px-4 align-middle text-right">
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-[var(--surface-3)] text-[var(--text)] border border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all"
+                            onClick={() => setClienteDetalleId(c.id)}
+                            title="Ver expediente e historial de consecutivos"
+                          >
+                            <History size={12} />
+                            <span className="hidden lg:inline">Historial</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            className="p-1.5 rounded bg-[var(--surface-3)] text-[var(--text)] border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-all"
+                            onClick={() => abrirEdicion(c)}
+                            title="Editar datos del cliente"
+                          >
+                            <Edit3 size={13} />
+                          </button>
+
+                          <button
+                            type="button"
+                            className="p-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-all"
+                            onClick={() => handleEliminar(item)}
+                            title="Eliminar cliente definitivamente"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* BARRA DE PAGINACIÓN (EVITA LA EXPANSIÓN INFINITA HACIA ABAJO) */}
+        {filtrados.length > 0 && (
+          <div className="flex items-center justify-between px-4 py-3 bg-[var(--surface-3)] border-t border-[var(--border)] text-xs text-[var(--text-muted)] flex-wrap gap-2">
+            <div>
+              Página <strong className="text-[var(--text)]">{paginaActual}</strong> de <strong className="text-[var(--text)]">{totalPaginas}</strong>
             </div>
 
-            <form onSubmit={handleGuardar} style={{ display: 'grid', gap: '0.75rem', padding: '1.25rem' }}>
-              <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                <div className="field">
-                  <label>Nombre *</label>
-                  <input value={form.nombre || ''} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} placeholder="Nombre" />
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={irAnterior}
+                disabled={paginaActual <= 1}
+                className="p-1.5 rounded border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] hover:border-[var(--accent)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                title="Página anterior"
+              >
+                <ChevronLeft size={14} />
+              </button>
+
+              {Array.from({ length: totalPaginas }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPaginas || Math.abs(p - paginaActual) <= 1)
+                .map((p, idx, arr) => {
+                  const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
+                  return (
+                    <React.Fragment key={p}>
+                      {showEllipsis && <span className="px-1 text-[var(--text-muted)]">…</span>}
+                      <button
+                        type="button"
+                        onClick={() => irAPagina(p)}
+                        className={`min-w-[28px] h-7 px-1 rounded text-xs font-semibold border transition-all ${
+                          p === paginaActual
+                            ? 'bg-[var(--accent)] text-[#141210] border-[var(--accent)] shadow-sm'
+                            : 'bg-[var(--surface-2)] text-[var(--text)] border-[var(--border)] hover:border-[var(--accent)]'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    </React.Fragment>
+                  );
+                })}
+
+              <button
+                type="button"
+                onClick={irSiguiente}
+                disabled={paginaActual >= totalPaginas}
+                className="p-1.5 rounded border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] hover:border-[var(--accent)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                title="Página siguiente"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* MODAL EDITAR / NUEVO CLIENTE */}
+      {editando && (
+        <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={cerrar}>
+          <div
+            className="modal-box w-full max-w-lg rounded-[var(--rad-md)] bg-[var(--surface)] border border-[var(--border)] shadow-[var(--sh-lg)] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border)] bg-[var(--surface-2)]">
+              <div className="font-bold text-sm text-[var(--text)] flex items-center gap-2">
+                <Users size={16} className="text-[var(--primary)]" />
+                <span>{form.id ? 'Editar cliente' : 'Registrar nuevo cliente'}</span>
+              </div>
+              <button
+                type="button"
+                className="text-[var(--text-muted)] hover:text-[var(--text)] p-1 rounded"
+                onClick={cerrar}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardar} className="p-5 flex flex-col gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="field flex flex-col gap-1">
+                  <label className="text-xs font-medium text-[var(--text-muted)]">Nombre *</label>
+                  <input
+                    required
+                    value={form.nombre || ''}
+                    onChange={(e) => setForm((p) => ({ ...p, nombre: e.target.value }))}
+                    placeholder="Ej. Juan"
+                    className="w-full px-3 py-2 text-xs rounded bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] outline-none focus:border-[var(--accent)]"
+                  />
                 </div>
-                <div className="field">
-                  <label>Apellido</label>
-                  <input value={form.apellido || ''} onChange={e => setForm(p => ({ ...p, apellido: e.target.value }))} placeholder="Apellido" />
+
+                <div className="field flex flex-col gap-1">
+                  <label className="text-xs font-medium text-[var(--text-muted)]">Apellido</label>
+                  <input
+                    value={form.apellido || ''}
+                    onChange={(e) => setForm((p) => ({ ...p, apellido: e.target.value }))}
+                    placeholder="Ej. Pérez"
+                    className="w-full px-3 py-2 text-xs rounded bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] outline-none focus:border-[var(--accent)]"
+                  />
                 </div>
-                <div className="field">
-                  <label><Phone size={11} style={{ display:'inline', verticalAlign:'-1px' }} /> Celular / Teléfono</label>
-                  <input value={form.telefono || ''} onChange={e => setForm(p => ({ ...p, telefono: e.target.value }))} placeholder="Ej. 3001234567" />
+
+                <div className="field flex flex-col gap-1">
+                  <label className="text-xs font-medium text-[var(--text-muted)] flex items-center gap-1">
+                    <Phone size={11} /> Celular / Teléfono
+                  </label>
+                  <input
+                    value={form.telefono || ''}
+                    onChange={(e) => setForm((p) => ({ ...p, telefono: e.target.value }))}
+                    placeholder="Ej. 3001234567"
+                    className="w-full px-3 py-2 text-xs rounded bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] outline-none focus:border-[var(--accent)]"
+                  />
                 </div>
-                <div className="field">
-                  <label><MessageCircle size={11} style={{ display:'inline', verticalAlign:'-1px', color:'#25d366' }} /> WhatsApp</label>
-                  <input value={form.whatsapp || ''} onChange={e => setForm(p => ({ ...p, whatsapp: e.target.value }))} placeholder="Ej. 573001234567" />
+
+                <div className="field flex flex-col gap-1">
+                  <label className="text-xs font-medium text-[var(--text-muted)] flex items-center gap-1">
+                    <MessageCircle size={11} className="text-[#25d366]" /> WhatsApp
+                  </label>
+                  <input
+                    value={form.whatsapp || ''}
+                    onChange={(e) => setForm((p) => ({ ...p, whatsapp: e.target.value }))}
+                    placeholder="Ej. 573001234567"
+                    className="w-full px-3 py-2 text-xs rounded bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] outline-none focus:border-[var(--accent)]"
+                  />
                 </div>
-                <div className="field" style={{ gridColumn: '1 / -1' }}>
-                  <label><Mail size={11} style={{ display:'inline', verticalAlign:'-1px' }} /> Correo electrónico</label>
-                  <input type="email" value={form.correo || ''} onChange={e => setForm(p => ({ ...p, correo: e.target.value }))} placeholder="correo@ejemplo.com" />
+
+                <div className="field sm:col-span-2 flex flex-col gap-1">
+                  <label className="text-xs font-medium text-[var(--text-muted)] flex items-center gap-1">
+                    <Mail size={11} /> Correo electrónico
+                  </label>
+                  <input
+                    type="email"
+                    value={form.correo || ''}
+                    onChange={(e) => setForm((p) => ({ ...p, correo: e.target.value }))}
+                    placeholder="correo@ejemplo.com"
+                    className="w-full px-3 py-2 text-xs rounded bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] outline-none focus:border-[var(--accent)]"
+                  />
                 </div>
-                <div className="field" style={{ gridColumn: '1 / -1' }}>
-                  <label>Observaciones</label>
-                  <textarea rows={3} value={form.observaciones || ''} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} placeholder="Preferencias, notas, etc…" />
+
+                <div className="field sm:col-span-2 flex flex-col gap-1">
+                  <label className="text-xs font-medium text-[var(--text-muted)]">Observaciones / Notas</label>
+                  <textarea
+                    rows={3}
+                    value={form.observaciones || ''}
+                    onChange={(e) => setForm((p) => ({ ...p, observaciones: e.target.value }))}
+                    placeholder="Preferencias, fincas de interés o notas internas…"
+                    className="w-full px-3 py-2 text-xs rounded bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)] outline-none focus:border-[var(--accent)] resize-none"
+                  />
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
-                <button type="button" className="btn" onClick={cerrar}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" disabled={guardando}>
-                  <Save size={14} /> {guardando ? 'Guardando…' : 'Guardar cliente'}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--border)]">
+                <button
+                  type="button"
+                  onClick={cerrar}
+                  className="px-4 py-2 text-xs font-medium rounded text-[var(--text)] border border-[var(--border)] hover:bg-[var(--surface-2)] transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardando}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded bg-[var(--accent)] text-[#141210] hover:brightness-110 disabled:opacity-50 transition-all shadow-sm"
+                >
+                  <Save size={13} /> {guardando ? 'Guardando…' : 'Guardar cliente'}
                 </button>
               </div>
             </form>
@@ -360,28 +496,54 @@ export const AdminClientes: React.FC<AdminClientesProps> = (props) => {
         </div>
       )}
 
-      {/* MODAL EXPEDIENTE E HISTORIAL DEL CLIENTE */}
+      {/* MODAL EXPEDIENTE E HISTORIAL DEL CLIENTE (ENFOCADO EN CRM Y CONSECUTIVOS) */}
       {clienteSeleccionado && (
-        <div className="modal-overlay" onClick={() => setClienteDetalleId(null)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px', maxHeight: '85vh', overflowY: 'auto' }}>
-            <div className="modal-header">
-              <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                <Users size={16} /> Expediente: {clienteSeleccionado.cliente.nombre} {clienteSeleccionado.cliente.apellido || ''}
+        <div
+          className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setClienteDetalleId(null)}
+        >
+          <div
+            className="modal-box w-full max-w-lg rounded-[var(--rad-md)] bg-[var(--surface)] border border-[var(--border)] shadow-[var(--sh-lg)] overflow-hidden max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal */}
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border)] bg-[var(--surface-2)] flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center w-7 h-7 rounded bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20">
+                  <History size={15} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-[var(--text)]">
+                    Historial de Consecutivos y Expediente
+                  </h3>
+                  <p className="text-[0.68rem] text-[var(--text-muted)]">
+                    Cliente: {clienteSeleccionado.cliente.nombre} {clienteSeleccionado.cliente.apellido || ''}
+                  </p>
+                </div>
               </div>
-              <button className="btn btn-sm" onClick={() => setClienteDetalleId(null)}><X size={14} /></button>
+              <button
+                type="button"
+                className="text-[var(--text-muted)] hover:text-[var(--text)] p-1 rounded"
+                onClick={() => setClienteDetalleId(null)}
+              >
+                <X size={16} />
+              </button>
             </div>
 
-            <div style={{ padding: '1.25rem', display: 'grid', gap: '1rem' }}>
-              <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem', borderRadius: 'var(--rad-xs)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+            {/* Contenido Modal Scrollable */}
+            <div className="p-5 overflow-y-auto flex flex-col gap-4">
+              {/* Tarjeta de Contacto */}
+              <div className="p-3.5 rounded-[var(--rad-xs)] bg-[var(--surface-2)] border border-[var(--border)] flex flex-col gap-2">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                    <h4 className="font-bold text-sm text-[var(--text)]">
                       {clienteSeleccionado.cliente.nombre} {clienteSeleccionado.cliente.apellido || ''}
-                    </div>
-                    <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
-                      📞 {clienteSeleccionado.cliente.telefono || 'Sin celular'} · WhatsApp: {clienteSeleccionado.cliente.whatsapp || 'No registrado'}
+                    </h4>
+                    <div className="text-xs text-[var(--text-muted)] mt-0.5">
+                      📞 {clienteSeleccionado.cliente.telefono || 'Sin teléfono'}
                     </div>
                   </div>
+
                   {clienteSeleccionado.cliente.whatsapp && (
                     <a
                       href={generarUrlWhatsApp(clienteSeleccionado.cliente.whatsapp, '')}
@@ -389,149 +551,104 @@ export const AdminClientes: React.FC<AdminClientesProps> = (props) => {
                         e.preventDefault();
                         abrirWhatsApp(clienteSeleccionado.cliente.whatsapp!, '');
                       }}
-                      className="btn btn-sm"
-                      style={{ color: '#25d366', borderColor: '#25d366', cursor: 'pointer' }}
-                      title="Abrir chat en WhatsApp (Desktop PC / Web)"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium text-[#25d366] bg-[#25d366]/10 border border-[#25d366]/30 hover:bg-[#25d366]/20 transition-all cursor-pointer"
                     >
                       <MessageCircle size={13} /> Chat WhatsApp
                     </a>
                   )}
                 </div>
 
-                {clienteSeleccionado.consecutivos.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)' }}>Consecutivos asociados:</span>
-                    {clienteSeleccionado.consecutivos.map(cons => (
-                      <span
-                        key={cons}
-                        style={{
-                          fontFamily: 'monospace',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          padding: '0.1rem 0.45rem',
-                          background: 'rgba(26, 107, 94, 0.1)',
-                          color: 'var(--primary)',
-                          borderRadius: '4px',
-                          border: '1px solid rgba(26, 107, 94, 0.3)',
-                        }}
-                      >
-                        #{cons}
-                      </span>
-                    ))}
+                {clienteSeleccionado.cliente.correo && (
+                  <div className="text-xs text-[var(--text-muted)] flex items-center gap-1 pt-1 border-t border-[var(--border)]">
+                    <Mail size={12} className="opacity-70" />
+                    <span>{clienteSeleccionado.cliente.correo}</span>
+                  </div>
+                )}
+
+                {clienteSeleccionado.cliente.observaciones && (
+                  <div className="text-xs text-[var(--text-muted)] italic pt-1">
+                    "{clienteSeleccionado.cliente.observaciones}"
                   </div>
                 )}
               </div>
 
-              {/* Resumen económico */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
-                <div style={{ padding: '0.6rem', border: '1px solid var(--border)', borderRadius: 'var(--rad-xs)' }}>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--primary)' }}>
+              {/* Consecutivos Asignados (Ordenados del más reciente al más antiguo) */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[var(--text)] flex items-center gap-1.5">
+                    <Hash size={13} className="text-[var(--primary)]" />
+                    Consecutivos Vinculados a este Número
+                  </span>
+                  <span className="text-[0.68rem] text-[var(--text-muted)]">
+                    Del más reciente al más antiguo
+                  </span>
+                </div>
+
+                {clienteSeleccionado.consecutivos.length === 0 ? (
+                  <p className="text-xs text-[var(--text-muted)] italic py-3 text-center bg-[var(--surface-2)] rounded border border-[var(--border)]">
+                    No hay números de consecutivo vinculados a este cliente aún.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {clienteSeleccionado.consecutivos.map((cons, index) => {
+                      const esElMasReciente = index === 0;
+                      const copiado = copiadoId === cons;
+
+                      return (
+                        <div
+                          key={cons}
+                          onClick={() => copiarConsecutivo(cons)}
+                          title="Clic para copiar consecutivo"
+                          className={`p-2.5 rounded border flex flex-col justify-between transition-all cursor-pointer ${
+                            copiado
+                              ? 'bg-[var(--success)]/15 border-[var(--success)] text-[var(--success)]'
+                              : esElMasReciente
+                              ? 'bg-[var(--primary)]/10 border-[var(--primary)]/40 text-[var(--primary)]'
+                              : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text)] hover:border-[var(--text-muted)]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[0.62rem] font-semibold uppercase tracking-wider opacity-70">
+                              {esElMasReciente ? 'Más reciente' : `Estancia #${clienteSeleccionado.consecutivos.length - index}`}
+                            </span>
+                            {copiado ? <Check size={11} /> : <Copy size={10} className="opacity-50" />}
+                          </div>
+                          <span className="font-mono text-sm font-bold mt-1">
+                            #{cons}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Resumen de actividad */}
+              <div className="grid grid-cols-2 gap-2 text-center pt-2 border-t border-[var(--border)]">
+                <div className="p-2.5 rounded bg-[var(--surface-2)] border border-[var(--border)]">
+                  <div className="text-lg font-bold text-[var(--primary)] font-mono">
+                    {clienteSeleccionado.consecutivos.length}
+                  </div>
+                  <div className="text-[0.68rem] text-[var(--text-muted)]">Consecutivos registrados</div>
+                </div>
+                <div className="p-2.5 rounded bg-[var(--surface-2)] border border-[var(--border)]">
+                  <div className="text-lg font-bold text-[var(--accent)] font-mono">
                     {clienteSeleccionado.reservas.length}
                   </div>
-                  <div className="text-xs text-muted">Reservas totales</div>
-                </div>
-                <div style={{ padding: '0.6rem', border: '1px solid var(--border)', borderRadius: 'var(--rad-xs)' }}>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#16a34a' }}>
-                    {clienteSeleccionado.reservasActivas}
-                  </div>
-                  <div className="text-xs text-muted">Reservas activas</div>
-                </div>
-                <div style={{ padding: '0.6rem', border: '1px solid var(--border)', borderRadius: 'var(--rad-xs)' }}>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '0.15rem' }}>
-                    {formatCOP(clienteSeleccionado.totalGastado)}
-                  </div>
-                  <div className="text-xs text-muted">Total liquidado</div>
+                  <div className="text-[0.68rem] text-[var(--text-muted)]">Reservas en sistema</div>
                 </div>
               </div>
+            </div>
 
-              {/* Listado de reservas */}
-              <div>
-                <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Calendar size={14} /> Reservas Registradas
-                </div>
-                {clienteSeleccionado.reservas.length === 0 ? (
-                  <p className="text-xs text-muted" style={{ fontStyle: 'italic' }}>Sin reservas registradas aún.</p>
-                ) : (
-                  <div style={{ display: 'grid', gap: '0.4rem' }}>
-                    {clienteSeleccionado.reservas.map(r => (
-                      <div
-                        key={r.id}
-                        style={{
-                          padding: '0.6rem 0.75rem',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--rad-xs)',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          fontSize: '0.8rem',
-                        }}
-                      >
-                        <div>
-                          <strong>{r.fincas?.nombre || 'Finca'}</strong>
-                          <span className="text-muted" style={{ marginLeft: '0.5rem', fontSize: '0.74rem' }}>
-                            {r.fecha_inicio} → {r.fecha_fin}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          {r.consecutivo && (
-                            <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem', color: 'var(--primary)' }}>
-                              #{r.consecutivo.match(/\d+/g)?.join('') || r.consecutivo}
-                            </span>
-                          )}
-                          <span className="status-badge" style={{ fontSize: '0.66rem' }}>{r.estado}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Listado de cotizaciones asociadas */}
-              <div>
-                <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Hash size={14} /> Cotizaciones Asociadas
-                </div>
-                {clienteSeleccionado.cotizaciones.length === 0 ? (
-                  <p className="text-xs text-muted" style={{ fontStyle: 'italic' }}>Sin cotizaciones previas.</p>
-                ) : (
-                  <div style={{ display: 'grid', gap: '0.4rem' }}>
-                    {clienteSeleccionado.cotizaciones.map(cot => (
-                      <div
-                        key={cot.id}
-                        style={{
-                          padding: '0.6rem 0.75rem',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--rad-xs)',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          fontSize: '0.8rem',
-                        }}
-                      >
-                        <div>
-                          <strong>{cot.fincas?.nombre || 'Finca'}</strong>
-                          <span className="text-muted" style={{ marginLeft: '0.5rem', fontSize: '0.74rem' }}>
-                            {cot.fecha_inicio} → {cot.fecha_fin} · {formatCOP(cot.total)}
-                          </span>
-                          {cot.alimentacion && (
-                            <div className="text-xs text-muted" style={{ marginTop: '0.15rem' }}>
-                              🍽️ {cot.alimentacion}
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          {cot.consecutivo && (
-                            <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem', color: 'var(--primary)' }}>
-                              #{cot.consecutivo.match(/\d+/g)?.join('') || cot.consecutivo}
-                            </span>
-                          )}
-                          <span className="status-badge" style={{ fontSize: '0.66rem' }}>{cot.estado}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+            {/* Footer Modal */}
+            <div className="p-3 border-t border-[var(--border)] bg-[var(--surface-2)] flex justify-end flex-shrink-0">
+              <button
+                type="button"
+                className="px-4 py-1.5 text-xs font-medium rounded text-[var(--text)] border border-[var(--border)] hover:bg-[var(--surface-3)] transition-all"
+                onClick={() => setClienteDetalleId(null)}
+              >
+                Cerrar expediente
+              </button>
             </div>
           </div>
         </div>
