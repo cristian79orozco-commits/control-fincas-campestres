@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { Finca } from '../types';
 import { useClientStore } from '../store/useClientStore';
+import { getAmenidadInfo } from '../utils/amenidades';
 
 interface FincaCard3DProps {
   finca: Finca;
@@ -372,20 +373,27 @@ export const FincaCard3D = React.memo<FincaCard3DProps>(({
                 color: 'var(--text-muted)',
               }}
             >
-              {finca.finca_amenidades.slice(0, 3).map((a, i) => (
-                <span
-                  key={i}
-                  style={{
-                    background: 'var(--surface-2)',
-                    border: '1px solid var(--border)',
-                    padding: '0.15rem 0.5rem',
-                    borderRadius: '6px',
-                    color: 'var(--text-muted)',
-                  }}
-                >
-                  ✓ {a.nombre}
-                </span>
-              ))}
+              {finca.finca_amenidades.slice(0, 3).map((a, i) => {
+                const info = getAmenidadInfo(a.nombre, a.icono);
+                return (
+                  <span
+                    key={i}
+                    style={{
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border)',
+                      padding: '0.15rem 0.5rem',
+                      borderRadius: '6px',
+                      color: 'var(--text)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.78rem' }}>{info.emoji}</span>
+                    <span>{info.cleanNombre}</span>
+                  </span>
+                );
+              })}
               {finca.finca_amenidades.length > 3 && (
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', alignSelf: 'center', fontStyle: 'italic' }}>
                   +{finca.finca_amenidades.length - 3} más

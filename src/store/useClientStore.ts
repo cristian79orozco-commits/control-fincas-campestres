@@ -3,6 +3,7 @@ import debounce from 'lodash/debounce';
 import sortBy from 'lodash/sortBy';
 import filter from 'lodash/filter';
 import type { Finca, BloqueoDisponibilidad } from '../types';
+import { isAmenidadMatch } from '../utils/amenidades';
 
 export interface ClientStoreState {
   // Filtros reactivos
@@ -224,10 +225,9 @@ export function filtrarFincasCliente(
 
     // 6. Amenidades seleccionadas
     if (amenidades.length > 0) {
-      const amsFinca = (finca.finca_amenidades || []).map((a) => a.nombre.toLowerCase());
+      const fincaAms = finca.finca_amenidades || [];
       const cumpleTodas = amenidades.every((sel) => {
-        const sLower = sel.toLowerCase();
-        return amsFinca.some((af) => af.includes(sLower) || sLower.includes(af));
+        return fincaAms.some((a) => isAmenidadMatch(a.nombre, sel));
       });
       if (!cumpleTodas) return false;
     }

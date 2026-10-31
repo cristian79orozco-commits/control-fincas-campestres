@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Finca, BloqueoDisponibilidad, ContenidoSitio } from '../types';
 import { useClientStore, filtrarFincasCliente } from '../store/useClientStore';
 import { FincaCard3D } from './FincaCard3D';
+import { getAmenidadInfo } from '../utils/amenidades';
 
 interface CatalogProps {
   fincas: Finca[];
@@ -631,6 +632,7 @@ const CatalogComponent: React.FC<CatalogProps> = ({
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
                 {AMENIDADES_FILTRO.map(am => {
                   const activa = amenidades.includes(am);
+                  const info = getAmenidadInfo(am);
                   return (
                     <button
                       key={am}
@@ -652,8 +654,9 @@ const CatalogComponent: React.FC<CatalogProps> = ({
                         boxShadow: activa ? '0 0 12px rgba(212, 146, 74, 0.2)' : 'none',
                       }}
                     >
+                      <span style={{ fontSize: '0.85rem' }}>{info.emoji}</span>
+                      <span>{am}</span>
                       {activa && <Check size={12} />}
-                      {am}
                     </button>
                   );
                 })}

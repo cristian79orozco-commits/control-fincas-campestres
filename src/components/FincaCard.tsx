@@ -4,6 +4,7 @@ import {
   Bed, Bath, Clock, Check, Dog, Volume2, Image as ImageIcon, ArrowRight
 } from 'lucide-react';
 import type { Finca } from '../types';
+import { getAmenidadInfo } from '../utils/amenidades';
 
 interface FincaCardProps {
   finca: Finca;
@@ -268,21 +269,28 @@ export const FincaCard = React.memo<FincaCardProps>(({ finca, onSelect, defaultE
               </span>
             )}
 
-            {(finca.finca_amenidades || []).slice(0, 5).map((a, i) => (
-              <span
-                key={i}
-                className="amenity-chip"
-                style={{
-                  fontSize: '0.72rem',
-                  padding: '0.2rem 0.55rem',
-                  background: 'var(--surface)',
-                  borderRadius: '4px',
-                  border: '1px solid var(--border-subtle)',
-                }}
-              >
-                <Check size={11} style={{ display: 'inline', verticalAlign: '-1px', color: 'var(--primary)' }} /> {a.nombre}
-              </span>
-            ))}
+            {(finca.finca_amenidades || []).slice(0, 5).map((a, i) => {
+              const info = getAmenidadInfo(a.nombre, a.icono);
+              return (
+                <span
+                  key={i}
+                  className="amenity-chip"
+                  style={{
+                    fontSize: '0.72rem',
+                    padding: '0.2rem 0.55rem',
+                    background: 'var(--surface)',
+                    borderRadius: '4px',
+                    border: '1px solid var(--border-subtle)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                  }}
+                >
+                  <span style={{ fontSize: '0.8rem', lineHeight: 1 }}>{info.emoji}</span>
+                  <span>{info.cleanNombre}</span>
+                </span>
+              );
+            })}
           </div>
 
           {/* Barra inferior de acción para cotizar */}

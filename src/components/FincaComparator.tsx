@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import type { Finca } from '../types';
 import { useClientStore } from '../store/useClientStore';
+import { getAmenidadInfo, isAmenidadMatch } from '../utils/amenidades';
 
 interface FincaComparatorProps {
   fincas: Finca[];
@@ -295,16 +296,19 @@ export const FincaComparator: React.FC<FincaComparatorProps> = ({
               </tr>
 
               {/* Amenidades clave */}
-              {todasAmenidades.map((am) => (
-                <tr key={am}>
-                  <td style={{ padding: '0.55rem 0.75rem', fontSize: '0.78rem', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
-                    {am}
-                  </td>
-                  {fincasSeleccionadas.map((f) => {
-                    const tiene = (f.finca_amenidades || []).some(
-                      (a) => a.nombre.toLowerCase() === am.toLowerCase()
-                    );
-                    return (
+              {todasAmenidades.map((am) => {
+                const info = getAmenidadInfo(am);
+                return (
+                  <tr key={am}>
+                    <td style={{ padding: '0.55rem 0.75rem', fontSize: '0.78rem', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ marginRight: '0.35rem' }}>{info.emoji}</span>
+                      {info.cleanNombre}
+                    </td>
+                    {fincasSeleccionadas.map((f) => {
+                      const tiene = (f.finca_amenidades || []).some(
+                        (a) => isAmenidadMatch(a.nombre, am)
+                      );
+                      return (
                       <td
                         key={f.id}
                         style={{
@@ -337,7 +341,8 @@ export const FincaComparator: React.FC<FincaComparatorProps> = ({
                     );
                   })}
                 </tr>
-              ))}
+              );
+            })}
 
               {/* Fila de Botones para Cotizar */}
               <tr>

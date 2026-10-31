@@ -10,6 +10,7 @@ import { GalleryLightbox } from './GalleryLightbox';
 import { CollapsibleSection } from './CollapsibleSection';
 import type { Finca, BloqueoDisponibilidad, Menu, ConfiguracionGeneral } from '../types';
 import type { DatosCotizacionPublica, ResultadoCotizacionPublica } from '../hooks/useCotizadorPublico';
+import { getAmenidadInfo } from '../utils/amenidades';
 
 interface FincaDetailProps {
   finca: Finca;
@@ -376,24 +377,27 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
                   icon={<Check size={15} />}
                 >
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.4rem', paddingTop: '0.5rem' }}>
-                    {finca.finca_amenidades.map((amenidad, idx) => (
-                      <span
-                        key={idx}
-                        style={{
-                          fontSize: '0.74rem',
-                          background: 'var(--surface-sunken)',
-                          padding: '0.35rem 0.55rem',
-                          borderRadius: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          color: 'var(--text-main)',
-                        }}
-                      >
-                        <Check size={12} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{amenidad.nombre}</span>
-                      </span>
-                    ))}
+                    {finca.finca_amenidades.map((amenidad, idx) => {
+                      const info = getAmenidadInfo(amenidad.nombre, amenidad.icono);
+                      return (
+                        <span
+                          key={idx}
+                          style={{
+                            fontSize: '0.74rem',
+                            background: 'var(--surface-sunken)',
+                            padding: '0.35rem 0.55rem',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            color: 'var(--text-main)',
+                          }}
+                        >
+                          <span style={{ fontSize: '0.85rem', flexShrink: 0 }}>{info.emoji}</span>
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{info.cleanNombre}</span>
+                        </span>
+                      );
+                    })}
                   </div>
                 </CollapsibleSection>
               )}
@@ -713,11 +717,15 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
                   icon={<Check size={16} />}
                 >
                   <div className="amenities-grid" style={{ paddingTop: '0.75rem' }}>
-                    {finca.finca_amenidades.map((amenidad, idx) => (
-                      <span key={idx} className="amenity">
-                        <Check size={13} style={{ color: 'var(--primary)' }} /> {amenidad.nombre}
-                      </span>
-                    ))}
+                    {finca.finca_amenidades.map((amenidad, idx) => {
+                      const info = getAmenidadInfo(amenidad.nombre, amenidad.icono);
+                      return (
+                        <span key={idx} className="amenity" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span style={{ fontSize: '1rem', flexShrink: 0 }}>{info.emoji}</span>
+                          <span>{info.cleanNombre}</span>
+                        </span>
+                      );
+                    })}
                   </div>
                 </CollapsibleSection>
               </div>

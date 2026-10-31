@@ -3,6 +3,11 @@ import type { Finca, FincaEstado } from '../types';
 import { supabase, DEFAULT_WA_NUMBER } from '../services/supabase';
 import { optimizarImagen, formatearBytes } from '../utils/imageOptimizer';
 import { useApp } from '../context/AppContext';
+import {
+  getAmenidadInfo,
+  formatAmenidadParaGuardar,
+  isAmenidadMatch,
+} from '../utils/amenidades';
 
 export type FincaFormTabId = 'general' | 'acomodacion' | 'tarifas' | 'bancario' | 'amenidades' | 'politicas' | 'fotos';
 
@@ -104,6 +109,8 @@ export function useFincaFormController({
     { nombre: 'Cocina dotada con electrodomésticos', icono: 'utensils' },
   ]);
   const [nuevaAmenidadTexto, setNuevaAmenidadTexto] = useState('');
+  const [amenidadEmoji, setAmenidadEmoji] = useState('✨');
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [planesSeleccionados, setPlanesSeleccionados] = useState<string[]>([
     'Sin alimentación',
     'Desayuno incluido',
@@ -265,32 +272,65 @@ export function useFincaFormController({
     setActiveTab('general');
   }, []);
 
-  // Acciones de amenidades
-  const toggleAmenidadSugerida = useCallback((sugerida: { nombre: string; icono: string }) => {
+  // Acciones de amenidades con blindaje de lógica y soporte de emojis
+  const toggleAmenidadSugerida = useCallback((sugerida: { nombre: string; icono: string; emoji?: string }) => {
     setAmenidades(prev => {
-      const yaExiste = prev.some(a => a.nombre.toLowerCase() === sugerida.nombre.toLowerCase());
+      const yaExiste = prev.some(a => isAmenidadMatch(a.nombre, sugerida.nombre));
       if (yaExiste) {
-        return prev.filter(a => a.nombre.toLowerCase() !== sugerida.nombre.toLowerCase());
+        return prev.filter(a => !isAmenidadMatch(a.nombre, sugerida.nombre));
       } else {
-        return [...prev, { nombre: sugerida.nombre, icono: sugerida.icono }];
+        const emoji = sugerida.emoji || getAmenidadInfo(sugerida.nombre).emoji;
+        return [...prev, { nombre: sugerida.nombre, icono: emoji || sugerida.icono }];
       }
     });
   }, []);
 
-  const handleAgregarAmenidadPersonalizada = useCallback(() => {
-    const texto = nuevaAmenidadTexto.trim();
-    if (!texto) return;
-    if (amenidades.some(a => a.nombre.toLowerCase() === texto.toLowerCase())) {
+  const handleAgregarAmenidadPersonalizada = useCallback((emojiParam?: string) => {
+    const rawTexto = nuevaAmenidadTexto.trim();
+    if (!rawTexto) {
+      showToast('Escribe el nombre de la comodidad', 'info');
+      return;
+    }
+
+    const emojiToUse = emojiParam !== undefined ? emojiParam : amenidadEmoji;
+    const formatted = formatAmenidadParaGuardar(rawTexto, emojiToUse && emojiToUse !== '✨' ? emojiToUse : undefined);
+
+    const yaExiste = amenidades.some(a => isAmenidadMatch(a.nombre, formatted.nombre));
+    if (yaExiste) {
       showToast('Esta comodidad ya está en la lista', 'info');
       return;
     }
-    setAmenidades(prev => [...prev, { nombre: texto, icono: 'check' }]);
-    setNuevaAmenidadTexto('');
-  }, [nuevaAmenidadTexto, amenidades, showToast]);
 
-  const handleEliminarAmenidad = useCallback((index: number) => {
-    setAmenidades(prev => prev.filter((_, idx) => idx !== index));
-  }, []);
+    setAmenidades(prev => [...prev, formatted]);
+    setNuevaAmenidadTexto('');
+    setAmenidadEmoji('✨');
+    setEmojiPickerOpen(false);
+    const infoNueva = getAmenidadInfo(formatted.nombre, formatted.icono);
+    showToast(`Comodidad "${infoNueva.cleanNombre}" añadida al listado`, 'success');
+  }, [nuevaAmenidadTexto, amenidadEmoji, amenidades, showToast]);
+
+  const handleEliminarAmenidad = useCallback((identificador: number | string) => {
+    setAmenidades(prev => {
+      let nombreEliminado = '';
+      let filtradas: { nombre: string; icono?: string }[] = [];
+
+      if (typeof identificador === 'number') {
+        if (identificador >= 0 && identificador < prev.length) {
+          nombreEliminado = prev[identificador].nombre;
+          filtradas = prev.filter((_, idx) => idx !== identificador);
+        } else {
+          return prev;
+        }
+      } else {
+        nombreEliminado = identificador;
+        filtradas = prev.filter(a => !isAmenidadMatch(a.nombre, identificador));
+      }
+
+      const info = getAmenidadInfo(nombreEliminado);
+      showToast(`Comodidad "${info.cleanNombre || nombreEliminado}" eliminada`, 'info');
+      return filtradas;
+    });
+  }, [showToast]);
 
   // Acciones de planes de estadía
   const togglePlan = useCallback((plan: string) => {
@@ -609,6 +649,8 @@ export function useFincaFormController({
     // Amenidades y Planes
     amenidades,
     nuevaAmenidadTexto, setNuevaAmenidadTexto,
+    amenidadEmoji, setAmenidadEmoji,
+    emojiPickerOpen, setEmojiPickerOpen,
     toggleAmenidadSugerida,
     handleAgregarAmenidadPersonalizada,
     handleEliminarAmenidad,

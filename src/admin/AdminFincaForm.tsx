@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Save, Trash2, Plus, Upload, Link as LinkIcon, Loader, Image as ImageIcon,
   Eye, ChevronDown, ChevronUp, Search, Check, Sparkles, MapPin, Users,
   Bed, Bath, Clock, ShieldAlert, Volume2, Dog, Home,
-  CreditCard, Copy, Building, DollarSign, ArrowLeft
+  CreditCard, Copy, Building, DollarSign, ArrowLeft, Smile, X
 } from 'lucide-react';
 import type { Finca, FincaEstado } from '../types';
 import { CurrencyInput } from '../components/CurrencyInput';
@@ -14,6 +14,12 @@ import {
   PLANES_SUGERIDOS,
   type FincaFormTabId
 } from './useFincaFormController';
+import {
+  getAmenidadInfo,
+  isAmenidadMatch,
+  EMOJIS_RAPIDOS_FINCAS,
+  CATEGORIAS_EMOJIS_FINCAS,
+} from '../utils/amenidades';
 
 interface AdminFincaFormProps {
   fincas: Finca[];
@@ -84,6 +90,8 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
     // Amenidades y Planes
     amenidades,
     nuevaAmenidadTexto, setNuevaAmenidadTexto,
+    amenidadEmoji, setAmenidadEmoji,
+    emojiPickerOpen, setEmojiPickerOpen,
     toggleAmenidadSugerida,
     handleAgregarAmenidadPersonalizada,
     handleEliminarAmenidad,
@@ -116,6 +124,8 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
     showToast,
     openConfirm,
   });
+
+  const [categoriaEmojiActiva, setCategoriaEmojiActiva] = useState<number>(0);
 
   return (
     <div className="relative w-full max-w-full overflow-hidden rounded-[var(--rad-md,16px)] bg-[var(--surface,#1a1814)] border border-[var(--border,#312e28)] p-4 sm:p-6 shadow-[var(--sh-md,0_4px_20px_rgba(0,0,0,0.25))] transition-all duration-300">
@@ -819,59 +829,214 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
 
         {/* TAB 5: COMODIDADES */}
         {activeTab === 'amenidades' && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-5">
+            {/* 1. SECCIÓN: COMODIDADES ACTIVAS EN TIEMPO REAL */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <div className="font-bold text-xs text-[var(--text,#f0eae0)] flex items-center gap-2">
+                  <span>Comodidades activas en esta finca</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent,#d4924a)]/20 text-[var(--accent,#d4924a)] border border-[var(--accent,#d4924a)]/30">
+                    {amenidades.length} seleccionadas
+                  </span>
+                </div>
+              </div>
+              <p className="text-[11px] text-[var(--text-muted,#a8a097)] mb-2.5">
+                Listado en tiempo real de comodidades que verán tus clientes. Haz clic en la <strong className="text-red-400 font-semibold">✕</strong> de cualquier comodidad para eliminarla de inmediato.
+              </p>
+
+              {/* Contenedor de comodidades activas */}
+              <div className="flex flex-wrap gap-2 p-3.5 rounded-[var(--rad-sm,10px)] bg-[var(--surface-2,#201e19)] border border-[var(--border,#312e28)] min-h-[60px] items-center">
+                {amenidades.length === 0 ? (
+                  <div className="w-full py-2 text-center text-xs text-[var(--text-muted,#a8a097)] flex items-center justify-center gap-2">
+                    <Sparkles size={14} className="text-[var(--accent,#d4924a)]" />
+                    <span>No has seleccionado ninguna comodidad aún. Elige del catálogo de sugerencias abajo o añade una personalizada.</span>
+                  </div>
+                ) : (
+                  amenidades.map((amenidad, idx) => {
+                    const info = getAmenidadInfo(amenidad.nombre, amenidad.icono);
+                    return (
+                      <div
+                        key={`${amenidad.nombre}-${idx}`}
+                        className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-full text-xs font-medium bg-[var(--surface,#1a1814)] border border-[var(--border,#312e28)] text-[var(--text,#f0eae0)] shadow-sm transition-all hover:border-[var(--accent,#d4924a)]/60 group animate-in fade-in zoom-in-95 duration-150"
+                      >
+                        <span className="text-sm select-none" role="img" aria-label={info.cleanNombre}>
+                          {info.emoji}
+                        </span>
+                        <span className="font-semibold text-[var(--text,#f0eae0)]">
+                          {info.cleanNombre}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleEliminarAmenidad(idx)}
+                          title={`Eliminar comodidad ${info.cleanNombre}`}
+                          aria-label={`Eliminar comodidad ${info.cleanNombre}`}
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-[var(--text-muted,#a8a097)] hover:text-red-400 hover:bg-red-500/15 transition-all focus:outline-none focus:ring-1 focus:ring-red-400 cursor-pointer"
+                        >
+                          <X size={12} className="stroke-[2.5]" />
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* 2. SECCIÓN: CATÁLOGO DE SUGERENCIAS RÁPIDAS */}
             <div>
               <div className="font-bold text-xs text-[var(--text,#f0eae0)] mb-1">
-                Comodidades seleccionadas ({amenidades.length}):
+                Catálogo de comodidades sugeridas:
               </div>
-              <p className="text-[11px] text-[var(--text-muted,#a8a097)] mb-3">
-                Haz clic en cualquiera de las comodidades sugeridas para activarla o añadir una propia personalizada.
+              <p className="text-[11px] text-[var(--text-muted,#a8a097)] mb-2.5">
+                Haz clic en cualquiera de las comodidades populares para activarla o desactivarla en esta finca:
               </p>
 
               {/* Chips sugeridos */}
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex flex-wrap gap-2">
                 {AMENIDADES_SUGERIDAS.map(sug => {
-                  const seleccionada = amenidades.some(a => a.nombre.toLowerCase() === sug.nombre.toLowerCase());
+                  const seleccionada = amenidades.some(a => isAmenidadMatch(a.nombre, sug.nombre));
                   return (
                     <button
                       key={sug.nombre}
                       type="button"
                       onClick={() => toggleAmenidadSugerida(sug)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border cursor-pointer ${
                         seleccionada
                           ? 'bg-[var(--primary,#4da89e)]/15 border-[var(--primary,#4da89e)] text-[var(--primary,#4da89e)] shadow-[0_0_10px_rgba(77,168,158,0.2)]'
-                          : 'bg-[var(--surface-2,#201e19)] border-[var(--border,#312e28)] text-[var(--text,#f0eae0)] hover:border-[var(--primary,#4da89e)]/40'
+                          : 'bg-[var(--surface-2,#201e19)] border-[var(--border,#312e28)] text-[var(--text-muted,#a8a097)] hover:text-[var(--text,#f0eae0)] hover:border-[var(--primary,#4da89e)]/40'
                       }`}
                     >
-                      <span>{sug.emoji}</span>
+                      <span className="text-sm">{sug.emoji}</span>
                       <span>{sug.nombre}</span>
                       {seleccionada && <Check size={13} className="stroke-[3]" />}
                     </button>
                   );
                 })}
               </div>
+            </div>
 
-              {/* Input para agregar comodidad personalizada */}
-              <div className="flex gap-2 max-w-md">
-                <input
-                  type="text"
-                  placeholder="Añadir otra comodidad (ej: Sendero ecológico)…"
-                  value={nuevaAmenidadTexto}
-                  onChange={e => setNuevaAmenidadTexto(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAgregarAmenidadPersonalizada();
-                    }
-                  }}
-                  className="flex-1 px-3.5 py-2 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
-                />
+            {/* 3. SECCIÓN: AÑADIR COMODIDAD PERSONALIZADA CON SELECTOR DE EMOJIS */}
+            <div className="p-4 rounded-[var(--rad-sm,10px)] bg-[var(--surface-2,#201e19)] border border-[var(--border,#312e28)] shadow-sm">
+              <div className="font-bold text-xs text-[var(--text,#f0eae0)] mb-1 flex items-center gap-1.5">
+                <Smile size={14} className="text-[var(--accent,#d4924a)]" />
+                <span>Añadir otra comodidad con emoji personalizado:</span>
+              </div>
+              <p className="text-[11px] text-[var(--text-muted,#a8a097)] mb-3">
+                Selecciona un emoji temático para ilustrarla y escribe el nombre de la comodidad (ej: 🌲 Sendero ecológico, 🏓 Mesa de ping pong, 🔥 Zona de fogata):
+              </p>
+
+              {/* Barra de emojis rápidos */}
+              <div className="flex items-center gap-1.5 flex-wrap mb-3 pb-2.5 border-b border-[var(--border,#312e28)]/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted,#a8a097)] mr-1">
+                  Emojis rápidos:
+                </span>
+                {EMOJIS_RAPIDOS_FINCAS.map(emoji => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => setAmenidadEmoji(emoji)}
+                    className={`w-7 h-7 rounded-[var(--rad-xs,6px)] flex items-center justify-center text-sm transition-all border cursor-pointer ${
+                      amenidadEmoji === emoji
+                        ? 'bg-[var(--accent,#d4924a)]/25 border-[var(--accent,#d4924a)] scale-110 shadow-sm'
+                        : 'bg-[var(--surface,#1a1814)] border-[var(--border,#312e28)] hover:border-[var(--accent,#d4924a)]/60 hover:scale-105'
+                    }`}
+                    title={`Usar emoji ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
                 <button
                   type="button"
-                  onClick={handleAgregarAmenidadPersonalizada}
-                  className="px-4 py-2 rounded-[var(--rad-xs,8px)] bg-[var(--accent,#d4924a)] text-[#141210] font-bold text-xs shrink-0 transition-all hover:brightness-110 active:scale-[0.98]"
+                  onClick={() => setEmojiPickerOpen(v => !v)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[var(--rad-xs,6px)] text-xs font-semibold border transition-all cursor-pointer ${
+                    emojiPickerOpen
+                      ? 'bg-[var(--accent,#d4924a)] text-[#141210] border-[var(--accent,#d4924a)] shadow-sm'
+                      : 'bg-[var(--surface,#1a1814)] border-[var(--border,#312e28)] text-[var(--accent,#d4924a)] hover:border-[var(--accent,#d4924a)]'
+                  }`}
                 >
-                  <Plus size={14} className="inline mr-1" /> Añadir
+                  <Smile size={13} />
+                  <span>{emojiPickerOpen ? 'Cerrar panel' : 'Más emojis…'}</span>
+                </button>
+              </div>
+
+              {/* Panel desplegable con categorías de emojis */}
+              {emojiPickerOpen && (
+                <div className="mb-3.5 p-3 rounded-[var(--rad-xs,8px)] bg-[var(--surface,#1a1814)] border border-[var(--border,#312e28)] shadow-lg animate-in fade-in slide-in-from-top-1 duration-200">
+                  {/* Pestañas de categorías */}
+                  <div className="flex flex-wrap gap-1 mb-2.5 border-b border-[var(--border,#312e28)] pb-2">
+                    {CATEGORIAS_EMOJIS_FINCAS.map((cat, idx) => (
+                      <button
+                        key={cat.nombre}
+                        type="button"
+                        onClick={() => setCategoriaEmojiActiva(idx)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-all cursor-pointer ${
+                          categoriaEmojiActiva === idx
+                            ? 'bg-[var(--accent,#d4924a)] text-[#141210] font-bold shadow-sm'
+                            : 'text-[var(--text-muted,#a8a097)] hover:text-[var(--text,#f0eae0)] hover:bg-[var(--surface-2,#201e19)]'
+                        }`}
+                      >
+                        <span>{cat.icono}</span>
+                        <span>{cat.nombre}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Grilla de emojis de la categoría seleccionada */}
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                    {CATEGORIAS_EMOJIS_FINCAS[categoriaEmojiActiva]?.emojis.map(emoji => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => {
+                          setAmenidadEmoji(emoji);
+                          setEmojiPickerOpen(false);
+                        }}
+                        className={`w-8 h-8 rounded flex items-center justify-center text-base hover:bg-[var(--accent,#d4924a)]/20 hover:scale-115 transition-all cursor-pointer ${
+                          amenidadEmoji === emoji ? 'bg-[var(--accent,#d4924a)]/25 ring-1 ring-[var(--accent,#d4924a)]' : ''
+                        }`}
+                        title={`Elegir ${emoji}`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Fila del input con selector de emoji y botón de agregar */}
+              <div className="flex flex-col sm:flex-row gap-2 max-w-2xl">
+                <div className="flex gap-1.5 flex-1 items-center">
+                  {/* Selector visual rápido del emoji actual */}
+                  <button
+                    type="button"
+                    onClick={() => setEmojiPickerOpen(v => !v)}
+                    title="Clic para cambiar el emoji"
+                    className="h-10 px-3 rounded-[var(--rad-xs,8px)] bg-[var(--surface,#1a1814)] border border-[var(--accent,#d4924a)]/60 text-[var(--accent,#d4924a)] flex items-center gap-1.5 shrink-0 hover:border-[var(--accent,#d4924a)] transition-all cursor-pointer shadow-sm"
+                  >
+                    <span className="text-base select-none">{amenidadEmoji}</span>
+                    <Smile size={13} className="text-[var(--text-muted,#a8a097)]" />
+                  </button>
+
+                  <input
+                    type="text"
+                    placeholder="Añadir otra comodidad (ej: Sendero ecológico, Hamacas)…"
+                    value={nuevaAmenidadTexto}
+                    onChange={e => setNuevaAmenidadTexto(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAgregarAmenidadPersonalizada();
+                      }
+                    }}
+                    className="flex-1 h-10 px-3.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface,#1a1814)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)] shadow-inner transition-all"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleAgregarAmenidadPersonalizada()}
+                  className="h-10 px-5 rounded-[var(--rad-xs,8px)] bg-[var(--accent,#d4924a)] text-[#141210] font-bold text-xs shrink-0 transition-all hover:brightness-110 active:scale-[0.98] inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-[0_2px_10px_rgba(212,146,74,0.25)]"
+                >
+                  <Plus size={15} /> Añadir Comodidad
                 </button>
               </div>
             </div>
