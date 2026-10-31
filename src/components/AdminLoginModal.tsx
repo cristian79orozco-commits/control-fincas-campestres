@@ -46,20 +46,21 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
             <div
               style={{
-                width: '46px',
-                height: '46px',
-                borderRadius: '12px',
-                background: '#FAF7EE',
-                border: '1px solid var(--border)',
+                width: '52px',
+                height: '52px',
+                borderRadius: '13px',
+                background: 'linear-gradient(145deg, #FFFDF9 0%, #FAF6EC 100%)',
+                border: '1.5px solid color-mix(in srgb, var(--accent) 45%, var(--border))',
                 overflow: 'hidden',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                padding: '2.5px',
+                boxShadow: '0 3px 12px rgba(212, 146, 74, 0.16)',
                 flexShrink: 0,
               }}
             >
               <img
-                src="/logo.png"
+                src="./logo.png?v=2"
                 alt="Paraíso Terrenal"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
               />
             </div>
             <div>

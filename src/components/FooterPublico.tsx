@@ -59,23 +59,24 @@ export const FooterPublico: React.FC<FooterPublicoProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.75rem' }}>
             <div
               style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '10px',
-                background: '#FAF7EE',
-                border: '1px solid var(--border)',
+                width: '46px',
+                height: '46px',
+                borderRadius: '12px',
+                background: 'linear-gradient(145deg, #FFFDF9 0%, #FAF6EC 100%)',
+                border: '1.5px solid color-mix(in srgb, var(--accent) 45%, var(--border))',
                 overflow: 'hidden',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                padding: '2px',
+                boxShadow: '0 3px 10px rgba(212, 146, 74, 0.14)',
                 flexShrink: 0,
               }}
             >
               <img
-                src="/logo.png"
+                src="./logo.png?v=2"
                 alt={nombreEmpresa}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                 loading="lazy"
               />
             </div>

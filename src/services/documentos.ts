@@ -453,13 +453,14 @@ function encabezado(doc: jsPDF, titulo: string, numero?: string, configParam?: C
   doc.line(0, 42, ancho, 42);
 
   // Tarjeta / Emblema contenedor del Logo oficial
-  doc.setFillColor(250, 247, 238);
-  doc.setDrawColor(219, 212, 195);
-  doc.roundedRect(12, 5.5, 31, 31, 2.5, 2.5, 'FD');
+  doc.setFillColor(253, 251, 246);
+  doc.setDrawColor(...colorAcento);
+  doc.setLineWidth(0.35);
+  doc.roundedRect(11.5, 5, 32, 32, 3, 3, 'FD');
 
   // Incrustación de la imagen del logo
   try {
-    doc.addImage(LOGO_EMPRESA_BASE64, LOGO_FORMAT, 12.5, 6, 30, 30);
+    doc.addImage(LOGO_EMPRESA_BASE64, LOGO_FORMAT, 12.3, 5.8, 30.4, 30.4);
   } catch (err) {
     console.warn('[documentos] Aviso al incrustar logo en PDF:', err);
   }

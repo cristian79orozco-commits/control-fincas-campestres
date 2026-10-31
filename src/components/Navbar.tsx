@@ -67,19 +67,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           className="brand-mark"
           style={{
             position: 'relative',
-            borderRadius: '12px',
+            borderRadius: '13px',
             overflow: 'hidden',
-            boxShadow: '0 2px 10px rgba(212, 146, 74, 0.2)',
+            boxShadow: '0 3px 12px rgba(212, 146, 74, 0.2)',
           }}
         >
           <img
-            src="/logo.png"
+            src="./logo.png?v=2"
             alt="Paraíso Terrenal - Fincas de Alquiler"
             className="brand-logo-img"
-            width={44}
-            height={44}
+            width={46}
+            height={46}
             loading="eager"
-            style={{ display: 'block' }}
+            style={{ display: 'block', objectFit: 'contain' }}
           />
         </div>
         <div className="brand-text-block">

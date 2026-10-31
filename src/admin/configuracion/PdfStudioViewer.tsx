@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { ConfiguracionGeneral, PlantillasPdfPersonalizadas } from '../../types';
 import type { DocumentoSubTab } from '../../hooks/usePdfConfigController';
+import { resolverLogoUrl, LOGO_OFICIAL_PATH } from '../../services/configuracion';
 
 interface PdfStudioViewerProps {
   docSubTab: DocumentoSubTab;
@@ -250,13 +251,13 @@ export const PdfStudioViewer: React.FC<PdfStudioViewerProps> = ({
               >
                 <div className="flex justify-between items-center gap-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-11 h-11 rounded-lg bg-[#FAF7EE] border border-[var(--border)] overflow-hidden flex items-center justify-center shrink-0 shadow-sm">
+                    <div className="w-12 h-12 rounded-lg bg-[#FDFBF6] border border-[#d4ac3f] overflow-hidden flex items-center justify-center shrink-0 shadow-sm p-0.5">
                       <img
-                        src={formData.doc_logo_url || formData.logo_url || '/logo.png'}
+                        src={resolverLogoUrl(formData.doc_logo_url || formData.logo_url)}
                         alt="Logo"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                         onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).src = '/logo.png';
+                          (e.currentTarget as HTMLImageElement).src = LOGO_OFICIAL_PATH;
                         }}
                       />
                     </div>

@@ -191,8 +191,8 @@ export function mostrarNotificacionEscritorio(
     const notif = new Notification(titulo, {
       body: opciones?.body,
       tag: opciones?.tag || 'cotizacion-notif',
-      icon: opciones?.icon || '/favicon.ico',
-      badge: opciones?.icon || '/favicon.ico',
+      icon: opciones?.icon || './icon-192.png?v=2',
+      badge: opciones?.icon || './icon-192.png?v=2',
       silent: true, // El sonido lo gestionamos nosotros con Web Audio para consistencia
     });
 

@@ -174,18 +174,25 @@ export const ClientePortalModal: React.FC<ClientePortalModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <span
               style={{
-                width: '40px',
-                height: '40px',
+                width: '46px',
+                height: '46px',
                 borderRadius: '12px',
-                background: 'var(--primary-bg)',
+                background: 'linear-gradient(145deg, #FFFDF9 0%, #FAF6EC 100%)',
+                border: '1.5px solid color-mix(in srgb, var(--accent) 45%, var(--border))',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: 'var(--primary)',
-                boxShadow: '0 2px 10px rgba(77, 168, 158, 0.25)',
+                padding: '2px',
+                overflow: 'hidden',
+                boxShadow: '0 2px 10px rgba(212, 146, 74, 0.18)',
+                flexShrink: 0,
               }}
             >
-              <FileCheck2 size={22} />
+              <img
+                src="./logo.png?v=2"
+                alt="Paraíso Terrenal"
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              />
             </span>
             <div>
               <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.02em' }}>

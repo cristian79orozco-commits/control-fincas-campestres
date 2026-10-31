@@ -11,7 +11,7 @@ import type { ToastMessage } from '../components/Toast';
 import { calcularSaldo } from '../types';
 import { obtenerSiguienteConsecutivo } from '../utils/consecutivos';
 import { generarUUID, esUUID } from '../utils/uuid';
-import { CONFIGURACION_DEFAULT, setConfiguracionGlobal } from '../services/configuracion';
+import { CONFIGURACION_DEFAULT, setConfiguracionGlobal, resolverLogoUrl } from '../services/configuracion';
 import {
   CONTENIDO_SITIO_DEFAULT,
   setContenidoSitioGlobal,
@@ -679,6 +679,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const configCombinada: ConfiguracionGeneral = {
           ...CONFIGURACION_DEFAULT,
           ...dAny,
+          logo_url: resolverLogoUrl(dAny.logo_url),
+          doc_logo_url: resolverLogoUrl(dAny.doc_logo_url),
           firma_digital_url: dAny.firma_digital_url || dAny.plantillas_pdf?.firma_digital_url || plantillasPdfEnPlantillas?.firma_digital_url || CONFIGURACION_DEFAULT.firma_digital_url || null,
           plantillas_pdf: {
             ...(CONFIGURACION_DEFAULT.plantillas_pdf || {}),

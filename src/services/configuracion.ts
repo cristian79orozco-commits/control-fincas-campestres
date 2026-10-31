@@ -1,12 +1,33 @@
 import type { ConfiguracionGeneral } from '../types';
 
+export const LOGO_OFICIAL_PATH = './logo.png?v=2';
+
+/**
+ * Resuelve la ruta del logo corporativo garantizando que las rutas por defecto
+ * apunten a la versión más reciente del logo oficial sin caché obsoleta.
+ */
+export function resolverLogoUrl(url?: string | null): string {
+  if (!url) return LOGO_OFICIAL_PATH;
+  const clean = url.trim();
+  if (
+    !clean ||
+    clean === '/logo.png' ||
+    clean === './logo.png' ||
+    clean === 'logo.png' ||
+    clean.includes('01_Paraiso_Terrenal')
+  ) {
+    return LOGO_OFICIAL_PATH;
+  }
+  return clean;
+}
+
 export const CONFIGURACION_DEFAULT: ConfiguracionGeneral = {
   id: 'general',
   // 1. Empresa
   nombre_empresa: 'Paraíso Terrenal',
   nit: '',
   eslogan: 'Fincas de Alquiler · Experiencias exclusivas y descanso en la naturaleza',
-  logo_url: '/logo.png',
+  logo_url: LOGO_OFICIAL_PATH,
   firma_digital_url: null,
   telefono: '+57 317 682 7093',
   whatsapp: '573176827093',
@@ -21,7 +42,7 @@ export const CONFIGURACION_DEFAULT: ConfiguracionGeneral = {
   },
 
   // 2. Documentos
-  doc_logo_url: '/logo.png',
+  doc_logo_url: LOGO_OFICIAL_PATH,
   doc_encabezado: 'PARAÍSO TERRENAL — FINCAS DE ALQUILER Y SERVICIOS TURÍSTICOS',
   doc_pie_pagina: 'Paraíso Terrenal • Fincas de Alquiler • Documento oficial generado automáticamente • Santa Elena, Valle del Cauca',
   doc_contacto_info: 'WhatsApp: +57 317 682 7093 | reservas@fincascampestres.com | Santa Elena, Valle',
@@ -112,7 +133,13 @@ let configuracionGlobal: ConfiguracionGeneral = (() => {
   try {
     const local = localStorage.getItem('fc_configuracion_general');
     if (local) {
-      return { ...CONFIGURACION_DEFAULT, ...JSON.parse(local) };
+      const parsed = JSON.parse(local);
+      return {
+        ...CONFIGURACION_DEFAULT,
+        ...parsed,
+        logo_url: resolverLogoUrl(parsed?.logo_url),
+        doc_logo_url: resolverLogoUrl(parsed?.doc_logo_url),
+      };
     }
   } catch {
     // Si localStorage no está disponible
@@ -125,7 +152,12 @@ export function getConfiguracionGlobal(): ConfiguracionGeneral {
 }
 
 export function setConfiguracionGlobal(cfg: ConfiguracionGeneral): void {
-  configuracionGlobal = { ...CONFIGURACION_DEFAULT, ...cfg };
+  configuracionGlobal = {
+    ...CONFIGURACION_DEFAULT,
+    ...cfg,
+    logo_url: resolverLogoUrl(cfg?.logo_url),
+    doc_logo_url: resolverLogoUrl(cfg?.doc_logo_url),
+  };
   try {
     localStorage.setItem('fc_configuracion_general', JSON.stringify(configuracionGlobal));
   } catch {

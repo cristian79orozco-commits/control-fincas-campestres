@@ -25,6 +25,7 @@ import { PdfStudioViewer } from './configuracion/PdfStudioViewer';
 import { PdfSignatureMapper } from './configuracion/PdfSignatureMapper';
 import { PdfStyleCustomizer } from './configuracion/PdfStyleCustomizer';
 import { usePdfConfigController, type DocumentoSubTab } from '../hooks/usePdfConfigController';
+import { resolverLogoUrl, LOGO_OFICIAL_PATH } from '../services/configuracion';
 
 interface AdminConfiguracionProps {
   config: ConfiguracionGeneral;
@@ -679,34 +680,35 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                   border: '1px solid var(--border)',
                 }}>
                   <div style={{
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: '12px',
-                    background: '#FAF7EE',
+                    width: '72px',
+                    height: '72px',
+                    borderRadius: '14px',
+                    background: 'linear-gradient(145deg, #FFFDF9 0%, #FAF6EC 100%)',
                     border: '1.5px solid #d4ac3f',
                     overflow: 'hidden',
+                    padding: '4px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                    boxShadow: '0 3px 12px rgba(212, 146, 74, 0.16)',
                     flexShrink: 0,
                   }}>
                     <img
-                      src={formData.logo_url || '/logo.png'}
+                      src={resolverLogoUrl(formData.logo_url)}
                       alt="Logo Oficial"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.png'; }}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = LOGO_OFICIAL_PATH; }}
                     />
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text)' }}>
-                      Logo Oficial — Paraíso Terrenal
+                      Logo Oficial — Paraíso Terrenal (Transparente HD)
                     </div>
                     <p className="text-xs text-muted" style={{ margin: '0.2rem 0 0.4rem 0' }}>
-                      Incrustado en alta definición en todos los documentos PDF y en la barra de navegación del cliente.
+                      Incrustado en alta definición en todos los documentos PDF, barra de navegación, instalador PWA de navegador y dispositivos móviles.
                     </p>
                     <span className="badge s-avail" style={{ fontSize: '0.7rem' }}>
-                      <Check size={11} style={{ marginRight: '3px', display: 'inline' }} /> Alta Resolución (300 DPI)
+                      <Check size={11} style={{ marginRight: '3px', display: 'inline' }} /> Alta Resolución (&gt;350 DPI · Fondo Transparente)
                     </span>
                   </div>
                 </div>
@@ -1213,6 +1215,51 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                         <Building2 size={17} style={{ color: 'var(--primary)' }} /> Membrete, Logo Oficial & Firma Digital
                       </div>
                       <span className="badge s-avail" style={{ fontSize: '0.68rem' }}>Aplica a Todos los Documentos</span>
+                    </div>
+
+                    {/* Tarjeta del Logo Oficial del Membrete PDF */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.85rem',
+                        padding: '0.75rem 0.9rem',
+                        marginBottom: '0.9rem',
+                        background: 'var(--surface-2)',
+                        borderRadius: 'var(--rad-sm, 12px)',
+                        border: '1px solid var(--border)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '12px',
+                          background: 'linear-gradient(145deg, #FFFDF9 0%, #FAF6EC 100%)',
+                          border: '1.5px solid #d4ac3f',
+                          padding: '3px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          boxShadow: '0 2px 8px rgba(212, 146, 74, 0.15)',
+                        }}
+                      >
+                        <img
+                          src={resolverLogoUrl(formData.doc_logo_url || formData.logo_url)}
+                          alt="Logo Membrete PDF"
+                          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).src = LOGO_OFICIAL_PATH; }}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.84rem', color: 'var(--text)' }}>
+                          Emblema Corporativo Activo en Membrete PDF
+                        </div>
+                        <p className="text-xs text-muted" style={{ margin: '0.15rem 0 0 0', lineHeight: 1.45 }}>
+                          Nuevo logo transparente de Paraíso Terrenal embebido sincrónicamente en Cotizaciones, Separaciones, Abonos, Estados de Cuenta, Paz y Salvo, Menús y Expedientes.
+                        </p>
+                      </div>
                     </div>
 
                     <PdfSignatureMapper

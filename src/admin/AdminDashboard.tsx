@@ -272,10 +272,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   if (!isAdminLoggedIn) {
     return (
       <div className="login-box">
-        <div className="login-icon"><Lock size={26} /></div>
+        <div
+          style={{
+            width: '72px',
+            height: '72px',
+            margin: '0 auto 0.25rem',
+            borderRadius: '16px',
+            background: 'linear-gradient(145deg, #FFFDF9 0%, #FAF6EC 100%)',
+            border: '1.5px solid color-mix(in srgb, var(--accent) 45%, var(--border))',
+            overflow: 'hidden',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 16px rgba(212, 146, 74, 0.18)',
+          }}
+        >
+          <img
+            src="./logo.png?v=2"
+            alt="Paraíso Terrenal"
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          />
+        </div>
         <div>
           <div className="login-title">Panel de Administración</div>
-          <div className="login-sub">Acceso seguro mediante Supabase Auth</div>
+          <div className="login-sub">Paraíso Terrenal · Acceso seguro mediante Supabase Auth</div>
         </div>
         <form onSubmit={handleLoginSubmit} style={{ display: 'grid', gap: '0.85rem' }}>
           <div className="field">
@@ -363,23 +384,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
             <div
               style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '10px',
-                background: '#FAF7EE',
-                border: '1px solid var(--border)',
+                width: '44px',
+                height: '44px',
+                borderRadius: '12px',
+                background: 'linear-gradient(145deg, #FFFDF9 0%, #FAF6EC 100%)',
+                border: '1.5px solid color-mix(in srgb, var(--accent) 45%, var(--border))',
                 overflow: 'hidden',
                 flexShrink: 0,
-                boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                padding: '2px',
+                boxShadow: '0 2px 10px rgba(212, 146, 74, 0.16)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
               <img
-                src="/logo.png"
+                src="./logo.png?v=2"
                 alt="Paraíso Terrenal"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
               />
             </div>
             <div>

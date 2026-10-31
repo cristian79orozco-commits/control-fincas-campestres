@@ -160,23 +160,25 @@ ul, ol {
 }
 
 .brand-mark {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
+  width: 50px;
+  height: 50px;
+  border-radius: 13px;
   flex-shrink: 0;
-  background: #FAF7EE;
-  border: 1px solid var(--border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  background: linear-gradient(145deg, #FFFDF9 0%, #FAF6EC 100%);
+  border: 1.5px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: 0 3px 12px rgba(212, 146, 74, 0.16);
   overflow: hidden;
   display: grid;
   place-items: center;
+  padding: 2px;
   cursor: pointer;
-  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 .brand-mark:hover {
-  transform: translateY(-1px) scale(1.02);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--primary) 25%, transparent);
+  transform: translateY(-1px) scale(1.03);
+  border-color: var(--accent);
+  box-shadow: 0 5px 18px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .brand-mark:active {
@@ -186,7 +188,7 @@ ul, ol {
 .brand-logo-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
