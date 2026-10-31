@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import {
   LayoutDashboard, LogOut, Lock, LogIn, ShieldCheck, Database,
   Home, Users, FileText, ClipboardList, Calendar, MessageCircle,
@@ -112,22 +112,23 @@ interface AdminDashboardProps {
 interface NavItemConfig {
   section: AdminSection;
   label: string;
+  shortLabel?: string;
   icon: React.ReactNode;
   group: 'Operación' | 'CRM & Clientes' | 'Sistema';
 }
 
 const NAV_ITEMS: NavItemConfig[] = [
-  { section: 'dashboard',       label: 'Dashboard',             icon: <LayoutDashboard size={16} />, group: 'Operación' },
-  { section: 'fincas',          label: 'Fincas',                icon: <Home size={16} />,            group: 'Operación' },
-  { section: 'disponibilidad',  label: 'Disponibilidad',        icon: <Calendar size={16} />,        group: 'Operación' },
-  { section: 'reservas',        label: 'Reservas',              icon: <ClipboardList size={16} />,   group: 'Operación' },
-  { section: 'cotizaciones',    label: 'Cotizaciones',          icon: <FileText size={16} />,        group: 'Operación' },
-  { section: 'clientes',        label: 'Clientes',              icon: <Users size={16} />,           group: 'CRM & Clientes' },
-  { section: 'whatsapp',        label: 'Comunicaciones',        icon: <MessageCircle size={16} />,   group: 'CRM & Clientes' },
-  { section: 'menus',           label: 'Menús',                 icon: <UtensilsCrossed size={16} />, group: 'CRM & Clientes' },
-  { section: 'historial',       label: 'Historial',             icon: <History size={16} />,         group: 'Sistema' },
-  { section: 'personalizacion', label: 'Personalización',       icon: <Palette size={16} />,         group: 'Sistema' },
-  { section: 'configuracion',   label: 'Configuración',         icon: <Settings size={16} />,        group: 'Sistema' },
+  { section: 'dashboard',       label: 'Dashboard',             shortLabel: 'Dashboard', icon: <LayoutDashboard size={18} />, group: 'Operación' },
+  { section: 'fincas',          label: 'Fincas',                shortLabel: 'Fincas',    icon: <Home size={18} />,            group: 'Operación' },
+  { section: 'disponibilidad',  label: 'Disponibilidad',        shortLabel: 'Disponib.', icon: <Calendar size={18} />,        group: 'Operación' },
+  { section: 'reservas',        label: 'Reservas',              shortLabel: 'Reservas',  icon: <ClipboardList size={18} />,   group: 'Operación' },
+  { section: 'cotizaciones',    label: 'Cotizaciones',          shortLabel: 'Cotiz.',    icon: <FileText size={18} />,        group: 'Operación' },
+  { section: 'clientes',        label: 'Clientes',              shortLabel: 'Clientes',  icon: <Users size={18} />,           group: 'CRM & Clientes' },
+  { section: 'whatsapp',        label: 'Comunicaciones',        shortLabel: 'Comunica.', icon: <MessageCircle size={18} />,   group: 'CRM & Clientes' },
+  { section: 'menus',           label: 'Menús',                 shortLabel: 'Menús',     icon: <UtensilsCrossed size={18} />, group: 'CRM & Clientes' },
+  { section: 'historial',       label: 'Historial',             shortLabel: 'Historial', icon: <History size={18} />,         group: 'Sistema' },
+  { section: 'personalizacion', label: 'Personalización',       shortLabel: 'Diseño',    icon: <Palette size={18} />,         group: 'Sistema' },
+  { section: 'configuracion',   label: 'Configuración',         shortLabel: 'Ajustes',   icon: <Settings size={18} />,        group: 'Sistema' },
 ];
 
 function formatCOP(v: number) { return '$' + v.toLocaleString('es-CO'); }
@@ -241,6 +242,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setActiveSection(adminActiveSection);
     }
   }, [adminActiveSection]);
+
+  // Contenedor de navegación móvil con auto-scroll al tab activo
+  const mobileNavRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!mobileNavRef.current) return;
+    const activeEl = mobileNavRef.current.querySelector('.admin-mobile-nav-btn.active');
+    if (activeEl) {
+      activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [activeSection]);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -483,12 +495,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </div>
 
       {/* ===== LAYOUT: SIDEBAR + CONTENIDO ===== */}
-      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '1rem', alignItems: 'start' }}>
+      <div className="admin-layout-grid">
 
         {/* SIDEBAR */}
         <nav
           className={`panel admin-sidebar${sidebarOpen ? ' open' : ''}`}
-          style={{ padding: '0.5rem 0', position: 'sticky', top: '80px' }}
+          aria-label="Menú principal de administración"
         >
           {/* Botón cerrar en móvil */}
           {sidebarOpen && (
@@ -748,13 +760,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
-      {/* Overlay móvil sidebar */}
+      {/* Overlay backdrop móvil para el drawer lateral */}
       {sidebarOpen && (
         <div
+          className="admin-sidebar-backdrop"
           onClick={() => setSidebarOpen(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 40 }}
+          aria-label="Cerrar menú lateral"
         />
       )}
+
+      {/* ===== BARRA DE NAVEGACIÓN FIJA PARA MÓVILES (Bottom Dock High-End) ===== */}
+      <aside className="admin-mobile-nav" aria-label="Navegación móvil del administrador">
+        <div className="admin-mobile-nav-scroller" ref={mobileNavRef}>
+          {NAV_ITEMS.map(item => {
+            const isCotizaciones = item.section === 'cotizaciones' && cotizacionesPendientes > 0;
+            const isReservas = item.section === 'reservas' && metricasReservas.activas > 0;
+            const badgeCount = isCotizaciones ? cotizacionesPendientes : isReservas ? metricasReservas.activas : 0;
+            const isActive = activeSection === item.section;
+
+            return (
+              <button
+                key={item.section}
+                type="button"
+                onClick={() => navigateTo(item.section)}
+                className={`admin-mobile-nav-btn${isActive ? ' active' : ''}`}
+                title={item.label}
+                aria-label={item.label}
+              >
+                <div className="admin-mobile-icon-box">
+                  {item.icon}
+                  {badgeCount > 0 && (
+                    <span className="admin-mobile-badge" aria-label={`${badgeCount} pendientes`}>
+                      {badgeCount > 99 ? '99+' : badgeCount}
+                    </span>
+                  )}
+                </div>
+                <span className="admin-mobile-nav-text">
+                  {item.shortLabel || item.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </aside>
     </div>
   );
 };
