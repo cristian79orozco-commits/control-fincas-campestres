@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -61,6 +61,23 @@ export const VisualExplorer: React.FC<VisualExplorerProps> = ({
     tipo === 'presupuesto' ? 'presupuesto' : 'comparativa'
   );
 
+  // Detección responsive para optimización móvil del gráfico
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 640;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 639px)');
+    const update = (e: MediaQueryListEvent | MediaQueryList) => setIsMobile(e.matches);
+    update(mq);
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
   // Store para la calculadora de presupuesto
   const {
     presupuestoHuespedes,
@@ -106,7 +123,7 @@ export const VisualExplorer: React.FC<VisualExplorerProps> = ({
     };
   }, [fincasActivas]);
 
-  const opcionesComparativa: any = {
+  const opcionesComparativa: any = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
@@ -120,11 +137,12 @@ export const VisualExplorer: React.FC<VisualExplorerProps> = ({
           color: 'var(--text)',
           font: {
             family: "'DM Sans', sans-serif",
-            size: 12,
+            size: isMobile ? 11 : 12,
             weight: '600',
           },
           usePointStyle: true,
-          boxWidth: 10,
+          boxWidth: isMobile ? 8 : 10,
+          padding: isMobile ? 8 : 12,
         },
       },
       tooltip: {
@@ -158,15 +176,17 @@ export const VisualExplorer: React.FC<VisualExplorerProps> = ({
           color: 'var(--text-muted)',
           font: {
             family: "'DM Sans', sans-serif",
-            size: 11,
+            size: isMobile ? 10 : 11,
           },
+          maxRotation: isMobile ? 25 : 0,
+          minRotation: 0,
         },
       },
       yCapacidad: {
         type: 'linear',
         position: 'left',
         title: {
-          display: true,
+          display: !isMobile,
           text: 'Capacidad (Pers.)',
           color: 'var(--primary)',
           font: { weight: 'bold', size: 11 },
@@ -176,13 +196,16 @@ export const VisualExplorer: React.FC<VisualExplorerProps> = ({
         },
         ticks: {
           color: 'var(--text-muted)',
+          font: { size: isMobile ? 10 : 11 },
+          maxTicksLimit: isMobile ? 5 : 7,
+          padding: isMobile ? 2 : 6,
         },
       },
       yPrecio: {
         type: 'linear',
         position: 'right',
         title: {
-          display: true,
+          display: !isMobile,
           text: 'Tarifa /pp (COP)',
           color: 'var(--accent)',
           font: { weight: 'bold', size: 11 },
@@ -192,11 +215,14 @@ export const VisualExplorer: React.FC<VisualExplorerProps> = ({
         },
         ticks: {
           color: 'var(--text-muted)',
+          font: { size: isMobile ? 10 : 11 },
+          maxTicksLimit: isMobile ? 5 : 7,
+          padding: isMobile ? 2 : 6,
           callback: (val: any) => `$${(val / 1000).toFixed(0)}k`,
         },
       },
     },
-  };
+  }), [isMobile, datosComparativa]);
 
   // ─────────────────────────────────────────────────────────────
   // 2. DATOS DE LA CALCULADORA DE PRESUPUESTO (DOUGHNUT CHART)
@@ -296,7 +322,7 @@ export const VisualExplorer: React.FC<VisualExplorerProps> = ({
         background: 'var(--surface)',
         border: '1.5px solid var(--border)',
         borderRadius: 'var(--rad-md, 18px)',
-        padding: '1.5rem',
+        padding: isMobile ? '1.1rem 0.85rem' : '1.5rem',
         boxShadow: 'var(--sh-md)',
       }}
     >
@@ -406,14 +432,24 @@ export const VisualExplorer: React.FC<VisualExplorerProps> = ({
           >
             <div
               style={{
-                height: '320px',
-                position: 'relative',
-                background: 'var(--surface-2)',
+                overflowX: 'auto',
+                WebkitOverflowScrolling: 'touch',
+                width: '100%',
                 borderRadius: 'var(--rad-sm, 12px)',
-                padding: '1rem',
               }}
             >
-              <Bar data={datosComparativa} options={opcionesComparativa} />
+              <div
+                style={{
+                  height: isMobile ? '280px' : '320px',
+                  minWidth: isMobile && fincasActivas.length > 3 ? `${fincasActivas.length * 85}px` : '100%',
+                  position: 'relative',
+                  background: 'var(--surface-2)',
+                  borderRadius: 'var(--rad-sm, 12px)',
+                  padding: isMobile ? '0.65rem 0.4rem 0.4rem 0.4rem' : '1rem',
+                }}
+              >
+                <Bar data={datosComparativa} options={opcionesComparativa} />
+              </div>
             </div>
 
             {/* Fila de accesos rápidos a fincas desde el gráfico */}

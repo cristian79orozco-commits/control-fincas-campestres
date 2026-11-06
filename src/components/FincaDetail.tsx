@@ -376,26 +376,26 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
                   defaultOpen={true}
                   icon={<Check size={15} />}
                 >
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.4rem', paddingTop: '0.5rem' }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 140px), 1fr))',
+                      gap: '0.45rem',
+                      paddingTop: '0.5rem',
+                    }}
+                  >
                     {finca.finca_amenidades.map((amenidad, idx) => {
                       const info = getAmenidadInfo(amenidad.nombre, amenidad.icono);
                       return (
-                        <span
+                        <div
                           key={idx}
-                          style={{
-                            fontSize: '0.74rem',
-                            background: 'var(--surface-sunken)',
-                            padding: '0.35rem 0.55rem',
-                            borderRadius: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.4rem',
-                            color: 'var(--text-main)',
-                          }}
+                          className="amenity-chip-pro"
                         >
-                          <span style={{ fontSize: '0.85rem', flexShrink: 0 }}>{info.emoji}</span>
-                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{info.cleanNombre}</span>
-                        </span>
+                          <span style={{ fontSize: '0.95rem', flexShrink: 0, lineHeight: 1 }}>{info.emoji}</span>
+                          <span style={{ fontWeight: 500, lineHeight: 1.25, wordBreak: 'break-word' }}>
+                            {info.cleanNombre}
+                          </span>
+                        </div>
                       );
                     })}
                   </div>
@@ -428,7 +428,7 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
                 defaultOpen={true}
                 icon={<Clock size={15} />}
               >
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem', paddingTop: '0.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))', gap: '0.45rem', paddingTop: '0.5rem' }}>
                   <div style={{ background: 'var(--surface-sunken)', padding: '0.5rem 0.65rem', borderRadius: 'var(--rad-xs)' }}>
                     <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Check-in (Entrada)</div>
                     <div style={{ fontWeight: 700, fontSize: '0.8rem', marginTop: '0.1rem' }}>

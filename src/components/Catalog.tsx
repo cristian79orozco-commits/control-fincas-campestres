@@ -80,17 +80,7 @@ const FincaListItem = React.memo<FincaListItemProps>(({ finca, onSelect, mostrar
       }}
     >
       {/* Miniatura */}
-      <div
-        style={{
-          width: '96px',
-          height: '96px',
-          borderRadius: '12px',
-          overflow: 'hidden',
-          flexShrink: 0,
-          position: 'relative',
-          background: 'var(--surface-2)',
-        }}
-      >
+      <div className="finca-list-thumb">
         {primeraFoto ? (
           <img
             src={primeraFoto}
@@ -129,10 +119,10 @@ const FincaListItem = React.memo<FincaListItemProps>(({ finca, onSelect, mostrar
       {/* Información condensada */}
       <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text)', letterSpacing: '-0.01em', wordBreak: 'break-word', lineHeight: 1.25 }}>
             {finca.nombre}
           </h3>
-          <span className="badge-pro-avail" style={{ fontSize: '0.68rem' }}>
+          <span className="badge-pro-avail" style={{ fontSize: '0.68rem', flexShrink: 0 }}>
             <span className="pulse-dot" />
             Disponible
           </span>
@@ -848,8 +838,8 @@ const CatalogComponent: React.FC<CatalogProps> = ({
               layout
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                gap: '1.5rem',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
+                gap: '1.25rem',
               }}
             >
               {fincasFiltradas.map(f => (

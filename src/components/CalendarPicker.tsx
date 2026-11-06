@@ -145,6 +145,7 @@ export const CalendarPicker = React.memo<CalendarPickerProps>(({
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '0.5rem',
+          flexWrap: 'wrap',
           fontSize: '0.82rem',
           boxShadow: 'var(--sh-sm)',
         }}

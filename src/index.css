@@ -1172,6 +1172,16 @@ ul, ol {
   grid-template-columns: 1fr 1fr;
 }
 
+.form-grid.three-cols {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 680px) {
+  .form-grid.three-cols {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 @media (max-width: 599px) {
   .form-grid.two-cols {
     grid-template-columns: 1fr !important;
@@ -2726,6 +2736,16 @@ textarea:focus {
   background: var(--primary);
 }
 
+.finca-list-thumb {
+  width: 96px;
+  height: 96px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+  background: var(--surface-2);
+}
+
 .finca-list-interactive-item {
   flex-shrink: 0 !important;
   min-height: fit-content;
@@ -2757,21 +2777,52 @@ textarea:focus {
 @media (max-width: 580px) {
   .finca-list-interactive-item {
     display: grid !important;
-    grid-template-columns: 76px 1fr !important;
-    gap: 0.65rem !important;
-    padding: 0.65rem 0.75rem !important;
+    grid-template-columns: 84px minmax(0, 1fr) !important;
+    gap: 0.75rem !important;
+    padding: 0.75rem 0.85rem !important;
+    align-items: start !important;
+  }
+  .finca-list-thumb {
+    width: 84px !important;
+    height: 84px !important;
+    max-width: 84px !important;
+    border-radius: 10px !important;
   }
   .finca-list-interactive-item > div:last-child {
     grid-column: 1 / -1 !important;
+    display: flex !important;
     flex-direction: row !important;
     align-items: center !important;
     justify-content: space-between !important;
     border-left: none !important;
     border-top: 1px solid var(--border-subtle) !important;
     padding-left: 0 !important;
-    padding-top: 0.45rem !important;
+    padding-top: 0.55rem !important;
+    margin-top: 0.25rem !important;
     width: 100% !important;
+    gap: 0.5rem !important;
   }
+}
+
+/* Chips de comodidades y amenidades pro para móvil y escritorio */
+.amenity-chip-pro {
+  font-size: 0.75rem;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  padding: 0.45rem 0.65rem;
+  border-radius: var(--rad-xs, 7px);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-main);
+  min-height: 40px;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.amenity-chip-pro:hover {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface));
 }
 
 /* ==========================================================================
