@@ -16,9 +16,14 @@ jobs:
     steps:
       - name: Enviar ping de actividad a la API REST de Supabase
         env:
-          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://porhjqsvhffshvdxvije.supabase.co' }}
-          SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvcmhqcXN2aGZmc2h2ZHh2aWplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5ODM4MTIsImV4cCI6MjA5MjU1OTgxMn0.DdnJ-9Ip-PdL1RneNzymogQ5mo-9yRvi3S1f096YfOc' }}
+          DEFAULT_URL: 'https://porhjqsvhffshvdxvije.supabase.co'
+          DEFAULT_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvcmhqcXN2aGZmc2h2ZHh2aWplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5ODM4MTIsImV4cCI6MjA5MjU1OTgxMn0.DdnJ-9Ip-PdL1RneNzymogQ5mo-9yRvi3S1f096YfOc'
+          SECRET_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SECRET_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
+          SUPABASE_URL="${SECRET_URL:-$DEFAULT_URL}"
+          SUPABASE_ANON_KEY="${SECRET_KEY:-$DEFAULT_KEY}"
+
           echo "Iniciando ping de actividad hacia: $SUPABASE_URL/rest/v1/fincas"
           
           RESPONSE=$(curl -s -w "\n%{http_code}" -X GET "$SUPABASE_URL/rest/v1/fincas?select=id&limit=1" \
