@@ -5,7 +5,7 @@ import type {
   ReservaEstado, CotizacionEstado, BloqueoDisponibilidad,
   Menu as MenuType, Comunicacion, ConfiguracionGeneral,
   ContenidoSitio, CierreReserva, ViewType, AdminSection,
-  EstadoAlimentacion
+  EstadoAlimentacion, OpcionesReinicioDatos, ResultadoReinicioDatos
 } from '../types';
 import type { ToastMessage } from '../components/Toast';
 import { calcularSaldo } from '../types';
@@ -26,6 +26,7 @@ import {
   probarNotificacionAdmin,
 } from '../services/notificaciones';
 import { precargarFirmaDataUrl } from '../services/documentos';
+import { ejecutarReinicioDatos } from '../services/reinicioDatos';
 
 // -----------------------------------------------------------------------------
 // Interfaz del Estado y Acciones Centralizadas
@@ -158,6 +159,9 @@ interface AppContextValue {
   guardandoContenido: boolean;
   guardarContenido: (datos: Partial<ContenidoSitio>) => Promise<{ success: boolean; error?: string }>;
   restablecerContenido: () => Promise<{ success: boolean; error?: string }>;
+
+  // Mantenimiento y Reinicio de Datos
+  reiniciarDatos: (opciones: OpcionesReinicioDatos) => Promise<ResultadoReinicioDatos>;
 }
 
 // Helpers de persistencia local resiliente
@@ -2786,6 +2790,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return guardarContenido(CONTENIDO_SITIO_DEFAULT);
   };
 
+  const reiniciarDatos = useCallback(async (opciones: OpcionesReinicioDatos): Promise<ResultadoReinicioDatos> => {
+    try {
+      const res = await ejecutarReinicioDatos(opciones);
+      if (res.success) {
+        // Actualización reactiva inmediata en memoria
+        if (opciones.reservasYPagos) setReservas([]);
+        if (opciones.cotizaciones) setCotizaciones([]);
+        if (opciones.disponibilidad) setBloquesAdmin([]);
+        if (opciones.clientes) setClientes([]);
+        if (opciones.comunicaciones) setComunicaciones([]);
+        if (opciones.fincas) setFincas([]);
+        if (opciones.menus) setMenus([]);
+        if (opciones.reiniciarConsecutivos) {
+          setConfiguracion(prev => ({
+            ...prev,
+            siguiente_cotizacion: 1001,
+            siguiente_separacion: 1001,
+            siguiente_abono: 1001,
+            siguiente_estado_cuenta: 1001,
+            siguiente_paz_salvo: 1001,
+            siguiente_propuesta_menu: 1001,
+          }));
+        }
+        // Sincronización multi-panel sin recarga de página (60 FPS)
+        await recargarTodo();
+      }
+      return res;
+    } catch (err: any) {
+      console.error('[AppContext] Error en reiniciarDatos:', err);
+      return {
+        success: false,
+        error: err?.message || 'Error inesperado al reiniciar datos',
+      };
+    }
+  }, [recargarTodo]);
+
   // ---------------------------------------------------------------------------
   // MÉTRICAS REACTIVAS
   // ---------------------------------------------------------------------------
@@ -2890,6 +2930,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     guardandoContenido,
     guardarContenido,
     restablecerContenido,
+    reiniciarDatos,
   }), [
     fincasActivas,
     todasLasFincas,
@@ -2923,6 +2964,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     recargarTodo,
     guardandoConfig,
     guardandoContenido,
+    reiniciarDatos,
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

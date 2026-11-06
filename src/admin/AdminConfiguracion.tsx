@@ -24,6 +24,7 @@ import { procesarFirmaTransparente, formatearBytes } from '../utils/imageOptimiz
 import { PdfStudioViewer } from './configuracion/PdfStudioViewer';
 import { PdfSignatureMapper } from './configuracion/PdfSignatureMapper';
 import { PdfStyleCustomizer } from './configuracion/PdfStyleCustomizer';
+import { ReinicioDatosSection } from './configuracion/ReinicioDatosSection';
 import { usePdfConfigController, type DocumentoSubTab } from '../hooks/usePdfConfigController';
 import { resolverLogoUrl, LOGO_OFICIAL_PATH } from '../services/configuracion';
 
@@ -37,7 +38,7 @@ interface AdminConfiguracionProps {
   openConfirm: (title: string, message: string, onConfirm: () => void) => void;
 }
 
-type MainTab = 'empresa' | 'plantillas' | 'cuentas';
+type MainTab = 'empresa' | 'plantillas' | 'cuentas' | 'datos';
 
 export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
   config,
@@ -569,6 +570,22 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
             <button
               type="button"
               className="btn btn-secondary text-xs"
+              onClick={() => setActiveTab('datos')}
+              title="Ir al módulo de reinicio de datos de prueba"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                border: activeTab === 'datos' ? '1px solid #ef4444' : '1px solid rgba(212, 146, 74, 0.4)',
+                color: activeTab === 'datos' ? '#ef4444' : 'var(--accent)',
+                fontWeight: 600,
+              }}
+            >
+              <RotateCcw size={13} /> Reinicio de Datos
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary text-xs"
               onClick={handleRestablecer}
               disabled={guardando}
               title="Restablecer valores originales de fábrica"
@@ -588,14 +605,15 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
         </div>
 
         {/* ============================================================== */}
-        {/* NAVEGACIÓN PRINCIPAL EN 3 PILARES CLAROS */}
+        {/* NAVEGACIÓN PRINCIPAL EN 4 PILARES CLAROS */}
         {/* ============================================================== */}
         <div style={{
           display: 'flex',
           gap: '0.5rem',
           marginTop: '1.25rem',
           borderBottom: '1px solid var(--border)',
-          paddingBottom: '0.25rem'
+          paddingBottom: '0.25rem',
+          flexWrap: 'wrap',
         }}>
           <button
             type="button"
@@ -640,6 +658,23 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
             }}
           >
             <CreditCard size={16} /> 3. Cuentas Bancarias & Servicios
+          </button>
+
+          <button
+            type="button"
+            className={`btn text-xs ${activeTab === 'datos' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('datos')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              fontWeight: activeTab === 'datos' ? 700 : 500,
+              padding: '0.55rem 1rem',
+              border: activeTab === 'datos' ? undefined : '1px solid rgba(212, 146, 74, 0.35)',
+              color: activeTab === 'datos' ? undefined : 'var(--accent)',
+            }}
+          >
+            <RotateCcw size={16} /> 4. Reinicio de Datos & Pruebas
           </button>
         </div>
       </div>
@@ -1562,43 +1597,59 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
           </motion.div>
         )}
 
-        {/* ============================================================== */}
-        {/* BARRA FLOTANTE DE GUARDADO AL FINAL */}
-        {/* ============================================================== */}
-        <div style={{
-          marginTop: '1.25rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          padding: '1rem 1.25rem',
-          background: 'var(--surface)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border)'
-        }}>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <Sparkles size={15} style={{ color: 'var(--primary)' }} />
-            Tus cambios se sincronizan en Supabase y se aplican al instante en el portal del cliente y documentos PDF.
-          </div>
+        {/* ------------------------------------------------------------ */}
+        {/* PILAR 4: REINICIO DE DATOS & MANTENIMIENTO */}
+        {/* ------------------------------------------------------------ */}
+        {activeTab === 'datos' && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
+            <ReinicioDatosSection showToast={showToast} />
+          </motion.div>
+        )}
 
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            {hayCambios && (
-              <span className="text-xs" style={{ color: '#b45309', fontWeight: 600 }}>
-                ● Cambios sin guardar
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => handleGuardar()}
-              className="btn btn-primary"
-              disabled={guardando}
-              style={{ fontWeight: 600, padding: '0.65rem 1.75rem', fontSize: '0.88rem' }}
-            >
-              <Save size={16} /> {guardando ? 'Guardando en Supabase...' : 'Guardar Toda la Configuración'}
-            </button>
+        {/* ============================================================== */}
+        {/* BARRA FLOTANTE DE GUARDADO AL FINAL (EXCEPTO EN REINICIO) */}
+        {/* ============================================================== */}
+        {activeTab !== 'datos' && (
+          <div style={{
+            marginTop: '1.25rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem',
+            padding: '1rem 1.25rem',
+            background: 'var(--surface)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border)'
+          }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Sparkles size={15} style={{ color: 'var(--primary)' }} />
+              Tus cambios se sincronizan en Supabase y se aplican al instante en el portal del cliente y documentos PDF.
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              {hayCambios && (
+                <span className="text-xs" style={{ color: '#b45309', fontWeight: 600 }}>
+                  ● Cambios sin guardar
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => handleGuardar()}
+                className="btn btn-primary"
+                disabled={guardando}
+                style={{ fontWeight: 600, padding: '0.65rem 1.75rem', fontSize: '0.88rem' }}
+              >
+                <Save size={16} /> {guardando ? 'Guardando en Supabase...' : 'Guardar Toda la Configuración'}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </form>
     </div>
   );

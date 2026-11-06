@@ -685,3 +685,49 @@ export function obtenerNombreFincaHistorico(reserva: Reserva): string {
   return 'Finca no especificada';
 }
 
+// -----------------------------------------------------------------------------
+// Tipos para Mantenimiento y Reinicio de Datos (Architecture Shield)
+// -----------------------------------------------------------------------------
+
+export interface OpcionesReinicioDatos {
+  reservasYPagos: boolean;
+  cotizaciones: boolean;
+  disponibilidad: boolean;
+  clientes: boolean;
+  comunicaciones: boolean;
+  reiniciarConsecutivos: boolean;
+  fincas?: boolean;
+  menus?: boolean;
+}
+
+export interface ConteoDatosBD {
+  reservas: number;
+  pagos: number;
+  cotizaciones: number;
+  disponibilidad: number;
+  clientes: number;
+  comunicaciones: number;
+  fincas: number;
+  menus: number;
+  siguienteCotizacion: number;
+  siguienteSeparacion: number;
+}
+
+export interface ResultadoReinicioDatos {
+  success: boolean;
+  eliminados?: {
+    reservas?: number;
+    pagos?: number;
+    cierres?: number;
+    cotizaciones?: number;
+    disponibilidad?: number;
+    clientes?: number;
+    comunicaciones?: number;
+    fincas?: number;
+    menus?: number;
+  };
+  error?: string;
+  mensaje?: string;
+}
+
+
