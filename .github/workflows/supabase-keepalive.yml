@@ -1,0 +1,40 @@
+name: Supabase Keep-Alive Ping
+
+# Previene la pausa automática por inactividad de 7 días en el plan gratuito de Supabase
+# sin modificar ninguna capa de la aplicación (100% desacoplado y seguro).
+
+on:
+  schedule:
+    # Se ejecuta cada 3 días a las 12:00 UTC (alrededor de las 7:00 AM hora Colombia)
+    - cron: '0 12 */3 * *'
+  workflow_dispatch: # Permite ejecución manual inmediata desde la pestaña Actions de GitHub
+
+jobs:
+  keep-alive:
+    name: Ping Preventivo a Supabase
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enviar ping de actividad a la API REST de Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://porhjqsvhffshvdxvije.supabase.co' }}
+          SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvcmhqcXN2aGZmc2h2ZHh2aWplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5ODM4MTIsImV4cCI6MjA5MjU1OTgxMn0.DdnJ-9Ip-PdL1RneNzymogQ5mo-9yRvi3S1f096YfOc' }}
+        run: |
+          echo "Iniciando ping de actividad hacia: $SUPABASE_URL/rest/v1/fincas"
+          
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X GET "$SUPABASE_URL/rest/v1/fincas?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+          
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          echo "Código HTTP recibido: $HTTP_STATUS"
+          
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "✅ Keep-Alive exitoso: Base de datos activa y respondiendo normalmente."
+          else
+            echo "❌ Error en Keep-Alive: Respuesta no esperada ($HTTP_STATUS)."
+            echo "Cuerpo de la respuesta: $BODY"
+            exit 1
+          fi
+
