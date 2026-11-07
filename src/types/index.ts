@@ -150,7 +150,7 @@ export interface CotizacionDB {
   created_at?: string;
   updated_at?: string;
   clientes?: Pick<Cliente, 'id' | 'nombre' | 'apellido' | 'whatsapp'>;
-  fincas?: Pick<Finca, 'id' | 'nombre' | 'banco_nombre' | 'banco_tipo_cuenta' | 'banco_cuenta' | 'banco_titular' | 'banco_identificacion' | 'politica_mascotas' | 'valor_mascota'>;
+  fincas?: Pick<Finca, 'id' | 'nombre' | 'banco_nombre' | 'banco_tipo_cuenta' | 'banco_cuenta' | 'banco_titular' | 'banco_identificacion' | 'politica_mascotas' | 'valor_mascota' | 'deposito_garantia'>;
   menus?: Pick<Menu, 'id' | 'nombre' | 'categoria' | 'precio_pp'>;
 }
 
@@ -206,7 +206,7 @@ export interface Reserva {
   cierre?: CierreReserva | null;
   // Relaciones expandidas
   clientes?: Pick<Cliente, 'id' | 'nombre' | 'apellido' | 'whatsapp' | 'telefono'>;
-  fincas?: Pick<Finca, 'id' | 'nombre'>;
+  fincas?: Pick<Finca, 'id' | 'nombre' | 'deposito_garantia' | 'politica_mascotas' | 'valor_mascota' | 'banco_nombre' | 'banco_tipo_cuenta' | 'banco_cuenta' | 'banco_titular' | 'banco_identificacion'>;
   menus?: Pick<Menu, 'id' | 'nombre' | 'categoria' | 'precio_pp'>;
   pagos?: Pago[];
 }
@@ -224,6 +224,71 @@ export interface Pago {
 }
 
 /**
+ * Resuelve y enriquece de forma centralizada los metadatos de una finca (incluyendo
+ * depósito reembolsable, política/tarifa de mascotas y datos bancarios) desde el objeto
+ * proporcionado o desde la caché local sincronizada cuando la relación de Supabase viene parcial.
+ */
+export function resolverMetadatosFinca(
+  finca?: Partial<Finca> | Record<string, any> | null,
+  fincaIdFallback?: string | null
+): Partial<Finca> {
+  const fId = finca?.id || fincaIdFallback || '';
+  let cacheFinca: Partial<Finca> = {};
+  let extMeta: Partial<Finca> = {};
+
+  if (fId && typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      const rawCache = localStorage.getItem('fc_cache_fincas');
+      if (rawCache) {
+        const lista = JSON.parse(rawCache);
+        if (Array.isArray(lista)) {
+          const encontrada = lista.find((x: any) => x && x.id === fId);
+          if (encontrada) cacheFinca = encontrada;
+        }
+      }
+      const rawExt = localStorage.getItem('fc_fincas_extended_meta');
+      if (rawExt) {
+        const mapa = JSON.parse(rawExt);
+        if (mapa && typeof mapa === 'object' && mapa[fId]) {
+          extMeta = mapa[fId];
+        }
+      }
+    } catch {
+      // Ignorar si localStorage no está disponible
+    }
+  }
+
+  return {
+    ...cacheFinca,
+    ...extMeta,
+    ...(finca || {}),
+    deposito_garantia:
+      finca?.deposito_garantia !== undefined && finca?.deposito_garantia !== null
+        ? Number(finca.deposito_garantia)
+        : extMeta?.deposito_garantia !== undefined && extMeta?.deposito_garantia !== null
+        ? Number(extMeta.deposito_garantia)
+        : cacheFinca?.deposito_garantia !== undefined && cacheFinca?.deposito_garantia !== null
+        ? Number(cacheFinca.deposito_garantia)
+        : 0,
+    politica_mascotas:
+      finca?.politica_mascotas || extMeta?.politica_mascotas || cacheFinca?.politica_mascotas || 'permitido',
+    valor_mascota:
+      finca?.valor_mascota !== undefined && finca?.valor_mascota !== null
+        ? Number(finca.valor_mascota)
+        : extMeta?.valor_mascota !== undefined && extMeta?.valor_mascota !== null
+        ? Number(extMeta.valor_mascota)
+        : cacheFinca?.valor_mascota !== undefined && cacheFinca?.valor_mascota !== null
+        ? Number(cacheFinca.valor_mascota)
+        : 0,
+    banco_nombre: finca?.banco_nombre || extMeta?.banco_nombre || cacheFinca?.banco_nombre || 'Bancolombia',
+    banco_tipo_cuenta: finca?.banco_tipo_cuenta || extMeta?.banco_tipo_cuenta || cacheFinca?.banco_tipo_cuenta || 'Ahorros',
+    banco_cuenta: finca?.banco_cuenta || extMeta?.banco_cuenta || cacheFinca?.banco_cuenta || null,
+    banco_titular: finca?.banco_titular || extMeta?.banco_titular || cacheFinca?.banco_titular || null,
+    banco_identificacion: finca?.banco_identificacion || extMeta?.banco_identificacion || cacheFinca?.banco_identificacion || null,
+  };
+}
+
+/**
  * Extrae de forma centralizada la cantidad y costo de mascotas desde una Cotización o Reserva
  * (soportando campos directos, cotizacion_snapshot o metadatos embebidos en notas/observaciones).
  */
@@ -231,8 +296,12 @@ export function extraerInfoMascotas(
   item?: Partial<CotizacionDB> | Partial<Reserva> | Record<string, any> | null,
   finca?: Partial<Finca> | Record<string, any> | null
 ): { cantidadMascotas: number; costoMascotas: number; valorUnitario: number } {
+  const fincaResuelta = resolverMetadatosFinca(
+    finca || (item as any)?.fincas || (item as any)?.finca_snapshot,
+    (item as any)?.finca_id
+  );
   if (!item) {
-    const valUnit = finca?.politica_mascotas === 'con_costo' ? Number(finca?.valor_mascota || 0) : 0;
+    const valUnit = fincaResuelta?.politica_mascotas === 'con_costo' ? Number(fincaResuelta?.valor_mascota || 0) : 0;
     return { cantidadMascotas: 0, costoMascotas: 0, valorUnitario: valUnit };
   }
 
@@ -263,7 +332,7 @@ export function extraerInfoMascotas(
     }
   }
 
-  const valorFinca = finca?.politica_mascotas === 'con_costo' ? Number(finca?.valor_mascota || 0) : 0;
+  const valorFinca = fincaResuelta?.politica_mascotas === 'con_costo' ? Number(fincaResuelta?.valor_mascota || 0) : 0;
   if (cantidad > 0 && costo <= 0 && valorFinca > 0) {
     costo = cantidad * valorFinca;
   }
@@ -280,6 +349,18 @@ export function extraerInfoMascotas(
 }
 
 /**
+ * Limpia las etiquetas técnicas o embebidas de mascotas de un texto de notas u observaciones
+ * para que no se dupliquen al mostrarlas en documentos o mensajes.
+ */
+export function limpiarMetaMascotasDeTexto(textoOriginal?: string | null): string {
+  if (!textoOriginal) return '';
+  return textoOriginal
+    .replace(/\s*·?\s*🐾\s*Mascotas:\s*\d+\s*(?:\(\$[\d.,]+\s*COP[^)]*\)|\(Sin costo adicional\))?/gi, '')
+    .replace(/\s*\[MASCOTAS:\d+:\d+\]/gi, '')
+    .trim();
+}
+
+/**
  * Embebe de forma limpia y legible la información de mascotas en notas u observaciones
  * para garantizar persistencia total en Supabase sin depender de migraciones de esquema.
  */
@@ -288,36 +369,41 @@ export function adjuntarMetaMascotasEnTexto(
   cantidadMascotas: number,
   costoMascotas: number
 ): string | null {
-  const limpio = (textoOriginal || '')
-    .replace(/\s*·?\s*🐾\s*Mascotas:\s*\d+\s*(?:\(\$[\d.,]+\s*COP[^)]*\)|\(Sin costo adicional\))?/gi, '')
-    .replace(/\s*\[MASCOTAS:\d+:\d+\]/gi, '')
-    .trim();
+  const limpio = limpiarMetaMascotasDeTexto(textoOriginal);
 
   if (!cantidadMascotas || cantidadMascotas <= 0) {
     return limpio || null;
   }
 
   const etiqueta = costoMascotas > 0
-    ? `🐾 Mascotas: ${cantidadMascotas} ($${costoMascotas.toLocaleString('es-CO')} COP - Pago al propietario)`
+    ? `🐾 Mascotas: ${cantidadMascotas} ($${costoMascotas.toLocaleString('es-CO')} COP)`
     : `🐾 Mascotas: ${cantidadMascotas} (Sin costo adicional)`;
 
   return limpio ? `${limpio} · ${etiqueta}` : etiqueta;
 }
 
 /**
- * Desglosa las finanzas de una Cotización separando claramente lo que corresponde al
- * Propietario de la Finca (Alojamiento Base + Mascotas) y a la Administración (Alimentación).
+ * Desglosa las finanzas de una Cotización separando claramente lo que corresponde a
+ * la Reserva de la Finca (Alojamiento Base + Mascotas + Depósito de Garantía informativo)
+ * y a la Administración (Alimentación).
  */
 export function desglosarFinanzasCotizacion(
   cotizacion: Partial<CotizacionDB> | null | undefined,
   finca?: Partial<Finca> | null
 ) {
+  const fincaResuelta = resolverMetadatosFinca(
+    finca || cotizacion?.fincas,
+    cotizacion?.finca_id
+  );
+  const depositoGarantia = Math.max(0, Number(fincaResuelta?.deposito_garantia || 0));
+
   if (!cotizacion) {
     return {
       subtotalAlojamientoBase: 0,
       cantidadMascotas: 0,
       costoMascotas: 0,
       valorMascotaUnitario: 0,
+      depositoGarantia,
       totalPropietarioFinca: 0,
       abono50Propietario: 0,
       costoAlimentacion: 0,
@@ -327,14 +413,14 @@ export function desglosarFinanzasCotizacion(
     };
   }
 
-  const infoMascotas = extraerInfoMascotas(cotizacion, finca);
+  const infoMascotas = extraerInfoMascotas(cotizacion, fincaResuelta);
   const costoAlimentacion = Number(cotizacion.costo_alimentacion || 0);
   const descuento = Number(cotizacion.descuento || 0);
   const recargo = Number(cotizacion.recargo || 0);
   const totalCotizado = Number(cotizacion.total || 0);
   const subRaw = Number(cotizacion.subtotal_alojamiento || 0);
 
-  // Determinar total que va al Propietario de la Finca (todo excepto alimentación)
+  // Determinar total que va a la Finca (todo excepto alimentación)
   const totalPropietarioFinca = totalCotizado > 0
     ? Math.max(0, totalCotizado - costoAlimentacion)
     : Math.max(0, subRaw + infoMascotas.costoMascotas - descuento + recargo);
@@ -351,6 +437,7 @@ export function desglosarFinanzasCotizacion(
     cantidadMascotas: infoMascotas.cantidadMascotas,
     costoMascotas: infoMascotas.costoMascotas,
     valorMascotaUnitario: infoMascotas.valorUnitario,
+    depositoGarantia,
     totalPropietarioFinca,
     abono50Propietario,
     costoAlimentacion,
@@ -378,9 +465,14 @@ export function calcularSaldo(reserva: Reserva): number {
  * por servicios de alimentación.
  */
 export function desglosarFinanzasReserva(reserva: Reserva, finca?: Partial<Finca> | null) {
+  const fincaResuelta = resolverMetadatosFinca(
+    finca || reserva.fincas || reserva.finca_snapshot,
+    reserva.finca_id
+  );
+  const depositoGarantia = Math.max(0, Number(fincaResuelta?.deposito_garantia || 0));
   const costoAlim = reserva.costo_alimentacion || 0;
   const snap = reserva.cotizacion_snapshot || {};
-  const infoMascotas = extraerInfoMascotas(reserva, finca);
+  const infoMascotas = extraerInfoMascotas(reserva, fincaResuelta);
 
   // Todo lo que no es alimentación corresponde al Propietario de la Finca (Alojamiento + Mascotas)
   const subtotalAlojamiento = Math.max(0, (reserva.valor_total || 0) - costoAlim);
@@ -427,6 +519,7 @@ export function desglosarFinanzasReserva(reserva: Reserva, finca?: Partial<Finca
     cantidadMascotas: infoMascotas.cantidadMascotas,
     costoMascotas: infoMascotas.costoMascotas,
     valorMascotaUnitario: infoMascotas.valorUnitario,
+    depositoGarantia,
     pagadoFinca,
     saldoFincaCheckIn,
     costoAlimentacion: costoAlim,

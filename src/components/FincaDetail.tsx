@@ -459,6 +459,17 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {Number(finca.deposito_garantia) > 0 && (
+                    <div style={{ background: 'var(--surface-sunken)', padding: '0.5rem 0.65rem', borderRadius: 'var(--rad-xs)', gridColumn: 'span 2' }}>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <ShieldCheck size={12} style={{ color: 'var(--primary)' }} /> Depósito reembolsable (Garantía)
+                      </div>
+                      <div style={{ fontWeight: 600, fontSize: '0.76rem', marginTop: '0.1rem' }}>
+                        ${Number(finca.deposito_garantia).toLocaleString('es-CO')} COP (Reintegrable al check-out)
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {finca.normas && (
@@ -809,6 +820,17 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
                       </div>
                       <div style={{ fontWeight: 600, fontSize: '0.85rem', marginTop: '0.15rem' }}>
                         {finca.politica_musica === 'moderada' ? 'Música moderada' : finca.politica_musica === 'hasta_medianoche' ? 'Hasta 12:00 AM' : finca.politica_musica === 'sin_restriccion' ? 'Eventos permitidos' : 'Tranquilidad total'}
+                      </div>
+                    </div>
+                  )}
+
+                  {Number(finca.deposito_garantia) > 0 && (
+                    <div style={{ background: 'var(--surface-2)', padding: '0.65rem 0.85rem', borderRadius: 'var(--rad-xs)' }}>
+                      <div className="text-xs text-muted" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <ShieldCheck size={13} style={{ color: 'var(--primary)' }} /> Depósito reembolsable
+                      </div>
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem', marginTop: '0.15rem' }}>
+                        ${Number(finca.deposito_garantia).toLocaleString('es-CO')} COP
                       </div>
                     </div>
                   )}

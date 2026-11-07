@@ -140,11 +140,13 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
     subtotalAlojamiento,
     costoMascotas,
     subtotalPropietario,
+    depositoGarantia,
     costoTotalAlimentacion,
     totalEstimado,
     alimentacionDetalle,
     alimentacionTextoResumen,
     mascotasLineaTexto,
+    depositoLineaTexto,
   } = useMemo(() => {
     let n = 1;
     if (fechaInicio && fechaFin) {
@@ -189,7 +191,11 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
     }
 
     const lineaMascotas = cantMasc > 0
-      ? `🐾 *Mascotas:* ${cantMasc} mascota${cantMasc !== 1 ? 's' : ''} (${costoMasc > 0 ? `$${costoMasc.toLocaleString('es-CO')} COP · Pago al dueño de la finca` : 'Sin costo adicional'})`
+      ? `🐾 *Mascotas:* ${cantMasc} mascota${cantMasc !== 1 ? 's' : ''} (${costoMasc > 0 ? `$${costoMasc.toLocaleString('es-CO')} COP` : 'Sin costo adicional'})`
+      : '';
+    const depGarantia = Math.max(0, Number(finca.deposito_garantia) || 0);
+    const lineaDeposito = depGarantia > 0
+      ? `🛡️ *Depósito reembolsable (Garantía):* $${depGarantia.toLocaleString('es-CO')} COP`
       : '';
 
     return {
@@ -197,13 +203,15 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
       subtotalAlojamiento: subtotalAloja,
       costoMascotas: costoMasc,
       subtotalPropietario: subPropietario,
+      depositoGarantia: depGarantia,
       costoTotalAlimentacion: costoAlim,
       totalEstimado: tot,
       alimentacionDetalle: detAlim,
       alimentacionTextoResumen: resAlim,
       mascotasLineaTexto: lineaMascotas,
+      depositoLineaTexto: lineaDeposito,
     };
-  }, [fechaInicio, fechaFin, personas, finca.precio_pp, permiteMascotas, cantidadMascotas, valorMascotaUnitario, soloAlojamiento, planesSeleccionados]);
+  }, [fechaInicio, fechaFin, personas, finca.precio_pp, finca.deposito_garantia, permiteMascotas, cantidadMascotas, valorMascotaUnitario, soloAlojamiento, planesSeleccionados]);
 
   // Mensaje y Enlace de WhatsApp dinámico con Plantilla Editable
   const { waMensaje, waUrl } = useMemo(() => {
@@ -218,9 +226,12 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
 
     // Si la plantilla personalizada no tiene aún el token {mascotas_linea}, lo integramos junto a {alimentacion_detalle}
     const plantillaTieneTokenMascotas = /\{mascotas_linea\}|\{mascotas_detalle\}/i.test(template);
-    const detalleAlimConMascotas = (!plantillaTieneTokenMascotas && mascotasLineaTexto)
-      ? `${mascotasLineaTexto}\n${alimentacionDetalle}`
-      : alimentacionDetalle;
+    const bloquesExtras = [
+      (!plantillaTieneTokenMascotas && mascotasLineaTexto) ? mascotasLineaTexto : '',
+      alimentacionDetalle,
+      depositoLineaTexto,
+    ].filter(Boolean);
+    const detalleAlimConMascotas = bloquesExtras.join('\n');
 
     const tokens: Record<string, string> = {
       finca: finca.nombre,
@@ -242,8 +253,10 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
       costo_mascotas: `$${costoMascotas.toLocaleString('es-CO')} COP`,
       mascotas_linea: mascotasLineaTexto,
       mascotas_detalle: mascotasLineaTexto,
+      deposito_garantia: depositoGarantia > 0 ? `$${depositoGarantia.toLocaleString('es-CO')} COP` : '$0 COP',
+      deposito_linea: depositoLineaTexto,
       alojamiento_total: costoMascotas > 0
-        ? `$${subtotalAlojamiento.toLocaleString('es-CO')} COP + Mascotas $${costoMascotas.toLocaleString('es-CO')} COP (Total Dueño: $${subtotalPropietario.toLocaleString('es-CO')} COP)`
+        ? `$${subtotalAlojamiento.toLocaleString('es-CO')} COP + Mascotas $${costoMascotas.toLocaleString('es-CO')} COP (Total Finca: $${subtotalPropietario.toLocaleString('es-CO')} COP)`
         : `$${subtotalAlojamiento.toLocaleString('es-CO')} COP`,
       alimentacion_detalle: detalleAlimConMascotas,
       costo_alimentacion: `$${costoTotalAlimentacion.toLocaleString('es-CO')} COP`,
@@ -258,7 +271,8 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
     finca, waNumberGlobal, configuracion, cotGuardada, mismoWa, clienteWa,
     clienteNombre, clienteCelular, fechaInicio, fechaFin, noches, personas,
     cantidadMascotas, costoMascotas, subtotalPropietario, mascotasLineaTexto,
-    subtotalAlojamiento, alimentacionDetalle, costoTotalAlimentacion, totalEstimado
+    depositoGarantia, depositoLineaTexto, subtotalAlojamiento, alimentacionDetalle,
+    costoTotalAlimentacion, totalEstimado
   ]);
 
   // --- Acción principal: Validar y Generar Cotización ---
@@ -339,9 +353,12 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
           const waNum = (finca.whatsapp || waNumberGlobal || '573176827093').replace(/[^0-9]/g, '');
           const waAltTxt = (!mismoWa && clienteWa.trim()) ? `\n📱 *WhatsApp alternativo:* ${clienteWa.trim()}` : '';
           const plantillaTieneTokenMascotas = /\{mascotas_linea\}|\{mascotas_detalle\}/i.test(template);
-          const detalleAlimConMascotas = (!plantillaTieneTokenMascotas && mascotasLineaTexto)
-            ? `${mascotasLineaTexto}\n${alimentacionDetalle}`
-            : alimentacionDetalle;
+          const bloquesExtras = [
+            (!plantillaTieneTokenMascotas && mascotasLineaTexto) ? mascotasLineaTexto : '',
+            alimentacionDetalle,
+            depositoLineaTexto,
+          ].filter(Boolean);
+          const detalleAlimConMascotas = bloquesExtras.join('\n');
 
           const tokensExito: Record<string, string> = {
             finca: finca.nombre,
@@ -363,8 +380,10 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
             costo_mascotas: `$${costoMascotas.toLocaleString('es-CO')} COP`,
             mascotas_linea: mascotasLineaTexto,
             mascotas_detalle: mascotasLineaTexto,
+            deposito_garantia: depositoGarantia > 0 ? `$${depositoGarantia.toLocaleString('es-CO')} COP` : '$0 COP',
+            deposito_linea: depositoLineaTexto,
             alojamiento_total: costoMascotas > 0
-              ? `$${subtotalAlojamiento.toLocaleString('es-CO')} COP + Mascotas $${costoMascotas.toLocaleString('es-CO')} COP (Total Dueño: $${subtotalPropietario.toLocaleString('es-CO')} COP)`
+              ? `$${subtotalAlojamiento.toLocaleString('es-CO')} COP + Mascotas $${costoMascotas.toLocaleString('es-CO')} COP (Total Finca: $${subtotalPropietario.toLocaleString('es-CO')} COP)`
               : `$${subtotalAlojamiento.toLocaleString('es-CO')} COP`,
             alimentacion_detalle: detalleAlimConMascotas,
             costo_alimentacion: `$${costoTotalAlimentacion.toLocaleString('es-CO')} COP`,
@@ -459,7 +478,7 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
             </select>
             <span className="text-xs text-muted" style={{ display: 'block', marginTop: '0.2rem', fontSize: '0.68rem' }}>
               {valorMascotaUnitario > 0
-                ? `$${valorMascotaUnitario.toLocaleString('es-CO')} c/u · Pago al dueño`
+                ? `$${valorMascotaUnitario.toLocaleString('es-CO')} c/u`
                 : 'Bienvenidas sin costo'}
             </span>
           </div>
@@ -516,17 +535,17 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
           <div className="quote-row">
             <span className="text-muted" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <Dog size={13} style={{ color: 'var(--primary)' }} />
-              Mascotas ({cantidadMascotas}{valorMascotaUnitario > 0 ? ` × $${valorMascotaUnitario.toLocaleString('es-CO')} · Dueño finca` : ''}):
+              Mascotas ({cantidadMascotas}{valorMascotaUnitario > 0 ? ` × $${valorMascotaUnitario.toLocaleString('es-CO')}` : ''}):
             </span>
             <span style={{ fontWeight: 600, color: costoMascotas > 0 ? 'var(--text-main)' : 'var(--success)' }}>
-              {costoMascotas > 0 ? `+ ${formatCOP(costoMascotas)}` : 'Sin costo'}
+              {costoMascotas > 0 ? formatCOP(costoMascotas) : 'Sin costo'}
             </span>
           </div>
         )}
 
         {costoMascotas > 0 && (
           <div className="quote-row" style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--primary)' }}>
-            <span>Subtotal Finca (Alojamiento + Mascotas · Propietario):</span>
+            <span>Subtotal Finca (Alojamiento + Mascotas):</span>
             <span>{formatCOP(subtotalPropietario)}</span>
           </div>
         )}
@@ -562,6 +581,17 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
             {formatCOP(totalEstimado)}
           </span>
         </div>
+
+        {depositoGarantia > 0 && (
+          <div className="quote-row" style={{ fontSize: '0.76rem', marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <ShieldCheck size={13} style={{ color: 'var(--primary)' }} /> Depósito reembolsable (Garantía):
+            </span>
+            <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+              {formatCOP(depositoGarantia)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* 4. Datos obligatorios del cliente */}

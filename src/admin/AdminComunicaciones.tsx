@@ -396,6 +396,13 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
                     </div>
                   )}
 
+                  {finanzasDoble.depositoGarantia > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem' }}>
+                      <span className="text-muted">🛡️ Depósito Reembolsable (Garantía):</span>
+                      <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{formatCOP(finanzasDoble.depositoGarantia)}</span>
+                    </div>
+                  )}
+
                   {finanzasDoble.esReserva ? (
                     <>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>

@@ -24,6 +24,7 @@ import {
   desglosarFinanzasReserva,
   desglosarFinanzasCotizacion,
   extraerInfoMascotas,
+  resolverMetadatosFinca,
   obtenerNombreClienteHistorico,
   obtenerNombreFincaHistorico,
   obtenerContactoClienteHistorico,
@@ -800,7 +801,7 @@ export function generarDocSeparacion(
   y += 8;
   y = linea(doc, y);
 
-  const fInfo = fincaParam || (reserva.fincas as any);
+  const fInfo = resolverMetadatosFinca(fincaParam || reserva.fincas, reserva.finca_id);
   const finanzas = desglosarFinanzasReserva(reserva, fInfo);
 
   // Fechas
@@ -819,8 +820,11 @@ export function generarDocSeparacion(
       doc,
       y,
       'Mascotas autorizadas:',
-      `${finanzas.cantidadMascotas} mascota(s) (${formatCOP(finanzas.costoMascotas)} - Pago al propietario)`
+      `${finanzas.cantidadMascotas} mascota(s) (${finanzas.costoMascotas > 0 ? formatCOP(finanzas.costoMascotas) : 'Sin costo adicional'})`
     );
+  }
+  if (finanzas.depositoGarantia > 0) {
+    y = fila(doc, y, 'Depósito reembolsable (Garantía):', formatCOP(finanzas.depositoGarantia));
   }
   if (reserva.alimentacion && reserva.alimentacion !== 'Sin alimentación') {
     y = fila(doc, y, 'Servicio gastronómico:', reserva.alimentacion);
@@ -839,16 +843,16 @@ export function generarDocSeparacion(
   const tieneAlimentacion = (reserva.costo_alimentacion || 0) > 0;
 
   if (tieneAlimentacion) {
-    // 1. Alojamiento + Mascotas (Propietario)
+    // 1. Alojamiento + Mascotas (Finca)
     if (finanzas.costoMascotas > 0) {
       y = fila(doc, y, 'Alojamiento Base en Finca:', formatCOP(finanzas.subtotalAlojamientoBase));
-      y = fila(doc, y, `Ingreso de Mascotas (${finanzas.cantidadMascotas} · Pago al Propietario):`, formatCOP(finanzas.costoMascotas));
-      y = fila(doc, y, 'Total Finca (Propietario):', formatCOP(finanzas.subtotalAlojamiento), true);
+      y = fila(doc, y, `Ingreso de Mascotas (${finanzas.cantidadMascotas}):`, formatCOP(finanzas.costoMascotas));
+      y = fila(doc, y, 'Total Reserva Finca:', formatCOP(finanzas.subtotalAlojamiento), true);
     } else {
       y = fila(doc, y, 'Alojamiento en Finca (Valor Total):', formatCOP(finanzas.subtotalAlojamiento));
     }
     y = fila(doc, y, 'Abono de Separación de Finca Pagado:', formatCOP(finanzas.pagadoFinca), true);
-    y = fila(doc, y, 'Saldo Restante Finca al Check-in (Propietario):', formatCOP(finanzas.saldoFincaCheckIn), true);
+    y = fila(doc, y, 'Saldo Restante Finca al Check-in:', formatCOP(finanzas.saldoFincaCheckIn), true);
     y += 2;
 
     // 2. Alimentación
@@ -865,9 +869,9 @@ export function generarDocSeparacion(
   } else {
     if (finanzas.costoMascotas > 0) {
       y = fila(doc, y, 'Alojamiento Base en Finca:', formatCOP(finanzas.subtotalAlojamientoBase));
-      y = fila(doc, y, `Ingreso de Mascotas (${finanzas.cantidadMascotas} · Pago al Propietario):`, formatCOP(finanzas.costoMascotas));
+      y = fila(doc, y, `Ingreso de Mascotas (${finanzas.cantidadMascotas}):`, formatCOP(finanzas.costoMascotas));
     }
-    y = fila(doc, y, 'Valor total de la reserva (Propietario):', formatCOP(reserva.valor_total), finanzas.costoMascotas > 0);
+    y = fila(doc, y, 'Valor total de la reserva:', formatCOP(reserva.valor_total), finanzas.costoMascotas > 0);
     y = fila(doc, y, 'Valor de separación pagado:', formatCOP(reserva.separacion), true);
     const saldo = calcularSaldo(reserva);
     y = fila(doc, y, 'Saldo pendiente al Check-in:', formatCOP(saldo), true);
@@ -1178,11 +1182,14 @@ export function generarEstadoCuenta(
     y += 4;
     if (finanzas.costoMascotas > 0) {
       y = fila(doc, y, 'Alojamiento Base en Finca:', formatCOP(finanzas.subtotalAlojamientoBase));
-      y = fila(doc, y, `Ingreso de Mascotas (${finanzas.cantidadMascotas} · Pago al Propietario):`, formatCOP(finanzas.costoMascotas));
+      y = fila(doc, y, `Ingreso de Mascotas (${finanzas.cantidadMascotas}):`, formatCOP(finanzas.costoMascotas));
     }
-    y = fila(doc, y, 'Valor total de la reserva (Propietario):', formatCOP(reserva.valor_total), finanzas.costoMascotas > 0);
+    if (finanzas.depositoGarantia > 0) {
+      y = fila(doc, y, 'Depósito reembolsable (Garantía):', formatCOP(finanzas.depositoGarantia));
+    }
+    y = fila(doc, y, 'Valor total de la reserva:', formatCOP(reserva.valor_total), finanzas.costoMascotas > 0);
     const pagado = pagos.reduce((acc, p) => acc + (p.tipo === 'devolucion' ? -p.valor : p.valor), 0);
-    y = fila(doc, y, 'Total pagado al Propietario:', formatCOP(pagado), true);
+    y = fila(doc, y, 'Total pagado a la fecha:', formatCOP(pagado), true);
     const saldo = calcularSaldo(reserva);
 
     doc.setFillColor(saldo === 0 ? 209 : 244, saldo === 0 ? 234 : 212, saldo === 0 ? 217 : 216);
@@ -1722,10 +1729,10 @@ export function generarDocCotizacion(
 
   y += 38;
 
-  const fInfo = fincaParam || (cotizacion.fincas as any);
+  const fInfo = resolverMetadatosFinca(fincaParam || cotizacion.fincas, cotizacion.finca_id);
   const finCot = desglosarFinanzasCotizacion(cotizacion, fInfo);
 
-  // Detalle de la estadía
+  // Detalle de la estadía (Exclusivamente Finca)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(26, 107, 94);
@@ -1741,16 +1748,21 @@ export function generarDocCotizacion(
       doc,
       y,
       'Mascotas incluidas:',
-      `${finCot.cantidadMascotas} mascota(s) (${formatCOP(finCot.costoMascotas)} - Pago al propietario)`
+      `${finCot.cantidadMascotas} mascota(s) (${finCot.costoMascotas > 0 ? formatCOP(finCot.costoMascotas) : 'Sin costo adicional'})`
     );
   }
-  if (cotizacion.alimentacion && cotizacion.alimentacion !== 'Sin alimentación') {
-    y = fila(doc, y, 'Servicio gastronómico:', cotizacion.alimentacion);
+  if (finCot.depositoGarantia > 0) {
+    y = fila(
+      doc,
+      y,
+      'Depósito reembolsable (Garantía):',
+      `${formatCOP(finCot.depositoGarantia)} (Reintegrable al finalizar la estadía)`
+    );
   }
   y += 4;
   y = linea(doc, y);
 
-  // Liquidación de valores
+  // Liquidación de valores (Exclusivamente Finca: Alojamiento + Mascotas)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(26, 107, 94);
@@ -1761,20 +1773,16 @@ export function generarDocCotizacion(
   y = fila(
     doc,
     y,
-    finCot.costoMascotas > 0 ? 'Subtotal alojamiento base (Finca):' : 'Subtotal alojamiento:',
+    'Subtotal alojamiento:',
     formatCOP(finCot.subtotalAlojamientoBase)
   );
-  if (finCot.costoMascotas > 0) {
+  if (finCot.cantidadMascotas > 0) {
     y = fila(
       doc,
       y,
-      `Ingreso de mascotas (${finCot.cantidadMascotas} · Pago al propietario):`,
-      formatCOP(finCot.costoMascotas)
+      `Ingreso de mascotas (${finCot.cantidadMascotas}):`,
+      finCot.costoMascotas > 0 ? formatCOP(finCot.costoMascotas) : 'Sin costo adicional'
     );
-    y = fila(doc, y, 'Total Finca (Propietario):', formatCOP(finCot.totalPropietarioFinca), true);
-  }
-  if (finCot.costoAlimentacion > 0) {
-    y = fila(doc, y, 'Alimentación seleccionada:', formatCOP(finCot.costoAlimentacion));
   }
   if (cotizacion.descuento > 0) {
     y = fila(doc, y, 'Descuento aplicado:', `-${formatCOP(cotizacion.descuento)}`);
@@ -1784,18 +1792,32 @@ export function generarDocCotizacion(
   }
 
   y += 2;
-  // Total destacado
+  // Total destacado (Exclusivamente Finca)
   doc.setFillColor(230, 243, 240);
   doc.rect(14, y - 4, 182, 10, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(26, 107, 94);
   doc.text('VALOR TOTAL COTIZADO:', 18, y + 2.5);
-  doc.text(formatCOP(finCot.totalCotizado), 182, y + 2.5, { align: 'right' });
+  doc.text(formatCOP(finCot.totalPropietarioFinca), 182, y + 2.5, { align: 'right' });
   doc.setTextColor(30, 27, 19);
   y += 10;
 
-  // Abono requerido (50% de alojamiento + mascotas de la finca) para formalizar y bloquear disponibilidad
+  // Si la finca tiene Depósito Reembolsable de Garantía, mostrarlo con claridad
+  if (finCot.depositoGarantia > 0) {
+    doc.setFillColor(244, 248, 246);
+    doc.setDrawColor(26, 107, 94);
+    doc.roundedRect(14, y, 182, 8.5, 1.5, 1.5, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(26, 107, 94);
+    doc.text('DEPÓSITO REEMBOLSABLE DE GARANTÍA (REINTEGRABLE AL CHECK-OUT):', 18, y + 5.5);
+    doc.text(formatCOP(finCot.depositoGarantia), 182, y + 5.5, { align: 'right' });
+    doc.setTextColor(30, 27, 19);
+    y += 11;
+  }
+
+  // Abono requerido (50% de la finca) para formalizar y bloquear disponibilidad
   const abono50 = finCot.abono50Propietario;
   doc.setFillColor(254, 249, 195);
   doc.setDrawColor(202, 138, 4);
@@ -1803,18 +1825,13 @@ export function generarDocCotizacion(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.2);
   doc.setTextColor(161, 98, 7);
-  const textoInstruccionAbono = plantillasPdf.instruccion_abono_cotizacion || (
-    finCot.costoMascotas > 0
-      ? 'ABONO REQUERIDO (50% FINCA + MASCOTAS PARA BLOQUEAR):'
-      : 'ABONO REQUERIDO (50% ALOJAMIENTO PARA BLOQUEAR):'
-  );
+  const textoInstruccionAbono = plantillasPdf.instruccion_abono_cotizacion || 'ABONO REQUERIDO (50% PARA SEPARAR Y BLOQUEAR DISPONIBILIDAD):';
   doc.text(sanearTextoParaPdf(textoInstruccionAbono), 18, y + 5.5);
   doc.text(formatCOP(abono50), 182, y + 5.5, { align: 'right' });
   doc.setTextColor(30, 27, 19);
   y += 12;
 
-  // CUENTAS BANCARIAS SEPARADAS
-  // 1. Cuenta del Propietario de la Finca para transferencia del anticipo de alojamiento
+  // CUENTA BANCARIA EXCLUSIVA PARA EL ABONO DE LA FINCA
   if (fInfo?.banco_cuenta) {
     doc.setFillColor(248, 249, 248);
     doc.setDrawColor(219, 212, 195);
@@ -1823,40 +1840,18 @@ export function generarDocCotizacion(
     doc.setFontSize(7.5);
     doc.setTextColor(26, 107, 94);
     doc.text(
-      finCot.costoMascotas > 0
-        ? '1. CUENTA DEL PROPIETARIO PARA TRANSFERENCIA DEL ABONO (50% FINCA + MASCOTAS):'
-        : '1. CUENTA DEL PROPIETARIO PARA TRANSFERENCIA DEL ABONO (50% ALOJAMIENTO):',
+      'CUENTA BANCARIA PARA TRANSFERENCIA DEL ABONO DE RESERVA (50%):',
       18,
       y + 4.5
     );
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(30, 27, 19);
-    let datosOwner = sanearTextoParaPdf(`Banco: ${fInfo.banco_nombre || 'Bancolombia'}  |  ${fInfo.banco_tipo_cuenta || 'Ahorros'} N°: ${fInfo.banco_cuenta}  |  Titular: ${fInfo.banco_titular || 'Propietario de la Finca'}`);
+    let datosOwner = sanearTextoParaPdf(`Banco: ${fInfo.banco_nombre || 'Bancolombia'}  |  ${fInfo.banco_tipo_cuenta || 'Ahorros'} N°: ${fInfo.banco_cuenta}  |  Titular: ${fInfo.banco_titular || 'Titular Autorizado'}`);
     if (fInfo.banco_identificacion?.trim()) {
       datosOwner += sanearTextoParaPdf(`  |  Identificación: ${fInfo.banco_identificacion.trim()}`);
     }
     doc.text(datosOwner, 18, y + 9);
-    y += 15;
-  }
-
-  // 2. Cuenta de la Administración Paraíso Terrenal si incluye servicio gastronómico
-  if (finCot.costoAlimentacion > 0 && config.banco_cuenta) {
-    doc.setFillColor(244, 248, 246);
-    doc.setDrawColor(26, 107, 94);
-    doc.roundedRect(14, y, 182, 13, 1.5, 1.5, 'FD');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(26, 107, 94);
-    doc.text('2. CUENTA DE LA ADMINISTRACIÓN PARA TRANSFERENCIA DE ALIMENTACIÓN (PARAÍSO TERRENAL):', 18, y + 4.5);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(30, 27, 19);
-    let datosAdmin = sanearTextoParaPdf(`Banco: ${config.banco_nombre || 'Bancolombia'}  |  ${config.banco_tipo_cuenta || 'Ahorros'} N°: ${config.banco_cuenta}  |  Titular: ${config.banco_titular || 'Administración Paraíso Terrenal'}`);
-    if (config.banco_identificacion?.trim()) {
-      datosAdmin += sanearTextoParaPdf(`  |  NIT / Cédula: ${config.banco_identificacion.trim()}`);
-    }
-    doc.text(datosAdmin, 18, y + 9);
     y += 15;
   }
 
@@ -2063,7 +2058,7 @@ export function generarExpedienteCompleto(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.8);
   doc.text(
-    sanearTextoParaPdf(`Alojamiento Base en Finca (${nochesCalc} noche(s), ${reserva.personas} pers.) - Propietario`),
+    sanearTextoParaPdf(`Alojamiento Base en Finca (${nochesCalc} noche(s), ${reserva.personas} pers.)`),
     18,
     yEcon
   );
@@ -2072,7 +2067,7 @@ export function generarExpedienteCompleto(
 
   if (finanzas.costoMascotas > 0) {
     doc.text(
-      sanearTextoParaPdf(`Ingreso de Mascotas (${finanzas.cantidadMascotas} mascota(s)) - Pago al Propietario`),
+      sanearTextoParaPdf(`Ingreso de Mascotas (${finanzas.cantidadMascotas} mascota(s))`),
       18,
       yEcon
     );
@@ -2214,7 +2209,9 @@ export function generarExpedienteCompleto(
     ? cierre.estado_entrega_finca.replace('_', ' ').toUpperCase()
     : (esCerrada ? 'ENTREGA CONFORME EN BUEN ESTADO' : 'PENDIENTE DE CHECK-OUT Y REVISIÓN');
   const depGarantia = cierre?.deposito_garantia_devuelto
-    ? `Depósito devuelto (${formatCOP(cierre?.valor_deposito_devuelto || 0)})`
+    ? `Depósito devuelto (${formatCOP(cierre?.valor_deposito_devuelto || finanzas.depositoGarantia || 0)})`
+    : finanzas.depositoGarantia > 0
+    ? `Depósito reembolsable: ${formatCOP(finanzas.depositoGarantia)} (Sin retenciones)`
     : 'Sin retenciones reportadas';
 
   // Limpiar etiquetas técnicas o textos redundantes de conversión

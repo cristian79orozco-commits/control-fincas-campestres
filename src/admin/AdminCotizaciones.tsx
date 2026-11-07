@@ -463,6 +463,11 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                       • Finca (Dueño{finCot.costoMascotas > 0 ? ` · Aloj. ${formatCOP(finCot.subtotalAlojamientoBase)} + Mascotas ${formatCOP(finCot.costoMascotas)}` : ''}): <strong>{formatCOP(valorAlojamiento)}</strong> (50%: {formatCOP(finCot.abono50Propietario)})
                     </div>
+                    {finCot.depositoGarantia > 0 && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>
+                        • Depósito reembolsable: <strong>{formatCOP(finCot.depositoGarantia)}</strong>
+                      </div>
+                    )}
                     {tieneAlimentacion && (
                       <div style={{ fontSize: '0.75rem', color: 'var(--accent, #ea580c)' }}>
                         • Menú (Admin): <strong>{formatCOP(c.costo_alimentacion || 0)}</strong>
