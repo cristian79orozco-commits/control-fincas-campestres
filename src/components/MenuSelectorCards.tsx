@@ -6,10 +6,11 @@
  * con control independiente de servicios y comensales por cada menú seleccionado.
  */
 
-import React, { useState, useMemo } from 'react';
-import { Check, ChevronDown, ChevronUp, Utensils, Plus, Minus, Info, Sparkles } from 'lucide-react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Check, ChevronDown, ChevronUp, Utensils, Plus, Minus, Info, Sparkles, ZoomIn } from 'lucide-react';
 import type { Menu } from '../types';
-import { obtenerFotoMenu } from '../utils/menuUtils';
+import { obtenerFotoMenu, obtenerGaleriaFotosMenu } from '../utils/menuUtils';
+import { GalleryLightbox } from './GalleryLightbox';
 
 export interface PlanAlimentacionSeleccionado {
   menuId: string;
@@ -72,8 +73,28 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
   // Por requerimiento expreso del cliente: contraído/colapsado por defecto
   const [expandido, setExpandido] = useState(false);
   const [descripcionesAbiertas, setDescripcionesAbiertas] = useState<Record<string, boolean>>({});
+  const [lightboxState, setLightboxState] = useState<{
+    isOpen: boolean;
+    images: string[];
+    currentIndex: number;
+    title?: string;
+    subtitle?: string;
+  }>({ isOpen: false, images: [], currentIndex: 0 });
 
-  const menusActivos = menus.filter(m => m.activo);
+  const menusActivos = useMemo(() => menus.filter(m => m.activo), [menus]);
+
+  const abrirLightbox = useCallback((m: Menu, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const fotos = obtenerGaleriaFotosMenu(m);
+    if (!fotos.length) return;
+    setLightboxState({
+      isOpen: true,
+      images: fotos,
+      currentIndex: 0,
+      title: m.nombre,
+      subtitle: `Categoría: ${m.categoria}`,
+    });
+  }, []);
 
   const toggleDesc = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -514,15 +535,54 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
                       position: 'relative',
                     }}
                   >
-                    {/* Imagen y header de tarjeta */}
-                    <div style={{ position: 'relative', height: '110px', background: 'var(--surface-sunken)' }}>
+                    {/* Imagen y header de tarjeta con soporte completo de proporción y botón de ampliación */}
+                    <div
+                      style={{
+                        position: 'relative',
+                        height: '125px',
+                        background: 'linear-gradient(145deg, #FFFDF9 0%, #F4EFE4 100%)',
+                        borderBottom: '1px solid var(--border-subtle)',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
                       {foto ? (
-                        <img
-                          src={foto}
-                          alt={m.nombre}
-                          loading="lazy"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
+                        <>
+                          <img
+                            src={foto}
+                            alt=""
+                            aria-hidden="true"
+                            loading="lazy"
+                            decoding="async"
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              filter: 'blur(16px)',
+                              opacity: 0.16,
+                              transform: 'scale(1.1)',
+                              pointerEvents: 'none',
+                            }}
+                          />
+                          <img
+                            src={foto}
+                            alt={m.nombre}
+                            loading="lazy"
+                            decoding="async"
+                            style={{
+                              position: 'relative',
+                              zIndex: 1,
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'contain',
+                              padding: '0.35rem',
+                            }}
+                          />
+                        </>
                       ) : (
                         <div
                           style={{
@@ -538,12 +598,42 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
                         </div>
                       )}
 
+                      {/* Botón para ver la imagen en pantalla completa sin alternar la selección */}
+                      {foto && (
+                        <button
+                          type="button"
+                          onClick={e => abrirLightbox(m, e)}
+                          title="Ampliar imagen del menú"
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            left: '8px',
+                            zIndex: 3,
+                            background: 'rgba(20, 18, 16, 0.76)',
+                            backdropFilter: 'blur(4px)',
+                            color: '#fff',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            borderRadius: '6px',
+                            padding: '0.2rem 0.45rem',
+                            fontSize: '0.64rem',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            cursor: 'zoom-in',
+                          }}
+                        >
+                          <ZoomIn size={11} /> Ver foto
+                        </button>
+                      )}
+
                       {/* Checkbox superior */}
                       <div
                         style={{
                           position: 'absolute',
                           top: '8px',
                           right: '8px',
+                          zIndex: 3,
                           width: '24px',
                           height: '24px',
                           borderRadius: '6px',
@@ -565,12 +655,13 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
                           position: 'absolute',
                           bottom: '8px',
                           left: '8px',
-                          fontSize: '0.66rem',
+                          zIndex: 3,
+                          fontSize: '0.64rem',
                           fontWeight: 700,
                           textTransform: 'uppercase',
                           letterSpacing: '0.04em',
                           color: '#fff',
-                          background: 'rgba(0,0,0,0.65)',
+                          background: 'rgba(20, 18, 16, 0.72)',
                           backdropFilter: 'blur(4px)',
                           padding: '0.15rem 0.5rem',
                           borderRadius: '4px',
@@ -891,6 +982,16 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
           </div>
         </div>
       )}
+
+      <GalleryLightbox
+        isOpen={lightboxState.isOpen}
+        images={lightboxState.images}
+        currentIndex={lightboxState.currentIndex}
+        onClose={() => setLightboxState(prev => ({ ...prev, isOpen: false }))}
+        onIndexChange={idx => setLightboxState(prev => ({ ...prev, currentIndex: idx }))}
+        title={lightboxState.title}
+        subtitle={lightboxState.subtitle}
+      />
     </div>
   );
 };

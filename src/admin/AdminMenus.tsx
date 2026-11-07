@@ -8,7 +8,7 @@ import {
 import { supabase } from '../services/supabase';
 import { generarPropuestaAlimentacion } from '../services/documentos';
 import { optimizarImagen, formatearBytes } from '../utils/imageOptimizer';
-import { obtenerFotoMenu } from '../utils/menuUtils';
+import { obtenerFotoMenu, obtenerGaleriaFotosMenu } from '../utils/menuUtils';
 import type { Menu, MenuCategoria, Cliente, Finca, ConfiguracionGeneral } from '../types';
 import { CurrencyInput } from '../components/CurrencyInput';
 
@@ -188,12 +188,8 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
 
   // Abrir modal de edición
   const abrirEdicion = (m: Menu) => {
-    const hijas = (m.menu_imagenes || []).map(i => i.url).filter(Boolean);
-    const portadaActual = m.imagen_url || hijas[0] || '';
-    const lista = [...hijas];
-    if (portadaActual && !lista.includes(portadaActual)) {
-      lista.unshift(portadaActual);
-    }
+    const lista = obtenerGaleriaFotosMenu(m);
+    const portadaActual = obtenerFotoMenu(m) || lista[0] || '';
 
     setForm({
       ...m,
@@ -251,7 +247,7 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
     e.target.value = '';
 
     if (nuevas.length > 0) {
-      setImagenesUrls(prev => [...prev, ...nuevas]);
+      setImagenesUrls(prev => [...prev.filter(u => !u.includes('unsplash.com')), ...nuevas]);
       // Si la foto actual es vacía o es una plantilla de Unsplash, reemplazarla por la foto real subida
       setForm(prev => {
         const esUnsplash = prev.imagen_url && prev.imagen_url.includes('unsplash.com');
@@ -962,14 +958,54 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
                 }}
               >
                 {/* Imagen del plato */}
-                <div style={{ height: '140px', width: '100%', position: 'relative', background: '#e2e8f0', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    height: '150px',
+                    width: '100%',
+                    position: 'relative',
+                    background: 'linear-gradient(145deg, #FFFDF9 0%, #F4EFE4 100%)',
+                    borderBottom: '1px solid var(--border-subtle)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
                   {foto ? (
-                    <img
-                      src={foto}
-                      alt={m.nombre}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      loading="lazy"
-                    />
+                    <>
+                      <img
+                        src={foto}
+                        alt=""
+                        aria-hidden="true"
+                        loading="lazy"
+                        decoding="async"
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          filter: 'blur(18px)',
+                          opacity: 0.16,
+                          transform: 'scale(1.1)',
+                          pointerEvents: 'none',
+                        }}
+                      />
+                      <img
+                        src={foto}
+                        alt={m.nombre}
+                        style={{
+                          position: 'relative',
+                          zIndex: 1,
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'contain',
+                          padding: '0.4rem',
+                        }}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
                       <ImageIcon size={32} />
@@ -1223,12 +1259,13 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
                               overflow: 'hidden',
                               position: 'relative',
                               border: esPrincipal ? '2.5px solid var(--primary)' : '1px solid var(--border)',
+                              background: 'linear-gradient(145deg, #FFFDF9 0%, #F4EFE4 100%)',
                               cursor: 'pointer',
                               boxShadow: esPrincipal ? '0 0 0 2px color-mix(in srgb, var(--primary) 28%, transparent)' : 'none',
                               transition: 'transform 0.15s, border-color 0.15s',
                             }}
                           >
-                            <img src={url} alt={`Foto ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img src={url} alt={`Foto ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
                             <button
                               type="button"
                               onClick={(e) => {
