@@ -308,6 +308,8 @@ export const AdminCierreModal: React.FC<AdminCierreModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.6rem',
               marginTop: '0.5rem',
               paddingTop: '0.75rem',
               borderTop: '1px solid var(--border)',

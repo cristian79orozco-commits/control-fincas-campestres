@@ -937,7 +937,7 @@ export const AdminMenus: React.FC<AdminMenusProps> = ({
           </button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 290px), 1fr))', gap: '1rem' }}>
           {menusFiltrados.map(m => {
             const catStyle = CATEGORIA_COLORS[m.categoria] || { bg: '#e5e7eb', text: '#374151' };
             const foto = obtenerFotoMenu(m);

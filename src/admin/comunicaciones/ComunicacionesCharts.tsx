@@ -271,7 +271,7 @@ export const ComunicacionesCharts: React.FC<ComunicacionesChartsProps> = ({
       </div>
 
       {/* Grid de Gráficas de Análisis con Aspecto Nativo */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '1rem' }}>
         {/* Gráfico 1: Proporción por Tipo de Comunicación */}
         <div
           style={{
@@ -338,7 +338,7 @@ export const ComunicacionesCharts: React.FC<ComunicacionesChartsProps> = ({
           </div>
 
           {finanzasDoble && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', paddingTop: '0.6rem', borderTop: '1px solid var(--border)', fontSize: '0.76rem' }}>
+            <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', paddingTop: '0.6rem', borderTop: '1px solid var(--border)', fontSize: '0.76rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#16a34a', flexShrink: 0 }} />
                 <span>Total Dueño: <strong>{formatCOP(finanzasDoble.subtotalFinca)}</strong></span>

@@ -370,7 +370,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                   marginBottom: '0.75rem',
                 }}
               >
-                <div style={{ flex: 1, minWidth: 280 }}>
+                <div style={{ flex: 1, minWidth: 'min(100%, 280px)' }}>
                   <div style={{ fontWeight: 600, display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <Tag size={13} style={{ color: 'var(--primary)' }} />
                     <span style={{ fontSize: '0.95rem', fontWeight: 700 }}>{fincaNombre}</span>
@@ -477,7 +477,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                 </div>
 
                 {/* ACCIONES INTELIGENTES Y AUTOMATIZADAS */}
-                <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap', alignSelf: 'center' }}>
+                <div className="admin-row-actions" style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap', alignSelf: 'center' }}>
                   {/* Botón 1: Pedir Abono Finca (50% a cuenta de propietario) */}
                   {c.estado !== 'cancelada' && (
                     <button

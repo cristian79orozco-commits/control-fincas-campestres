@@ -225,7 +225,7 @@ export const HistorialCharts: React.FC<HistorialChartsProps> = ({
         </div>
 
         {/* Pestañas con micro-animaciones */}
-        <div style={{ display: 'inline-flex', background: 'var(--surface-2)', padding: '0.2rem', borderRadius: '12px', gap: '0.2rem' }}>
+        <div style={{ display: 'inline-flex', flexWrap: 'wrap', maxWidth: '100%', background: 'var(--surface-2)', padding: '0.2rem', borderRadius: '12px', gap: '0.2rem' }}>
           {TABS.map((tab) => {
             const isActive = tabActiva === tab.id;
             return (
@@ -299,7 +299,7 @@ export const HistorialCharts: React.FC<HistorialChartsProps> = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', alignItems: 'center' }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: '1.25rem', alignItems: 'center' }}
           >
             <div style={{ height: '250px' }}>
               <Doughnut data={dataEstados} options={optionsEstados} />

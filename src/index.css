@@ -3255,3 +3255,364 @@ textarea:focus {
   display: inline-block;
   animation: pulseDot 2s infinite ease-in-out;
 }
+
+/* ==========================================================================
+   RESTRUCTURA RESPONSIVE MÓVIL — PANEL DE ADMINISTRACIÓN (FINCAS UI/UX PRO)
+   100% Aislado en breakpoints móviles (<= 860px / 640px / 480px).
+   Preserva intacta la visualización en PC (> 860px).
+   ========================================================================== */
+
+.admin-mobile-module-strip,
+.admin-mobile-finca-bar,
+.admin-mobile-drawer-overlay {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  /* 1. Contención estricta del shell de administración para cero desbordamiento horizontal */
+  .main-content:has(.admin-shell) {
+    margin-top: 0.65rem !important;
+    padding: 0 0.65rem !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  .admin-shell {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  .admin-layout-grid,
+  .admin-layout-grid > div,
+  .admin-shell .panel,
+  .admin-shell .dashboard-glass-panel {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 2. Topbar del Panel de Administración en móvil */
+  .admin-topbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.65rem !important;
+    margin-bottom: 0.85rem !important;
+  }
+
+  .admin-topbar-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: space-between !important;
+    gap: 0.45rem !important;
+    width: 100% !important;
+  }
+
+  /* 3. Cinta horizontal táctil de los 11 módulos del Administrador (Solo Móvil) */
+  .admin-mobile-module-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0.4rem 0.45rem;
+    margin-bottom: 0.9rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--rad-sm, 12px);
+    box-shadow: var(--sh-sm);
+    max-width: 100%;
+  }
+
+  .admin-mobile-module-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-mobile-module-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.38rem;
+    padding: 0.48rem 0.78rem;
+    border-radius: var(--rad-xs, 8px);
+    font-size: 0.76rem;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.18s ease;
+    min-height: 38px;
+  }
+
+  .admin-mobile-module-pill.active {
+    background: var(--primary);
+    color: #ffffff;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(26, 107, 94, 0.25);
+  }
+
+  .admin-mobile-module-pill .pill-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.08rem 0.38rem;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text);
+  }
+
+  .admin-mobile-module-pill.active .pill-badge {
+    background: rgba(255, 255, 255, 0.22);
+    color: #ffffff;
+  }
+
+  /* 4. Selector de Fincas y botón "+ Nueva Finca" en móvil cuando está en pestaña Fincas */
+  .admin-mobile-finca-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.75rem 0.85rem;
+    margin-bottom: 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--rad-sm, 12px);
+    box-shadow: var(--sh-sm);
+  }
+
+  /* 5. Drawer / Bottom Sheet para el menú "Más" en móvil */
+  .admin-mobile-drawer-overlay {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .admin-mobile-drawer {
+    width: 100%;
+    max-width: 520px;
+    max-height: 82dvh;
+    overflow-y: auto;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-radius: 20px 20px 0 0;
+    padding: 1.1rem 1rem calc(76px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -10px 35px rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .admin-mobile-drawer-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .admin-mobile-drawer-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.7rem 0.8rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    min-height: 46px;
+    transition: all 0.15s ease;
+  }
+
+  .admin-mobile-drawer-btn.active {
+    background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+    border-color: var(--primary);
+    color: var(--primary);
+    font-weight: 700;
+  }
+
+  /* 6. Corrección crítica de .avail-row y .form-grid dentro de Admin y Modales */
+  .admin-shell .avail-row,
+  .modal-box .avail-row {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.65rem !important;
+    padding: 0.85rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .admin-shell .avail-row > div,
+  .modal-box .avail-row > div {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .admin-shell .form-grid,
+  .modal-box .form-grid {
+    grid-template-columns: 1fr !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .admin-beneficio-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+
+  .admin-row-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.4rem !important;
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
+
+  .admin-chart-col-divider {
+    border-left: none !important;
+    padding-left: 0 !important;
+    border-top: 1px solid var(--border);
+    padding-top: 1rem;
+  }
+
+  /* 7. Modales del Administrador adaptados al 100% de pantallas móviles */
+  .modal-overlay {
+    padding: 0.5rem !important;
+  }
+
+  .modal-box {
+    width: 100% !important;
+    max-width: calc(100vw - 1rem) !important;
+    max-height: 90dvh !important;
+    margin: auto !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  .modal-header {
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+    padding: 0.9rem 1rem !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .main-content:has(.admin-shell) {
+    margin-top: 0.5rem !important;
+    padding: 0 0.5rem !important;
+  }
+
+  .admin-shell .panel {
+    padding: 0.9rem 0.75rem !important;
+    border-radius: var(--rad-sm, 12px) !important;
+  }
+
+  .admin-shell .panel-header {
+    flex-wrap: wrap !important;
+    gap: 0.45rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  /* Navbar superior compacta y deslizable cuando el Admin está logueado */
+  .topbar {
+    gap: 0.4rem !important;
+  }
+
+  .topbar-right {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 0.35rem !important;
+  }
+
+  .topbar-right::-webkit-scrollbar {
+    display: none;
+  }
+
+  .segmented {
+    overflow-x: auto;
+    max-width: 100%;
+    scrollbar-width: none;
+    flex-shrink: 1;
+  }
+
+  .segmented::-webkit-scrollbar {
+    display: none;
+  }
+
+  .seg-btn {
+    padding: 0.32rem 0.52rem !important;
+    font-size: 0.71rem !important;
+    white-space: nowrap;
+  }
+
+  /* Calendario Maestro en pantallas estrechas */
+  .admin-big-cal-grid {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .admin-big-cal-weekday {
+    padding: 0.35rem 0.1rem !important;
+    font-size: 0.62rem !important;
+    letter-spacing: 0 !important;
+  }
+
+  .admin-big-cal-cell {
+    min-height: 64px !important;
+    padding: 0.2rem !important;
+    overflow: hidden !important;
+  }
+
+  .admin-day-num {
+    width: 20px !important;
+    height: 20px !important;
+    font-size: 0.68rem !important;
+  }
+
+  .admin-day-price-tag {
+    font-size: 0.54rem !important;
+    padding: 0.04rem 0.18rem !important;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .admin-cal-event-pill {
+    font-size: 0.56rem !important;
+    padding: 0.08rem 0.2rem !important;
+  }
+
+  /* Quote rows en resúmenes financieros */
+  .quote-row {
+    flex-wrap: wrap !important;
+    gap: 0.25rem !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .admin-mobile-drawer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-shell .kpi-grid-pro {
+    grid-template-columns: 1fr !important;
+  }
+}

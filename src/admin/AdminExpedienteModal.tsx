@@ -170,32 +170,32 @@ export const AdminExpedienteModal: React.FC<AdminExpedienteModalProps> = ({
         </div>
 
         {/* Barra de pestañas internas */}
-        <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid var(--border)', padding: '0 1.25rem', background: 'var(--surface-alt, #fafafa)' }}>
+        <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid var(--border)', padding: '0 1.25rem', background: 'var(--surface-alt, #fafafa)', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
           <button
             className={`btn btn-sm${tabActiva === 'general' ? ' btn-primary' : ''}`}
             onClick={() => setTabActiva('general')}
-            style={{ borderRadius: 'var(--rad-xs) var(--rad-xs) 0 0', borderBottom: 'none', fontSize: '0.78rem' }}
+            style={{ borderRadius: 'var(--rad-xs) var(--rad-xs) 0 0', borderBottom: 'none', fontSize: '0.78rem', whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             Ficha y Operación
           </button>
           <button
             className={`btn btn-sm${tabActiva === 'pagos' ? ' btn-primary' : ''}`}
             onClick={() => setTabActiva('pagos')}
-            style={{ borderRadius: 'var(--rad-xs) var(--rad-xs) 0 0', borderBottom: 'none', fontSize: '0.78rem' }}
+            style={{ borderRadius: 'var(--rad-xs) var(--rad-xs) 0 0', borderBottom: 'none', fontSize: '0.78rem', whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             Pagos ({pagos.length})
           </button>
           <button
             className={`btn btn-sm${tabActiva === 'documentos' ? ' btn-primary' : ''}`}
             onClick={() => setTabActiva('documentos')}
-            style={{ borderRadius: 'var(--rad-xs) var(--rad-xs) 0 0', borderBottom: 'none', fontSize: '0.78rem' }}
+            style={{ borderRadius: 'var(--rad-xs) var(--rad-xs) 0 0', borderBottom: 'none', fontSize: '0.78rem', whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             Documentos PDF
           </button>
           <button
             className={`btn btn-sm${tabActiva === 'cierre' ? ' btn-primary' : ''}`}
             onClick={() => setTabActiva('cierre')}
-            style={{ borderRadius: 'var(--rad-xs) var(--rad-xs) 0 0', borderBottom: 'none', fontSize: '0.78rem' }}
+            style={{ borderRadius: 'var(--rad-xs) var(--rad-xs) 0 0', borderBottom: 'none', fontSize: '0.78rem', whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             Acta de Cierre y Auditoría
           </button>
@@ -208,7 +208,7 @@ export const AdminExpedienteModal: React.FC<AdminExpedienteModalProps> = ({
           {tabActiva === 'general' && (
             <div style={{ display: 'grid', gap: '1rem' }}>
               {/* Grid 2 columnas: Cliente y Finca */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.85rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '0.85rem' }}>
                 {/* Datos del Cliente */}
                 <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--rad-xs)', padding: '0.85rem 1rem' }}>
                   <div style={{ fontWeight: 600, fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.6rem', color: 'var(--primary)' }}>
@@ -364,7 +364,7 @@ export const AdminExpedienteModal: React.FC<AdminExpedienteModalProps> = ({
                 Documentos vinculados a esta operación. Puedes descargarlos en PDF o reenviarlos por WhatsApp al cliente.
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '0.75rem' }}>
                 {/* 1. Expediente Completo Consolidado */}
                 <div style={{ border: '2px solid var(--primary)', borderRadius: 'var(--rad-xs)', padding: '0.85rem 1rem', background: 'var(--surface)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>

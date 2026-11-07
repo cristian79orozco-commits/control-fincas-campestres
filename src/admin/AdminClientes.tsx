@@ -154,7 +154,7 @@ export const AdminClientes: React.FC<AdminClientesProps> = (props) => {
           zIndex: 1,
         }}
       >
-        <div style={{ position: 'relative', flex: '1 1 280px', maxWidth: '520px' }}>
+        <div style={{ position: 'relative', flex: '1 1 min(100%, 280px)', maxWidth: '520px' }}>
           <Search
             size={14}
             style={{

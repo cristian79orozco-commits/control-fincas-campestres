@@ -138,7 +138,7 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
 
   return (
     <div style={{ display: 'grid', gap: '0.75rem' }}>
-      <div style={{ fontWeight: 600, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--primary)' }}>
+      <div style={{ fontWeight: 600, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.35rem', color: 'var(--primary)' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <FileText size={15} /> Documentos y Comunicaciones
         </span>
@@ -170,7 +170,7 @@ export const AdminDocumentos: React.FC<AdminDocumentosProps> = ({
       </div>
 
       {/* Grid de documentos con descarga y envío por WhatsApp */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.6rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '0.6rem' }}>
         {/* 1. Separación */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--rad-xs)', padding: '0.55rem 0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>Separación</span>

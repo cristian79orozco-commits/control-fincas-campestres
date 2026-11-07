@@ -546,7 +546,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
           </div>
 
           {/* Botones de acción y estado de cambios */}
-          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <AnimatePresence>
               {hayCambios && (
                 <motion.span
@@ -692,7 +692,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1.25rem' }}
           >
             {/* Tarjeta: Identidad Institucional */}
             <div className="panel">
@@ -871,7 +871,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                 <span className="text-xs text-muted">Aparece en el pie de página de la página pública</span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.85rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: '0.85rem' }}>
                 <div className="field">
                   <label>Instagram</label>
                   <input
@@ -960,7 +960,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
             </div>
 
             {/* Área de trabajo en 2 columnas: Editor a la Izquierda, Simulador en Vivo a la Derecha */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.25rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: '1.25rem' }}>
               {/* COLUMNA 1: FORMULARIO DE EDICIÓN DEL DOCUMENTO SELECCIONADO */}
               <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {/* 1. COTIZACIÓN FORMAL */}
@@ -1404,7 +1404,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.25rem' }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '1.25rem' }}
           >
             {/* TARJETA 1: CUENTA DE LA ADMINISTRACIÓN (PARAÍSO TERRENAL) */}
             <div className="panel" style={{ border: '1.5px solid rgba(26, 107, 94, 0.4)' }}>
@@ -1558,7 +1558,7 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                   </label>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="field">
                     <label>Hasta cuántas personas aplica:</label>
                     <input

@@ -567,7 +567,7 @@ export const AdminHistorial: React.FC<AdminHistorialProps> = (props) => {
                     style={{ flexWrap: 'wrap', gap: '0.85rem', padding: '0.95rem 1.35rem', borderBottom: '1px solid var(--border)' }}
                   >
                     {/* Identificador y Finca */}
-                    <div style={{ flex: '1 1 240px', minWidth: '220px' }}>
+                    <div style={{ flex: '1 1 240px', minWidth: 'min(100%, 220px)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                         {r.consecutivo && <ConsecutivoBadge consecutivo={r.consecutivo} />}
                         <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)' }}>{finNombre}</span>

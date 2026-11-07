@@ -301,7 +301,7 @@ export const ReinicioDatosSection: React.FC<ReinicioDatosSectionProps> = ({
       {/* ============================================================== */}
       {/* 2. PANEL PRINCIPAL: SELECCIÓN Y CONFIGURACIÓN DEL REINICIO */}
       {/* ============================================================== */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: '1.5rem' }}>
         {/* COLUMNA IZQUIERDA: OPCIONES DEPURACIÓN */}
         <div
           className="panel"
@@ -315,7 +315,7 @@ export const ReinicioDatosSection: React.FC<ReinicioDatosSectionProps> = ({
             gap: '1rem',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
             <div>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>
                 1. Selección de Datos a Purgar

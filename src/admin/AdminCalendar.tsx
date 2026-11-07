@@ -185,7 +185,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: '1', justifyContent: 'flex-end', minWidth: '220px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: '1', justifyContent: 'flex-end', minWidth: 'min(100%, 220px)' }}>
             <div style={{ position: 'relative', width: '100%', maxWidth: '260px' }}>
               <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
@@ -319,7 +319,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
             <button className="btn btn-sm" onClick={handlePrevMonth} title="Mes anterior">
               <ChevronLeft size={16} />
             </button>
-            <span style={{ fontFamily: 'var(--font-dashboard)', fontWeight: 700, fontSize: '1.25rem', letterSpacing: '-0.015em', minWidth: '160px', textAlign: 'center' }}>
+            <span style={{ fontFamily: 'var(--font-dashboard)', fontWeight: 700, fontSize: '1.25rem', letterSpacing: '-0.015em', minWidth: 'min(100%, 140px)', textAlign: 'center' }}>
               {MESES[mes]} {anio}
             </span>
             <button className="btn btn-sm" onClick={handleNextMonth} title="Mes siguiente">
@@ -585,7 +585,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: '0.75rem', alignItems: 'end' }}>
             <div className="field" style={{ margin: 0 }}>
               <label style={{ fontSize: 'var(--text-xs)', fontWeight: 600 }}>
                 <User size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> Nombre del huésped / Razón de bloqueo (opcional)
@@ -639,7 +639,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
           </div>
 
           {/* Selector de filtro: solo de esta finca o todas */}
-          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               className={`btn btn-sm ${filtroFincaReservas === 'esta_finca' ? 'btn-primary' : ''}`}
               onClick={() => setFiltroFincaReservas('esta_finca')}
@@ -723,7 +723,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
 
                   {/* Fila principal de datos */}
                   <div className="avail-row" style={{ borderBottom: 'none', flexWrap: 'wrap', gap: '0.75rem' }}>
-                    <div style={{ flex: 1, minWidth: '280px' }}>
+                    <div style={{ flex: 1, minWidth: 'min(100%, 280px)' }}>
                       {/* Título: Finca, Consecutivo y Estado */}
                       <div style={{ fontWeight: 600, display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.95rem' }}>{fincaNombre}</span>

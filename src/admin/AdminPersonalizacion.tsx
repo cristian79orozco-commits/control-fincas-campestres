@@ -280,15 +280,16 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = (props)
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
+                    flexWrap: 'wrap',
                     padding: '0.85rem 1.1rem',
                     background: visible ? 'var(--surface-2)' : 'color-mix(in srgb, var(--surface-2) 40%, transparent)',
                     border: '1px solid var(--border)',
                     borderRadius: 'var(--rad-sm)',
                     opacity: visible ? 1 : 0.65,
-                    gap: '1rem',
+                    gap: '0.75rem',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flex: '1 1 200px', minWidth: 0 }}>
                     <span
                       style={{
                         width: '26px',
@@ -394,7 +395,7 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = (props)
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px', gap: '0.75rem' }}>
+              <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px', gap: '0.75rem' }}>
                 <div className="field">
                   <label>Texto del enlace</label>
                   <input
@@ -476,7 +477,7 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = (props)
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div className="field">
                   <label>Texto Botón Primario</label>
                   <input
@@ -497,7 +498,7 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = (props)
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
@@ -617,7 +618,7 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = (props)
             </div>
 
             <div style={{ display: 'grid', gap: '0.85rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div className="field">
                   <label>Título del Catálogo</label>
                   <input
@@ -647,7 +648,7 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = (props)
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.35rem' }}>
+              <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.35rem' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
@@ -689,7 +690,7 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = (props)
               </label>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div className="field">
                 <label>Título del Comparador</label>
                 <input
@@ -737,7 +738,7 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = (props)
           </div>
 
           <div style={{ display: 'grid', gap: '0.85rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div className="field">
                 <label>Título de la sección</label>
                 <input
@@ -760,6 +761,7 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = (props)
               {form.destacados_items.map((item, idx) => (
                 <div
                   key={item.id || idx}
+                  className="admin-beneficio-grid"
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '60px 1fr 1.5fr auto',
@@ -825,7 +827,7 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = (props)
           </div>
 
           <div style={{ display: 'grid', gap: '0.85rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div className="field">
                 <label>Título de la sección</label>
                 <input
@@ -880,7 +882,7 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = (props)
           </div>
 
           <div style={{ display: 'grid', gap: '0.85rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div className="field">
                 <label>Título de la sección</label>
                 <input
@@ -1011,7 +1013,7 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = (props)
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              width: previewDevice === 'mobile' ? '420px' : '95%',
+              width: previewDevice === 'mobile' ? 'min(95vw, 420px)' : '95%',
               maxWidth: '1200px',
               height: '92vh',
               background: 'var(--bg)',
@@ -1033,6 +1035,8 @@ export const AdminPersonalizacion: React.FC<AdminPersonalizacionProps> = (props)
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

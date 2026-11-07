@@ -371,14 +371,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     <div className="admin-shell">
       {/* ===== TOPBAR ===== */}
       <div className="panel" style={{ marginBottom: '1rem' }}>
-        <div className="flex" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
+        <div className="flex admin-topbar" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', minWidth: 0 }}>
             {/* Hamburguesa móvil */}
             <button
               className="btn btn-sm"
-              style={{ display: 'none' }}
+              style={{ display: 'none', flexShrink: 0 }}
               id="admin-sidebar-toggle"
               onClick={() => setSidebarOpen(o => !o)}
+              aria-label="Abrir menú lateral"
             >
               <Menu size={16} />
             </button>
@@ -404,13 +405,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 style={{ width: '100%', height: '100%', objectFit: 'contain' }}
               />
             </div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>Paraíso Terrenal · Administración</div>
-              <div className="text-xs text-muted">{userEmail || 'admin@fincas.com'} · Sesión activa</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Paraíso Terrenal · Administración</div>
+              <div className="text-xs text-muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userEmail || 'admin@fincas.com'} · Sesión activa</div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="admin-topbar-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
             {/* Botón de Instalación PWA (Solo si el navegador tiene disponible el prompt) */}
             {deferredInstallPrompt && (
               <button
@@ -514,6 +515,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* ===== CINTA DE MÓDULOS TÁCTIL SUPERIOR (SOLO MÓVIL <= 860px) ===== */}
+      <div className="admin-mobile-module-strip" role="tablist" aria-label="Módulos de administración">
+        {NAV_ITEMS.map(item => {
+          const isCotizaciones = item.section === 'cotizaciones' && cotizacionesPendientes > 0;
+          const isReservas = item.section === 'reservas' && metricasReservas.activas > 0;
+          const badgeCount = isCotizaciones ? cotizacionesPendientes : isReservas ? metricasReservas.activas : 0;
+          const isActive = activeSection === item.section;
+
+          return (
+            <button
+              key={item.section}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => navigateTo(item.section)}
+              className={`admin-mobile-module-pill${isActive ? ' active' : ''}`}
+            >
+              {item.icon}
+              <span>{item.shortLabel || item.label}</span>
+              {badgeCount > 0 && (
+                <span className="pill-badge">{badgeCount}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* ===== LAYOUT: SIDEBAR + CONTENIDO ===== */}

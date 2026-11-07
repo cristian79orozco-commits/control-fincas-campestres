@@ -294,7 +294,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
         </div>
 
         {/* Pestañas con pills animadas */}
-        <div style={{ display: 'inline-flex', background: 'var(--surface-2)', padding: '0.25rem', borderRadius: '12px', gap: '0.25rem', position: 'relative' }}>
+        <div style={{ display: 'inline-flex', flexWrap: 'wrap', maxWidth: '100%', background: 'var(--surface-2)', padding: '0.25rem', borderRadius: '12px', gap: '0.25rem', position: 'relative' }}>
           {TABS.map((tab) => {
             const isActive = tabActiva === tab.id;
             return (
@@ -337,11 +337,11 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.35rem', alignItems: 'center' }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.35rem', alignItems: 'center' }}
           >
             {/* Gráfico 1: Evolución Mensual */}
-            <div style={{ height: '280px', position: 'relative' }}>
-              <div className="text-xs text-muted" style={{ fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ height: '280px', position: 'relative', minWidth: 0 }}>
+              <div className="text-xs text-muted" style={{ fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.25rem' }}>
                 <span>Evolución Histórica (Últimos 6 Meses)</span>
                 <span className="text-xs" style={{ color: 'var(--primary)', fontWeight: 600 }}>Alojamiento + Menús</span>
               </div>
@@ -352,7 +352,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
             </div>
 
             {/* Gráfico 2: Composición del Negocio */}
-            <div style={{ height: '280px', position: 'relative', borderLeft: '1px solid var(--border)', paddingLeft: '1.25rem' }}>
+            <div className="admin-chart-col-divider" style={{ height: '280px', position: 'relative', borderLeft: '1px solid var(--border)', paddingLeft: '1.25rem', minWidth: 0 }}>
               <div className="text-xs text-muted" style={{ fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <PieIcon size={14} /> Composición de Cartera y Cobros
               </div>
@@ -396,7 +396,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.35rem', alignItems: 'center' }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1.35rem', alignItems: 'center' }}
           >
             <div style={{ height: '260px' }}>
               <div className="text-xs text-muted" style={{ fontWeight: 600, marginBottom: '0.5rem' }}>

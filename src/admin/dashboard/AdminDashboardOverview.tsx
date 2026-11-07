@@ -125,7 +125,7 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = (pr
           </motion.button>
 
           {/* Selector de periodo */}
-          <div style={{ display: 'inline-flex', background: 'var(--surface-2)', padding: '0.2rem', borderRadius: '10px', gap: '0.15rem' }}>
+          <div style={{ display: 'inline-flex', flexWrap: 'wrap', maxWidth: '100%', background: 'var(--surface-2)', padding: '0.2rem', borderRadius: '10px', gap: '0.15rem' }}>
             {periodosOpciones.map((p) => {
               const isActive = periodo === p.id;
               return (
@@ -168,6 +168,8 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = (pr
               fontWeight: 500,
               cursor: 'pointer',
               outline: 'none',
+              maxWidth: '100%',
+              minWidth: 0,
             }}
           >
             <option value="todas">Todas las Fincas ({fincas.length})</option>
@@ -609,7 +611,7 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = (pr
       )}
 
       {/* ===== 6. ALERTAS Y ACCIONES PRIORITARIAS ===== */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1rem' }}>
         {metricas.totalSaldoPendiente > 0 && (
           <motion.div
             className="panel dashboard-glass-panel"

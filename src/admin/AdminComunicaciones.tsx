@@ -182,7 +182,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
           >
             {/* Fila de Búsqueda y Chips de Expedientes Recientes */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', position: 'relative', flex: 1, minWidth: '280px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', position: 'relative', flex: 1, minWidth: 'min(100%, 280px)' }}>
                 <Search size={16} style={{ color: 'var(--primary)', position: 'absolute', left: '0.75rem' }} />
                 <input
                   type="text"
@@ -336,7 +336,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(310px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 310px), 1fr))',
                   gap: '0.85rem',
                   paddingTop: '0.75rem',
                   borderTop: '1px solid color-mix(in srgb, var(--primary) 15%, transparent)',
@@ -631,7 +631,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
             </div>
 
             {/* Grid animado de tarjetas de mensajes */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.65rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: '0.65rem' }}>
               {mensajesFiltrados.map(tarjeta => {
                 const esCobrarAlim = tarjeta.id === 'cobrar_alimentacion' || tarjeta.id === 'cobrar_alimentacion_cotiz';
                 const esActivo =
@@ -701,17 +701,17 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))',
               gap: '1.25rem',
               alignItems: 'start',
             }}
           >
             {/* COLUMNA 1: EDITOR DE PARÁMETROS Y TEXTO */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', minWidth: 0 }}>
               
               {/* Destinatario y Celular */}
               <div style={{ background: 'var(--surface)', padding: '0.85rem', borderRadius: '12px', border: '1px solid var(--border)', display: 'grid', gap: '0.6rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
                   <div className="field" style={{ margin: 0 }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Destinatario:</label>
                     <input
@@ -1090,7 +1090,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
               <select
                 value={plantillaSeleccionada}
                 onChange={e => setPlantillaSeleccionada(e.target.value)}
-                style={{ fontSize: '0.82rem', padding: '0.35rem 0.75rem', minWidth: '240px' }}
+                style={{ fontSize: '0.82rem', padding: '0.35rem 0.75rem', minWidth: 'min(100%, 240px)', maxWidth: '100%' }}
               >
                 <option value="cotizacion">📄 Cotización Oficial</option>
                 <option value="separacion">🎉 Documento de Separación</option>
