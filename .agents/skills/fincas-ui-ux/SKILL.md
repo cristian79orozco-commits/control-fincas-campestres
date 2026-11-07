@@ -3,6 +3,7 @@ name: fincas-ui-ux
 description: >-
   Especialista en diseño de interfaz (UI) y experiencia de usuario (UX) para el sistema de control de fincas.
   Aplica una estética "High-End" profesional basada en la guía de marca Futuro Digital Pro,
+  con optimización y paridad dual obligatoria tanto en PC (escritorio) como en dispositivos móviles,
   utilizando estrictamente la paleta de colores y variables CSS existentes, y garantizando la preservación
   total de la lógica de negocio, stores y funciones en ejecución.
 ---
@@ -26,6 +27,7 @@ Al intervenir cualquier vista o componente:
 2. **Preservar Props y Tipos:** Mantener intactas las interfaces TypeScript (`props`, `types`, enums) y los contratos de datos existentes.
 3. **Preservar Controladores de Eventos:** Los handlers (`onClick`, `onChange`, `onSubmit`, filtros, paginación, cálculo de cotizaciones) deben permanecer funcionalmente idénticos; únicamente se estiliza su presentación y retroalimentación visual.
 4. **Cero Efectos Secundarios:** Las mejoras deben ser visuales y de interacción: clases de Tailwind, estilos CSS nativos, transiciones y microinteracciones.
+5. **Paridad de Experiencia Dual (Desktop & Mobile First-Class):** Ningún ajuste visual o de interfaz se considera terminado si solo se concibe o prueba para un factor de forma. Cada pantalla o componente debe ofrecer una experiencia impecable, balanceada y de alto impacto tanto en PC (aprovechamiento panorámico de alta densidad, microinteracciones con cursor, tablas completas) como en Mobile (ergonomía táctil para una mano, prevención de zoom involuntario, adaptabilidad al teclado virtual, cero desbordamiento horizontal).
 
 ---
 
@@ -55,15 +57,17 @@ Queda prohibido el uso de colores genéricos quemados o no alineados. Se deben u
 
 La jerarquía tipográfica debe garantizar claridad inmediata en pantallas de alta densidad:
 
-* **Títulos y Encabezados (H1, H2, H3):**
+* **Títulos y Encabezados Fluidos (H1, H2, H3):**
   * Fuente: `var(--font-dashboard)` o `var(--font-display)` con peso semibold/bold (`font-bold`).
-  * `H1`: 36px - 42px (`text-3xl` o `text-4xl`), tracking estrecho (`tracking-tight`), color `var(--text)`.
-  * `H2`: 24px - 28px (`text-2xl`), estructurado y conciso.
-  * `H3`: 18px - 20px (`text-lg` / `text-xl`), énfasis en métricas o títulos de sección.
+  * `H1`: Adaptable `text-2xl sm:text-3xl lg:text-4xl` (28px en móvil a 40px en desktop), tracking estrecho (`tracking-tight`), color `var(--text)`.
+  * `H2`: Adaptable `text-xl sm:text-2xl` (20px a 24px), estructurado y conciso.
+  * `H3`: `text-base sm:text-lg` / `text-xl`, énfasis en métricas o títulos de sección.
 * **Cuerpo de Texto y Datos (Body):**
   * Fuente: `var(--font-body)` (`DM Sans` / `Inter`).
-  * Tamaño estándar: `16px` (`text-base`) para contenido principal, `14px` (`text-sm`) para tablas densas y formularios.
+  * Tamaño estándar: `16px` (`text-base`) para contenido principal, `14px` (`text-sm`) para tablas densas y formularios en desktop.
   * **Interlineado obligatorio:** `line-height: 1.6` (`leading-relaxed`) para máxima legibilidad sin fatiga visual.
+* **Campos de Entrada en Móvil (Prevención de Zoom en iOS):**
+  * Todo `<input>`, `<select>` y `<textarea>` debe tener obligatoriamente `text-base md:text-sm` (mínimo 16px en pantallas táctiles móviles) para evitar que Safari / iOS active zoom automático invasivo al enfocar el campo.
 
 ---
 
@@ -92,12 +96,14 @@ Las tarjetas deben lucir pulidas, con elevación controlada y un borde sutil que
 
 ### 4.2. Botones de Acción (Button Pro)
 
+Todos los botones deben cumplir con el área táctil mínima ergonómica (`min-h-[44px] min-w-[44px]`) y ofrecer respuesta táctil instantánea (`active:scale-[0.98]`).
+
 #### A. Botón Primario (Llamado a la Acción / CTA):
 Fondo sólido con el color de acento o primario, texto en alto contraste, padding generoso y micro-elevación:
 ```tsx
 <button className="
   inline-flex items-center justify-center gap-2.5
-  px-7 py-3 rounded-[var(--rad-sm)]
+  min-h-[44px] px-6 sm:px-7 py-3 rounded-[var(--rad-sm)]
   bg-[var(--accent)] text-[#141210] font-semibold text-sm tracking-wide
   shadow-[0_2px_10px_rgba(212,146,74,0.25)]
   transition-all duration-200 ease-in-out
@@ -114,7 +120,7 @@ Fondo transparente o superficie sutil, borde de 1px y efecto *glow* al pasar el 
 ```tsx
 <button className="
   inline-flex items-center justify-center gap-2
-  px-6 py-2.5 rounded-[var(--rad-sm)]
+  min-h-[44px] px-5 sm:px-6 py-2.5 rounded-[var(--rad-sm)]
   bg-transparent text-[var(--text)] font-medium text-sm
   border border-[var(--border)]
   transition-all duration-200 ease-in-out
@@ -126,15 +132,15 @@ Fondo transparente o superficie sutil, borde de 1px y efecto *glow* al pasar el 
 </button>
 ```
 
-### 4.3. Inputs y Formularios (Focus Glow)
-Los campos de entrada deben integrarse orgánicamente en el tema oscuro, ofreciendo feedback nítido al foco:
+### 4.3. Inputs y Formularios (Focus Glow + iOS Safe)
+Los campos de entrada deben integrarse orgánicamente en el tema oscuro, tener altura táctil mínima de 44px y tamaño de texto `text-base md:text-sm` para impedir el zoom intrusivo de iOS Safari:
 
 ```tsx
 <input 
   type="text" 
   className="
-    w-full px-4 py-3 rounded-[var(--rad-xs)]
-    bg-[var(--surface-2)] text-[var(--text)] text-sm
+    w-full min-h-[44px] px-4 py-2.5 sm:py-3 rounded-[var(--rad-xs)]
+    bg-[var(--surface-2)] text-[var(--text)] text-base md:text-sm
     border border-[var(--border)]
     placeholder:text-[var(--text-muted)]/60
     outline-none transition-all duration-200
@@ -159,31 +165,98 @@ Insignias de datos compactas, semitransparentes y con borde nítido:
 </span>
 ```
 
+### 4.5. Diálogo Adaptable (Modal Centrado en PC / Bottom Sheet en Móvil)
+Para garantizar máxima ergonomía, los diálogos deben presentarse centrados en pantallas medianas/grandes y transformarse en una hoja inferior deslizable (*Bottom Sheet*) en dispositivos móviles:
+
+```tsx
+<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm">
+  <div className="
+    w-full sm:max-w-lg 
+    max-h-[92vh] sm:max-h-[85vh] 
+    flex flex-col
+    rounded-t-2xl sm:rounded-[var(--rad-md)] 
+    bg-[var(--surface)] border border-[var(--border)]
+    p-5 sm:p-6 shadow-[var(--sh-xl)]
+    overflow-hidden
+  ">
+    {/* Tirador visual táctil para móvil */}
+    <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[var(--border)] sm:hidden" />
+    
+    <div className="flex-1 overflow-y-auto">
+      {/* Contenido del modal o formulario */}
+    </div>
+  </div>
+</div>
+```
+
+### 4.6. Barra de Acciones Persistente Móvil (Sticky Action Bar)
+En formularios extensos o flujos de reserva, los botones de acción principal deben quedar fijados en la parte inferior en móviles para acceso directo con el pulgar:
+
+```tsx
+<div className="
+  fixed sm:static bottom-0 inset-x-0 z-30
+  p-3 sm:p-0 
+  bg-[var(--surface)]/95 sm:bg-transparent backdrop-blur-md sm:backdrop-blur-none 
+  border-t sm:border-0 border-[var(--border)]
+  flex items-center gap-3 justify-end
+">
+  {/* Botones de acción (ej. Cancelar / Guardar / Cotizar) */}
+</div>
+```
+
 ---
 
-## 5. Reglas de Experiencia de Usuario (UX)
+## 5. Directrices Maestras de Experiencia de Usuario: Optimización Dual PC & Mobile
 
-1. **Mobile-First para Vistas Operativas:** Los administradores deben poder operar el historial, cotizador y fichas de fincas desde dispositivos móviles con total fluidez.
-   * Elementos táctiles mínimos: `44px x 44px`.
-   * Tablas con desplazamiento horizontal suave o transformación a formato de tarjeta en pantallas pequeñas (`< 768px`).
-2. **Estados Vacíos y de Carga Elegantes (Empty & Loading States):**
-   * Reemplazar spinners genéricos por esqueletos (*skeletons*) que pulsen suavemente respetando el color `var(--surface-2)`.
-   * En listas vacías, presentar ilustraciones o iconos minimalistas con un mensaje claro y un botón secundario de acción.
-3. **Micro-interacciones y Feedback:**
-   * Cualquier botón de copiado, guardado o confirmación debe ofrecer feedback inmediato (cambio de icono, toast sutil o micro-animación).
+> [!IMPORTANT]
+> **ESTÁNDAR DE PARIDAD DUAL INQUEBRANTABLE:**
+> Toda vista o componente debe diseñarse y optimizarse en paralelo para **PC (Escritorio / Laptop)** y **Dispositivos Móviles (Smartphones / Tablets)**. Está estrictamente prohibido degradar la experiencia de escritorio para acomodar el móvil, o ignorar la ergonomía móvil asumiendo que el usuario operará con ratón.
+
+### 5.1. Filosofía de Coexistencia (Sin Concesiones)
+
+| Dimensión | Experiencia en PC (Desktop / Laptop) | Experiencia en Móvil (Smartphones) |
+| :--- | :--- | :--- |
+| **Lienzo y Layout** | Multi-columna (`grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`), paneles laterales analíticos continuos, visualización panorámica de datos. | Columna única fluida (`flex-col`), acordeones colapsables, espaciado perimetral de seguridad (`px-3.5`). |
+| **Interacción** | Puntero fino: efectos hover (`hover:border-[var(--accent)]`, `hover:shadow-...`), tooltips enriquecidos al pasar el cursor. | Ergonomía táctil para una mano (*Thumb Zone*): feedback inmediato al toque (`active:scale-[0.98]`), micro-vibración visual y barras fijas inferiores. |
+| **Manejo de Tablas** | Tablas densas con todas sus columnas (ID, cliente, fechas, montos, estado, acciones). | *Adaptive Data Display*: En pantallas `< 768px`, las tablas se transforman en **tarjetas modulares** o en contenedores con scroll horizontal elástico y sombreado visual de continuidad. |
+| **Modales y Diálogos** | Ventanas modales centradas (`max-w-xl` o `max-w-2xl`) con scroll interno limpio. | **Bottom Sheets** (hojas emergentes desde el fondo de pantalla) con tirador táctil y altura adaptable (`max-h-[92vh]`). |
+
+### 5.2. Reglas Táctiles y Ergonómicas Estrictas
+
+1. **Target Táctil Mínimo (Touch Target 44x44px):**
+   * Cualquier botón, pestaña, icono clickeable, checkbox o enlace interactivo debe medir como mínimo `44px x 44px` (`min-h-[44px] min-w-[44px]`).
+   * Separación mínima obligatoria de `8px` a `12px` entre controles táctiles contiguos para erradicar pulsaciones accidentales (*fat-finger errors*).
+2. **Prevención de Zoom Involuntario en iOS:**
+   * En todo `<input>`, `<select>` y `<textarea>`, la fuente debe ser de al menos `16px` en móvil (`text-base md:text-sm`). Si el tamaño es menor a 16px, Safari en iOS fuerza un zoom automático que descompone la alineación de la página.
+3. **Blindaje Anti-Scroll Horizontal:**
+   * Las vistas raíz y contenedores principales deben portar siempre `w-full max-w-full overflow-x-hidden`.
+   * Prohibido definir anchos fijos rígidos que superen el ancho del viewport (usar `w-full max-w-md` en lugar de `w-[480px]`).
+4. **Resguardo Perimetral Móvil:**
+   * Padding lateral de seguridad en pantallas móviles (`px-3.5` a `px-4`), garantizando que ningún texto, input o botón roce el borde del cristal del teléfono.
+5. **Convivencia con el Teclado Virtual:**
+   * Los formularios en pantallas móviles deben incluir padding inferior de resguardo (`pb-28` o contenedor flexible con `scroll-padding`) para que los botones de acción ("Guardar", "Confirmar") nunca queden sepultados tras el teclado en pantalla.
+
+### 5.3. Estados Vacíos, Cargas y Microinteracciones Responsivas
+
+1. **Skeletons Proporcionales al Dispositivo:**
+   * Los esqueletos de carga deben mantener la misma geometría del contenido final (en PC replican la grilla multi-columna; en móvil replican tarjetas apiladas).
+2. **Feedback Visual Inmediato al Tacto:**
+   * Debido a que en pantallas táctiles no existe el estado `hover`, los botones e ítems de lista deben utilizar clases activas sutiles (`active:scale-[0.98]` o `active:bg-[var(--surface-3)]`) garantizando respuesta visual en `< 50ms`.
 
 ---
 
-## 6. Procedimiento Paso a Paso al Rediseñar una Vista
+## 6. Procedimiento Paso a Paso al Rediseñar una Vista (Protocolo Dual)
 
-Cuando el usuario pida mejorar o refactorizar visualmente una vista:
-1. **Inspeccionar:** Leer el archivo objetivo e identificar:
-   * Variables de estado y funciones que deben permanecer intactas.
-   * Componentes nativos o Tailwind que pueden elevarse al estándar High-End.
-2. **Aplicar el Estándar:**
+Cuando se solicite agregar, retocar o refactorizar visualmente cualquier vista:
+
+1. **Inspección Previa (Desktop & Mobile):**
+   * Leer el componente y evaluar cómo se comporta tanto en viewport de escritorio como en pantalla móvil estrecha.
+   * Identificar variables de estado, stores y funciones que deben permanecer 100% intactas.
+2. **Aplicar el Estándar Dual:**
+   * Estructurar el layout con utilidades responsivas (`sm:`, `md:`, `lg:`).
    * Envolver secciones en contenedores `Card Pro`.
-   * Ajustar botones a los estilos primario o secundario con efecto glow.
-   * Asegurar que los inputs tengan el estado `focus:shadow-[0_0_12px_...]`.
-   * Verificar la consistencia tipográfica (`leading-relaxed`, contraste `var(--text)` vs `var(--text-muted)`).
-3. **Validar:**
-   * Verificar que todas las funciones, eventos y props sigan enlazados correctamente sin pérdidas de datos.
+   * Asegurar que los botones tengan `min-h-[44px]`, `active:scale-[0.98]` y que los inputs porten `text-base md:text-sm`.
+   * En tablas densas, asegurar formato responsivo (tarjetas en móvil o scroll horizontal controlado).
+3. **Validación Dual Obligatoria:**
+   * **Checkpoint Desktop (1280px - 1920px):** Verificar alineación de grillas, espaciado armónico, legibilidad de tablas completas y efectos hover de precisión.
+   * **Checkpoint Mobile (360px - 430px):** Verificar usabilidad táctil con una sola mano, ausencia total de scroll horizontal involuntario, correcta apertura y cierre de formularios con teclado virtual y botones de acción accesibles.

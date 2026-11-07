@@ -3,6 +3,7 @@ name: architecture-shield-optimizer
 description: >-
   Especialista en arquitectura modular desacoplada, blindaje de lógica funcional existente,
   centralización multi-panel y optimización de rendimiento a alta velocidad (60 FPS).
+  Garantiza paridad y optimización estricta tanto en PC (escritorio) como en dispositivos móviles.
   Usa esta skill obligatoriamente antes y durante cualquier refactorización, modificación o nueva funcionalidad
   en proyectos con React, TypeScript, Tailwind, Zustand/Redux Toolkit y Supabase con sincronización en tiempo real.
 ---
@@ -13,7 +14,7 @@ Esta skill define el **estándar arquitectónico maestro, protocolo de no-regres
 
 ---
 
-## 1. Los 5 Mandamientos de Blindaje (Zero-Breakage)
+## 1. Los 6 Mandamientos de Blindaje (Zero-Breakage)
 
 > [!IMPORTANT]
 > **REGLA SUPREMA:** Trabajar SIEMPRE sobre lo que está funcionando. Jamás eliminar, renombrar o reescribir funciones activas, contratos de datos o stores a menos que sea una refactorización guiada y validada paso a paso.
@@ -26,6 +27,7 @@ Esta skill define el **estándar arquitectónico maestro, protocolo de no-regres
 3. **Desacoplamiento Estricto:** Ningún componente visual de presentación (botones, tablas, cards, formularios) debe contener consultas crudas SQL/Supabase (`supabase.from(...)`) ni mutaciones no mediadas por un hook controlador o store.
 4. **Adición Incremental:** Los nuevos requerimientos se implementan de forma aditiva: extensiones modulares que enriquecen el sistema sin modificar destructivamente lo existente.
 5. **Verificación de No-Regresión:** Antes de dar por concluida una tarea, comprobar que los flujos asociados (creación, edición, listado, filtros, cálculos y sincronización entre paneles) sigan operativos sin errores de compilación ni excepciones en consola.
+6. **Optimización Dual Obligatoria (PC y Mobile):** Ninguna tarea, ajuste o refactorización se considera terminada si solo opera o se ve bien en una sola resolución. Cada intervención debe garantizar fluidez, estabilidad y legibilidad tanto en pantallas de escritorio (PC) como en dispositivos móviles, previniendo desbordamientos horizontales, re-renders que agoten la CPU móvil o dependencias exclusivas de hover que inutilicen las pantallas táctiles.
 
 ---
 
@@ -138,6 +140,9 @@ Para eliminar tirones, lentitud en scroll o retraso en formularios complejos:
    - Vistas pesadas (`AdminCalendar`, `AdminComunicaciones`, reportes PDF, modales densos) cargados dinámicamente con `React.lazy` y `Suspense` con skeletons elegantes.
 4. **Sanitización de Estado Local:**
    - No duplicar en el estado local de un componente datos que ya existen en el store global. La única fuente de verdad debe ser el Store.
+5. **Rendimiento y Ergonomía en Hardware Móvil:**
+   - En dispositivos móviles la CPU, GPU y memoria están limitadas térmicamente. Evitar anidaciones innecesarias de `backdrop-blur`, renderizados masivos de listas sin virtualizar o paginar, y calcular debounces adecuados.
+   - Las interacciones táctiles deben responder en menos de 50ms (INP óptimo) sin bloquear el hilo principal.
 
 ---
 
@@ -155,15 +160,19 @@ Cuando se solicite agregar, retocar o refactorizar cualquier panel o vista:
 2. Dejar la vista (`NombrePanel.tsx`) como consumidor limpio de dicho hook o de props.
 3. Confirmar que las variables, nombres de handlers y valores devueltos sean 100% compatibles.
 
-### Fase 3: Aplicación de Mejoras Visuales o Nuevas Funciones
+### Fase 3: Aplicación de Mejoras Visuales o Nuevas Funciones (Dual PC & Mobile)
 1. Modificar el componente visual aplicando los tokens de diseño (ver `fincas-ui-ux`).
-2. Añadir las nuevas propiedades requeridas sin eliminar las existentes.
-3. Optimizar re-renders con selectores y memoización.
+2. Diseñar simultáneamente para lienzo amplio en PC (multi-columna, visualización analítica) y compacto en móvil (controles accesibles, áreas táctiles de 44x44px).
+3. Añadir las nuevas propiedades requeridas sin eliminar las existentes.
+4. Optimizar re-renders con selectores y memoización.
 
-### Fase 4: Validación y Verificación
+### Fase 4: Validación y Verificación Multi-Dispositivo
 1. Validar tipos de TypeScript con `npx tsc --noEmit` o build.
 2. Confirmar que la sinergia multi-panel se mantenga (comprobar que la vista responde a cambios en otros paneles).
-3. Asegurar fluidez visual (sin parpadeos de pantalla completa ni pérdida de foco en inputs).
+3. **Verificación Dual Obligatoria:** Comprobar la experiencia visual e interactiva tanto en resolución de escritorio (PC >= 1024px) como en dispositivo móvil (viewport estrecho <= 430px), verificando:
+   - Cero scroll horizontal involuntario en la ventana principal.
+   - Acciones principales y botones completamente accesibles con el pulgar.
+   - Fluidez visual a 60 FPS (sin parpadeos de pantalla completa ni pérdida de foco en inputs al escribir o abrir teclados virtuales).
 
 ---
 

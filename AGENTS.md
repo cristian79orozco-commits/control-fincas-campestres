@@ -1,6 +1,6 @@
 # Reglas Maestras de Desarrollo: Blindaje, Desacoplamiento y Rendimiento
 
-Este proyecto opera bajo estrictas directivas de **no-regresión (zero-breakage)**, **arquitectura desacoplada en 4 capas** y **optimización de rendimiento a 60 FPS**.
+Este proyecto opera bajo estrictas directivas de **no-regresión (zero-breakage)**, **arquitectura desacoplada en 4 capas**, **optimización de rendimiento a 60 FPS** y **paridad obligatoria PC & Dispositivos Móviles**.
 
 ---
 
@@ -24,10 +24,21 @@ Este proyecto opera bajo estrictas directivas de **no-regresión (zero-breakage)
 - Cálculos intensivos (sumatorias financieras, cálculos de cotizaciones, filtros de fechas) deben estar memoizados con `useMemo`.
 - Las funciones pasadas como props a componentes de listas deben protegerse con `useCallback`.
 - Implementar **actualizaciones optimistas** para que la UI responda de inmediato (< 50ms) mientras Supabase confirma en segundo plano.
-- Mantener las interfaces táctiles fluidas (mínimo 44x44px en móviles) y soporte mobile-first.
 
 ---
 
-## 4. Skills de Referencia Asociadas
-- **`architecture-shield-optimizer`**: Consultar para la arquitectura de 4 capas, sincronización en tiempo real y guías de rendimiento.
-- **`fincas-ui-ux`**: Consultar para la paleta de colores (`var(--primary)`, `var(--accent)`, `var(--surface)`), tokens y biblioteca de componentes High-End.
+## 4. Garantía de Optimización Dual Obligatoria (PC y Mobile)
+- **Paridad de Plataforma:** Todo cambio, ajuste visual o nueva característica debe implementarse y validarse de forma paralela para PC (escritorio) y dispositivos móviles.
+- **Reglas Móviles Inquebrantables:**
+  - Áreas táctiles mínimas de 44x44px (`min-h-[44px] min-w-[44px]`).
+  - Inputs con tamaño mínimo de fuente `text-base md:text-sm` (16px en móvil) para evitar el zoom automático invasivo en iOS Safari.
+  - Blindaje contra scroll horizontal no deseado (`w-full max-w-full overflow-x-hidden`).
+  - Tablas densas adaptadas a tarjetas (*cards*) o scrolls horizontales fluidos en `< 768px`.
+  - Formularios con margen inferior suficiente para no tapar botones con el teclado virtual.
+- **Experiencia de Escritorio (PC):** Mantener el aprovechamiento panorámico, microinteracciones hover y visualización analítica densa sin comprometerla por las restricciones móviles.
+
+---
+
+## 5. Skills de Referencia Asociadas
+- **`architecture-shield-optimizer`**: Consultar para la arquitectura de 4 capas, sincronización en tiempo real, rendimiento 60 FPS y blindaje multi-dispositivo.
+- **`fincas-ui-ux`**: Consultar para la paleta de colores (`var(--primary)`, `var(--accent)`, `var(--surface)`), tokens, directrices ergonómicas y biblioteca de componentes High-End para PC y móvil.
