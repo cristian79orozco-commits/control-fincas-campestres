@@ -73,43 +73,32 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
   if (!visible || menusActivos.length === 0) return null;
 
   return (
-    <section className="menus-publicos-section" style={{ margin: '1.5rem 0', width: '100%', boxSizing: 'border-box' }}>
+    <section className="menus-publicos-section">
       {/* ─── Cabecera Desplegable High-End de Gastronomía ─── */}
       <div
+        className="menus-publicos-header"
         onClick={() => toggleSeccion()}
         style={{
-          background: 'var(--surface)',
           border: `1.5px solid ${seccionAbierta ? 'var(--primary)' : 'var(--border)'}`,
-          borderRadius: 'var(--rad-sm, 14px)',
-          padding: '0.95rem 1.2rem',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '0.85rem',
-          flexWrap: 'wrap',
           boxShadow: seccionAbierta ? 'var(--sh-sm)' : 'none',
-          transition: 'all 0.2s ease',
-          width: '100%',
-          boxSizing: 'border-box',
         }}
       >
-        <div>
+        <div style={{ minWidth: 0, flex: '1 1 240px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
-            <UtensilsCrossed size={20} style={{ color: 'var(--primary)' }} />
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
+            <UtensilsCrossed size={20} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--text)', wordBreak: 'break-word' }}>
               {titulo || 'Gastronomía y Menús Campestres'}
             </h2>
-            <span className="status-badge s-avail" style={{ fontSize: '0.72rem' }}>
+            <span className="status-badge s-avail" style={{ fontSize: '0.72rem', flexShrink: 0 }}>
               {menusActivos.length} opción{menusActivos.length !== 1 ? 'es' : ''}
             </span>
           </div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem', lineHeight: 1.5 }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem', lineHeight: 1.5, wordBreak: 'break-word' }}>
             {subtitulo || 'Platos típicos al fogón de leña, asados campestres y desayunos tradicionales'}
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+        <div className="menus-publicos-header-actions">
           {badgeTexto && (
             <span className="status-badge s-info" style={{ fontSize: '0.72rem' }}>
               {badgeTexto}
@@ -120,11 +109,13 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
             className="btn btn-sm btn-primary"
             onClick={toggleSeccion}
             style={{
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '0.35rem',
               fontSize: '0.78rem',
-              padding: '0.42rem 0.9rem',
+              padding: '0.45rem 0.9rem',
+              minHeight: '38px',
             }}
           >
             {seccionAbierta ? (
@@ -145,37 +136,28 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '0.2rem 0.35rem 0.65rem 0.35rem',
+              padding: '0.2rem 0.25rem 0.65rem 0.25rem',
               borderBottom: '1px solid var(--border-subtle)',
               marginBottom: '0.65rem',
               fontSize: '0.76rem',
               color: 'var(--text-muted)',
               flexWrap: 'wrap',
               gap: '0.4rem',
+              minWidth: 0,
             }}
           >
-            <span style={{ fontWeight: 700, color: 'var(--text)' }}>
+            <span style={{ fontWeight: 700, color: 'var(--text)', wordBreak: 'break-word' }}>
               {menusFiltrados.length} {menusFiltrados.length === 1 ? 'menú disponible' : 'menús disponibles'}
               {categoriaActiva !== 'todas' ? ` en ${categoriaActiva}` : ' para complementar tu estadía'}
             </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.73rem', color: 'var(--primary)', fontWeight: 600 }}>
-              🔍 Toca cualquier menú para desplegar o clic en la imagen para pantalla completa
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 600 }}>
+              🔍 Toca el menú para desplegar o la foto para ampliar
             </span>
           </div>
 
           {/* Barra de Filtros Rápidos por Categoría (Solo si hay más de 1 categoría activa) */}
           {categoriasConConteo.length > 1 && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                overflowX: 'auto',
-                padding: '0.1rem 0.2rem 0.65rem 0.2rem',
-                marginBottom: '0.35rem',
-                scrollbarWidth: 'thin',
-              }}
-            >
+            <div className="menus-category-bar">
               <button
                 type="button"
                 onClick={() => seleccionarCategoria('todas')}
@@ -263,15 +245,8 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
                 >
                   {/* Cabecera del ítem de menú (Clic para expandir/contraer) */}
                   <div
+                    className="menu-item-header"
                     onClick={() => toggleMenu(m.id)}
-                    style={{
-                      padding: '0.75rem 0.9rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.8rem',
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                    }}
                     role="button"
                     tabIndex={0}
                     onKeyDown={e => {
@@ -283,6 +258,7 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
                   >
                     {/* Miniatura con contraste cálido para PNG/WebP transparentes y clic directo a Lightbox */}
                     <div
+                      className="menu-item-thumb"
                       onClick={e => {
                         if (fotoMostrada) {
                           abrirLightboxMenu(fotosMenu, fotoIdx, m.nombre, m.categoria, e);
@@ -290,19 +266,7 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
                       }}
                       title={fotoMostrada ? 'Clic para ampliar imagen' : m.nombre}
                       style={{
-                        width: '70px',
-                        height: '70px',
-                        borderRadius: '8px',
-                        overflow: 'hidden',
-                        background: 'linear-gradient(145deg, #FFFDF9 0%, #F4EFE4 100%)',
-                        border: '1px solid var(--border)',
-                        flexShrink: 0,
-                        position: 'relative',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
                         cursor: fotoMostrada ? 'zoom-in' : 'pointer',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
                       }}
                     >
                       {fotoMostrada ? (
@@ -313,10 +277,13 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
                           decoding="async"
                           onError={() => marcarImagenRota(fotoMostrada)}
                           style={{
+                            position: 'absolute',
+                            inset: 0,
                             width: '100%',
                             height: '100%',
                             objectFit: 'contain',
                             padding: '3px',
+                            boxSizing: 'border-box',
                           }}
                         />
                       ) : (
@@ -331,6 +298,7 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
                             position: 'absolute',
                             bottom: '3px',
                             right: '3px',
+                            zIndex: 2,
                             background: 'rgba(20, 18, 16, 0.76)',
                             backdropFilter: 'blur(3px)',
                             color: '#fff',
@@ -411,12 +379,12 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
                     </div>
 
                     {/* Precio y flecha de despliegue */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexShrink: 0, marginLeft: 'auto' }}>
+                    <div className="menu-item-price-block">
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: '0.58rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
                           Tarifa /pp
                         </div>
-                        <div style={{ fontSize: '0.98rem', fontWeight: 900, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: '0.96rem', fontWeight: 900, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
                           {formatCOP(m.precio_pp)}
                         </div>
                       </div>
@@ -445,12 +413,13 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
                     <div className="menu-expanded-container">
                       <div
                         className="menu-expanded-grid"
-                        style={{ gridTemplateColumns: fotoMostrada ? undefined : '1fr' }}
+                        style={{ gridTemplateColumns: fotoMostrada ? undefined : 'minmax(0, 1fr)' }}
                       >
                         {/* Columna Izquierda: Visor de Imagen Completo sin recortes + Clic para Lightbox */}
                         {fotoMostrada && (
-                          <div style={{ width: '100%', minWidth: 0 }}>
+                          <div style={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
                             <div
+                              className="menu-expanded-photo-box"
                               onClick={e => abrirLightboxMenu(fotosMenu, fotoIdx, m.nombre, m.categoria, e)}
                               role="button"
                               tabIndex={0}
@@ -461,22 +430,6 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
                                 }
                               }}
                               title="Haz clic para ver la imagen en tamaño completo"
-                              style={{
-                                position: 'relative',
-                                width: '100%',
-                                minHeight: '220px',
-                                maxHeight: '270px',
-                                aspectRatio: '16 / 10',
-                                borderRadius: '10px',
-                                overflow: 'hidden',
-                                background: 'linear-gradient(145deg, #FFFDF9 0%, #F2ECE0 100%)',
-                                border: '1px solid var(--border)',
-                                boxShadow: '0 4px 14px rgba(0,0,0,0.07)',
-                                cursor: 'zoom-in',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
                             >
                               {/* Halo ambiental desenfocado para llenar bordes sin recortar la foto real */}
                               <img
@@ -498,7 +451,7 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
                                 }}
                               />
 
-                              {/* Imagen principal en proporción real (sin mutilar bordes ni oscurecer PNGs) */}
+                              {/* Imagen principal en proporción real (sin mutilar bordes ni desbordar en móvil) */}
                               <img
                                 src={fotoMostrada}
                                 alt={m.nombre}
@@ -506,13 +459,16 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
                                 decoding="async"
                                 onError={() => marcarImagenRota(fotoMostrada)}
                                 style={{
-                                  position: 'relative',
+                                  position: 'absolute',
+                                  inset: 0,
                                   zIndex: 1,
                                   width: '100%',
                                   height: '100%',
-                                  maxHeight: '260px',
+                                  maxWidth: '100%',
+                                  maxHeight: '100%',
                                   objectFit: 'contain',
                                   padding: '0.45rem',
+                                  boxSizing: 'border-box',
                                   transition: 'transform 0.22s ease',
                                 }}
                               />
@@ -777,6 +733,7 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
 
                           {/* Mensaje informativo + CTA directo al catálogo de fincas */}
                           <div
+                            className="menu-expanded-cta-box"
                             style={{
                               background: 'color-mix(in srgb, var(--primary) 8%, var(--surface))',
                               border: '1px solid color-mix(in srgb, var(--primary) 25%, transparent)',
@@ -790,11 +747,13 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
                               fontSize: '0.78rem',
                               color: 'var(--text)',
                               lineHeight: 1.5,
+                              width: '100%',
+                              boxSizing: 'border-box',
                             }}
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flex: '1 1 240px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flex: '1 1 200px', minWidth: 0 }}>
                               <Sparkles size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                              <span>
+                              <span style={{ wordBreak: 'break-word' }}>
                                 <strong>Servicio de alimentación opcional:</strong> Podrás incluir este menú directamente en tu cotización al seleccionar tu finca y configurar la cantidad exacta de comensales.
                               </span>
                             </div>
@@ -806,7 +765,7 @@ export const MenusPublicosSection: React.FC<MenusPublicosSectionProps> = React.m
                               style={{
                                 fontSize: '0.74rem',
                                 padding: '0.35rem 0.75rem',
-                                minHeight: '34px',
+                                minHeight: '38px',
                                 borderColor: 'var(--primary)',
                                 color: 'var(--primary)',
                                 flexShrink: 0,

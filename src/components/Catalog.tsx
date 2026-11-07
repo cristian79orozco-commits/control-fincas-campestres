@@ -3,7 +3,7 @@ import {
   Filter, X, Search, Sparkles, Dog, Check, ChevronDown, ChevronUp,
   MapPin, Users, Bed, Bath, Calendar, MessageCircle, ArrowRight,
   ShieldCheck, Image as ImageIcon, Home, LayoutGrid, List, SlidersHorizontal,
-  FileCheck2, Scale
+  Scale
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Finca, BloqueoDisponibilidad, ContenidoSitio } from '../types';
@@ -275,7 +275,7 @@ const CatalogComponent: React.FC<CatalogProps> = ({
   onSelectFinca,
   contenido,
   waNumber,
-  onOpenPortalHuesped,
+  onOpenPortalHuesped: _onOpenPortalHuesped,
 }) => {
   // Selectores atómicos de Zustand para eliminar re-renders masivos
   const busquedaTexto = useClientStore(s => s.busquedaTexto);
@@ -404,18 +404,6 @@ const CatalogComponent: React.FC<CatalogProps> = ({
             </div>
 
             <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              {onOpenPortalHuesped && (
-                <button
-                  type="button"
-                  className="btn-pro-secondary"
-                  onClick={onOpenPortalHuesped}
-                  style={{ fontSize: '0.78rem', padding: '0.45rem 0.95rem' }}
-                >
-                  <FileCheck2 size={14} style={{ color: 'var(--primary)' }} />
-                  <span>Consultar mi reserva</span>
-                </button>
-              )}
-
               {hayFiltrosActivos && (
                 <button
                   type="button"

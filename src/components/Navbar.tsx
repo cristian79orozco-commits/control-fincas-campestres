@@ -22,7 +22,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAdminLoginModal,
   hasSelectedFinca,
 }) => {
-  const { setModalConsultaOpen } = useClientStore();
+  const setModalConsultaOpen = useClientStore(state => state.setModalConsultaOpen);
   const brandClicks = useRef(0);
   const brandTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -236,24 +236,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <ShieldCheck size={18} style={{ color: 'var(--primary)' }} />
           </button>
         )}
-
-        {/* Acceso rápido a consulta de reserva para huéspedes */}
-        <button
-          className="icon-btn"
-          onClick={() => setModalConsultaOpen(true)}
-          title="Consultar estado de mi reserva o cotización"
-          style={{
-            borderRadius: 'var(--rad-xs, 8px)',
-            border: '1px solid var(--border)',
-            background: 'var(--surface-2)',
-            minWidth: '40px',
-            minHeight: '40px',
-            color: 'var(--primary)',
-            transition: 'all 0.2s ease',
-          }}
-        >
-          <FileCheck2 size={18} />
-        </button>
 
         {/* Alternador de Modo Claro / Oscuro con animación de rotación */}
         <button

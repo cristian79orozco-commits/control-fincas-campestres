@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Search, MapPinned, UtensilsCrossed, TrendingUp, FileCheck2, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Search, MapPinned, UtensilsCrossed, TrendingUp, Sparkles, CheckCircle2 } from 'lucide-react';
 import type { ContenidoSitio } from '../types';
 
 interface HeroProps {
@@ -23,7 +23,7 @@ export const Hero: React.FC<HeroProps> = ({
   onExploreClick,
   onMenusClick,
   onVisualClick,
-  onPortalClick,
+  onPortalClick: _onPortalClick,
   contenido,
 }) => {
   if (contenido && contenido.hero_visible === false) {
@@ -164,25 +164,6 @@ export const Hero: React.FC<HeroProps> = ({
                 }}
               >
                 <TrendingUp size={16} /> Ver Análisis & Presupuesto
-              </button>
-            )}
-
-            {onPortalClick && (
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={onPortalClick}
-                style={{
-                  padding: '0.75rem 1.15rem',
-                  fontSize: '0.88rem',
-                  fontWeight: 600,
-                  borderRadius: 'var(--rad-sm, 12px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                }}
-              >
-                <FileCheck2 size={16} /> Consultar mi Reserva
               </button>
             )}
 
