@@ -18,6 +18,7 @@ import {
   generarDistribucionEstadosCierre
 } from '../utils/historialMetrics';
 import { generarExpedienteCompleto } from '../services/documentos';
+import { formatearConsecutivoSimple } from '../utils/consecutivos';
 import { useDebounce } from './useDebounce';
 
 export interface UseHistorialControllerParams {
@@ -194,8 +195,10 @@ export function useHistorialController({
       const tel = (obtenerContactoClienteHistorico(r).whatsapp || obtenerContactoClienteHistorico(r).telefono || '').replace(/"/g, '""');
       const responsable = (r.cerrada_por || r.cierre?.responsable || '').replace(/"/g, '""');
 
+      const consecLimpio = r.consecutivo ? formatearConsecutivoSimple(r.consecutivo) : r.id.slice(0, 8).toUpperCase();
+
       return [
-        `"EXP-${r.id.slice(0, 8).toUpperCase()}"`,
+        `"EXP-${consecLimpio} (#${consecLimpio})"`,
         `"${finNom}"`,
         `"${cliNom}"`,
         `"${tel}"`,

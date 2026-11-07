@@ -15,7 +15,10 @@ import {
   obtenerNombreClienteHistorico,
   obtenerNombreFincaHistorico,
   obtenerContactoClienteHistorico,
+  extraerInfoMascotas,
 } from '../types';
+import { formatearConsecutivoSimple } from '../utils/consecutivos';
+import { ConsecutivoBadge } from './AdminReservas';
 import { HistorialCharts } from './historial/HistorialCharts';
 import { AdminExpedienteModal } from './AdminExpedienteModal';
 import { AdminCierreModal } from './AdminCierreModal';
@@ -551,6 +554,8 @@ export const AdminHistorial: React.FC<AdminHistorialProps> = (props) => {
                 const finNombre = obtenerNombreFincaHistorico(r);
                 const contacto = obtenerContactoClienteHistorico(r);
                 const tel = contacto.whatsapp || contacto.telefono || '—';
+                const consecLimpio = r.consecutivo ? formatearConsecutivoSimple(r.consecutivo) : r.id.slice(0, 8).toUpperCase();
+                const infoMascotas = extraerInfoMascotas(r, (r.fincas as any) || r.finca_snapshot);
 
                 const esCerrada = r.estado === 'completada' || r.estado === 'cancelada' || r.estado === 'no_show';
 
@@ -564,6 +569,7 @@ export const AdminHistorial: React.FC<AdminHistorialProps> = (props) => {
                     {/* Identificador y Finca */}
                     <div style={{ flex: '1 1 240px', minWidth: '220px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {r.consecutivo && <ConsecutivoBadge consecutivo={r.consecutivo} />}
                         <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)' }}>{finNombre}</span>
                         <span
                           className={`status-badge ${
@@ -580,12 +586,17 @@ export const AdminHistorial: React.FC<AdminHistorialProps> = (props) => {
                       </div>
 
                       <div className="text-xs text-muted" style={{ marginTop: '0.3rem' }}>
-                        EXP-{r.id.slice(0, 8).toUpperCase()} · 👤 {cliNombre} ({tel})
+                        <strong>#{consecLimpio}</strong> (EXP-{consecLimpio}) · 👤 {cliNombre} ({tel})
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.25rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.25rem', fontSize: '0.75rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
                         <span>📅 {formatFecha(r.fecha_inicio)} → {formatFecha(r.fecha_fin)}</span>
                         <span>👥 {r.personas || 1} personas</span>
+                        {infoMascotas.cantidadMascotas > 0 && (
+                          <span style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                            🐾 {infoMascotas.cantidadMascotas} mascota(s) ({formatCOP(infoMascotas.costoMascotas)})
+                          </span>
+                        )}
                       </div>
                     </div>
 

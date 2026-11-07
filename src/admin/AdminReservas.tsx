@@ -761,6 +761,11 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
                         </span>
                       )}
                       {r.consecutivo && <ConsecutivoBadge consecutivo={r.consecutivo} />}
+                      {desglose.cantidadMascotas > 0 && (
+                        <span className="status-badge s-avail" style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                          🐾 {desglose.cantidadMascotas} mascota{desglose.cantidadMascotas !== 1 ? 's' : ''}{desglose.costoMascotas > 0 ? ` (+${formatCOP(desglose.costoMascotas)} · Dueño)` : ''}
+                        </span>
+                      )}
                       {((r.costo_alimentacion || 0) > 0 || (r.alimentacion && r.alimentacion !== 'Sin alimentación')) && (
                         r.estado_alimentacion === 'pagada' ? (
                           <span

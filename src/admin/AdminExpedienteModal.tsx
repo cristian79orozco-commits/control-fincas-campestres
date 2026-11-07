@@ -7,10 +7,12 @@ import {
 import type { Reserva, ConfiguracionGeneral, Pago } from '../types';
 import {
   calcularSaldo,
+  desglosarFinanzasReserva,
   obtenerNombreClienteHistorico,
   obtenerNombreFincaHistorico,
   obtenerContactoClienteHistorico,
 } from '../types';
+import { formatearConsecutivoSimple } from '../utils/consecutivos';
 import {
   generarDocSeparacion,
   generarComprobantePago,
@@ -74,15 +76,19 @@ export const AdminExpedienteModal: React.FC<AdminExpedienteModalProps> = ({
     tipo: 'estado_cuenta',
   });
 
-  const saldo = calcularSaldo(reserva);
-  const totalPagado = reserva.valor_total - saldo;
+  const finanzas = desglosarFinanzasReserva(reserva, (reserva.fincas as any) || reserva.finca_snapshot);
+  const saldo = finanzas.saldoConsolidado;
+  const totalPagado = finanzas.totalPagado;
   const clienteNombre = obtenerNombreClienteHistorico(reserva);
   const clienteContacto = obtenerContactoClienteHistorico(reserva);
   const fincaNombre = obtenerNombreFincaHistorico(reserva);
   const pagos: Pago[] = reserva.pagos || [];
   const cierre = reserva.cierre;
 
-  const numExpediente = `EXP-${reserva.id.slice(0, 8).toUpperCase()}`;
+  const consecLimpio = reserva.consecutivo
+    ? formatearConsecutivoSimple(reserva.consecutivo)
+    : reserva.id.slice(0, 8).toUpperCase();
+  const numExpediente = `EXP-${consecLimpio}`;
 
   const ejecutarDescarga = (tipo: string, fn: () => void) => {
     setDescargando(tipo);
@@ -114,7 +120,7 @@ export const AdminExpedienteModal: React.FC<AdminExpedienteModalProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
               <span style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--primary)' }}>
-                {numExpediente}
+                Reserva #{consecLimpio} · {numExpediente}
               </span>
               <span
                 className={`status-badge ${
@@ -249,6 +255,9 @@ export const AdminExpedienteModal: React.FC<AdminExpedienteModalProps> = ({
                   <div><span className="text-muted">Salida:</span> <br /><strong>{formatFecha(reserva.fecha_fin)}</strong></div>
                   <div><span className="text-muted">Duración:</span> <br /><strong>{nochesCalc} noche(s)</strong></div>
                   <div><span className="text-muted">Huéspedes:</span> <br /><strong>{reserva.personas} personas</strong></div>
+                  {finanzas.cantidadMascotas > 0 && (
+                    <div><span className="text-muted">Mascotas:</span> <br /><strong>🐾 {finanzas.cantidadMascotas} mascota(s)</strong></div>
+                  )}
                   <div><span className="text-muted">Alimentación:</span> <br /><strong>{reserva.alimentacion || 'Sin alimentación'}</strong></div>
                 </div>
               </div>
@@ -259,10 +268,14 @@ export const AdminExpedienteModal: React.FC<AdminExpedienteModalProps> = ({
                   <DollarSign size={15} /> Resumen de Liquidación Económica
                 </div>
                 <div className="quote-card" style={{ margin: 0 }}>
-                  <div className="quote-row"><span className="text-muted">Valor total pactado:</span><strong>{formatCOP(reserva.valor_total)}</strong></div>
-                  {reserva.costo_alimentacion ? (
-                    <div className="quote-row"><span className="text-muted">Incluye alimentación:</span><span>{formatCOP(reserva.costo_alimentacion)}</span></div>
+                  <div className="quote-row"><span className="text-muted">Alojamiento base (Propietario):</span><span>{formatCOP(finanzas.subtotalAlojamientoBase)}</span></div>
+                  {finanzas.costoMascotas > 0 && (
+                    <div className="quote-row"><span className="text-muted">🐾 Ingreso de mascotas ({finanzas.cantidadMascotas} · Pago al propietario):</span><span>{formatCOP(finanzas.costoMascotas)}</span></div>
+                  )}
+                  {finanzas.costoAlimentacion > 0 ? (
+                    <div className="quote-row"><span className="text-muted">Servicio de alimentación (Paraíso Terrenal):</span><span>{formatCOP(finanzas.costoAlimentacion)}</span></div>
                   ) : null}
+                  <div className="quote-row"><span className="text-muted">Valor total pactado:</span><strong>{formatCOP(reserva.valor_total)}</strong></div>
                   <div className="quote-row"><span className="text-muted">Total efectivamente recaudado:</span><strong style={{ color: 'var(--success)' }}>{formatCOP(totalPagado)}</strong></div>
                   <div className="quote-row quote-total">
                     <span>Saldo final liquidado:</span>

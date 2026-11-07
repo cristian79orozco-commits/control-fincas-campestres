@@ -3,7 +3,8 @@ import type {
   Reserva, ReservaEstado, Cliente, Finca, Pago, PagoTipo,
   CotizacionDB, CierreReserva, ConfiguracionGeneral
 } from '../types';
-import { calcularSaldo, desglosarFinanzasReserva } from '../types';
+import { calcularSaldo, desglosarFinanzasReserva, extraerInfoMascotas } from '../types';
+import { resolverPlanesAlimentacionDetalle } from '../utils/calcularCotizacion';
 import { useApp } from '../context/AppContext';
 import { getConfiguracionGlobal } from '../services/configuracion';
 import {
@@ -116,7 +117,7 @@ export function useReservasController({
   cotizacionInicial,
   onCotizacionInicialUsada,
 }: UseReservasControllerParams) {
-  const { abrirComunicacionesConExpediente, cambiarEstadoAlimentacionReserva } = useApp();
+  const { abrirComunicacionesConExpediente, cambiarEstadoAlimentacionReserva, menus } = useApp();
 
   // Estado local reactivo optimista (< 16ms)
   const [reservasState, setReservasState] = useState<Reserva[]>(() => reservas || []);
@@ -377,7 +378,7 @@ export function useReservasController({
     let cantPersonas = r.personas || 4;
     let cantServ = (r as any).cantidad_alimentacion || 1;
     if (r.alimentacion) {
-      const match = r.alimentacion.match(/(\d+)\s*serv(?:\.|\w*)\s*×\s*(\d+)\s*pers/i);
+      const match = r.alimentacion.match(/(\d+)\s*serv(?:\.|\w*)\s*[×xX*]\s*(\d+)\s*pers/i);
       if (match) {
         cantServ = parseInt(match[1], 10) || cantServ;
         cantPersonas = parseInt(match[2], 10) || cantPersonas;
@@ -385,7 +386,16 @@ export function useReservasController({
     }
 
     const onGenPdf = async () => {
-      const m = (r.alimentacion && r.alimentacion !== 'Sin alimentación' ? {
+      const resuelto = resolverPlanesAlimentacionDetalle({
+        alimentacionTexto: r.alimentacion,
+        costoTotalReal: r.costo_alimentacion,
+        menusCatalogo: menus,
+        menuIdFallback: r.menu_id,
+        personasDefault: cantPersonas,
+        serviciosDefault: cantServ,
+      });
+
+      const m = resuelto.items[0]?.menu || (r.alimentacion && r.alimentacion !== 'Sin alimentación' ? {
         id: 'res-menu',
         nombre: r.alimentacion,
         categoria: 'Almuerzo' as const,
@@ -397,6 +407,9 @@ export function useReservasController({
       try {
         await generarPropuestaAlimentacion({
           menu: m,
+          menusCatalogo: menus,
+          alimentacionTexto: r.alimentacion,
+          costoTotalReal: r.costo_alimentacion,
           cliente: r.clientes,
           finca: f,
           personas: cantPersonas,
@@ -420,7 +433,7 @@ export function useReservasController({
       onGenerarPdf: onGenPdf,
       tipo: 'cobro_alimentacion',
     });
-  }, [configuracion, fincas, showToast]);
+  }, [configuracion, fincas, menus, showToast]);
 
   const handleAbrirModalPago = useCallback((r: Reserva) => {
     const f = desglosarFinanzasReserva(r);

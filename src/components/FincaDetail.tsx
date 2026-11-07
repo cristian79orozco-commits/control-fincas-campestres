@@ -449,7 +449,13 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
                         <Dog size={12} style={{ color: 'var(--primary)' }} /> Mascotas
                       </div>
                       <div style={{ fontWeight: 600, fontSize: '0.76rem', marginTop: '0.1rem' }}>
-                        {finca.politica_mascotas === 'permitido' ? 'Bienvenidas sin costo' : finca.politica_mascotas === 'con_costo' ? 'Se aceptan con costo adicional' : 'No permitidas'}
+                        {finca.politica_mascotas === 'permitido'
+                          ? 'Bienvenidas sin costo'
+                          : finca.politica_mascotas === 'con_costo'
+                          ? `Se aceptan ($${Number(finca.valor_mascota || 0).toLocaleString('es-CO')} c/u)`
+                          : finca.politica_mascotas === 'consulta_previa'
+                          ? 'Previa autorización'
+                          : 'No permitidas'}
                       </div>
                     </div>
                   )}

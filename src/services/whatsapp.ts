@@ -16,7 +16,8 @@
  */
 
 import type { Reserva, Pago, CotizacionDB, Cliente, Finca, TipoComunicacion, MetodoEnvioWhatsApp } from '../types';
-import { calcularSaldo, desglosarFinanzasReserva } from '../types';
+import { calcularSaldo, desglosarFinanzasReserva, desglosarFinanzasCotizacion, extraerInfoMascotas } from '../types';
+import { resolverPlanesAlimentacionDetalle } from '../utils/calcularCotizacion';
 import {
   generarDocSeparacion,
   generarComprobantePago,
@@ -229,6 +230,7 @@ export function plantillaCotizacion(
   const noches = calcularNoches(cotizacion.fecha_inicio, cotizacion.fecha_fin);
   const tieneAlim = (cotizacion.costo_alimentacion || 0) > 0 || (cotizacion.alimentacion && cotizacion.alimentacion !== 'Sin alimentación');
   const consecPrefijado = formatearConsecutivoConPrefijo(cotizacion.consecutivo, 'cotizacion');
+  const finCot = desglosarFinanzasCotizacion(cotizacion, finca as any);
 
   let msg = `🏡 *COTIZACIÓN OFICIAL DE ESTANCIA*
 *Paraíso Terrenal*
@@ -240,13 +242,19 @@ export function plantillaCotizacion(
 📅 *Fecha de llegada:* ${formatFecha(cotizacion.fecha_inicio)}
 📅 *Fecha de salida:* ${formatFecha(cotizacion.fecha_fin)}
 🌙 *Noches de estancia:* ${noches}
-👥 *Capacidad / Personas:* ${cotizacion.personas} personas
+👥 *Capacidad / Personas:* ${cotizacion.personas} personas${finCot.cantidadMascotas > 0 ? `\n🐾 *Mascotas:* ${finCot.cantidadMascotas} mascota${finCot.cantidadMascotas !== 1 ? 's' : ''}` : ''}
 
 💵 *RESUMEN DE LIQUIDACIÓN:*
-• Alojamiento: ${formatCOP(cotizacion.subtotal_alojamiento || 0)}`;
+• Alojamiento Base: ${formatCOP(finCot.subtotalAlojamientoBase)}`;
 
+  if (finCot.cantidadMascotas > 0) {
+    msg += `\n• 🐾 Ingreso de mascotas (${finCot.cantidadMascotas} · Pago al dueño de la finca): ${finCot.costoMascotas > 0 ? `+${formatCOP(finCot.costoMascotas)}` : 'Sin costo adicional'}`;
+    if (finCot.costoMascotas > 0) {
+      msg += `\n• *Subtotal Finca (Propietario):* *${formatCOP(finCot.totalPropietarioFinca)}*`;
+    }
+  }
   if (tieneAlim) {
-    msg += `\n• Menú / Alimentación: ${formatCOP(cotizacion.costo_alimentacion || 0)} (${cotizacion.alimentacion || 'Seleccionado'})`;
+    msg += `\n• Menú / Alimentación (Administración): ${formatCOP(cotizacion.costo_alimentacion || 0)} (${cotizacion.alimentacion || 'Seleccionado'})`;
   }
   if (cotizacion.descuento && cotizacion.descuento > 0) {
     msg += `\n• Descuento especial: -${formatCOP(cotizacion.descuento)}`;
@@ -257,6 +265,7 @@ export function plantillaCotizacion(
 
   msg += `\n━━━━━━━━━━━━━━━━━━━━
 💰 *TOTAL DE LA COTIZACIÓN:* *${formatCOP(cotizacion.total || 0)}*
+🔒 *ABONO 50% SEPARACIÓN FINCA (PROPIETARIO):* *${formatCOP(finCot.abono50Propietario)}*
 ━━━━━━━━━━━━━━━━━━━━
 
 📝 *Estado:* ${cotizacion.estado.toUpperCase()}
@@ -288,12 +297,18 @@ export function plantillaPedirAbonoCotizacion(
   const cNombre = cliente ? `${cliente.nombre || ''} ${cliente.apellido || ''}`.trim() : (cotizacion.clientes ? `${cotizacion.clientes.nombre} ${cotizacion.clientes.apellido || ''}`.trim() : 'Estimado/a cliente');
   const fNombre = finca?.nombre || cotizacion.fincas?.nombre || 'Finca Campestre';
   const noches = calcularNoches(cotizacion.fecha_inicio, cotizacion.fecha_fin);
-  
-  // El 50% de separación aplica sobre el valor de alojamiento de la propiedad
-  const valorAlojamiento = (cotizacion.subtotal_alojamiento && cotizacion.subtotal_alojamiento > 0)
-    ? cotizacion.subtotal_alojamiento
-    : Math.max(0, (cotizacion.total || 0) - (cotizacion.costo_alimentacion || 0));
+
+  // El porcentaje de separación aplica sobre el total correspondiente al propietario de la finca (Alojamiento + Mascotas)
+  const finCot = desglosarFinanzasCotizacion(cotizacion, finca as any);
+  const valorAlojamiento = finCot.totalPropietarioFinca;
   const abonoSugerido = Math.round(valorAlojamiento * (porcentaje / 100));
+
+  let desglosePropietario = `🏠 *Valor Alojamiento Finca:* *${formatCOP(valorAlojamiento)}*`;
+  if (finCot.cantidadMascotas > 0) {
+    desglosePropietario = `🏠 *Alojamiento Base:* ${formatCOP(finCot.subtotalAlojamientoBase)}
+🐾 *Ingreso de Mascotas (${finCot.cantidadMascotas} · Pago al dueño de la finca):* ${finCot.costoMascotas > 0 ? `+${formatCOP(finCot.costoMascotas)}` : 'Sin costo adicional'}
+🏡 *Total Finca Propietario (Alojamiento + Mascotas):* *${formatCOP(valorAlojamiento)}*`;
+  }
 
   let msg = `🌿 *SOLICITUD OFICIAL DE SEPARACIÓN Y BLOQUEO DE FECHAS*
 *Paraíso Terrenal*
@@ -302,8 +317,8 @@ Hola, *${cNombre}* 👋
 Adjuntamos la propuesta formal para tu estadía en *${fNombre}*.
 
 📅 *Fechas solicitadas:* ${formatFecha(cotizacion.fecha_inicio)} al ${formatFecha(cotizacion.fecha_fin)} (${noches} noche${noches > 1 ? 's' : ''})
-👥 *Huéspedes:* ${cotizacion.personas} personas
-${cotizacion.consecutivo ? `🆔 *Cotización N°:* ${cotizacion.consecutivo}\n` : ''}🏠 *Valor Alojamiento Finca:* *${formatCOP(valorAlojamiento)}*
+👥 *Huéspedes:* ${cotizacion.personas} personas${finCot.cantidadMascotas > 0 ? ` · 🐾 ${finCot.cantidadMascotas} mascota(s)` : ''}
+${cotizacion.consecutivo ? `🆔 *Cotización N°:* ${cotizacion.consecutivo}\n` : ''}${desglosePropietario}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔒 *ABONO REQUERIDO PARA SEPARAR (${porcentaje}%):* *${formatCOP(abonoSugerido)}*
@@ -425,6 +440,7 @@ export function plantillaSeparacion(reserva: Reserva, enlacePdf?: string): strin
   const anticipo = reserva.separacion || 0;
   const noches = calcularNoches(reserva.fecha_inicio, reserva.fecha_fin);
   const consecPrefijado = formatearConsecutivoConPrefijo(reserva.consecutivo, 'separacion');
+  const finRes = desglosarFinanzasReserva(reserva);
 
   let msg = `🎉 *CONFIRMACIÓN DE RESERVA Y SEPARACIÓN*
 *Paraíso Terrenal*
@@ -435,12 +451,13 @@ Hola, *${clienteNombre}* 🙌 Hemos emitido satisfactoriamente tu *Documento Ofi
 🆔 *Consecutivo de Reserva:* ${consecPrefijado}
 📅 *Llegada (Check-in):* ${formatFecha(reserva.fecha_inicio)}
 📅 *Salida (Check-out):* ${formatFecha(reserva.fecha_fin)}
-🌙 *Noches:* ${noches} | 👥 *Huéspedes:* ${reserva.personas} personas
+🌙 *Noches:* ${noches} | 👥 *Huéspedes:* ${reserva.personas} personas${finRes.cantidadMascotas > 0 ? ` | 🐾 *Mascotas:* ${finRes.cantidadMascotas}` : ''}
 
 📊 *ESTADO ECONÓMICO DE LA RESERVA:*
-• Valor Total Acordado: *${formatCOP(reserva.valor_total)}*
-• Anticipo de Separación: *${formatCOP(anticipo)}* ✅
-• Saldo Pendiente: *${formatCOP(saldo)}* ${saldo <= 0 ? '🟢 (Completamente pagada)' : '⚠️'}
+• Alojamiento Base: ${formatCOP(finRes.subtotalAlojamientoBase)}${finRes.cantidadMascotas > 0 ? `\n• 🐾 Ingreso de Mascotas (${finRes.cantidadMascotas} · Pago al dueño de la finca): ${finRes.costoMascotas > 0 ? `+${formatCOP(finRes.costoMascotas)}` : 'Sin costo'}` : ''}${finRes.costoAlimentacion > 0 ? `\n• Servicio de Alimentación (Administración): ${formatCOP(finRes.costoAlimentacion)}` : ''}
+• *Valor Total Acordado:* *${formatCOP(reserva.valor_total)}*
+• Anticipo de Separación (Finca): *${formatCOP(anticipo)}* ✅${finRes.pagadoAlimentacion > 0 ? `\n• Abono Alimentación (Administración): *${formatCOP(finRes.pagadoAlimentacion)}* ✅` : ''}
+• *Saldo Pendiente Total:* *${formatCOP(saldo)}* ${saldo <= 0 ? '🟢 (Completamente pagada)' : '⚠️'}
 
 📄 *DOCUMENTO PDF ADJUNTO:*
 Hemos generado tu documento oficial de separación en formato PDF con todos los términos, condiciones y políticas de uso de la finca.`;
@@ -500,7 +517,7 @@ ${pago.observacion ? `• Observación / Ref: ${pago.observacion}\n` : ''}
 
 /**
  * 4. Plantilla: Estado de Cuenta con Doble Balance Transparente
- * Separa lo correspondiente al Propietario de la finca (Alojamiento / Check-in)
+ * Separa lo correspondiente al Propietario de la finca (Alojamiento + Mascotas / Check-in)
  * de lo correspondiente a la Administración de Paraíso Terrenal (Alimentación).
  */
 export function plantillaEstadoCuenta(reserva: Reserva, enlacePdf?: string): string {
@@ -510,6 +527,9 @@ export function plantillaEstadoCuenta(reserva: Reserva, enlacePdf?: string): str
 
   const {
     subtotalAlojamiento,
+    subtotalAlojamientoBase,
+    cantidadMascotas,
+    costoMascotas,
     pagadoFinca,
     saldoFincaCheckIn,
     costoAlimentacion,
@@ -530,6 +550,10 @@ export function plantillaEstadoCuenta(reserva: Reserva, enlacePdf?: string): str
     historialTexto = `  • Anticipo inicial de separación registrado: ${formatCOP(reserva.separacion || 0)}`;
   }
 
+  const detalleMascotasFinca = cantidadMascotas > 0
+    ? `\n• Alojamiento Base: ${formatCOP(subtotalAlojamientoBase)}\n• 🐾 Mascotas (${cantidadMascotas} · Pago al Propietario): ${costoMascotas > 0 ? `+${formatCOP(costoMascotas)}` : 'Sin costo'}`
+    : '';
+
   let msg = `📊 *ESTADO DE CUENTA CONSOLIDADO*
 *Paraíso Terrenal*
 
@@ -540,8 +564,8 @@ Hola, *${clienteNombre}* 📋 Te compartimos el balance financiero detallado y t
 📅 *Estancia:* ${formatFecha(reserva.fecha_inicio)} al ${formatFecha(reserva.fecha_fin)}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-🏡 *1. ALOJAMIENTO · PROPIETARIO DE LA FINCA*
-• Valor Total Finca: ${formatCOP(subtotalAlojamiento)}
+🏡 *1. ALOJAMIENTO · PROPIETARIO DE LA FINCA*${detalleMascotasFinca}
+• Valor Total Finca (Propietario): ${formatCOP(subtotalAlojamiento)}
 • Anticipo / Pagado al Propietario: ${formatCOP(pagadoFinca)}
 • *SALDO PENDIENTE CHECK-IN:* *${formatCOP(saldoFincaCheckIn)}* ${saldoFincaCheckIn <= 0 ? '🟢 (Al día)' : '⚠️ (Se liquida al ingresar a la finca)'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━`;
@@ -606,38 +630,47 @@ Nos complace certificarte que tu reserva para la finca *${fincaNombre}* se encue
 }
 
 /**
- * 6. Plantilla: Propuesta de Menú / Alimentación
+ * 6. Plantilla: Propuesta de Menú / Alimentación (Soporta 1 o múltiples menús centralizados)
  */
 export function plantillaPropuestaAlimentacion(datos: PropuestaAlimentacionDatos, enlacePdf?: string): string {
   const cNombre = datos.cliente ? `${datos.cliente.nombre} ${datos.cliente.apellido || ''}`.trim() : 'Estimado/a cliente';
   const fNombre = datos.finca?.nombre || 'Finca Campestre';
-  const total = (datos.menu.precio_pp || 0) * (datos.personas || 1) * (datos.cantidadServicios || 1);
-  const consecPrefijado = formatearConsecutivoConPrefijo(datos.menu.id || '1001', 'menu');
+  const consecPrefijado = formatearConsecutivoConPrefijo(datos.consecutivo || datos.menu.id || '1001', 'menu');
+
+  const resuelto = resolverPlanesAlimentacionDetalle({
+    alimentacionTexto: datos.alimentacionTexto,
+    costoTotalReal: datos.costoTotalReal,
+    menusCatalogo: datos.menusCatalogo,
+    menuPrincipal: datos.menu,
+    personasDefault: datos.personas || 1,
+    serviciosDefault: datos.cantidadServicios || 1,
+  });
+
+  const bloqueItems = resuelto.items.map((it, idx) => {
+    const numPrefix = resuelto.items.length > 1 ? `*${idx + 1}. ${it.nombre}*` : `*${it.nombre}*`;
+    return `🍲 ${numPrefix} (${it.categoria})
+${it.descripcion ? `   _${it.descripcion}_\n` : ''}   • Comensales: ${it.personas} pers. × ${it.cantidadServicios} serv. (${formatCOP(it.precioPp)}/pp) = *${formatCOP(it.subtotal)}*`;
+  }).join('\n\n');
 
   let msg = `🍽️ *PROPUESTA GASTRONÓMICA CAMPESTRE*
 *Paraíso Terrenal*
 
 Hola, *${cNombre}* 👨‍🍳 Te presentamos la propuesta culinaria para tu estadía en *${fNombre}*:
-
-🍲 *Menú seleccionado:* *${datos.menu.nombre}*
-🏷️ *Categoría:* ${datos.menu.categoria}
 🆔 *Propuesta N°:* ${consecPrefijado}
-${datos.menu.descripcion ? `📝 *Descripción:* ${datos.menu.descripcion}\n` : ''}
-👥 *Comensales:* ${datos.personas || 1} personas
-🍽️ *Servicios / Días:* ${datos.cantidadServicios || 1}
-💵 *Tarifa por persona:* ${formatCOP(datos.menu.precio_pp)}
+
+${bloqueItems}
+
 ━━━━━━━━━━━━━━━━━━━━
-💰 *TOTAL DEL SERVICIO:* *${formatCOP(total)}*
+💰 *TOTAL DEL SERVICIO GASTRONÓMICO:* *${formatCOP(resuelto.totalCalculado)}*
 ━━━━━━━━━━━━━━━━━━━━
 
-${datos.menu.condiciones ? `📌 *Condiciones:* ${datos.menu.condiciones}\n` : ''}
-📄 Te adjuntamos la propuesta formal en PDF con fotografías de los platos y las condiciones del servicio.`;
+${datos.menu.condiciones ? `📌 *Condiciones:* ${datos.menu.condiciones}\n` : ''}📄 Te adjuntamos la propuesta formal en PDF con fotografías de los platos y las condiciones del servicio.`;
 
   if (enlacePdf) {
     msg += `\n\n📎 *Consulta la propuesta completa en PDF:*\n${enlacePdf}`;
   }
 
-  msg += `\n\n¿Deseas que coordinemos y reservemos este menú para tus fechas? 👩‍🍳✨`;
+  msg += `\n\n¿Deseas que coordinemos y reservemos este servicio para tus fechas? 👩‍🍳✨`;
   return msg;
 }
 
@@ -648,14 +681,15 @@ ${datos.menu.condiciones ? `📌 *Condiciones:* ${datos.menu.condiciones}\n` : '
 export function plantillaRecordatorioPago(reserva: Reserva): string {
   const clienteNombre = reserva.clientes ? `${reserva.clientes.nombre} ${reserva.clientes.apellido || ''}`.trim() : 'Estimado/a cliente';
   const fincaNombre = reserva.fincas?.nombre || 'Finca Campestre';
-  const { saldoFincaCheckIn, saldoAlimentacionAdmin, saldoConsolidado } = desglosarFinanzasReserva(reserva);
+  const { saldoFincaCheckIn, saldoAlimentacionAdmin, saldoConsolidado, cantidadMascotas, costoMascotas } = desglosarFinanzasReserva(reserva);
+  const notaMascotas = cantidadMascotas > 0 && costoMascotas > 0 ? ` (incluye ${cantidadMascotas} mascota(s): ${formatCOP(costoMascotas)})` : '';
 
   let desglose = '';
   if (saldoFincaCheckIn > 0 && saldoAlimentacionAdmin > 0) {
-    desglose = `\n• *Saldo Finca (a liquidar en el check-in al dueño/anfitrión):* ${formatCOP(saldoFincaCheckIn)}
+    desglose = `\n• *Saldo Finca (a liquidar en el check-in al dueño/anfitrión${notaMascotas}):* ${formatCOP(saldoFincaCheckIn)}
 • *Saldo Alimentación (transferencia a Paraíso Terrenal):* ${formatCOP(saldoAlimentacionAdmin)}`;
   } else if (saldoFincaCheckIn > 0) {
-    desglose = `\n• *Saldo Alojamiento (al ingresar a la finca):* ${formatCOP(saldoFincaCheckIn)}`;
+    desglose = `\n• *Saldo Alojamiento (al ingresar a la finca al propietario${notaMascotas}):* ${formatCOP(saldoFincaCheckIn)}`;
   } else if (saldoAlimentacionAdmin > 0) {
     desglose = `\n• *Saldo Alimentación (transferencia a Paraíso Terrenal):* ${formatCOP(saldoAlimentacionAdmin)}`;
   }
@@ -1011,31 +1045,39 @@ export function obtenerTokensParaMensaje(params: {
   const anticipo = reserva?.separacion || 0;
   const valorPago = pago?.valor || 0;
 
-  // Desglose de finca vs alimentación si es reserva
+  // Datos bancarios del Propietario de la finca
+  const fObj: any = finca || reserva?.fincas || cotizacion?.fincas || null;
+
+  // Desglose de finca vs alimentación si es reserva o cotización
   let saldoFinca = total;
   let saldoAlimentacion = 0;
   let costoFinca = total;
   let costoAlimentacion = 0;
   let pagadoFinca = 0;
   let pagadoAlimentacion = 0;
+  let cantidadMascotas = 0;
+  let costoMascotas = 0;
 
   if (reserva) {
-    const finanzas = desglosarFinanzasReserva(reserva);
+    const finanzas = desglosarFinanzasReserva(reserva, fObj);
     saldoFinca = finanzas.saldoFincaCheckIn;
     saldoAlimentacion = finanzas.saldoAlimentacionAdmin;
     costoFinca = finanzas.subtotalAlojamiento;
     costoAlimentacion = finanzas.costoAlimentacion;
     pagadoFinca = finanzas.pagadoFinca;
     pagadoAlimentacion = finanzas.pagadoAlimentacion;
+    cantidadMascotas = finanzas.cantidadMascotas;
+    costoMascotas = finanzas.costoMascotas;
   } else if (cotizacion) {
-    costoAlimentacion = cotizacion.costo_alimentacion || 0;
-    costoFinca = cotizacion.subtotal_alojamiento || Math.max(0, total - costoAlimentacion);
-    saldoFinca = costoFinca;
-    saldoAlimentacion = costoAlimentacion;
+    const finCot = desglosarFinanzasCotizacion(cotizacion, fObj);
+    costoAlimentacion = finCot.costoAlimentacion;
+    costoFinca = finCot.totalPropietarioFinca;
+    saldoFinca = finCot.totalPropietarioFinca;
+    saldoAlimentacion = finCot.costoAlimentacion;
+    cantidadMascotas = finCot.cantidadMascotas;
+    costoMascotas = finCot.costoMascotas;
   }
 
-  // Datos bancarios del Propietario de la finca
-  const fObj: any = finca || reserva?.fincas || cotizacion?.fincas || null;
   const bBanco = fObj?.banco_nombre || 'Bancolombia';
   const bTipo = fObj?.banco_tipo_cuenta || 'Ahorros';
   const bCuenta = fObj?.banco_cuenta || '';
@@ -1085,6 +1127,11 @@ export function obtenerTokensParaMensaje(params: {
     costo_alimentacion: formatCOP(costoAlimentacion),
     pagado_finca: formatCOP(pagadoFinca),
     pagado_alimentacion: formatCOP(pagadoAlimentacion),
+    cantidad_mascotas: String(cantidadMascotas),
+    costo_mascotas: formatCOP(costoMascotas),
+    mascotas_detalle: cantidadMascotas > 0
+      ? `🐾 *Mascotas:* ${cantidadMascotas} mascota(s) (${formatCOP(costoMascotas)} - Pago al propietario)`
+      : '',
     datos_bancarios: bCuenta
       ? `• *Banco:* ${bBanco}\n• *Tipo de Cuenta:* ${bTipo}\n• *Número de Cuenta:* ${bCuenta}\n• *Titular:* ${bTitular}${bId ? `\n• *Identificación / NIT:* ${bId}` : ''}`
       : '',

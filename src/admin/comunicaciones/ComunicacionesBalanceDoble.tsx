@@ -7,6 +7,9 @@ import type { Finca, ConfiguracionGeneral } from '../../types';
 interface ComunicacionesBalanceDobleProps {
   finanzasDoble: {
     esReserva: boolean;
+    subtotalAlojamientoBase?: number;
+    cantidadMascotas?: number;
+    costoMascotas?: number;
     subtotalFinca: number;
     pagadoFinca: number;
     saldoFincaCheckIn: number;
@@ -71,12 +74,37 @@ export const ComunicacionesBalanceDoble: React.FC<ComunicacionesBalanceDobleProp
           </div>
 
           {/* Cifras */}
-          <div className="flex items-center justify-between text-xs py-0.5">
-            <span className="text-slate-500 dark:text-slate-400">Valor Finca:</span>
-            <strong className="text-slate-800 dark:text-slate-100 font-bold">
-              {formatCOP(finanzasDoble.subtotalFinca)}
-            </strong>
-          </div>
+          {(finanzasDoble.cantidadMascotas || 0) > 0 ? (
+            <>
+              <div className="flex items-center justify-between text-xs py-0.5">
+                <span className="text-slate-500 dark:text-slate-400">Alojamiento Base:</span>
+                <span className="text-slate-700 dark:text-slate-200 font-medium">
+                  {formatCOP(finanzasDoble.subtotalAlojamientoBase || finanzasDoble.subtotalFinca)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs py-0.5">
+                <span className="text-slate-500 dark:text-slate-400">
+                  🐾 Mascotas ({finanzasDoble.cantidadMascotas} · Pago al Dueño):
+                </span>
+                <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
+                  +{formatCOP(finanzasDoble.costoMascotas || 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs py-1 border-t border-dashed border-slate-200 dark:border-slate-700">
+                <span className="text-slate-600 dark:text-slate-300 font-semibold">Valor Total Finca (Dueño):</span>
+                <strong className="text-slate-800 dark:text-slate-100 font-bold">
+                  {formatCOP(finanzasDoble.subtotalFinca)}
+                </strong>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-between text-xs py-0.5">
+              <span className="text-slate-500 dark:text-slate-400">Valor Finca:</span>
+              <strong className="text-slate-800 dark:text-slate-100 font-bold">
+                {formatCOP(finanzasDoble.subtotalFinca)}
+              </strong>
+            </div>
+          )}
 
           {finanzasDoble.esReserva ? (
             <>
@@ -99,7 +127,11 @@ export const ComunicacionesBalanceDoble: React.FC<ComunicacionesBalanceDobleProp
             </>
           ) : (
             <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/20 text-xs font-bold">
-              <span>Anticipo Requerido (50% Finca):</span>
+              <span>
+                {(finanzasDoble.cantidadMascotas || 0) > 0
+                  ? 'Anticipo Requerido (50% Finca + Mascotas):'
+                  : 'Anticipo Requerido (50% Finca):'}
+              </span>
               <span>{formatCOP(finanzasDoble.anticipoFinca50 || 0)}</span>
             </div>
           )}

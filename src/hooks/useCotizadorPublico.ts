@@ -14,6 +14,7 @@
 import { supabase } from '../services/supabase';
 import { obtenerSiguienteConsecutivo } from '../utils/consecutivos';
 import { generarUUID } from '../utils/uuid';
+import { adjuntarMetaMascotasEnTexto } from '../types';
 
 // -----------------------------------------------------------------------
 // Tipos públicos
@@ -27,6 +28,8 @@ export interface DatosCotizacionPublica {
   fechaInicio: string;
   fechaFin: string;
   personas: number;
+  cantidadMascotas?: number;
+  costoMascotas?: number;
   alimentacion: string;
   menuId?: string;
   cantidadServicios: number;
@@ -126,6 +129,12 @@ export function useCotizadorPublico() {
       // ----------------------------------------------------------------
       const newCotId = generarUUID();
 
+      const notasConMascotas = adjuntarMetaMascotasEnTexto(
+        `Solicitud web directa por WhatsApp · Consecutivo ${consecutivo}`,
+        datos.cantidadMascotas || 0,
+        datos.costoMascotas || 0
+      );
+
       const payload: Record<string, unknown> = {
         id: newCotId,
         cliente_id: clienteId,
@@ -143,6 +152,7 @@ export function useCotizadorPublico() {
         total: datos.total,
         consecutivo: consecutivo,
         estado: 'cotizada',
+        notas: notasConMascotas,
       };
 
       // Incluir menu_id solo si está definido

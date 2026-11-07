@@ -88,7 +88,7 @@ export function useHistorial(
         if (r.fecha_inicio > filtros.fechaHasta) return false;
       }
 
-      // 7. Búsqueda por texto (búsqueda libre sobre nombres, notas, id)
+      // 7. Búsqueda por texto (búsqueda libre sobre consecutivo, nombres, notas, id)
       if (filtros.busqueda.trim()) {
         const q = filtros.busqueda.toLowerCase().trim();
         const cliNom = obtenerNombreClienteHistorico(r).toLowerCase();
@@ -96,8 +96,11 @@ export function useHistorial(
         const obs = (r.observaciones || '').toLowerCase();
         const notasCierre = (r.notas_cierre || '').toLowerCase();
         const idCorto = r.id.toLowerCase();
+        const consec = (r.consecutivo || '').toLowerCase();
 
         const match =
+          consec.includes(q.replace(/^#|^exp-?/i, '')) ||
+          consec.includes(q) ||
           cliNom.includes(q) ||
           finNom.includes(q) ||
           obs.includes(q) ||

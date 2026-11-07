@@ -22,10 +22,13 @@ import type { Reserva, Pago, Menu, Cliente, Finca, CotizacionDB, ConfiguracionGe
 import {
   calcularSaldo,
   desglosarFinanzasReserva,
+  desglosarFinanzasCotizacion,
+  extraerInfoMascotas,
   obtenerNombreClienteHistorico,
   obtenerNombreFincaHistorico,
   obtenerContactoClienteHistorico,
 } from '../types';
+import { resolverPlanesAlimentacionDetalle } from '../utils/calcularCotizacion';
 import { getConfiguracionGlobal, setConfiguracionGlobal } from './configuracion';
 import { formatearConsecutivoConPrefijo, formatearConsecutivoSimple } from '../utils/consecutivos';
 import { LOGO_EMPRESA_BASE64, LOGO_FORMAT } from '../assets/logoBase64';
@@ -59,6 +62,9 @@ export async function subirDocumentoStorage(blob: Blob, nombreArchivo: string): 
 
 export interface PropuestaAlimentacionDatos {
   menu: Menu;
+  menusCatalogo?: Menu[];
+  alimentacionTexto?: string | null;
+  costoTotalReal?: number | null;
   cliente?: Pick<Cliente, 'nombre' | 'apellido' | 'whatsapp' | 'correo'> | null;
   finca?: { nombre: string; zona?: string } | null;
   personas?: number;
@@ -565,15 +571,22 @@ function linea(doc: jsPDF, y: number): number {
 }
 
 // ---------------------------------------------------------------
-// Fila de tabla simple
+// Fila de tabla simple (con ajuste automático multi-línea anti-solapamiento)
 // ---------------------------------------------------------------
 function fila(doc: jsPDF, y: number, izq: string, der: string, negrita = false): number {
   const ancho = doc.internal.pageSize.getWidth();
   doc.setFont('helvetica', negrita ? 'bold' : 'normal');
   doc.setFontSize(9);
-  doc.text(izq, 14, y);
-  doc.text(der, ancho - 14, y, { align: 'right' });
-  return y + 7;
+  const izqLimpio = sanearTextoParaPdf(izq);
+  const derLimpio = sanearTextoParaPdf(der);
+  doc.text(izqLimpio, 14, y);
+  const anchoIzq = doc.getTextWidth(izqLimpio);
+  const maxAnchoDer = Math.max(70, ancho - 28 - anchoIzq - 8);
+  const lineasDer = doc.splitTextToSize(derLimpio, maxAnchoDer);
+  lineasDer.forEach((lineaTxt: string, idx: number) => {
+    doc.text(lineaTxt, ancho - 14, y + idx * 4.6, { align: 'right' });
+  });
+  return y + Math.max(1, lineasDer.length) * 4.6 + 2.4;
 }
 
 /**
@@ -787,6 +800,9 @@ export function generarDocSeparacion(
   y += 8;
   y = linea(doc, y);
 
+  const fInfo = fincaParam || (reserva.fincas as any);
+  const finanzas = desglosarFinanzasReserva(reserva, fInfo);
+
   // Fechas
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
@@ -798,6 +814,14 @@ export function generarDocSeparacion(
   y = fila(doc, y, 'Fecha de llegada:', formatFecha(reserva.fecha_inicio));
   y = fila(doc, y, 'Fecha de salida:', formatFecha(reserva.fecha_fin));
   y = fila(doc, y, 'Personas:', String(reserva.personas));
+  if (finanzas.cantidadMascotas > 0) {
+    y = fila(
+      doc,
+      y,
+      'Mascotas autorizadas:',
+      `${finanzas.cantidadMascotas} mascota(s) (${formatCOP(finanzas.costoMascotas)} - Pago al propietario)`
+    );
+  }
   if (reserva.alimentacion && reserva.alimentacion !== 'Sin alimentación') {
     y = fila(doc, y, 'Servicio gastronómico:', reserva.alimentacion);
   }
@@ -812,14 +836,19 @@ export function generarDocSeparacion(
   doc.setTextColor(30, 27, 19);
   y += 8;
 
-  const finanzas = desglosarFinanzasReserva(reserva);
   const tieneAlimentacion = (reserva.costo_alimentacion || 0) > 0;
 
   if (tieneAlimentacion) {
-    // 1. Alojamiento
-    y = fila(doc, y, 'Alojamiento en Finca (Valor Total):', formatCOP(finanzas.subtotalAlojamiento));
+    // 1. Alojamiento + Mascotas (Propietario)
+    if (finanzas.costoMascotas > 0) {
+      y = fila(doc, y, 'Alojamiento Base en Finca:', formatCOP(finanzas.subtotalAlojamientoBase));
+      y = fila(doc, y, `Ingreso de Mascotas (${finanzas.cantidadMascotas} · Pago al Propietario):`, formatCOP(finanzas.costoMascotas));
+      y = fila(doc, y, 'Total Finca (Propietario):', formatCOP(finanzas.subtotalAlojamiento), true);
+    } else {
+      y = fila(doc, y, 'Alojamiento en Finca (Valor Total):', formatCOP(finanzas.subtotalAlojamiento));
+    }
     y = fila(doc, y, 'Abono de Separación de Finca Pagado:', formatCOP(finanzas.pagadoFinca), true);
-    y = fila(doc, y, 'Saldo Restante de Alojamiento (al Check-in):', formatCOP(finanzas.saldoFincaCheckIn), true);
+    y = fila(doc, y, 'Saldo Restante Finca al Check-in (Propietario):', formatCOP(finanzas.saldoFincaCheckIn), true);
     y += 2;
 
     // 2. Alimentación
@@ -834,17 +863,20 @@ export function generarDocSeparacion(
     y = fila(doc, y, 'VALOR TOTAL CONSOLIDADO:', formatCOP(reserva.valor_total), true);
     y = fila(doc, y, 'SALDO TOTAL PENDIENTE:', formatCOP(finanzas.saldoConsolidado), true);
   } else {
-    y = fila(doc, y, 'Valor total de la reserva:', formatCOP(reserva.valor_total));
+    if (finanzas.costoMascotas > 0) {
+      y = fila(doc, y, 'Alojamiento Base en Finca:', formatCOP(finanzas.subtotalAlojamientoBase));
+      y = fila(doc, y, `Ingreso de Mascotas (${finanzas.cantidadMascotas} · Pago al Propietario):`, formatCOP(finanzas.costoMascotas));
+    }
+    y = fila(doc, y, 'Valor total de la reserva (Propietario):', formatCOP(reserva.valor_total), finanzas.costoMascotas > 0);
     y = fila(doc, y, 'Valor de separación pagado:', formatCOP(reserva.separacion), true);
     const saldo = calcularSaldo(reserva);
-    y = fila(doc, y, 'Saldo pendiente:', formatCOP(saldo), true);
+    y = fila(doc, y, 'Saldo pendiente al Check-in:', formatCOP(saldo), true);
   }
 
   y += 5;
   y = linea(doc, y);
 
   // CUENTAS BANCARIAS SEPARADAS
-  const fInfo = fincaParam || (reserva.fincas as any);
   const saldoAlojamiento = tieneAlimentacion ? finanzas.saldoFincaCheckIn : calcularSaldo(reserva);
 
   // 1. Cuenta del Propietario para saldo de Alojamiento
@@ -859,9 +891,9 @@ export function generarDocSeparacion(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(30, 27, 19);
-    let datosOwner = `Banco: ${fInfo.banco_nombre || 'Bancolombia'}  •  ${fInfo.banco_tipo_cuenta || 'Ahorros'} N°: ${fInfo.banco_cuenta}  •  Titular: ${fInfo.banco_titular || 'Propietario de la Finca'}`;
+    let datosOwner = sanearTextoParaPdf(`Banco: ${fInfo.banco_nombre || 'Bancolombia'}  |  ${fInfo.banco_tipo_cuenta || 'Ahorros'} N°: ${fInfo.banco_cuenta}  |  Titular: ${fInfo.banco_titular || 'Propietario de la Finca'}`);
     if (fInfo.banco_identificacion?.trim()) {
-      datosOwner += `  •  Identificación: ${fInfo.banco_identificacion.trim()}`;
+      datosOwner += sanearTextoParaPdf(`  |  Identificación: ${fInfo.banco_identificacion.trim()}`);
     }
     doc.text(datosOwner, 18, y + 9);
     y += 15;
@@ -879,16 +911,21 @@ export function generarDocSeparacion(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(30, 27, 19);
-    let datosAdmin = `Banco: ${config.banco_nombre || 'Bancolombia'}  •  ${config.banco_tipo_cuenta || 'Ahorros'} N°: ${config.banco_cuenta}  •  Titular: ${config.banco_titular || 'Administración Paraíso Terrenal'}`;
+    let datosAdmin = sanearTextoParaPdf(`Banco: ${config.banco_nombre || 'Bancolombia'}  |  ${config.banco_tipo_cuenta || 'Ahorros'} N°: ${config.banco_cuenta}  |  Titular: ${config.banco_titular || 'Administración Paraíso Terrenal'}`);
     if (config.banco_identificacion?.trim()) {
-      datosAdmin += `  •  NIT / Cédula: ${config.banco_identificacion.trim()}`;
+      datosAdmin += sanearTextoParaPdf(`  |  NIT / Cédula: ${config.banco_identificacion.trim()}`);
     }
     doc.text(datosAdmin, 18, y + 9);
     y += 15;
   }
 
-  // Condiciones (Fase 4: extraídas de configuración)
-  y += 2;
+  // Condiciones (Fase 4: extraídas de configuración con margen de seguridad anti-solapamiento)
+  y += 5;
+  if (y > 235) {
+    doc.addPage();
+    encabezado(doc, tituloDoc, num, config);
+    y = 52;
+  }
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(26, 107, 94);
@@ -1090,7 +1127,7 @@ export function generarEstadoCuenta(
   y = linea(doc, y);
 
   // Totales finales con doble balance si incluye alimentación
-  const finanzas = desglosarFinanzasReserva(reserva);
+  const finanzas = desglosarFinanzasReserva(reserva, reserva.fincas as any);
   if (finanzas.costoAlimentacion > 0) {
     // 1. Bloque Alojamiento / Propietario
     doc.setFillColor(248, 249, 248);
@@ -1099,11 +1136,20 @@ export function generarEstadoCuenta(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(26, 107, 94);
-    doc.text('1. ALOJAMIENTO · PROPIETARIO DE LA FINCA', 18, y + 7);
+    doc.text(
+      finanzas.costoMascotas > 0
+        ? `1. ALOJAMIENTO + MASCOTAS (${finanzas.cantidadMascotas}) · PROPIETARIO DE LA FINCA`
+        : '1. ALOJAMIENTO · PROPIETARIO DE LA FINCA',
+      18,
+      y + 7
+    );
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(30, 27, 19);
-    doc.text(`Valor Finca: ${formatCOP(finanzas.subtotalAlojamiento)}   •   Abonado al Propietario: ${formatCOP(finanzas.pagadoFinca)}`, 18, y + 12.5);
+    const txtFincaDet = finanzas.costoMascotas > 0
+      ? `Total Finca (Aloj. ${formatCOP(finanzas.subtotalAlojamientoBase)} + Mascotas ${formatCOP(finanzas.costoMascotas)}): ${formatCOP(finanzas.subtotalAlojamiento)} | Abonado: ${formatCOP(finanzas.pagadoFinca)}`
+      : `Valor Finca: ${formatCOP(finanzas.subtotalAlojamiento)}   |   Abonado al Propietario: ${formatCOP(finanzas.pagadoFinca)}`;
+    doc.text(sanearTextoParaPdf(txtFincaDet), 18, y + 12.5);
     doc.setFont('helvetica', 'bold');
     doc.text(`SALDO CHECK-IN: ${formatCOP(finanzas.saldoFincaCheckIn)}`, 182, y + 12.5, { align: 'right' });
     y += 20;
@@ -1119,7 +1165,7 @@ export function generarEstadoCuenta(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(30, 27, 19);
-    doc.text(`Servicio Menú: ${formatCOP(finanzas.costoAlimentacion)}   •   Abonado Administración: ${formatCOP(finanzas.pagadoAlimentacion)}`, 18, y + 10.5);
+    doc.text(sanearTextoParaPdf(`Servicio Menú: ${formatCOP(finanzas.costoAlimentacion)}   |   Abonado Administración: ${formatCOP(finanzas.pagadoAlimentacion)}`), 18, y + 10.5);
     doc.setFont('helvetica', 'bold');
     doc.text(`SALDO ALIMENTACIÓN: ${formatCOP(finanzas.saldoAlimentacionAdmin)}`, 182, y + 10.5, { align: 'right' });
     y += 18;
@@ -1130,14 +1176,18 @@ export function generarEstadoCuenta(
     y = fila(doc, y + 3, 'SALDO TOTAL RESTANTE:', formatCOP(finanzas.saldoConsolidado), true);
   } else {
     y += 4;
-    y = fila(doc, y, 'Valor total de la reserva:', formatCOP(reserva.valor_total));
+    if (finanzas.costoMascotas > 0) {
+      y = fila(doc, y, 'Alojamiento Base en Finca:', formatCOP(finanzas.subtotalAlojamientoBase));
+      y = fila(doc, y, `Ingreso de Mascotas (${finanzas.cantidadMascotas} · Pago al Propietario):`, formatCOP(finanzas.costoMascotas));
+    }
+    y = fila(doc, y, 'Valor total de la reserva (Propietario):', formatCOP(reserva.valor_total), finanzas.costoMascotas > 0);
     const pagado = pagos.reduce((acc, p) => acc + (p.tipo === 'devolucion' ? -p.valor : p.valor), 0);
-    y = fila(doc, y, 'Total pagado:', formatCOP(pagado), true);
+    y = fila(doc, y, 'Total pagado al Propietario:', formatCOP(pagado), true);
     const saldo = calcularSaldo(reserva);
 
     doc.setFillColor(saldo === 0 ? 209 : 244, saldo === 0 ? 234 : 212, saldo === 0 ? 217 : 216);
     doc.rect(14, y - 4, 182, 9, 'F');
-    y = fila(doc, y, 'SALDO PENDIENTE:', formatCOP(saldo), true);
+    y = fila(doc, y, 'SALDO PENDIENTE AL CHECK-IN:', formatCOP(saldo), true);
   }
 
   const textoLegal = config.textos_legales || 'Documento expedido de conformidad con las disposiciones turísticas y comerciales colombianas vigentes.';
@@ -1322,85 +1372,169 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
   doc.text(`Cliente: ${nombreCli}`, 14, y + 17);
   doc.text(`Finca / Lugar: ${finca?.nombre || 'Finca Campestre'}`, col2, y + 17);
 
+  const resuelto = resolverPlanesAlimentacionDetalle({
+    alimentacionTexto: datos.alimentacionTexto,
+    costoTotalReal: datos.costoTotalReal,
+    menusCatalogo: datos.menusCatalogo,
+    menuPrincipal: menu,
+    personasDefault: personas,
+    serviciosDefault: cantidadServicios,
+  });
+
+  const esMulti = resuelto.items.length > 1;
+  const itemUnico = resuelto.items[0];
+
   const contactoCli = cliente?.whatsapp || cliente?.correo || 'Coordinación directa';
-  doc.text(`Contacto: ${contactoCli}`, 14, y + 26);
-  doc.text(`Comensales: ${personas} personas • ${cantidadServicios} servicio(s)`, col2, y + 26);
+  doc.text(`Contacto: ${sanearTextoParaPdf(contactoCli)}`, 14, y + 26);
+  const textoComensales = esMulti
+    ? `Modalidad: ${resuelto.items.length} planes (${personas} huéspedes ref.)`
+    : `Comensales: ${itemUnico?.personas || personas} personas | ${itemUnico?.cantidadServicios || cantidadServicios} servicio(s)`;
+  doc.text(sanearTextoParaPdf(textoComensales), col2, y + 26);
 
   y += 38;
 
-  // DETALLE DEL MENÚ
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(26, 107, 94);
-  doc.text('MENÚ SELECCIONADO', 14, y);
-  doc.setTextColor(30, 27, 19);
+  if (!esMulti && itemUnico) {
+    const menuRef = itemUnico.menuCatalogo || menu;
+    // DETALLE DEL MENÚ ÚNICO
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(26, 107, 94);
+    doc.text('MENÚ SELECCIONADO', 14, y);
+    doc.setTextColor(30, 27, 19);
 
-  // Badge categoría
-  doc.setFillColor(230, 243, 240);
-  doc.roundedRect(ancho - 55, y - 4.5, 41, 6, 2, 2, 'F');
-  doc.setFontSize(7.5);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(26, 107, 94);
-  doc.text(menu.categoria.toUpperCase(), ancho - 34.5, y - 0.5, { align: 'center' });
-  doc.setTextColor(30, 27, 19);
+    // Badge categoría
+    const catBadge = sanearTextoParaPdf((itemUnico.categoria || menuRef.categoria || 'MENÚ').toUpperCase());
+    doc.setFillColor(230, 243, 240);
+    doc.roundedRect(ancho - 55, y - 4.5, 41, 6, 2, 2, 'F');
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(26, 107, 94);
+    doc.text(catBadge, ancho - 34.5, y - 0.5, { align: 'center' });
+    doc.setTextColor(30, 27, 19);
 
-  y += 7;
+    y += 7;
 
-  // Título del Menú
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text(menu.nombre, 14, y);
-  y += 6;
+    // Título del Menú
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text(sanearTextoParaPdf(itemUnico.nombre), 14, y);
+    y += 6;
 
-  // Descripción del menú
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(75, 70, 60);
-  const descLineas = doc.splitTextToSize(
-    menu.descripcion || 'Servicio gastronómico completo elaborado con ingredientes frescos y preparación artesanal campesina.',
-    182
-  );
-  doc.text(descLineas, 14, y);
-  y += descLineas.length * 4.5 + 4;
-  doc.setTextColor(30, 27, 19);
+    // Descripción del menú
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(75, 70, 60);
+    const descLineas = doc.splitTextToSize(
+      sanearTextoParaPdf(itemUnico.descripcion || menuRef.descripcion || 'Servicio gastronómico completo elaborado con ingredientes frescos y preparación artesanal campesina.'),
+      182
+    );
+    doc.text(descLineas, 14, y);
+    y += descLineas.length * 4.5 + 4;
+    doc.setTextColor(30, 27, 19);
 
-  // Intentar cargar e incrustar imagen si está disponible
-  const imagenUrl = menu.imagen_url || (menu.menu_imagenes && menu.menu_imagenes[0]?.url);
-  if (imagenUrl) {
-    try {
-      const b64 = await urlABase64(imagenUrl);
-      if (b64) {
-        const altoFoto = 36;
-        doc.setDrawColor(219, 212, 195);
-        doc.setFillColor(248, 247, 244);
-        doc.roundedRect(14, y, 75, altoFoto, 2, 2, 'FD');
-        doc.addImage(b64, 'JPEG', 15, y + 1, 73, altoFoto - 2);
+    // Intentar cargar e incrustar imagen si está disponible
+    const imagenUrl = itemUnico.imagenUrl || menuRef.imagen_url || (menuRef.menu_imagenes && menuRef.menu_imagenes[0]?.url);
+    if (imagenUrl) {
+      try {
+        const b64 = await urlABase64(imagenUrl);
+        if (b64) {
+          const altoFoto = 36;
+          doc.setDrawColor(219, 212, 195);
+          doc.setFillColor(248, 247, 244);
+          doc.roundedRect(14, y, 75, altoFoto, 2, 2, 'FD');
+          doc.addImage(b64, 'JPEG', 15, y + 1, 73, altoFoto - 2);
 
-        doc.setFillColor(244, 241, 234);
-        doc.roundedRect(95, y, ancho - 109, altoFoto, 2, 2, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8.5);
-        doc.setTextColor(26, 107, 94);
-        doc.text('ASPECTOS DESTACADOS', 100, y + 6.5);
-        doc.setTextColor(30, 27, 19);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.text(`• Categoría: ${menu.categoria}`, 100, y + 13.5);
-        doc.text(`• Valor individual: ${formatCOP(menu.precio_pp)} /pp`, 100, y + 20.5);
-        doc.text(`• Servicio para: ${personas} personas`, 100, y + 27.5);
-        doc.text(`• Total servicios: ${cantidadServicios}`, 100, y + 33.5);
+          doc.setFillColor(244, 241, 234);
+          doc.roundedRect(95, y, ancho - 109, altoFoto, 2, 2, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8.5);
+          doc.setTextColor(26, 107, 94);
+          doc.text('ASPECTOS DESTACADOS', 100, y + 6.5);
+          doc.setTextColor(30, 27, 19);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.text(sanearTextoParaPdf(`- Categoría: ${itemUnico.categoria || menuRef.categoria}`), 100, y + 13.5);
+          doc.text(sanearTextoParaPdf(`- Valor individual: ${formatCOP(itemUnico.precioPp)} /pp`), 100, y + 20.5);
+          doc.text(sanearTextoParaPdf(`- Servicio para: ${itemUnico.personas} personas`), 100, y + 27.5);
+          doc.text(sanearTextoParaPdf(`- Total servicios: ${itemUnico.cantidadServicios}`), 100, y + 33.5);
 
-        y += altoFoto + 4;
+          y += altoFoto + 4;
+        }
+      } catch {
+        // Continuar limpiamente si la imagen no responde CORS
       }
-    } catch {
-      // Continuar limpiamente si la imagen no responde CORS
+    }
+  } else {
+    // DETALLE DE MÚLTIPLES MENÚS SELECCIONADOS
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(26, 107, 94);
+    doc.text(`MENÚS SELECCIONADOS (${resuelto.items.length} PLANES GASTRONÓMICOS)`, 14, y);
+    doc.setTextColor(30, 27, 19);
+
+    doc.setFillColor(230, 243, 240);
+    doc.roundedRect(ancho - 55, y - 4.5, 41, 6, 2, 2, 'F');
+    doc.setFontSize(7.2);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(26, 107, 94);
+    doc.text('MULTIMENÚ', ancho - 34.5, y - 0.5, { align: 'center' });
+    doc.setTextColor(30, 27, 19);
+
+    y += 5.5;
+
+    for (let idx = 0; idx < resuelto.items.length; idx++) {
+      const it = resuelto.items[idx];
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.8);
+      const descLineas = doc.splitTextToSize(
+        sanearTextoParaPdf(it.descripcion || 'Servicio gastronómico campestre elaborado con ingredientes frescos.'),
+        174
+      );
+      const altoCard = 11.5 + descLineas.length * 3.8;
+
+      if (y + altoCard > 245) {
+        doc.addPage();
+        encabezado(doc, tituloDoc, num, config);
+        y = 50;
+      }
+
+      doc.setFillColor(249, 248, 244);
+      doc.setDrawColor(219, 212, 195);
+      doc.roundedRect(14, y, 182, altoCard, 2, 2, 'FD');
+
+      // Título del menú e info de comensales/categoría
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.2);
+      doc.setTextColor(26, 107, 94);
+      doc.text(sanearTextoParaPdf(`${idx + 1}. ${it.nombre}`), 18, y + 5.2);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(30, 27, 19);
+      const metaMenu = `${(it.categoria || 'MENÚ').toUpperCase()} | ${it.personas} pers. x ${it.cantidadServicios} serv. | ${formatCOP(it.precioPp)}/pp`;
+      doc.text(sanearTextoParaPdf(metaMenu), ancho - 18, y + 5.2, { align: 'right' });
+
+      // Descripción limpia sin superposición
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.8);
+      doc.setTextColor(75, 70, 60);
+      doc.text(descLineas, 18, y + 9.8);
+      doc.setTextColor(30, 27, 19);
+
+      y += altoCard + 3;
     }
   }
 
   y = linea(doc, y);
   y += 2;
 
-  // TABLA DE LIQUIDACIÓN
+  // TABLA DE LIQUIDACIÓN CENTRALIZADA
+  if (y + 38 > 250) {
+    doc.addPage();
+    encabezado(doc, tituloDoc, num, config);
+    y = 50;
+  }
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(26, 107, 94);
@@ -1414,22 +1548,27 @@ export async function generarPropuestaAlimentacion(datos: PropuestaAlimentacionD
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.text('Concepto / Menú', 16, y);
-  doc.text('Precio / Persona', 90, y);
-  doc.text('Comensales', 130, y);
+  doc.text('Precio / Persona', 96, y);
+  doc.text('Comensales', 132, y);
   doc.text('Subtotal', 182, y, { align: 'right' });
   y += 5.5;
   y = linea(doc, y);
-  y += 2.5;
+  y += 2;
 
-  const totalServicio = (menu.precio_pp || 0) * personas * cantidadServicios;
+  for (const it of resuelto.items) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.2);
+    const nombreLineas = doc.splitTextToSize(sanearTextoParaPdf(it.nombre), 76);
+    doc.text(nombreLineas, 16, y);
+    doc.text(formatCOP(it.precioPp), 96, y);
+    doc.text(sanearTextoParaPdf(`${it.personas} pers. x ${it.cantidadServicios} serv.`), 132, y);
+    doc.setFont('helvetica', 'bold');
+    doc.text(formatCOP(it.subtotal), 182, y, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    y += Math.max(1, nombreLineas.length) * 4.4 + 2.2;
+  }
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.text(menu.nombre.slice(0, 38), 16, y);
-  doc.text(formatCOP(menu.precio_pp), 90, y);
-  doc.text(`${personas} pers. × ${cantidadServicios} serv.`, 130, y);
-  doc.text(formatCOP(totalServicio), 182, y, { align: 'right' });
-  y += 6.5;
+  const totalServicio = resuelto.totalCalculado;
 
   y = linea(doc, y);
   y += 2.5;
@@ -1583,6 +1722,9 @@ export function generarDocCotizacion(
 
   y += 38;
 
+  const fInfo = fincaParam || (cotizacion.fincas as any);
+  const finCot = desglosarFinanzasCotizacion(cotizacion, fInfo);
+
   // Detalle de la estadía
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
@@ -1594,6 +1736,14 @@ export function generarDocCotizacion(
   y = fila(doc, y, 'Fecha de ingreso:', formatFecha(cotizacion.fecha_inicio));
   y = fila(doc, y, 'Fecha de salida:', formatFecha(cotizacion.fecha_fin));
   y = fila(doc, y, 'Total de personas:', `${cotizacion.personas} huéspedes`);
+  if (finCot.cantidadMascotas > 0) {
+    y = fila(
+      doc,
+      y,
+      'Mascotas incluidas:',
+      `${finCot.cantidadMascotas} mascota(s) (${formatCOP(finCot.costoMascotas)} - Pago al propietario)`
+    );
+  }
   if (cotizacion.alimentacion && cotizacion.alimentacion !== 'Sin alimentación') {
     y = fila(doc, y, 'Servicio gastronómico:', cotizacion.alimentacion);
   }
@@ -1608,9 +1758,23 @@ export function generarDocCotizacion(
   doc.setTextColor(30, 27, 19);
   y += 8;
 
-  y = fila(doc, y, 'Subtotal alojamiento:', formatCOP(cotizacion.subtotal_alojamiento));
-  if (cotizacion.costo_alimentacion > 0) {
-    y = fila(doc, y, 'Alimentación seleccionada:', formatCOP(cotizacion.costo_alimentacion));
+  y = fila(
+    doc,
+    y,
+    finCot.costoMascotas > 0 ? 'Subtotal alojamiento base (Finca):' : 'Subtotal alojamiento:',
+    formatCOP(finCot.subtotalAlojamientoBase)
+  );
+  if (finCot.costoMascotas > 0) {
+    y = fila(
+      doc,
+      y,
+      `Ingreso de mascotas (${finCot.cantidadMascotas} · Pago al propietario):`,
+      formatCOP(finCot.costoMascotas)
+    );
+    y = fila(doc, y, 'Total Finca (Propietario):', formatCOP(finCot.totalPropietarioFinca), true);
+  }
+  if (finCot.costoAlimentacion > 0) {
+    y = fila(doc, y, 'Alimentación seleccionada:', formatCOP(finCot.costoAlimentacion));
   }
   if (cotizacion.descuento > 0) {
     y = fila(doc, y, 'Descuento aplicado:', `-${formatCOP(cotizacion.descuento)}`);
@@ -1627,30 +1791,30 @@ export function generarDocCotizacion(
   doc.setFontSize(10);
   doc.setTextColor(26, 107, 94);
   doc.text('VALOR TOTAL COTIZADO:', 18, y + 2.5);
-  doc.text(formatCOP(cotizacion.total), 182, y + 2.5, { align: 'right' });
+  doc.text(formatCOP(finCot.totalCotizado), 182, y + 2.5, { align: 'right' });
   doc.setTextColor(30, 27, 19);
   y += 10;
 
-  // Abono requerido (50% de alojamiento de la finca) para formalizar y bloquear disponibilidad
-  const valorAlojamiento = (cotizacion.subtotal_alojamiento && cotizacion.subtotal_alojamiento > 0)
-    ? cotizacion.subtotal_alojamiento
-    : Math.max(0, (cotizacion.total || 0) - (cotizacion.costo_alimentacion || 0));
-  const abono50 = Math.round(valorAlojamiento * 0.5);
+  // Abono requerido (50% de alojamiento + mascotas de la finca) para formalizar y bloquear disponibilidad
+  const abono50 = finCot.abono50Propietario;
   doc.setFillColor(254, 249, 195);
   doc.setDrawColor(202, 138, 4);
   doc.roundedRect(14, y, 182, 8.5, 1.5, 1.5, 'FD');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
+  doc.setFontSize(8.2);
   doc.setTextColor(161, 98, 7);
-  const textoInstruccionAbono = plantillasPdf.instruccion_abono_cotizacion || 'ABONO REQUERIDO (50% ALOJAMIENTO PARA BLOQUEAR):';
-  doc.text(textoInstruccionAbono, 18, y + 5.5);
+  const textoInstruccionAbono = plantillasPdf.instruccion_abono_cotizacion || (
+    finCot.costoMascotas > 0
+      ? 'ABONO REQUERIDO (50% FINCA + MASCOTAS PARA BLOQUEAR):'
+      : 'ABONO REQUERIDO (50% ALOJAMIENTO PARA BLOQUEAR):'
+  );
+  doc.text(sanearTextoParaPdf(textoInstruccionAbono), 18, y + 5.5);
   doc.text(formatCOP(abono50), 182, y + 5.5, { align: 'right' });
   doc.setTextColor(30, 27, 19);
   y += 12;
 
   // CUENTAS BANCARIAS SEPARADAS
   // 1. Cuenta del Propietario de la Finca para transferencia del anticipo de alojamiento
-  const fInfo = fincaParam || (cotizacion.fincas as any);
   if (fInfo?.banco_cuenta) {
     doc.setFillColor(248, 249, 248);
     doc.setDrawColor(219, 212, 195);
@@ -1658,20 +1822,26 @@ export function generarDocCotizacion(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
     doc.setTextColor(26, 107, 94);
-    doc.text('1. CUENTA DEL PROPIETARIO PARA TRANSFERENCIA DEL ABONO (50% ALOJAMIENTO):', 18, y + 4.5);
+    doc.text(
+      finCot.costoMascotas > 0
+        ? '1. CUENTA DEL PROPIETARIO PARA TRANSFERENCIA DEL ABONO (50% FINCA + MASCOTAS):'
+        : '1. CUENTA DEL PROPIETARIO PARA TRANSFERENCIA DEL ABONO (50% ALOJAMIENTO):',
+      18,
+      y + 4.5
+    );
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(30, 27, 19);
-    let datosOwner = `Banco: ${fInfo.banco_nombre || 'Bancolombia'}  •  ${fInfo.banco_tipo_cuenta || 'Ahorros'} N°: ${fInfo.banco_cuenta}  •  Titular: ${fInfo.banco_titular || 'Propietario de la Finca'}`;
+    let datosOwner = sanearTextoParaPdf(`Banco: ${fInfo.banco_nombre || 'Bancolombia'}  |  ${fInfo.banco_tipo_cuenta || 'Ahorros'} N°: ${fInfo.banco_cuenta}  |  Titular: ${fInfo.banco_titular || 'Propietario de la Finca'}`);
     if (fInfo.banco_identificacion?.trim()) {
-      datosOwner += `  •  Identificación: ${fInfo.banco_identificacion.trim()}`;
+      datosOwner += sanearTextoParaPdf(`  |  Identificación: ${fInfo.banco_identificacion.trim()}`);
     }
     doc.text(datosOwner, 18, y + 9);
     y += 15;
   }
 
   // 2. Cuenta de la Administración Paraíso Terrenal si incluye servicio gastronómico
-  if (cotizacion.costo_alimentacion > 0 && config.banco_cuenta) {
+  if (finCot.costoAlimentacion > 0 && config.banco_cuenta) {
     doc.setFillColor(244, 248, 246);
     doc.setDrawColor(26, 107, 94);
     doc.roundedRect(14, y, 182, 13, 1.5, 1.5, 'FD');
@@ -1682,14 +1852,20 @@ export function generarDocCotizacion(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(30, 27, 19);
-    let datosAdmin = `Banco: ${config.banco_nombre || 'Bancolombia'}  •  ${config.banco_tipo_cuenta || 'Ahorros'} N°: ${config.banco_cuenta}  •  Titular: ${config.banco_titular || 'Administración Paraíso Terrenal'}`;
+    let datosAdmin = sanearTextoParaPdf(`Banco: ${config.banco_nombre || 'Bancolombia'}  |  ${config.banco_tipo_cuenta || 'Ahorros'} N°: ${config.banco_cuenta}  |  Titular: ${config.banco_titular || 'Administración Paraíso Terrenal'}`);
     if (config.banco_identificacion?.trim()) {
-      datosAdmin += `  •  NIT / Cédula: ${config.banco_identificacion.trim()}`;
+      datosAdmin += sanearTextoParaPdf(`  |  NIT / Cédula: ${config.banco_identificacion.trim()}`);
     }
     doc.text(datosAdmin, 18, y + 9);
     y += 15;
-  } else if (!fInfo?.banco_cuenta) {
-    y += 2;
+  }
+
+  // Espaciado de seguridad anti-solapamiento antes de Términos y Validez
+  y += 6;
+  if (y > 235) {
+    doc.addPage();
+    encabezado(doc, tituloDoc, num, config);
+    y = 52;
   }
 
   // Condiciones y Políticas
@@ -1735,7 +1911,7 @@ export function generarDocCotizacion(
 }
 
 // ---------------------------------------------------------------
-// 7. EXPEDIENTE COMPLETO Y ACTA DE CIERRE (Fase 6)
+// 7. EXPEDIENTE COMPLETO Y ACTA DE CIERRE (Fase 6 - Optimizado sin redundancia)
 // ---------------------------------------------------------------
 export function generarExpedienteCompleto(
   reserva: Reserva,
@@ -1743,129 +1919,230 @@ export function generarExpedienteCompleto(
   configParam?: ConfiguracionGeneral
 ) {
   const config = configParam || getConfiguracionGlobal();
-  const doc = new jsPDF();
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const ancho = doc.internal.pageSize.getWidth();
-  const col2 = 110;
+  const col2 = 108;
 
   const cliNombre = obtenerNombreClienteHistorico(reserva);
   const cliContacto = obtenerContactoClienteHistorico(reserva);
   const finNombre = obtenerNombreFincaHistorico(reserva);
-  const saldo = calcularSaldo(reserva);
-  const totalPagado = reserva.valor_total - saldo;
-  const consecBase = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8).toUpperCase();
-  const numExpediente = reserva.consecutivo ? `EXP-${consecBase}` : `EXP-${reserva.id.slice(0, 8).toUpperCase()}`;
+  const fInfo = (reserva.fincas as any) || reserva.finca_snapshot;
+  const finanzas = desglosarFinanzasReserva(reserva, fInfo);
+  const saldo = finanzas.saldoConsolidado;
+  const totalPagado = finanzas.totalPagado;
 
-  encabezado(doc, 'EXPEDIENTE HISTÓRICO Y ACTA DE CIERRE', numExpediente, config);
+  const consecSimple = reserva.consecutivo
+    ? formatearConsecutivoSimple(reserva.consecutivo)
+    : reserva.id.slice(0, 8).toUpperCase();
+  const numExpediente = `EXP-${consecSimple}`;
+
+  encabezado(doc, 'EXPEDIENTE DE RESERVA Y LIQUIDACIÓN', `#${consecSimple}`, config);
 
   let y = 47;
 
-  // Estado general
-  doc.setFillColor(245, 247, 246);
-  doc.roundedRect(14, y, ancho - 28, 12, 1.5, 1.5, 'F');
+  // Franja de estado real y consecutivo unificado
+  doc.setFillColor(244, 247, 246);
+  doc.setDrawColor(210, 224, 218);
+  doc.roundedRect(14, y, ancho - 28, 12.5, 1.5, 1.5, 'FD');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
+  doc.setFontSize(8.8);
   doc.setTextColor(26, 107, 94);
-  doc.text(`EXPEDIENTE DE AUDITORÍA: ${numExpediente}`, 18, y + 5);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(90, 85, 75);
-  const estadoStr = (reserva.estado || 'completada').toUpperCase();
-  const fechaCierreStr = reserva.fecha_cierre || cierre?.fecha_cierre
-    ? formatFecha((reserva.fecha_cierre || cierre?.fecha_cierre || '').split('T')[0])
-    : formatFecha(new Date().toISOString().split('T')[0]);
-  doc.text(`Estado: ${estadoStr}  •  Fecha de Cierre: ${fechaCierreStr}  •  Registros Inmutables Protegidos`, 18, y + 9);
-  doc.setTextColor(30, 27, 19);
-  y += 16;
+  doc.text(sanearTextoParaPdf(`RESERVA OFICIAL #${consecSimple}  |  EXPEDIENTE ${numExpediente}`), 18, y + 5.2);
 
-  // Bloque 1: Datos del Huésped / Cliente
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.6);
+  doc.setTextColor(75, 70, 60);
+  const estadoRaw = (reserva.estado || 'activa').toLowerCase();
+  const tieneFechaCierre = Boolean(reserva.fecha_cierre || cierre?.fecha_cierre);
+  const fechaCierreReal = tieneFechaCierre
+    ? formatFecha((reserva.fecha_cierre || cierre?.fecha_cierre || '').split('T')[0])
+    : null;
+
+  let textoEstadoHeader = '';
+  if (estadoRaw === 'completada' || tieneFechaCierre) {
+    textoEstadoHeader = `Estado: COMPLETADA / CERRADA${fechaCierreReal ? `  |  Fecha de Cierre: ${fechaCierreReal}` : ''}  |  Saldo Actual: ${formatCOP(saldo)}`;
+  } else if (estadoRaw === 'cancelada') {
+    textoEstadoHeader = `Estado: CANCELADA  |  Check-in programado: ${formatFecha(reserva.fecha_inicio)}`;
+  } else {
+    textoEstadoHeader = `Estado: RESERVA ACTIVA (EN CURSO)  |  Estadía: ${formatFecha(reserva.fecha_inicio)} al ${formatFecha(reserva.fecha_fin)}  |  Saldo: ${formatCOP(saldo)}`;
+  }
+  doc.text(sanearTextoParaPdf(textoEstadoHeader), 18, y + 9.8);
+  doc.setTextColor(30, 27, 19);
+  y += 16.5;
+
+  // Bloque 1: Datos del Titular (sin UUID ni teléfonos duplicados)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(26, 107, 94);
-  doc.text('1. EXPEDIENTE DEL CLIENTE / HUÉSPED TITULAR', 14, y);
+  doc.text('1. DATOS DEL HUÉSPED TITULAR', 14, y);
   doc.setTextColor(30, 27, 19);
-  y += 5;
+  y += 4.5;
 
   doc.setFillColor(252, 252, 252);
   doc.setDrawColor(220, 225, 222);
-  doc.rect(14, y, ancho - 28, 22, 'FD');
+  doc.roundedRect(14, y, ancho - 28, 17, 1.5, 1.5, 'FD');
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Nombre completo: ${cliNombre}`, 18, y + 5.5);
-  doc.text(`Teléfono / Celular: ${cliContacto.telefono || 'No registrado'}`, 18, y + 10.5);
-  doc.text(`WhatsApp: ${cliContacto.whatsapp || 'No registrado'}`, 18, y + 15.5);
 
-  doc.text(`Correo: ${cliContacto.correo || 'No registrado'}`, col2, y + 5.5);
-  doc.text(`Identificador de Cliente: ${reserva.cliente_id.slice(0, 13)}…`, col2, y + 10.5);
-  doc.text(`Integridad: Datos preservados en Snapshot inmutable`, col2, y + 15.5);
-  y += 26;
+  const telLimpio = (cliContacto.telefono || '').trim();
+  const waLimpio = (cliContacto.whatsapp || '').trim();
+  const contactoUnificado = (telLimpio && waLimpio && telLimpio !== waLimpio)
+    ? `Tel: ${telLimpio} / WhatsApp: ${waLimpio}`
+    : (waLimpio || telLimpio || 'No registrado');
 
-  // Bloque 2: Datos de la Finca Campestre y Estancia
+  doc.text(sanearTextoParaPdf(`Titular de la Reserva: ${cliNombre}`), 18, y + 6.2);
+  doc.text(sanearTextoParaPdf(`Teléfono / WhatsApp: ${contactoUnificado}`), 18, y + 12.2);
+
+  doc.text(sanearTextoParaPdf(`Correo Electrónico: ${cliContacto.correo || 'No registrado'}`), col2, y + 6.2);
+  doc.text(sanearTextoParaPdf(`Consecutivo Oficial: #${consecSimple} (${numExpediente})`), col2, y + 12.2);
+  y += 21.5;
+
+  // Bloque 2: Detalles de la Finca y Estadía
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(26, 107, 94);
-  doc.text('2. DETALLES DE LA FINCA Y ESTANCIA', 14, y);
+  doc.text('2. DETALLES DE LA FINCA Y ESTADÍA', 14, y);
   doc.setTextColor(30, 27, 19);
-  y += 5;
+  y += 4.5;
 
   doc.setFillColor(252, 252, 252);
-  doc.rect(14, y, ancho - 28, 24, 'FD');
+  doc.roundedRect(14, y, ancho - 28, 21, 1.5, 1.5, 'FD');
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Finca Campestre: ${finNombre}`, 18, y + 5.5);
-  const zonaFinca = reserva.finca_snapshot?.zona || (reserva.fincas as any)?.zona || 'Santa Elena, El Cerrito';
-  doc.text(`Ubicación / Sector: ${zonaFinca}`, 18, y + 10.5);
-  doc.text(`Número de Huéspedes: ${reserva.personas} personas`, 18, y + 15.5);
+  doc.text(sanearTextoParaPdf(`Finca Campestre: ${finNombre}`), 18, y + 6);
+  const zonaFinca = reserva.finca_snapshot?.zona || (reserva.fincas as any)?.zona || 'Santa Elena, Valle del Cauca';
+  doc.text(sanearTextoParaPdf(`Ubicación / Sector: ${zonaFinca}`), 18, y + 11.5);
+  const textoHuespedes = finanzas.cantidadMascotas > 0
+    ? `Capacidad Contratada: ${reserva.personas} personas + ${finanzas.cantidadMascotas} mascota(s)`
+    : `Capacidad Contratada: ${reserva.personas} personas`;
+  doc.text(sanearTextoParaPdf(textoHuespedes), 18, y + 17);
 
-  const [y1, m1, d1] = (reserva.fecha_inicio || '').split('-');
-  const [y2, m2, d2] = (reserva.fecha_fin || '').split('-');
   const dt1 = new Date(reserva.fecha_inicio);
   const dt2 = new Date(reserva.fecha_fin);
   const nochesCalc = Math.max(1, Math.round((dt2.getTime() - dt1.getTime()) / (1000 * 3600 * 24)));
 
-  doc.text(`Fecha de Entrada (Check-in): ${d1}/${m1}/${y1}`, col2, y + 5.5);
-  doc.text(`Fecha de Salida (Check-out): ${d2}/${m2}/${y2}`, col2, y + 10.5);
-  doc.text(`Total Noches de Alojamiento: ${nochesCalc} noche(s)`, col2, y + 15.5);
-  y += 28;
+  doc.text(sanearTextoParaPdf(`Entrada (Check-in): ${formatFecha(reserva.fecha_inicio)}`), col2, y + 6);
+  doc.text(sanearTextoParaPdf(`Salida (Check-out): ${formatFecha(reserva.fecha_fin)}`), col2, y + 11.5);
+  doc.text(sanearTextoParaPdf(`Duración Total: ${nochesCalc} noche(s) de estadía`), col2, y + 17);
+  y += 25.5;
 
-  // Bloque 3: Balance Económico y Liquidación
+  // Bloque 3: Desglose Económico y Distribución de Cuentas (Propietario vs Administración)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(26, 107, 94);
-  doc.text('3. DESGLOSE ECONÓMICO Y LIQUIDACIÓN DEFINITIVA', 14, y);
+  doc.text('3. DESGLOSE ECONÓMICO Y DISTRIBUCIÓN DE CUENTAS', 14, y);
   doc.setTextColor(30, 27, 19);
-  y += 5;
+  y += 4.5;
+
+  const costoAlim = finanzas.costoAlimentacion;
+  const servAlim = reserva.alimentacion && reserva.alimentacion !== 'Sin alimentación'
+    ? reserva.alimentacion
+    : 'Menú campestre seleccionado';
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.8);
+  const lineasAlim = costoAlim > 0
+    ? doc.splitTextToSize(sanearTextoParaPdf(`Servicio Gastronómico (Paraíso Terrenal): ${servAlim}`), 126)
+    : [];
+
+  const filasExtraMascotas = finanzas.costoMascotas > 0 ? 5.5 : 0;
+  const altoFilaAlim = costoAlim > 0 ? Math.max(5.5, lineasAlim.length * 4.2 + 1.5) : 0;
+  const altoTablaEcon = 14 + 5.5 + filasExtraMascotas + altoFilaAlim + 6;
 
   doc.setFillColor(248, 249, 248);
-  doc.rect(14, y, ancho - 28, 26, 'FD');
-  doc.setFontSize(8);
+  doc.setDrawColor(220, 225, 222);
+  doc.roundedRect(14, y, ancho - 28, altoTablaEcon, 1.5, 1.5, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.8);
+  doc.text('Concepto Contratado / Destinatario del Recaudo', 18, y + 5.2);
+  doc.text('Valor COP', 182, y + 5.2, { align: 'right' });
+  doc.line(14, y + 7.2, ancho - 14, y + 7.2);
+
+  let yEcon = y + 12;
   doc.setFont('helvetica', 'normal');
-  doc.text('Concepto', 18, y + 5.5);
-  doc.text('Monto COP', 182, y + 5.5, { align: 'right' });
-  doc.line(14, y + 7.5, ancho - 14, y + 7.5);
+  doc.setFontSize(7.8);
+  doc.text(
+    sanearTextoParaPdf(`Alojamiento Base en Finca (${nochesCalc} noche(s), ${reserva.personas} pers.) - Propietario`),
+    18,
+    yEcon
+  );
+  doc.text(formatCOP(finanzas.subtotalAlojamientoBase), 182, yEcon, { align: 'right' });
+  yEcon += 5.5;
 
-  const costoAlim = reserva.costo_alimentacion || 0;
-  const servAlim = reserva.alimentacion || 'Sin alimentación';
-  doc.text(`Alojamiento por la estancia (${nochesCalc} noches, ${reserva.personas} pers.)`, 18, y + 12);
-  doc.text(formatCOP(reserva.valor_total - costoAlim), 182, y + 12, { align: 'right' });
-
-  if (costoAlim > 0) {
-    doc.text(`Servicio de Alimentación (${servAlim})`, 18, y + 16.5);
-    doc.text(formatCOP(costoAlim), 182, y + 16.5, { align: 'right' });
+  if (finanzas.costoMascotas > 0) {
+    doc.text(
+      sanearTextoParaPdf(`Ingreso de Mascotas (${finanzas.cantidadMascotas} mascota(s)) - Pago al Propietario`),
+      18,
+      yEcon
+    );
+    doc.text(formatCOP(finanzas.costoMascotas), 182, yEcon, { align: 'right' });
+    yEcon += 5.5;
   }
 
-  // Fila total liquidado
+  if (costoAlim > 0) {
+    doc.text(lineasAlim, 18, yEcon);
+    doc.text(formatCOP(costoAlim), 182, yEcon, { align: 'right' });
+    yEcon += altoFilaAlim;
+  }
+
+  doc.line(18, yEcon - 2.5, ancho - 18, yEcon - 2.5);
   doc.setFont('helvetica', 'bold');
-  doc.text('VALOR TOTAL CONTRATADO:', 18, y + 21.5);
-  doc.text(formatCOP(reserva.valor_total), 182, y + 21.5, { align: 'right' });
-  y += 30;
+  doc.setFontSize(8.4);
+  doc.setTextColor(26, 107, 94);
+  doc.text(`VALOR TOTAL CONTRATADO (RESERVA #${consecSimple}):`, 18, yEcon + 2.2);
+  doc.text(formatCOP(reserva.valor_total), 182, yEcon + 2.2, { align: 'right' });
+  doc.setTextColor(30, 27, 19);
+
+  y += altoTablaEcon + 3;
+
+  // Tarjetas paralelas: Balance Propietario vs Balance Administración
+  const anchoCardMitad = (ancho - 28 - 4) / 2;
+  doc.setFillColor(246, 250, 248);
+  doc.setDrawColor(200, 220, 212);
+  doc.roundedRect(14, y, anchoCardMitad, 14, 1.5, 1.5, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.4);
+  doc.setTextColor(26, 107, 94);
+  doc.text(
+    finanzas.costoMascotas > 0
+      ? 'CUENTA 1: PROPIETARIO (ALOJAMIENTO + MASCOTAS)'
+      : 'CUENTA 1: PROPIETARIO DE LA FINCA (ALOJAMIENTO)',
+    17,
+    y + 4.8
+  );
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.1);
+  doc.setTextColor(30, 27, 19);
+  doc.text(sanearTextoParaPdf(`Total Finca: ${formatCOP(finanzas.subtotalAlojamiento)} | Pagado: ${formatCOP(finanzas.pagadoFinca)}`), 17, y + 9);
+  doc.setFont('helvetica', 'bold');
+  doc.text(sanearTextoParaPdf(`Saldo Check-in (Dueño): ${formatCOP(finanzas.saldoFincaCheckIn)}`), 17, y + 12.6);
+
+  const xCardDer = 14 + anchoCardMitad + 4;
+  doc.setFillColor(250, 248, 244);
+  doc.setDrawColor(219, 212, 195);
+  doc.roundedRect(xCardDer, y, anchoCardMitad, 14, 1.5, 1.5, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.4);
+  doc.setTextColor(26, 107, 94);
+  doc.text('CUENTA 2: ADMINISTRACIÓN (SERVICIO MENÚS)', xCardDer + 3, y + 4.8);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.1);
+  doc.setTextColor(30, 27, 19);
+  doc.text(sanearTextoParaPdf(`Total Menús: ${formatCOP(finanzas.costoAlimentacion)} | Pagado: ${formatCOP(finanzas.pagadoAlimentacion)}`), xCardDer + 3, y + 9);
+  doc.setFont('helvetica', 'bold');
+  doc.text(sanearTextoParaPdf(`Saldo Alimentación: ${formatCOP(finanzas.saldoAlimentacionAdmin)}`), xCardDer + 3, y + 12.6);
+  doc.setTextColor(30, 27, 19);
+
+  y += 18.5;
 
   // Bloque 4: Historial de Pagos y Abonos
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(26, 107, 94);
-  doc.text('4. HISTORIAL DE RECAUDO Y MOVIMIENTOS FINANCIEROS', 14, y);
+  doc.text('4. HISTORIAL DE ABONOS Y MOVIMIENTOS FINANCIEROS', 14, y);
   doc.setTextColor(30, 27, 19);
-  y += 5;
+  y += 4.5;
 
   const pagos = reserva.pagos || [];
   doc.setFillColor(26, 107, 94);
@@ -1874,8 +2151,8 @@ export function generarExpedienteCompleto(
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'bold');
   doc.text('Fecha', 18, y + 4.2);
-  doc.text('Tipo de Pago', 48, y + 4.2);
-  doc.text('Detalle / Observación', 90, y + 4.2);
+  doc.text('Concepto', 44, y + 4.2);
+  doc.text('Detalle / Destino del Pago', 82, y + 4.2);
   doc.text('Valor COP', 182, y + 4.2, { align: 'right' });
   doc.setTextColor(30, 27, 19);
   y += 6;
@@ -1883,7 +2160,7 @@ export function generarExpedienteCompleto(
   if (pagos.length === 0) {
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(7.5);
-    doc.text('No hay registros detallados de abonos adicionales en la base de datos.', 18, y + 5);
+    doc.text('No se han registrado abonos para esta reserva.', 18, y + 5);
     y += 8;
   } else {
     doc.setFont('helvetica', 'normal');
@@ -1893,8 +2170,8 @@ export function generarExpedienteCompleto(
       doc.setFillColor(fondo, fondo, fondo);
       doc.rect(14, y, ancho - 28, 5.5, 'F');
       doc.text(formatFecha(p.fecha), 18, y + 4);
-      doc.text(p.tipo.toUpperCase(), 48, y + 4);
-      doc.text((p.observacion || 'Abono verificado').slice(0, 42), 90, y + 4);
+      doc.text(sanearTextoParaPdf(p.tipo.replace('_', ' ').toUpperCase()), 44, y + 4);
+      doc.text(sanearTextoParaPdf((p.observacion || 'Abono registrado').slice(0, 52)), 82, y + 4);
       const signo = p.tipo === 'devolucion' ? '-' : '+';
       doc.text(`${signo}${formatCOP(p.valor)}`, 182, y + 4, { align: 'right' });
       y += 5.5;
@@ -1903,44 +2180,61 @@ export function generarExpedienteCompleto(
 
   // Resumen de saldo final
   doc.setFillColor(saldo <= 0 ? 230 : 255, saldo <= 0 ? 245 : 235, saldo <= 0 ? 236 : 235);
-  doc.rect(14, y, ancho - 28, 7, 'F');
+  doc.rect(14, y, ancho - 28, 6.8, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text(`Total Recaudado: ${formatCOP(totalPagado)}`, 18, y + 4.8);
-  doc.text(`Saldo Pendiente al Cierre: ${formatCOP(saldo)}`, 182, y + 4.8, { align: 'right' });
-  y += 11;
+  doc.text(`Total Recaudado: ${formatCOP(totalPagado)}`, 18, y + 4.6);
+  doc.text(`Saldo Total Pendiente: ${formatCOP(saldo)}`, 182, y + 4.6, { align: 'right' });
+  y += 10.5;
 
-  // Bloque 5: Acta de Cierre Operativo y Check-out
+  // Bloque 5: Estado Operativo, Entrega y Observaciones (sin datos inventados cuando sigue activa)
+  if (y + 32 > 250) {
+    doc.addPage();
+    encabezado(doc, 'EXPEDIENTE DE RESERVA Y LIQUIDACIÓN', `#${consecSimple}`, config);
+    y = 50;
+  }
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(26, 107, 94);
-  doc.text('5. ACTA DE CIERRE OPERATIVO, ENTREGA Y OBSERVACIONES', 14, y);
+  doc.text('5. ESTADO OPERATIVO, ENTREGA Y OBSERVACIONES', 14, y);
   doc.setTextColor(30, 27, 19);
-  y += 5;
+  y += 4.5;
 
   doc.setFillColor(252, 252, 252);
   doc.setDrawColor(220, 225, 222);
-  doc.rect(14, y, ancho - 28, 26, 'FD');
-  doc.setFontSize(7.5);
+  doc.roundedRect(14, y, ancho - 28, 22, 1.5, 1.5, 'FD');
+  doc.setFontSize(7.6);
   doc.setFont('helvetica', 'normal');
 
-  const responsableCierre = reserva.cerrada_por || cierre?.responsable || 'Administración de Fincas';
-  const calif = cierre?.calificacion ? `${cierre.calificacion} / 5 Estrellas ★` : 'No calificada';
+  const esCerrada = estadoRaw === 'completada' || Boolean(cierre) || tieneFechaCierre;
+  const responsableCierre = reserva.cerrada_por || cierre?.responsable || 'Administración Paraíso Terrenal';
+  const calif = cierre?.calificacion ? `${cierre.calificacion} / 5 Estrellas` : (esCerrada ? 'Sin calificación registrada' : 'Pendiente (Estadía en curso)');
   const estadoFinca = cierre?.estado_entrega_finca
     ? cierre.estado_entrega_finca.replace('_', ' ').toUpperCase()
-    : 'ENTREGA CONFORME EN BUEN ESTADO';
+    : (esCerrada ? 'ENTREGA CONFORME EN BUEN ESTADO' : 'PENDIENTE DE CHECK-OUT Y REVISIÓN');
   const depGarantia = cierre?.deposito_garantia_devuelto
-    ? `Depósito de garantía devuelto (${formatCOP(cierre?.valor_deposito_devuelto || 0)})`
-    : 'Sin retenciones de depósito reportadas';
+    ? `Depósito devuelto (${formatCOP(cierre?.valor_deposito_devuelto || 0)})`
+    : 'Sin retenciones reportadas';
 
-  doc.text(`Responsable de Cierre: ${responsableCierre}`, 18, y + 5);
-  doc.text(`Calificación de la Estadía: ${calif}`, 18, y + 9.5);
-  doc.text(`Estado de Entrega del Inmueble: ${estadoFinca}`, 18, y + 14);
-  doc.text(`Garantía: ${depGarantia}`, 18, y + 18.5);
+  // Limpiar etiquetas técnicas o textos redundantes de conversión
+  const obsLimpias = (reserva.notas_cierre || cierre?.notas_cierre || reserva.observaciones || '')
+    .replace(/\[?🐾\s*Mascotas:\s*\d+[^\n\]]*\]?/gi, '')
+    .replace(/^Convertida de cotizaci[oó]n\s*#?\d+\.?$/i, '')
+    .trim();
 
-  const notasFinales = reserva.notas_cierre || cierre?.notas_cierre || reserva.observaciones || 'Operación finalizada a entera satisfacción sin novedades pendientes.';
-  doc.text(`Observaciones de Cierre: ${notasFinales.slice(0, 110)}`, 18, y + 23);
-  y += 30;
+  const notasFinales = obsLimpias || (
+    esCerrada
+      ? 'Reserva finalizada satisfactoriamente sin novedades pendientes.'
+      : 'Reserva confirmada y activa en el sistema.'
+  );
+
+  doc.text(sanearTextoParaPdf(`Responsable: ${responsableCierre}`), 18, y + 5.2);
+  doc.text(sanearTextoParaPdf(`Calificación Estadía: ${calif}`), col2, y + 5.2);
+  doc.text(sanearTextoParaPdf(`Entrega del Inmueble: ${estadoFinca}`), 18, y + 10.5);
+  doc.text(sanearTextoParaPdf(`Garantía / Depósito: ${depGarantia}`), col2, y + 10.5);
+  doc.text(sanearTextoParaPdf(`Observaciones: ${notasFinales.slice(0, 108)}`), 18, y + 16.2);
+  y += 25;
 
   // Firma institucional administrativa (Centrado institucional)
   y = dibujarBloqueFirmaAdmin(
@@ -1951,13 +2245,12 @@ export function generarExpedienteCompleto(
     undefined,
     `${responsableCierre} • ${config.nombre_empresa || 'Paraíso Terrenal'}`,
     config,
-    'EXPEDIENTE HISTÓRICO Y ACTA DE CIERRE',
-    numExpediente
+    'EXPEDIENTE DE RESERVA Y LIQUIDACIÓN',
+    `#${consecSimple}`
   );
 
   pie(doc, config);
-  const nombreArchivo = reserva.consecutivo ? reserva.consecutivo.replace(/[^a-zA-Z0-9_-]/g, '') : reserva.id.slice(0, 8);
-  doc.save(`Expediente_${nombreArchivo}.pdf`);
+  doc.save(`Expediente_${consecSimple}.pdf`);
 }
 
 /**

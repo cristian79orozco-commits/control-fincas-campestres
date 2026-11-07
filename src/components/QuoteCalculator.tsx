@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   MessageCircle, Calculator, Calendar, Users, Utensils,
-  Check, User, Phone, Loader2, BadgeCheck, AlertCircle, Sparkles, ShieldCheck
+  Check, User, Phone, Loader2, BadgeCheck, AlertCircle, Sparkles, ShieldCheck, Dog
 } from 'lucide-react';
 import type { Finca, Cotizacion, Menu, ConfiguracionGeneral } from '../types';
 import type { DatosCotizacionPublica, ResultadoCotizacionPublica } from '../hooks/useCotizadorPublico';
@@ -46,10 +46,19 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
   // Selección múltiple de planes de alimentación complementaria
   const [planesSeleccionados, setPlanesSeleccionados] = useState<PlanAlimentacionSeleccionado[]>([]);
   const [soloAlojamiento, setSoloAlojamiento] = useState(true);
+  const [cantidadMascotas, setCantidadMascotas] = useState<number>(0);
 
   // Capacidad mínima y máxima permitida para esta propiedad
   const minPersonas = Math.max(1, finca.capacidad_minima || 1);
   const maxPersonas = Math.max(minPersonas, finca.capacidad || 20);
+  const permiteMascotas = finca.politica_mascotas !== 'no_permitido';
+  const valorMascotaUnitario = finca.politica_mascotas === 'con_costo' ? Math.max(0, Number(finca.valor_mascota) || 0) : 0;
+
+  useEffect(() => {
+    if (!permiteMascotas && cantidadMascotas > 0) {
+      setCantidadMascotas(0);
+    }
+  }, [permiteMascotas, cantidadMascotas]);
 
   // Asegurar que el número de huéspedes cumpla con el rango permitido por la finca
   useEffect(() => {
@@ -126,7 +135,17 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
   const cumpleRegla = !reglaAplica || totalServicios >= minServiciosRegla;
 
   // Cálculo de estancia y valores
-  const { noches, subtotalAlojamiento, costoTotalAlimentacion, totalEstimado, alimentacionDetalle, alimentacionTextoResumen } = useMemo(() => {
+  const {
+    noches,
+    subtotalAlojamiento,
+    costoMascotas,
+    subtotalPropietario,
+    costoTotalAlimentacion,
+    totalEstimado,
+    alimentacionDetalle,
+    alimentacionTextoResumen,
+    mascotasLineaTexto,
+  } = useMemo(() => {
     let n = 1;
     if (fechaInicio && fechaFin) {
       const ini = new Date(fechaInicio + 'T00:00:00').getTime();
@@ -138,6 +157,9 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
 
     const precioBasePp = Number(finca.precio_pp) || 0;
     const subtotalAloja = precioBasePp * n * personas;
+    const cantMasc = permiteMascotas ? Math.max(0, cantidadMascotas) : 0;
+    const costoMasc = cantMasc * valorMascotaUnitario;
+    const subPropietario = subtotalAloja + costoMasc;
 
     const costoAlim = soloAlojamiento || planesSeleccionados.length === 0
       ? 0
@@ -146,7 +168,7 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
           return acc + (p.precioPp * p.cantidadServicios * persPlan);
         }, 0);
 
-    const tot = subtotalAloja + costoAlim;
+    const tot = subtotalAloja + costoMasc + costoAlim;
 
     let detAlim = '';
     let resAlim = 'Solo alojamiento';
@@ -166,15 +188,22 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
       }).join(' + ');
     }
 
+    const lineaMascotas = cantMasc > 0
+      ? `🐾 *Mascotas:* ${cantMasc} mascota${cantMasc !== 1 ? 's' : ''} (${costoMasc > 0 ? `$${costoMasc.toLocaleString('es-CO')} COP · Pago al dueño de la finca` : 'Sin costo adicional'})`
+      : '';
+
     return {
       noches: n,
       subtotalAlojamiento: subtotalAloja,
+      costoMascotas: costoMasc,
+      subtotalPropietario: subPropietario,
       costoTotalAlimentacion: costoAlim,
       totalEstimado: tot,
       alimentacionDetalle: detAlim,
       alimentacionTextoResumen: resAlim,
+      mascotasLineaTexto: lineaMascotas,
     };
-  }, [fechaInicio, fechaFin, personas, finca.precio_pp, soloAlojamiento, planesSeleccionados]);
+  }, [fechaInicio, fechaFin, personas, finca.precio_pp, permiteMascotas, cantidadMascotas, valorMascotaUnitario, soloAlojamiento, planesSeleccionados]);
 
   // Mensaje y Enlace de WhatsApp dinámico con Plantilla Editable
   const { waMensaje, waUrl } = useMemo(() => {
@@ -186,6 +215,12 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
     const consecutivoTxt = cotGuardada ? cotGuardada.consecutivo : '';
     const consecutivoLineaTxt = cotGuardada ? `🆔 *Cotización N°:* ${cotGuardada.consecutivo}` : '';
     const waAltTxt = (!mismoWa && clienteWa.trim()) ? `\n📱 *WhatsApp alternativo:* ${clienteWa.trim()}` : '';
+
+    // Si la plantilla personalizada no tiene aún el token {mascotas_linea}, lo integramos junto a {alimentacion_detalle}
+    const plantillaTieneTokenMascotas = /\{mascotas_linea\}|\{mascotas_detalle\}/i.test(template);
+    const detalleAlimConMascotas = (!plantillaTieneTokenMascotas && mascotasLineaTexto)
+      ? `${mascotasLineaTexto}\n${alimentacionDetalle}`
+      : alimentacionDetalle;
 
     const tokens: Record<string, string> = {
       finca: finca.nombre,
@@ -203,8 +238,14 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
       noches: String(noches),
       noches_plural: noches !== 1 ? 's' : '',
       personas: String(personas),
-      alojamiento_total: `$${subtotalAlojamiento.toLocaleString('es-CO')} COP`,
-      alimentacion_detalle: alimentacionDetalle,
+      mascotas: String(cantidadMascotas),
+      costo_mascotas: `$${costoMascotas.toLocaleString('es-CO')} COP`,
+      mascotas_linea: mascotasLineaTexto,
+      mascotas_detalle: mascotasLineaTexto,
+      alojamiento_total: costoMascotas > 0
+        ? `$${subtotalAlojamiento.toLocaleString('es-CO')} COP + Mascotas $${costoMascotas.toLocaleString('es-CO')} COP (Total Dueño: $${subtotalPropietario.toLocaleString('es-CO')} COP)`
+        : `$${subtotalAlojamiento.toLocaleString('es-CO')} COP`,
+      alimentacion_detalle: detalleAlimConMascotas,
       costo_alimentacion: `$${costoTotalAlimentacion.toLocaleString('es-CO')} COP`,
       total: `$${totalEstimado.toLocaleString('es-CO')} COP`,
     };
@@ -216,6 +257,7 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
   }, [
     finca, waNumberGlobal, configuracion, cotGuardada, mismoWa, clienteWa,
     clienteNombre, clienteCelular, fechaInicio, fechaFin, noches, personas,
+    cantidadMascotas, costoMascotas, subtotalPropietario, mascotasLineaTexto,
     subtotalAlojamiento, alimentacionDetalle, costoTotalAlimentacion, totalEstimado
   ]);
 
@@ -273,6 +315,8 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
         fechaInicio,
         fechaFin,
         personas,
+        cantidadMascotas: permiteMascotas ? cantidadMascotas : 0,
+        costoMascotas,
         alimentacion: alimentacionTextoResumen,
         menuId: planesSeleccionados[0]?.menuId,
         cantidadServicios: planesSeleccionados.reduce((a, b) => a + b.cantidadServicios, 0) || 1,
@@ -294,6 +338,10 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
 
           const waNum = (finca.whatsapp || waNumberGlobal || '573176827093').replace(/[^0-9]/g, '');
           const waAltTxt = (!mismoWa && clienteWa.trim()) ? `\n📱 *WhatsApp alternativo:* ${clienteWa.trim()}` : '';
+          const plantillaTieneTokenMascotas = /\{mascotas_linea\}|\{mascotas_detalle\}/i.test(template);
+          const detalleAlimConMascotas = (!plantillaTieneTokenMascotas && mascotasLineaTexto)
+            ? `${mascotasLineaTexto}\n${alimentacionDetalle}`
+            : alimentacionDetalle;
 
           const tokensExito: Record<string, string> = {
             finca: finca.nombre,
@@ -311,8 +359,14 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
             noches: String(noches),
             noches_plural: noches !== 1 ? 's' : '',
             personas: String(personas),
-            alojamiento_total: `$${subtotalAlojamiento.toLocaleString('es-CO')} COP`,
-            alimentacion_detalle: alimentacionDetalle,
+            mascotas: String(cantidadMascotas),
+            costo_mascotas: `$${costoMascotas.toLocaleString('es-CO')} COP`,
+            mascotas_linea: mascotasLineaTexto,
+            mascotas_detalle: mascotasLineaTexto,
+            alojamiento_total: costoMascotas > 0
+              ? `$${subtotalAlojamiento.toLocaleString('es-CO')} COP + Mascotas $${costoMascotas.toLocaleString('es-CO')} COP (Total Dueño: $${subtotalPropietario.toLocaleString('es-CO')} COP)`
+              : `$${subtotalAlojamiento.toLocaleString('es-CO')} COP`,
+            alimentacion_detalle: detalleAlimConMascotas,
             costo_alimentacion: `$${costoTotalAlimentacion.toLocaleString('es-CO')} COP`,
             total: `$${totalEstimado.toLocaleString('es-CO')} COP`,
           };
@@ -333,8 +387,8 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
 
   return (
     <div style={{ display: 'grid', gap: '1.25rem' }}>
-      {/* 1. Selección básica de fechas y personas */}
-      <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.65rem' }}>
+      {/* 1. Selección básica de fechas, personas y mascotas */}
+      <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', gap: '0.65rem' }}>
         <div className="field">
           <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>
             <Calendar size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> Llegada
@@ -382,6 +436,34 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
             </span>
           )}
         </div>
+
+        {permiteMascotas && (
+          <div className="field">
+            <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+              <Dog size={12} style={{ display: 'inline', verticalAlign: '-1px', color: 'var(--primary)' }} /> Mascotas
+            </label>
+            <select
+              value={cantidadMascotas}
+              onChange={e => setCantidadMascotas(Number(e.target.value))}
+            >
+              <option value={0}>Sin mascotas</option>
+              {Array.from({ length: 10 }).map((_, i) => {
+                const val = i + 1;
+                return (
+                  <option key={val} value={val}>
+                    {val} mascota{val !== 1 ? 's' : ''}
+                    {valorMascotaUnitario > 0 ? ` (+$${(val * valorMascotaUnitario).toLocaleString('es-CO')})` : ''}
+                  </option>
+                );
+              })}
+            </select>
+            <span className="text-xs text-muted" style={{ display: 'block', marginTop: '0.2rem', fontSize: '0.68rem' }}>
+              {valorMascotaUnitario > 0
+                ? `$${valorMascotaUnitario.toLocaleString('es-CO')} c/u · Pago al dueño`
+                : 'Bienvenidas sin costo'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* 2. Selector múltiple de planes de alimentación complementaria */}
@@ -429,6 +511,25 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
           </span>
           <span style={{ fontWeight: 600 }}>{formatCOP(subtotalAlojamiento)}</span>
         </div>
+
+        {permiteMascotas && cantidadMascotas > 0 && (
+          <div className="quote-row">
+            <span className="text-muted" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Dog size={13} style={{ color: 'var(--primary)' }} />
+              Mascotas ({cantidadMascotas}{valorMascotaUnitario > 0 ? ` × $${valorMascotaUnitario.toLocaleString('es-CO')} · Dueño finca` : ''}):
+            </span>
+            <span style={{ fontWeight: 600, color: costoMascotas > 0 ? 'var(--text-main)' : 'var(--success)' }}>
+              {costoMascotas > 0 ? `+ ${formatCOP(costoMascotas)}` : 'Sin costo'}
+            </span>
+          </div>
+        )}
+
+        {costoMascotas > 0 && (
+          <div className="quote-row" style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--primary)' }}>
+            <span>Subtotal Finca (Alojamiento + Mascotas · Propietario):</span>
+            <span>{formatCOP(subtotalPropietario)}</span>
+          </div>
+        )}
 
         {/* Desglose individual de cada menú complementario seleccionado */}
         {!soloAlojamiento && planesSeleccionados.map(p => {

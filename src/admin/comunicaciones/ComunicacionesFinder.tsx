@@ -33,32 +33,42 @@ export const ComunicacionesFinder: React.FC<ComunicacionesFinderProps> = ({
     reservaId,
   } = useComunicacionesStore();
 
-  // Búsqueda inteligente predictiva
-  const listaResultadosFinder = useMemo(() => {
-    const q = busquedaExpediente.toLowerCase().trim();
-    if (!q) return [];
-
-    const res: Array<{
+  // Expedientes unificados por consecutivo (1 solo registro por consecutivo con su estado actual)
+  const expedientesUnificados = useMemo(() => {
+    const mapa = new Map<string, {
       tipo: 'cotizacion' | 'reserva';
       id: string;
       consecutivo: string;
       clienteNombre: string;
       fincaNombre: string;
+      telefono: string;
       fechas: string;
       total: number;
-    }> = [];
+    }>();
 
-    // Buscar en cotizaciones
+    reservas.forEach((r) => {
+      const num = formatearConsecutivoSimple(r.consecutivo);
+      const key = num || `res-${r.id}`;
+      mapa.set(key, {
+        tipo: 'reserva',
+        id: r.id,
+        consecutivo: num,
+        clienteNombre: r.clientes
+          ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim()
+          : 'Sin cliente',
+        fincaNombre: r.fincas?.nombre || 'Finca Campestre',
+        telefono: r.clientes?.whatsapp || r.clientes?.telefono || '',
+        fechas: `${formatFecha(r.fecha_inicio)} al ${formatFecha(r.fecha_fin)}`,
+        total: r.valor_total || 0,
+      });
+    });
+
     cotizaciones.forEach((c) => {
       const num = formatearConsecutivoSimple(c.consecutivo);
-      const cliNom = c.clientes
-        ? `${c.clientes.nombre} ${c.clientes.apellido || ''}`.toLowerCase()
-        : '';
-      const fNom = (c.fincas?.nombre || '').toLowerCase();
-      const tel = (c.clientes?.whatsapp || '').toLowerCase();
-
-      if (num.includes(q) || cliNom.includes(q) || fNom.includes(q) || tel.includes(q)) {
-        res.push({
+      const key = num || `cot-${c.id}`;
+      const yaTieneReserva = mapa.has(key) || reservas.some((r) => r.cotizacion_id === c.id);
+      if (!yaTieneReserva) {
+        mapa.set(key, {
           tipo: 'cotizacion',
           id: c.id,
           consecutivo: num,
@@ -66,38 +76,35 @@ export const ComunicacionesFinder: React.FC<ComunicacionesFinderProps> = ({
             ? `${c.clientes.nombre} ${c.clientes.apellido || ''}`.trim()
             : 'Sin cliente',
           fincaNombre: c.fincas?.nombre || 'Finca Campestre',
+          telefono: c.clientes?.whatsapp || (c.clientes as any)?.telefono || '',
           fechas: `${formatFecha(c.fecha_inicio)} al ${formatFecha(c.fecha_fin)}`,
           total: c.total || 0,
         });
       }
     });
 
-    // Buscar en reservas
-    reservas.forEach((r) => {
-      const num = formatearConsecutivoSimple(r.consecutivo);
-      const cliNom = r.clientes
-        ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.toLowerCase()
-        : '';
-      const fNom = (r.fincas?.nombre || '').toLowerCase();
-      const tel = (r.clientes?.whatsapp || '').toLowerCase();
-
-      if (num.includes(q) || cliNom.includes(q) || fNom.includes(q) || tel.includes(q)) {
-        res.push({
-          tipo: 'reserva',
-          id: r.id,
-          consecutivo: num,
-          clienteNombre: r.clientes
-            ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim()
-            : 'Sin cliente',
-          fincaNombre: r.fincas?.nombre || 'Finca Campestre',
-          fechas: `${formatFecha(r.fecha_inicio)} al ${formatFecha(r.fecha_fin)}`,
-          total: r.valor_total || 0,
-        });
-      }
+    return Array.from(mapa.values()).sort((a, b) => {
+      const numA = parseInt(a.consecutivo.replace(/\D/g, ''), 10) || 0;
+      const numB = parseInt(b.consecutivo.replace(/\D/g, ''), 10) || 0;
+      return numB - numA;
     });
+  }, [cotizaciones, reservas]);
 
-    return res.slice(0, 8);
-  }, [busquedaExpediente, cotizaciones, reservas]);
+  // Búsqueda inteligente predictiva sin duplicar consecutivos
+  const listaResultadosFinder = useMemo(() => {
+    const q = busquedaExpediente.toLowerCase().trim();
+    if (!q) return [];
+
+    return expedientesUnificados
+      .filter((item) => {
+        const num = item.consecutivo.toLowerCase();
+        const cliNom = item.clienteNombre.toLowerCase();
+        const fNom = item.fincaNombre.toLowerCase();
+        const tel = item.telefono.toLowerCase();
+        return num.includes(q) || cliNom.includes(q) || fNom.includes(q) || tel.includes(q);
+      })
+      .slice(0, 8);
+  }, [busquedaExpediente, expedientesUnificados]);
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -202,55 +209,40 @@ export const ComunicacionesFinder: React.FC<ComunicacionesFinderProps> = ({
         </button>
       </div>
 
-      {/* Chips de Acceso Rápido a Últimos Expedientes */}
+      {/* Chips de Acceso Rápido a Últimos Expedientes (1 por consecutivo con su estado actual) */}
       <div className="flex items-center gap-2 flex-wrap text-xs">
         <span className="text-slate-400 text-[11px] font-semibold uppercase tracking-wider">
           Cargar rápido:
         </span>
 
-        {/* Cotizaciones Recientes */}
-        {cotizaciones.slice(0, 3).map((c) => {
-          const num = formatearConsecutivoSimple(c.consecutivo);
-          const activo = cotizacionId === c.id && expedienteTipo === 'cotizacion';
+        {expedientesUnificados.slice(0, 6).map((item) => {
+          const esRes = item.tipo === 'reserva';
+          const activo = esRes
+            ? reservaId === item.id && expedienteTipo === 'reserva'
+            : cotizacionId === item.id && expedienteTipo === 'cotizacion';
           return (
             <button
-              key={c.id}
+              key={`${item.tipo}-${item.id}`}
               type="button"
-              onClick={() => onSeleccionarExpediente({ tipo: 'cotizacion', id: c.id, consecutivo: num })}
+              onClick={() => onSeleccionarExpediente({ tipo: item.tipo, id: item.id, consecutivo: item.consecutivo })}
               className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 border transition-all ${
                 activo
-                  ? 'bg-orange-600 text-white border-orange-600 shadow-sm'
+                  ? esRes
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                    : 'bg-orange-600 text-white border-orange-600 shadow-sm'
+                  : esRes
+                  ? 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-emerald-300'
                   : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-orange-300'
               }`}
             >
-              <FileText size={11} className={activo ? 'text-white' : 'text-orange-500'} />
-              <span>COT #{num}</span>
+              {esRes ? (
+                <Calendar size={11} className={activo ? 'text-white' : 'text-emerald-500'} />
+              ) : (
+                <FileText size={11} className={activo ? 'text-white' : 'text-orange-500'} />
+              )}
+              <span>{esRes ? 'RES' : 'COT'} #{item.consecutivo}</span>
               <span className="text-[10px] opacity-75">
-                ({c.clientes?.nombre?.split(' ')[0] || 'Cliente'})
-              </span>
-            </button>
-          );
-        })}
-
-        {/* Reservas Recientes */}
-        {reservas.slice(0, 3).map((r) => {
-          const num = formatearConsecutivoSimple(r.consecutivo);
-          const activo = reservaId === r.id && expedienteTipo === 'reserva';
-          return (
-            <button
-              key={r.id}
-              type="button"
-              onClick={() => onSeleccionarExpediente({ tipo: 'reserva', id: r.id, consecutivo: num })}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 border transition-all ${
-                activo
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-emerald-300'
-              }`}
-            >
-              <Calendar size={11} className={activo ? 'text-white' : 'text-emerald-500'} />
-              <span>RES #{num}</span>
-              <span className="text-[10px] opacity-75">
-                ({r.clientes?.nombre?.split(' ')[0] || 'Cliente'})
+                ({item.clienteNombre.split(' ')[0] || 'Cliente'})
               </span>
             </button>
           );

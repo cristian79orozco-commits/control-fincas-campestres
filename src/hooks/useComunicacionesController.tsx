@@ -7,7 +7,8 @@ import type {
   Cliente, Finca, Reserva, CotizacionDB, Menu, Pago, TipoComunicacion, Comunicacion,
   ConfiguracionGeneral, MetodoEnvioWhatsApp
 } from '../types';
-import { calcularSaldo, desglosarFinanzasReserva } from '../types';
+import { calcularSaldo, desglosarFinanzasReserva, desglosarFinanzasCotizacion } from '../types';
+import { resolverPlanesAlimentacionDetalle } from '../utils/calcularCotizacion';
 import {
   plantillaCotizacion,
   plantillaPedirAbonoCotizacion,
@@ -159,8 +160,9 @@ export function useComunicacionesController({
   const cotizacionEfectiva = useMemo(() => {
     if (cotizacionActual) return cotizacionActual;
     if (reservaActual) {
-      const cVinculada = cotizaciones.find(c => (reservaActual.cotizacion_id && c.id === reservaActual.cotizacion_id) || (reservaActual.consecutivo && c.consecutivo === reservaActual.consecutivo));
+      const cVinculada = cotizaciones.find(c => (reservaActual.cotizacion_id && c.id === reservaActual.cotizacion_id) || (reservaActual.consecutivo && formatearConsecutivoSimple(c.consecutivo) === formatearConsecutivoSimple(reservaActual.consecutivo)));
       if (cVinculada) return cVinculada;
+      const finRes = desglosarFinanzasReserva(reservaActual, fincas.find(f => f.id === reservaActual.finca_id) || (reservaActual.fincas as any));
       return {
         id: reservaActual.cotizacion_id || reservaActual.id,
         cliente_id: reservaActual.cliente_id,
@@ -171,7 +173,10 @@ export function useComunicacionesController({
         noches: calcularNoches(reservaActual.fecha_inicio, reservaActual.fecha_fin),
         total: reservaActual.valor_total,
         costo_alimentacion: reservaActual.costo_alimentacion || 0,
-        subtotal_alojamiento: (reservaActual as any).subtotal_alojamiento || Math.max(0, (reservaActual.valor_total || 0) - (reservaActual.costo_alimentacion || 0)),
+        subtotal_alojamiento: finRes.subtotalAlojamientoBase,
+        cantidad_mascotas: finRes.cantidadMascotas,
+        costo_mascotas: finRes.costoMascotas,
+        notas: reservaActual.observaciones,
         consecutivo: reservaActual.consecutivo,
         estado: 'confirmada' as const,
         clientes: reservaActual.clientes,
@@ -183,15 +188,15 @@ export function useComunicacionesController({
       } as CotizacionDB;
     }
     return cotizaciones[0] || null;
-  }, [cotizacionActual, reservaActual, cotizaciones]);
+  }, [cotizacionActual, reservaActual, cotizaciones, fincas]);
 
   // Reserva efectiva vinculada o sintética
   const reservaEfectiva = useMemo(() => {
     if (reservaActual) return reservaActual;
     if (cotizacionActual) {
-      const rVinculada = reservas.find(r => r.cotizacion_id === cotizacionActual.id || (cotizacionActual.consecutivo && r.consecutivo === cotizacionActual.consecutivo));
+      const rVinculada = reservas.find(r => r.cotizacion_id === cotizacionActual.id || (cotizacionActual.consecutivo && formatearConsecutivoSimple(r.consecutivo) === formatearConsecutivoSimple(cotizacionActual.consecutivo)));
       if (rVinculada) return rVinculada;
-      const subAloja = cotizacionActual.subtotal_alojamiento || Math.max(0, (cotizacionActual.total || 0) - (cotizacionActual.costo_alimentacion || 0));
+      const finCot = desglosarFinanzasCotizacion(cotizacionActual, fincas.find(f => f.id === cotizacionActual.finca_id) || (cotizacionActual.fincas as any));
       return {
         id: cotizacionActual.id,
         cotizacion_id: cotizacionActual.id,
@@ -202,10 +207,13 @@ export function useComunicacionesController({
         fecha_fin: cotizacionActual.fecha_fin,
         personas: cotizacionActual.personas,
         noches: cotizacionActual.noches,
-        valor_total: cotizacionActual.total,
-        costo_alimentacion: cotizacionActual.costo_alimentacion || 0,
-        subtotal_alojamiento: subAloja,
-        separacion: Math.round(subAloja * 0.5),
+        valor_total: finCot.totalCotizado,
+        costo_alimentacion: finCot.costoAlimentacion,
+        subtotal_alojamiento: finCot.subtotalAlojamientoBase,
+        cantidad_mascotas: finCot.cantidadMascotas,
+        costo_mascotas: finCot.costoMascotas,
+        observaciones: cotizacionActual.notas,
+        separacion: finCot.abono50Propietario,
         estado: 'activa' as const,
         clientes: cotizacionActual.clientes,
         fincas: cotizacionActual.fincas,
@@ -216,14 +224,14 @@ export function useComunicacionesController({
             reserva_id: cotizacionActual.id,
             tipo: 'abono' as const,
             fecha: new Date().toISOString().split('T')[0],
-            valor: Math.round(subAloja * 0.5),
+            valor: finCot.abono50Propietario,
             observacion: 'Abono de separación (50% Finca)'
           }
         ]
       } as Reserva;
     }
     return reservas[0] || null;
-  }, [reservaActual, cotizacionActual, reservas]);
+  }, [reservaActual, cotizacionActual, reservas, fincas]);
 
   const fincaActual = useMemo(() => {
     if (expedienteTipo === 'cotizacion' && cotizacionEfectiva) {
@@ -265,36 +273,40 @@ export function useComunicacionesController({
   }, [expedienteTipo, cotizacionEfectiva, reservaEfectiva]);
 
   // ---------------------------------------------------------------------------
-  // Desglose Financiero Doble (Finca/Dueño vs Alimentación/Paraíso Terrenal)
+  // Desglose Financiero Doble (Finca/Dueño + Mascotas vs Alimentación/Paraíso Terrenal)
   // ---------------------------------------------------------------------------
   const finanzasDoble = useMemo(() => {
-    if (expedienteTipo === 'cotizacion' && cotizacionEfectiva) {
-      const costoAlim = cotizacionEfectiva.costo_alimentacion || 0;
-      const subtotalFinca = cotizacionEfectiva.subtotal_alojamiento || Math.max(0, (cotizacionEfectiva.total || 0) - costoAlim);
-      const anticipoFinca50 = Math.round(subtotalFinca * 0.5);
-
+    if (expedienteTipo === 'cotizacion' && !reservaActual && cotizacionEfectiva) {
+      const finCot = desglosarFinanzasCotizacion(cotizacionEfectiva, fincaActual as any);
       return {
         esReserva: false,
-        subtotalFinca,
+        subtotalAlojamientoBase: finCot.subtotalAlojamientoBase,
+        cantidadMascotas: finCot.cantidadMascotas,
+        costoMascotas: finCot.costoMascotas,
+        subtotalFinca: finCot.totalPropietarioFinca,
         pagadoFinca: 0,
-        saldoFincaCheckIn: subtotalFinca,
-        anticipoFinca50,
-        costoAlimentacion: costoAlim,
+        saldoFincaCheckIn: finCot.totalPropietarioFinca,
+        anticipoFinca50: finCot.abono50Propietario,
+        costoAlimentacion: finCot.costoAlimentacion,
         pagadoAlimentacion: 0,
-        saldoAlimentacionAdmin: costoAlim,
-        totalConsolidado: cotizacionEfectiva.total || 0,
+        saldoAlimentacionAdmin: finCot.costoAlimentacion,
+        totalConsolidado: finCot.totalCotizado,
         totalRecaudado: 0,
-        saldoConsolidado: cotizacionEfectiva.total || 0,
+        saldoConsolidado: finCot.totalCotizado,
       };
     }
 
     if (reservaEfectiva) {
-      const desglose = desglosarFinanzasReserva(reservaEfectiva);
+      const desglose = desglosarFinanzasReserva(reservaEfectiva, fincaActual as any);
       return {
         esReserva: true,
+        subtotalAlojamientoBase: desglose.subtotalAlojamientoBase,
+        cantidadMascotas: desglose.cantidadMascotas,
+        costoMascotas: desglose.costoMascotas,
         subtotalFinca: desglose.subtotalAlojamiento,
         pagadoFinca: desglose.pagadoFinca,
         saldoFincaCheckIn: desglose.saldoFincaCheckIn,
+        anticipoFinca50: Math.round(desglose.subtotalAlojamiento * 0.5),
         costoAlimentacion: desglose.costoAlimentacion,
         pagadoAlimentacion: desglose.pagadoAlimentacion,
         saldoAlimentacionAdmin: desglose.saldoAlimentacionAdmin,
@@ -305,7 +317,7 @@ export function useComunicacionesController({
     }
 
     return null;
-  }, [expedienteTipo, reservaEfectiva, cotizacionEfectiva]);
+  }, [expedienteTipo, reservaActual, reservaEfectiva, cotizacionEfectiva, fincaActual]);
 
   // ---------------------------------------------------------------------------
   // Generador de Mensajes según el tipo y subtipo
@@ -415,10 +427,21 @@ export function useComunicacionesController({
       }
       case 'menu': {
         if (c) {
-          const m = (c.menu_id && menus.find(x => x.id === c.menu_id)) || menus[0];
+          const resuelto = resolverPlanesAlimentacionDetalle({
+            alimentacionTexto: c.alimentacion,
+            costoTotalReal: c.costo_alimentacion,
+            menusCatalogo: menus,
+            menuPrincipal: (c.menu_id && menus.find(x => x.id === c.menu_id)) || menus[0] || null,
+            personasDefault: c.personas || 4,
+            serviciosDefault: (c as any)?.cantidad_alimentacion || 1,
+          });
+          const m = resuelto.items[0]?.menuCatalogo || (c.menu_id && menus.find(x => x.id === c.menu_id)) || menus[0];
           if (m) {
             msg = plantillaPropuestaAlimentacion({
               menu: m,
+              menusCatalogo: menus,
+              alimentacionTexto: c.alimentacion,
+              costoTotalReal: c.costo_alimentacion,
               cliente: cli,
               finca: f,
               personas: c.personas || 4,
@@ -694,83 +717,124 @@ export function useComunicacionesController({
   }, [setFaseFiltro, CATALOGO_MENSAJES, tipoSeleccionado, subTipoAccion, handleSeleccionarMensajeCard]);
 
   // ---------------------------------------------------------------------------
-  // Smart Finder
+  // Expedientes Unificados por Consecutivo (1 solo registro por consecutivo con su estado actual)
   // ---------------------------------------------------------------------------
-  const listaResultadosFinder = useMemo(() => {
-    const q = busquedaExpediente.toLowerCase().trim();
-    if (!q) return [];
-
-    const res: Array<{
+  const expedientesUnificados = useMemo(() => {
+    const mapaPorConsecutivo = new Map<string, {
       tipo: 'cotizacion' | 'reserva';
       id: string;
       consecutivo: string;
+      estadoActual: string;
+      etiquetaPrefijo: 'COT' | 'RES';
       clienteNombre: string;
       fincaNombre: string;
+      telefono: string;
       fechas: string;
       total: number;
-    }> = [];
+    }>();
 
+    // 1. Primero registrar todas las Reservas activas/históricas (tienen prioridad de estado sobre su cotización origen)
+    reservas.forEach(r => {
+      const num = formatearConsecutivoSimple(r.consecutivo);
+      const key = num || `res-${r.id}`;
+      mapaPorConsecutivo.set(key, {
+        tipo: 'reserva',
+        id: r.id,
+        consecutivo: num,
+        estadoActual: r.estado || 'activa',
+        etiquetaPrefijo: 'RES',
+        clienteNombre: r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim() : 'Sin cliente',
+        fincaNombre: r.fincas?.nombre || 'Finca Campestre',
+        telefono: r.clientes?.whatsapp || r.clientes?.telefono || '',
+        fechas: `${formatFecha(r.fecha_inicio)} al ${formatFecha(r.fecha_fin)}`,
+        total: r.valor_total || 0,
+      });
+    });
+
+    // 2. Registrar Cotizaciones únicamente si su consecutivo aún NO se ha convertido en Reserva
     cotizaciones.forEach(c => {
       const num = formatearConsecutivoSimple(c.consecutivo);
-      const cliNom = c.clientes ? `${c.clientes.nombre} ${c.clientes.apellido || ''}`.toLowerCase() : '';
-      const fNom = (c.fincas?.nombre || '').toLowerCase();
-      const tel = (c.clientes?.whatsapp || '').toLowerCase();
-
-      if (num.includes(q) || cliNom.includes(q) || fNom.includes(q) || tel.includes(q)) {
-        res.push({
+      const key = num || `cot-${c.id}`;
+      const yaTieneReserva = mapaPorConsecutivo.has(key) || reservas.some(r => r.cotizacion_id === c.id);
+      if (!yaTieneReserva) {
+        mapaPorConsecutivo.set(key, {
           tipo: 'cotizacion',
           id: c.id,
           consecutivo: num,
+          estadoActual: c.estado || 'pendiente',
+          etiquetaPrefijo: 'COT',
           clienteNombre: c.clientes ? `${c.clientes.nombre} ${c.clientes.apellido || ''}`.trim() : 'Sin cliente',
           fincaNombre: c.fincas?.nombre || 'Finca Campestre',
+          telefono: c.clientes?.whatsapp || (c.clientes as any)?.telefono || '',
           fechas: `${formatFecha(c.fecha_inicio)} al ${formatFecha(c.fecha_fin)}`,
           total: c.total || 0,
         });
       }
     });
 
-    reservas.forEach(r => {
-      const num = formatearConsecutivoSimple(r.consecutivo);
-      const cliNom = r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.toLowerCase() : '';
-      const fNom = (r.fincas?.nombre || '').toLowerCase();
-      const tel = (r.clientes?.whatsapp || '').toLowerCase();
-
-      if (num.includes(q) || cliNom.includes(q) || fNom.includes(q) || tel.includes(q)) {
-        res.push({
-          tipo: 'reserva',
-          id: r.id,
-          consecutivo: num,
-          clienteNombre: r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim() : 'Sin cliente',
-          fincaNombre: r.fincas?.nombre || 'Finca Campestre',
-          fechas: `${formatFecha(r.fecha_inicio)} al ${formatFecha(r.fecha_fin)}`,
-          total: r.valor_total || 0,
-        });
-      }
+    // Ordenar por número de consecutivo descendente (más reciente primero)
+    return Array.from(mapaPorConsecutivo.values()).sort((a, b) => {
+      const numA = parseInt(a.consecutivo.replace(/\D/g, ''), 10) || 0;
+      const numB = parseInt(b.consecutivo.replace(/\D/g, ''), 10) || 0;
+      return numB - numA;
     });
+  }, [cotizaciones, reservas]);
 
-    return res.slice(0, 8);
-  }, [busquedaExpediente, cotizaciones, reservas]);
+  const expedientesRecientes = useMemo(() => {
+    return expedientesUnificados.slice(0, 6);
+  }, [expedientesUnificados]);
+
+  // ---------------------------------------------------------------------------
+  // Smart Finder (Sin duplicados de consecutivo)
+  // ---------------------------------------------------------------------------
+  const listaResultadosFinder = useMemo(() => {
+    const q = busquedaExpediente.toLowerCase().trim();
+    if (!q) return [];
+
+    return expedientesUnificados.filter(item => {
+      const num = item.consecutivo.toLowerCase();
+      const cliNom = item.clienteNombre.toLowerCase();
+      const fNom = item.fincaNombre.toLowerCase();
+      const tel = item.telefono.toLowerCase();
+      return num.includes(q) || cliNom.includes(q) || fNom.includes(q) || tel.includes(q);
+    }).slice(0, 8);
+  }, [busquedaExpediente, expedientesUnificados]);
 
   const cargarExpedienteSeleccionado = useCallback((item: { tipo: 'cotizacion' | 'reserva'; id: string; consecutivo: string }) => {
     if (item.tipo === 'cotizacion') {
       const c = cotizaciones.find(x => x.id === item.id);
       if (c) {
-        const rAsociada = reservas.find(x => x.cotizacion_id === c.id || (c.consecutivo && x.consecutivo === c.consecutivo));
-        setExpediente({
-          tipo: 'cotizacion',
-          cotizacionId: c.id,
-          reservaId: rAsociada ? rAsociada.id : '',
-          clienteId: c.cliente_id || (c.clientes as any)?.id || '',
-        });
-        setFaseFiltro('fase_1_cotizacion');
-        setTipoSeleccionado('cotizacion');
-        setSubTipoAccion('normal');
-        aplicarMensaje('cotizacion', 'normal', rAsociada ? rAsociada.id : '', c.id, c.cliente_id || '');
+        const rAsociada = reservas.find(x => x.cotizacion_id === c.id || (c.consecutivo && formatearConsecutivoSimple(x.consecutivo) === formatearConsecutivoSimple(c.consecutivo)));
+        if (rAsociada) {
+          const saldo = calcularSaldo(rAsociada);
+          const sugerido: TipoComunicacion = saldo <= 0 ? 'paz_salvo' : 'estado_cuenta';
+          setExpediente({
+            tipo: 'reserva',
+            reservaId: rAsociada.id,
+            cotizacionId: c.id,
+            clienteId: rAsociada.cliente_id || c.cliente_id || '',
+          });
+          setFaseFiltro('fase_3_saldos');
+          setTipoSeleccionado(sugerido);
+          setSubTipoAccion('normal');
+          aplicarMensaje(sugerido, 'normal', rAsociada.id, c.id, rAsociada.cliente_id || c.cliente_id || '');
+        } else {
+          setExpediente({
+            tipo: 'cotizacion',
+            cotizacionId: c.id,
+            reservaId: '',
+            clienteId: c.cliente_id || (c.clientes as any)?.id || '',
+          });
+          setFaseFiltro('fase_1_cotizacion');
+          setTipoSeleccionado('cotizacion');
+          setSubTipoAccion('normal');
+          aplicarMensaje('cotizacion', 'normal', '', c.id, c.cliente_id || '');
+        }
       }
     } else {
       const r = reservas.find(x => x.id === item.id);
       if (r) {
-        const cAsociada = cotizaciones.find(x => (r.cotizacion_id && x.id === r.cotizacion_id) || (r.consecutivo && x.consecutivo === r.consecutivo));
+        const cAsociada = cotizaciones.find(x => (r.cotizacion_id && x.id === r.cotizacion_id) || (r.consecutivo && formatearConsecutivoSimple(x.consecutivo) === formatearConsecutivoSimple(r.consecutivo)));
         const saldo = calcularSaldo(r);
         const sugerido: TipoComunicacion = saldo <= 0 ? 'paz_salvo' : 'estado_cuenta';
         setExpediente({
@@ -839,21 +903,25 @@ export function useComunicacionesController({
           return false;
         }
 
-        let cantPersonas = itemActual.personas || 4;
-        let cantServ = (itemActual as any).cantidad_alimentacion || 1;
-        if (itemActual.alimentacion) {
-          const match = itemActual.alimentacion.match(/(\d+)\s*serv(?:\.|\w*)\s*×\s*(\d+)\s*pers/i);
-          if (match) {
-            cantServ = parseInt(match[1], 10) || cantServ;
-            cantPersonas = parseInt(match[2], 10) || cantPersonas;
-          }
-        }
+        const resuelto = resolverPlanesAlimentacionDetalle({
+          alimentacionTexto: itemActual.alimentacion,
+          costoTotalReal: itemActual.costo_alimentacion,
+          menusCatalogo: menus,
+          menuPrincipal: (itemActual.menu_id && menus.find(x => x.id === itemActual.menu_id)) || null,
+          personasDefault: itemActual.personas || 4,
+          serviciosDefault: (itemActual as any).cantidad_alimentacion || 1,
+        });
 
-        const m = (itemActual.menu_id && menus.find(x => x.id === itemActual.menu_id)) || (itemActual.alimentacion && itemActual.alimentacion !== 'Sin alimentación' ? {
+        const primerItem = resuelto.items[0];
+        const cantPersonas = primerItem?.personas || itemActual.personas || 4;
+        const cantServ = primerItem?.cantidadServicios || (itemActual as any).cantidad_alimentacion || 1;
+
+        const m = primerItem?.menuCatalogo || (itemActual.menu_id && menus.find(x => x.id === itemActual.menu_id)) || (itemActual.alimentacion && itemActual.alimentacion !== 'Sin alimentación' ? {
           id: itemActual.menu_id || 'cotiz-menu',
-          nombre: itemActual.alimentacion,
-          categoria: 'Almuerzo' as const,
-          precio_pp: (itemActual.costo_alimentacion || 0) / Math.max(1, cantPersonas * cantServ),
+          nombre: primerItem?.nombre || itemActual.alimentacion,
+          descripcion: primerItem?.descripcion || 'Servicio gastronómico campestre.',
+          categoria: (primerItem?.categoria as any) || ('Almuerzo' as const),
+          precio_pp: primerItem?.precioPp || (itemActual.costo_alimentacion || 0) / Math.max(1, cantPersonas * cantServ),
           activo: true,
         } : menus[0]);
 
@@ -861,6 +929,9 @@ export function useComunicacionesController({
         if (m) {
           await generarPropuestaAlimentacion({
             menu: m,
+            menusCatalogo: menus,
+            alimentacionTexto: itemActual.alimentacion,
+            costoTotalReal: itemActual.costo_alimentacion,
             cliente: itemActual.clientes,
             finca: f,
             personas: cantPersonas,
@@ -909,10 +980,21 @@ export function useComunicacionesController({
       if (tipoSeleccionado === 'menu') {
         const target = cotizacionEfectiva;
         const f = target ? (fincas.find(x => x.id === target.finca_id) || target.fincas) : null;
-        const m = (target && menus.find(x => x.id === target.menu_id)) || menus[0];
+        const resuelto = resolverPlanesAlimentacionDetalle({
+          alimentacionTexto: target?.alimentacion,
+          costoTotalReal: target?.costo_alimentacion,
+          menusCatalogo: menus,
+          menuPrincipal: (target && menus.find(x => x.id === target.menu_id)) || menus[0] || null,
+          personasDefault: target?.personas || 4,
+          serviciosDefault: (target as any)?.cantidad_alimentacion || 1,
+        });
+        const m = resuelto.items[0]?.menuCatalogo || (target && menus.find(x => x.id === target.menu_id)) || menus[0];
         if (m) {
           await generarPropuestaAlimentacion({
             menu: m,
+            menusCatalogo: menus,
+            alimentacionTexto: target?.alimentacion,
+            costoTotalReal: target?.costo_alimentacion,
             cliente: target?.clientes,
             finca: f,
             personas: target?.personas || 4,
@@ -1137,6 +1219,8 @@ export function useComunicacionesController({
     // Catálogo y Búsqueda
     CATALOGO_MENSAJES,
     mensajesFiltrados,
+    expedientesUnificados,
+    expedientesRecientes,
     listaResultadosFinder,
     cargarExpedienteSeleccionado,
     handleSeleccionarMensajeCard,

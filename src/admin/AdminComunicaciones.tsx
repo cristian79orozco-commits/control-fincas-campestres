@@ -93,6 +93,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
     finanzasDoble,
     CATALOGO_MENSAJES,
     mensajesFiltrados,
+    expedientesRecientes,
     listaResultadosFinder,
     cargarExpedienteSeleccionado,
     handleSeleccionarMensajeCard,
@@ -257,7 +258,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
                                 color: item.tipo === 'reserva' ? '#15803d' : '#c2410c',
                               }}
                             >
-                              #{item.consecutivo}
+                              {item.tipo === 'reserva' ? 'RES' : 'COT'} #{item.consecutivo}
                             </span>
                             <strong>{item.clienteNombre}</strong>
                             <span className="text-muted">· {item.fincaNombre}</span>
@@ -292,20 +293,24 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
               </button>
             </div>
 
-            {/* Chips de acceso directo a últimos expedientes */}
+            {/* Chips de acceso directo a últimos expedientes (1 por consecutivo con su estado actual) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.76rem' }}>
               <span className="text-muted" style={{ fontWeight: 600 }}>Cargar reciente:</span>
-              {cotizaciones.slice(0, 3).map(c => {
-                const num = formatearConsecutivoSimple(c.consecutivo);
-                const activo = cotizacionId === c.id && expedienteTipo === 'cotizacion';
+              {expedientesRecientes.map(item => {
+                const esRes = item.tipo === 'reserva';
+                const activo = Boolean(cotizacionId || reservaId) && consecutivoBase === item.consecutivo;
                 return (
                   <button
-                    key={c.id}
+                    key={`${item.tipo}-${item.id}`}
                     type="button"
-                    onClick={() => cargarExpedienteSeleccionado({ tipo: 'cotizacion', id: c.id, consecutivo: num })}
+                    onClick={() => cargarExpedienteSeleccionado({ tipo: item.tipo, id: item.id, consecutivo: item.consecutivo })}
                     style={{
-                      border: activo ? '1px solid var(--primary)' : '1px solid var(--border)',
-                      background: activo ? 'var(--primary)' : 'var(--surface)',
+                      border: activo
+                        ? (esRes ? '1px solid #16a34a' : '1px solid var(--primary)')
+                        : '1px solid var(--border)',
+                      background: activo
+                        ? (esRes ? '#16a34a' : 'var(--primary)')
+                        : 'var(--surface)',
                       color: activo ? '#ffffff' : 'var(--text)',
                       borderRadius: '6px',
                       padding: '0.2rem 0.55rem',
@@ -318,34 +323,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
                       transition: 'all 0.15s ease',
                     }}
                   >
-                    COT #{num} ({c.clientes?.nombre || 'Cliente'})
-                  </button>
-                );
-              })}
-              {reservas.slice(0, 3).map(r => {
-                const num = formatearConsecutivoSimple(r.consecutivo);
-                const activo = reservaId === r.id && expedienteTipo === 'reserva';
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => cargarExpedienteSeleccionado({ tipo: 'reserva', id: r.id, consecutivo: num })}
-                    style={{
-                      border: activo ? '1px solid #16a34a' : '1px solid var(--border)',
-                      background: activo ? '#16a34a' : 'var(--surface)',
-                      color: activo ? '#ffffff' : 'var(--text)',
-                      borderRadius: '6px',
-                      padding: '0.2rem 0.55rem',
-                      fontSize: '0.72rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.3rem',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    RES #{num} ({r.clientes?.nombre || 'Cliente'})
+                    {item.etiquetaPrefijo} #{item.consecutivo} ({item.clienteNombre || 'Cliente'})
                   </button>
                 );
               })}
@@ -396,10 +374,27 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginTop: '0.2rem' }}>
-                    <span className="text-muted">Valor Finca:</span>
-                    <strong>{formatCOP(finanzasDoble.subtotalFinca)}</strong>
-                  </div>
+                  {finanzasDoble.cantidadMascotas > 0 ? (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.77rem', marginTop: '0.15rem' }}>
+                        <span className="text-muted">Alojamiento Base:</span>
+                        <span>{formatCOP(finanzasDoble.subtotalAlojamientoBase)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.77rem' }}>
+                        <span className="text-muted">🐾 Mascotas ({finanzasDoble.cantidadMascotas} · Pago al Dueño):</span>
+                        <span style={{ color: '#15803d', fontWeight: 600 }}>+{formatCOP(finanzasDoble.costoMascotas)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderTop: '1px dashed var(--border)', paddingTop: '0.2rem' }}>
+                        <span className="text-muted" style={{ fontWeight: 600 }}>Valor Total Finca (Dueño):</span>
+                        <strong>{formatCOP(finanzasDoble.subtotalFinca)}</strong>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                      <span className="text-muted">Valor Finca:</span>
+                      <strong>{formatCOP(finanzasDoble.subtotalFinca)}</strong>
+                    </div>
+                  )}
 
                   {finanzasDoble.esReserva ? (
                     <>
@@ -438,7 +433,11 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
                         border: '1px solid rgba(22, 163, 74, 0.2)',
                       }}
                     >
-                      <span style={{ color: '#15803d', fontWeight: 600 }}>Anticipo Requerido (50% Finca):</span>
+                      <span style={{ color: '#15803d', fontWeight: 600 }}>
+                        {finanzasDoble.cantidadMascotas > 0
+                          ? 'Anticipo Requerido (50% Finca + Mascotas):'
+                          : 'Anticipo Requerido (50% Finca):'}
+                      </span>
                       <strong style={{ color: '#15803d' }}>{formatCOP(finanzasDoble.anticipoFinca50 || 0)}</strong>
                     </div>
                   )}

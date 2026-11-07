@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import {
   FileText, Plus, Edit3, Trash2, X, Save, ArrowRight,
-  Calendar, Users, Utensils, Tag, MessageCircle, Download, Hash, Copy, Check, Eye, XCircle, AlertCircle
+  Calendar, Users, Utensils, Tag, MessageCircle, Download, Hash, Copy, Check, Eye, XCircle, AlertCircle, Dog
 } from 'lucide-react';
 import type { CotizacionDB, CotizacionEstado, Cliente, Finca, Menu, ConfiguracionGeneral } from '../types';
+import { desglosarFinanzasCotizacion } from '../types';
 import { generarDocCotizacion } from '../services/documentos';
 import { WhatsAppModal } from '../components/WhatsAppModal';
 import { abrirWhatsApp, generarUrlWhatsApp } from '../services/whatsapp';
@@ -217,6 +218,26 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                 </div>
 
                 <div className="field">
+                  <label><Dog size={11} style={{ display:'inline', verticalAlign:'-1px', color: 'var(--primary)' }} /> Mascotas (Pago al Propietario)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={15}
+                    value={form.cantidad_mascotas || 0}
+                    onChange={e => updateField('cantidad_mascotas', Math.max(0, +e.target.value))}
+                  />
+                  {fincaSeleccionada && (
+                    <span className="text-xs text-muted" style={{ display: 'block', marginTop: '0.2rem', fontSize: '0.68rem' }}>
+                      {fincaSeleccionada.politica_mascotas === 'con_costo'
+                        ? `Tarifa: ${formatCOP(Number(fincaSeleccionada.valor_mascota || 0))} c/u · Dueño finca`
+                        : fincaSeleccionada.politica_mascotas === 'no_permitido'
+                        ? 'Esta finca no admite mascotas por defecto'
+                        : 'Mascotas permitidas sin costo'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="field" style={{ gridColumn: '1 / -1' }}>
                   <label><Utensils size={11} style={{ display:'inline', verticalAlign:'-1px' }} /> Menú de Alimentación</label>
                   <select
                     value={modoAlimentacionPersonalizada ? 'custom' : (form.menu_id || '')}
@@ -228,7 +249,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                         [{m.categoria}] {m.nombre} — {formatCOP(m.precio_pp)}/pp
                       </option>
                     ))}
-                    <option value="custom">✏️ Personalizado…</option>
+                    <option value="custom">✏️ Personalizado / Múltiples menús…</option>
                   </select>
                 </div>
               </div>
@@ -266,9 +287,15 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
               {/* Resumen de totales */}
               <div style={{ background: 'var(--surface-sunken)', padding: '0.75rem', borderRadius: '8px', display: 'grid', gap: '0.35rem', fontSize: '0.85rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Alojamiento ({form.personas || 1} pers × {noches(form.fecha_inicio || '', form.fecha_fin || '')} noches):</span>
+                  <span>Alojamiento base ({form.personas || 1} pers × {noches(form.fecha_inicio || '', form.fecha_fin || '')} noches):</span>
                   <span>{formatCOP(form.subtotal_alojamiento || 0)}</span>
                 </div>
+                {(form.cantidad_mascotas || 0) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--primary)', fontWeight: 600 }}>
+                    <span>🐾 Mascotas ({form.cantidad_mascotas} · Pago al Propietario):</span>
+                    <span>+{formatCOP(form.costo_mascotas || 0)}</span>
+                  </div>
+                )}
                 {(form.costo_alimentacion || 0) > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent, #ea580c)' }}>
                     <span>Servicio de Alimentación (Admin):</span>
@@ -318,11 +345,11 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
         ) : (
           filtradas.map(c => {
             const clienteNombre = c.clientes ? `${c.clientes.nombre} ${c.clientes.apellido || ''}`.trim() : '—';
-            const fincaNombre = c.fincas?.nombre || '—';
+            const fincaRef = fincas.find(f => f.id === c.finca_id);
+            const fincaNombre = fincaRef?.nombre || c.fincas?.nombre || '—';
             const tieneAlimentacion = (c.costo_alimentacion || 0) > 0 || (c.alimentacion && c.alimentacion !== 'Sin alimentación');
-            const valorAlojamiento = (c.subtotal_alojamiento && c.subtotal_alojamiento > 0)
-              ? c.subtotal_alojamiento
-              : Math.max(0, (c.total || 0) - (c.costo_alimentacion || 0));
+            const finCot = desglosarFinanzasCotizacion(c, fincaRef);
+            const valorAlojamiento = finCot.totalPropietarioFinca;
 
             // La etiqueta "¡Nueva!" solo aplica si la cotización está pendiente y tiene menos de 20 minutos
             const esPendiente = ['borrador', 'cotizada', 'pendiente'].includes(c.estado);
@@ -391,6 +418,12 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                       <ConsecutivoBadge consecutivo={c.consecutivo} />
                     )}
 
+                    {finCot.cantidadMascotas > 0 && (
+                      <span className="status-badge s-avail" style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <Dog size={10} /> {finCot.cantidadMascotas} mascota{finCot.cantidadMascotas !== 1 ? 's' : ''}{finCot.costoMascotas > 0 ? ` (+${formatCOP(finCot.costoMascotas)})` : ''}
+                      </span>
+                    )}
+
                     {tieneAlimentacion && (
                       <span className="status-badge s-avail" style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                         <Utensils size={10} /> {c.alimentacion || 'Con alimentación'}
@@ -401,6 +434,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                   <div className="text-xs text-muted" style={{ marginTop: '0.35rem', lineHeight: 1.5 }}>
                     <Calendar size={11} style={{ display:'inline', verticalAlign:'-1px' }} /> {formatFecha(c.fecha_inicio)} → {formatFecha(c.fecha_fin)} ({noches(c.fecha_inicio, c.fecha_fin)} noches)
                     {' · '}<Users size={11} style={{ display:'inline', verticalAlign:'-1px' }} /> {c.personas} personas
+                    {finCot.cantidadMascotas > 0 && ` · 🐾 ${finCot.cantidadMascotas} mascota(s)`}
                     {clienteNombre !== '—' && (
                       <>
                         {' · '}👤 <strong>{clienteNombre}</strong>
@@ -421,13 +455,13 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                     )}
                   </div>
 
-                  {/* Detalle económico con desglose Finca vs Alimentación */}
+                  {/* Detalle económico con desglose Finca (Alojamiento + Mascotas) vs Alimentación */}
                   <div style={{ marginTop: '0.4rem', display: 'flex', gap: '0.75rem', alignItems: 'baseline', flexWrap: 'wrap' }}>
                     <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.98rem' }}>
                       {formatCOP(c.total)}
                     </div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      • Finca (Alojamiento): <strong>{formatCOP(valorAlojamiento)}</strong> (50%: {formatCOP(Math.round(valorAlojamiento * 0.5))})
+                      • Finca (Dueño{finCot.costoMascotas > 0 ? ` · Aloj. ${formatCOP(finCot.subtotalAlojamientoBase)} + Mascotas ${formatCOP(finCot.costoMascotas)}` : ''}): <strong>{formatCOP(valorAlojamiento)}</strong> (50%: {formatCOP(finCot.abono50Propietario)})
                     </div>
                     {tieneAlimentacion && (
                       <div style={{ fontSize: '0.75rem', color: 'var(--accent, #ea580c)' }}>
@@ -568,9 +602,9 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
       {/* MODAL DE CONFIRMACIÓN: PASAR A RESERVA */}
       {modalConfirmarReserva.abierto && modalConfirmarReserva.cotizacion && (() => {
         const cModal = modalConfirmarReserva.cotizacion;
-        const valorAlojamientoModal = (cModal.subtotal_alojamiento && cModal.subtotal_alojamiento > 0)
-          ? cModal.subtotal_alojamiento
-          : Math.max(0, (cModal.total || 0) - (cModal.costo_alimentacion || 0));
+        const fincaModalRef = fincas.find(f => f.id === cModal.finca_id);
+        const finCotModal = desglosarFinanzasCotizacion(cModal, fincaModalRef);
+        const valorAlojamientoModal = finCotModal.totalPropietarioFinca;
         const costoAlimModal = cModal.costo_alimentacion || 0;
         const tieneAlimModal = costoAlimModal > 0 || (cModal.alimentacion && cModal.alimentacion !== 'Sin alimentación');
 
@@ -582,7 +616,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
         const totalCotizacionModal = cModal.total || (valorAlojamientoModal + costoAlimModal);
         const totalRecibidoHoy = modalConfirmarReserva.anticipoFinca + abonoAlimIngresado;
         const saldoTotalPendiente = saldoFincaCheckIn + saldoAlimAdmin;
-        const anticipoSugerido = Math.round(valorAlojamientoModal * 0.5);
+        const anticipoSugerido = finCotModal.abono50Propietario;
 
         return (
           <div className="modal-overlay" onClick={() => setModalConfirmarReserva(p => ({ ...p, abierto: false, cotizacion: null, guardando: false }))}>
@@ -628,10 +662,27 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span className="text-muted">Fechas:</span>
-                    <span>{formatFecha(cModal.fecha_inicio)} → {formatFecha(cModal.fecha_fin)} ({cModal.personas} personas)</span>
+                    <span>
+                      {formatFecha(cModal.fecha_inicio)} → {formatFecha(cModal.fecha_fin)} ({cModal.personas} personas
+                      {finCotModal.cantidadMascotas > 0 ? ` · 🐾 ${finCotModal.cantidadMascotas} mascota(s)` : ''})
+                    </span>
                   </div>
+                  {finCotModal.costoMascotas > 0 && (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span className="text-muted">Alojamiento Base:</span>
+                        <span>{formatCOP(finCotModal.subtotalAlojamientoBase)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--primary)' }}>
+                        <span>🐾 Mascotas ({finCotModal.cantidadMascotas} · Pago al Propietario):</span>
+                        <strong>+{formatCOP(finCotModal.costoMascotas)}</strong>
+                      </div>
+                    </>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span className="text-muted">Valor Finca (Alojamiento):</span>
+                    <span className="text-muted">
+                      {finCotModal.costoMascotas > 0 ? 'Total Finca (Alojamiento + Mascotas · Dueño):' : 'Valor Finca (Alojamiento):'}
+                    </span>
                     <strong>{formatCOP(valorAlojamientoModal)}</strong>
                   </div>
                   {tieneAlimModal && (

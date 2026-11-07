@@ -136,6 +136,8 @@ export interface CotizacionDB {
   menu_id?: string | null;
   cantidad_alimentacion?: number;
   alimentacion?: string | null;
+  cantidad_mascotas?: number | null;
+  costo_mascotas?: number | null;
   precio_base_pp: number;
   subtotal_alojamiento: number;
   costo_alimentacion: number;
@@ -148,7 +150,7 @@ export interface CotizacionDB {
   created_at?: string;
   updated_at?: string;
   clientes?: Pick<Cliente, 'id' | 'nombre' | 'apellido' | 'whatsapp'>;
-  fincas?: Pick<Finca, 'id' | 'nombre' | 'banco_nombre' | 'banco_tipo_cuenta' | 'banco_cuenta' | 'banco_titular' | 'banco_identificacion'>;
+  fincas?: Pick<Finca, 'id' | 'nombre' | 'banco_nombre' | 'banco_tipo_cuenta' | 'banco_cuenta' | 'banco_titular' | 'banco_identificacion' | 'politica_mascotas' | 'valor_mascota'>;
   menus?: Pick<Menu, 'id' | 'nombre' | 'categoria' | 'precio_pp'>;
 }
 
@@ -168,6 +170,8 @@ export interface Reserva {
   menu_id?: string | null;
   alimentacion?: string | null;
   costo_alimentacion?: number;
+  cantidad_mascotas?: number | null;
+  costo_mascotas?: number | null;
   estado_alimentacion?: EstadoAlimentacion | null;
   monto_pagado_alimentacion?: number;
   saldo_pendiente_alimentacion?: number;
@@ -219,6 +223,143 @@ export interface Pago {
   created_at?: string;
 }
 
+/**
+ * Extrae de forma centralizada la cantidad y costo de mascotas desde una Cotización o Reserva
+ * (soportando campos directos, cotizacion_snapshot o metadatos embebidos en notas/observaciones).
+ */
+export function extraerInfoMascotas(
+  item?: Partial<CotizacionDB> | Partial<Reserva> | Record<string, any> | null,
+  finca?: Partial<Finca> | Record<string, any> | null
+): { cantidadMascotas: number; costoMascotas: number; valorUnitario: number } {
+  if (!item) {
+    const valUnit = finca?.politica_mascotas === 'con_costo' ? Number(finca?.valor_mascota || 0) : 0;
+    return { cantidadMascotas: 0, costoMascotas: 0, valorUnitario: valUnit };
+  }
+
+  const snap = (item as Reserva).cotizacion_snapshot || {};
+  let cantidad = typeof item.cantidad_mascotas === 'number'
+    ? item.cantidad_mascotas
+    : (typeof snap.cantidad_mascotas === 'number' ? snap.cantidad_mascotas : 0);
+
+  let costo = typeof item.costo_mascotas === 'number'
+    ? item.costo_mascotas
+    : (typeof snap.costo_mascotas === 'number' ? snap.costo_mascotas : 0);
+
+  const textoNotas = `${(item as CotizacionDB).notas || ''} ${(item as Reserva).observaciones || ''}`;
+
+  if (cantidad <= 0 && textoNotas) {
+    const matchTag = textoNotas.match(/\[MASCOTAS:(\d+):(\d+)\]/i);
+    if (matchTag) {
+      cantidad = parseInt(matchTag[1], 10) || 0;
+      costo = parseInt(matchTag[2], 10) || 0;
+    } else {
+      const matchTexto = textoNotas.match(/Mascotas:\s*(\d+)\s*(?:\(\$([\d.,]+)\s*COP)?/i);
+      if (matchTexto) {
+        cantidad = parseInt(matchTexto[1], 10) || 0;
+        if (matchTexto[2]) {
+          costo = parseInt(matchTexto[2].replace(/\D/g, ''), 10) || 0;
+        }
+      }
+    }
+  }
+
+  const valorFinca = finca?.politica_mascotas === 'con_costo' ? Number(finca?.valor_mascota || 0) : 0;
+  if (cantidad > 0 && costo <= 0 && valorFinca > 0) {
+    costo = cantidad * valorFinca;
+  }
+
+  const valorUnitario = cantidad > 0 && costo > 0
+    ? Math.round(costo / cantidad)
+    : valorFinca;
+
+  return {
+    cantidadMascotas: Math.max(0, cantidad),
+    costoMascotas: Math.max(0, costo),
+    valorUnitario: Math.max(0, valorUnitario),
+  };
+}
+
+/**
+ * Embebe de forma limpia y legible la información de mascotas en notas u observaciones
+ * para garantizar persistencia total en Supabase sin depender de migraciones de esquema.
+ */
+export function adjuntarMetaMascotasEnTexto(
+  textoOriginal: string | null | undefined,
+  cantidadMascotas: number,
+  costoMascotas: number
+): string | null {
+  const limpio = (textoOriginal || '')
+    .replace(/\s*·?\s*🐾\s*Mascotas:\s*\d+\s*(?:\(\$[\d.,]+\s*COP[^)]*\)|\(Sin costo adicional\))?/gi, '')
+    .replace(/\s*\[MASCOTAS:\d+:\d+\]/gi, '')
+    .trim();
+
+  if (!cantidadMascotas || cantidadMascotas <= 0) {
+    return limpio || null;
+  }
+
+  const etiqueta = costoMascotas > 0
+    ? `🐾 Mascotas: ${cantidadMascotas} ($${costoMascotas.toLocaleString('es-CO')} COP - Pago al propietario)`
+    : `🐾 Mascotas: ${cantidadMascotas} (Sin costo adicional)`;
+
+  return limpio ? `${limpio} · ${etiqueta}` : etiqueta;
+}
+
+/**
+ * Desglosa las finanzas de una Cotización separando claramente lo que corresponde al
+ * Propietario de la Finca (Alojamiento Base + Mascotas) y a la Administración (Alimentación).
+ */
+export function desglosarFinanzasCotizacion(
+  cotizacion: Partial<CotizacionDB> | null | undefined,
+  finca?: Partial<Finca> | null
+) {
+  if (!cotizacion) {
+    return {
+      subtotalAlojamientoBase: 0,
+      cantidadMascotas: 0,
+      costoMascotas: 0,
+      valorMascotaUnitario: 0,
+      totalPropietarioFinca: 0,
+      abono50Propietario: 0,
+      costoAlimentacion: 0,
+      descuento: 0,
+      recargo: 0,
+      totalCotizado: 0,
+    };
+  }
+
+  const infoMascotas = extraerInfoMascotas(cotizacion, finca);
+  const costoAlimentacion = Number(cotizacion.costo_alimentacion || 0);
+  const descuento = Number(cotizacion.descuento || 0);
+  const recargo = Number(cotizacion.recargo || 0);
+  const totalCotizado = Number(cotizacion.total || 0);
+  const subRaw = Number(cotizacion.subtotal_alojamiento || 0);
+
+  // Determinar total que va al Propietario de la Finca (todo excepto alimentación)
+  const totalPropietarioFinca = totalCotizado > 0
+    ? Math.max(0, totalCotizado - costoAlimentacion)
+    : Math.max(0, subRaw + infoMascotas.costoMascotas - descuento + recargo);
+
+  // Determinar alojamiento base sin mascotas
+  const subtotalAlojamientoBase = Math.abs((subRaw + infoMascotas.costoMascotas + costoAlimentacion - descuento + recargo) - totalCotizado) <= 10 && subRaw > 0
+    ? subRaw
+    : Math.max(0, totalPropietarioFinca - infoMascotas.costoMascotas + descuento - recargo);
+
+  const abono50Propietario = Math.round(totalPropietarioFinca * 0.5);
+
+  return {
+    subtotalAlojamientoBase,
+    cantidadMascotas: infoMascotas.cantidadMascotas,
+    costoMascotas: infoMascotas.costoMascotas,
+    valorMascotaUnitario: infoMascotas.valorUnitario,
+    totalPropietarioFinca,
+    abono50Propietario,
+    costoAlimentacion,
+    descuento,
+    recargo,
+    totalCotizado: totalCotizado || (totalPropietarioFinca + costoAlimentacion),
+  };
+}
+
 // Saldo calculado en frontend a partir de pagos
 export function calcularSaldo(reserva: Reserva): number {
   if (!reserva.pagos || reserva.pagos.length === 0) {
@@ -233,14 +374,17 @@ export function calcularSaldo(reserva: Reserva): number {
 /**
  * Desglose financiero independiente pero centralizado:
  * Separa de manera transparente lo que le corresponde al Propietario de la finca
- * de lo que le corresponde a la Administración por servicios de alimentación.
+ * (Alojamiento Base + Ingreso de Mascotas) de lo que le corresponde a la Administración
+ * por servicios de alimentación.
  */
-export function desglosarFinanzasReserva(reserva: Reserva) {
+export function desglosarFinanzasReserva(reserva: Reserva, finca?: Partial<Finca> | null) {
   const costoAlim = reserva.costo_alimentacion || 0;
   const snap = reserva.cotizacion_snapshot || {};
-  const subtotalAlojamiento = typeof snap.subtotal_alojamiento === 'number'
-    ? snap.subtotal_alojamiento
-    : Math.max(0, reserva.valor_total - costoAlim);
+  const infoMascotas = extraerInfoMascotas(reserva, finca);
+
+  // Todo lo que no es alimentación corresponde al Propietario de la Finca (Alojamiento + Mascotas)
+  const subtotalAlojamiento = Math.max(0, (reserva.valor_total || 0) - costoAlim);
+  const subtotalAlojamientoBase = Math.max(0, subtotalAlojamiento - infoMascotas.costoMascotas);
 
   // Pagos totales
   const totalPagos = (reserva.pagos || []).reduce((acc, p) => {
@@ -271,14 +415,18 @@ export function desglosarFinanzasReserva(reserva: Reserva) {
   }
   pagadoAlimentacion = Math.max(0, Math.min(costoAlim, pagadoAlimentacion));
 
-  // El resto de los pagos corresponde al alojamiento (finca para el propietario)
+  // El resto de los pagos corresponde al propietario de la finca (alojamiento + mascotas)
   const pagadoFinca = Math.max(0, Math.min(subtotalAlojamiento, totalRecaudado - pagadoAlimentacion));
   const saldoFincaCheckIn = Math.max(0, subtotalAlojamiento - pagadoFinca);
   const saldoAlimentacionAdmin = Math.max(0, costoAlim - pagadoAlimentacion);
   const saldoConsolidado = saldoFincaCheckIn + saldoAlimentacionAdmin;
 
   return {
-    subtotalAlojamiento,
+    subtotalAlojamiento, // Total Propietario de la Finca (Alojamiento Base + Mascotas)
+    subtotalAlojamientoBase,
+    cantidadMascotas: infoMascotas.cantidadMascotas,
+    costoMascotas: infoMascotas.costoMascotas,
+    valorMascotaUnitario: infoMascotas.valorUnitario,
     pagadoFinca,
     saldoFincaCheckIn,
     costoAlimentacion: costoAlim,
@@ -286,6 +434,7 @@ export function desglosarFinanzasReserva(reserva: Reserva) {
     saldoAlimentacionAdmin,
     totalConsolidado: reserva.valor_total,
     totalRecaudado,
+    totalPagado: totalRecaudado,
     saldoConsolidado,
   };
 }

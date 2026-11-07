@@ -8,7 +8,7 @@ import type {
   EstadoAlimentacion, OpcionesReinicioDatos, ResultadoReinicioDatos
 } from '../types';
 import type { ToastMessage } from '../components/Toast';
-import { calcularSaldo } from '../types';
+import { calcularSaldo, extraerInfoMascotas, adjuntarMetaMascotasEnTexto } from '../types';
 import { obtenerSiguienteConsecutivo } from '../utils/consecutivos';
 import { generarUUID, esUUID } from '../utils/uuid';
 import { CONFIGURACION_DEFAULT, setConfiguracionGlobal, resolverLogoUrl } from '../services/configuracion';
@@ -513,7 +513,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         `)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      const arr = (data as unknown as CotizacionDB[]) || [];
+      const arr = ((data as unknown as CotizacionDB[]) || []).map(c => {
+        const infoM = extraerInfoMascotas(c);
+        return {
+          ...c,
+          cantidad_mascotas: c.cantidad_mascotas ?? infoM.cantidadMascotas,
+          costo_mascotas: c.costo_mascotas ?? infoM.costoMascotas,
+        };
+      });
       const ordenadas = arr.sort(
         (a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
       );
@@ -591,10 +598,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           : (r.cotizacion_snapshot?.saldo_pendiente_alimentacion !== undefined && r.cotizacion_snapshot?.saldo_pendiente_alimentacion !== null
               ? Number(r.cotizacion_snapshot.saldo_pendiente_alimentacion)
               : Math.max(0, costoAlim - montoPagadoAlim));
+        const infoM = extraerInfoMascotas(r);
         return {
           ...r,
           cierre,
           costo_alimentacion: costoAlim,
+          cantidad_mascotas: r.cantidad_mascotas ?? infoM.cantidadMascotas,
+          costo_mascotas: r.costo_mascotas ?? infoM.costoMascotas,
           estado_alimentacion: estadoAlimentacion,
           fecha_pago_alimentacion: fechaPagoAlim,
           metodo_pago_alimentacion: metodoPagoAlim,
@@ -1060,6 +1070,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fFin = dFin.toISOString().split('T')[0];
       }
 
+      const notasConMascotas = adjuntarMetaMascotasEnTexto(
+        `Solicitud web directa por WhatsApp · Consecutivo ${consecutivo}`,
+        datos.cantidadMascotas || 0,
+        datos.costoMascotas || 0
+      );
+
       const nuevaCotizacion: CotizacionDB = {
         id: newCotId,
         cliente_id: clienteId,
@@ -1067,6 +1083,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fecha_inicio: fInicio,
         fecha_fin: fFin,
         personas: datos.personas || 1,
+        cantidad_mascotas: datos.cantidadMascotas || 0,
+        costo_mascotas: datos.costoMascotas || 0,
         alimentacion: datos.alimentacion,
         menu_id: (datos.menuId && esUUID(datos.menuId)) ? datos.menuId : null,
         cantidad_alimentacion: datos.cantidadServicios || 1,
@@ -1078,7 +1096,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         total: datos.total,
         consecutivo: consecutivo,
         estado: 'cotizada',
-        notas: `Solicitud web directa por WhatsApp · Consecutivo ${consecutivo}`,
+        notas: notasConMascotas,
         created_at: new Date().toISOString(),
         clientes: {
           id: clienteObj.id,
@@ -1258,6 +1276,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       }
 
+      const infoMascotasCot = extraerInfoMascotas(cotizacion, fincaSel);
+      const obsConMascotas = adjuntarMetaMascotasEnTexto(
+        `Convertida de cotización ${cotizacion.consecutivo || cotizacion.id}`,
+        infoMascotasCot.cantidadMascotas,
+        infoMascotasCot.costoMascotas
+      );
+
       const nuevaReserva: Reserva = {
         id: newResId,
         cotizacion_id: cotizacion.id,
@@ -1266,6 +1291,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fecha_inicio: cotizacion.fecha_inicio,
         fecha_fin: cotizacion.fecha_fin,
         personas: cotizacion.personas,
+        cantidad_mascotas: infoMascotasCot.cantidadMascotas,
+        costo_mascotas: infoMascotasCot.costoMascotas,
         valor_total: cotizacion.total,
         separacion: anticipo,
         consecutivo: consecutivoReserva,
@@ -1278,7 +1305,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fecha_pago_alimentacion: fechaPagoAlim,
         metodo_pago_alimentacion: abonoAlim > 0 ? metodoPagoAlim : null,
         estado: 'activa',
-        observaciones: `Convertida de cotización ${cotizacion.consecutivo || cotizacion.id}`,
+        observaciones: obsConMascotas,
         created_at: new Date().toISOString(),
         clientes: clienteSel ? {
           id: clienteSel.id,
@@ -1296,6 +1323,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           cotizacion_id: cotizacion.id,
           consecutivo: cotizacion.consecutivo,
           subtotal_alojamiento: cotizacion.subtotal_alojamiento,
+          cantidad_mascotas: infoMascotasCot.cantidadMascotas,
+          costo_mascotas: infoMascotasCot.costoMascotas,
           costo_alimentacion: costoAlim,
           estado_alimentacion: estAlim,
           monto_pagado_alimentacion: abonoAlim,
@@ -1428,6 +1457,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const fincaSel = fincas.find(f => f.id === datos.finca_id);
       const clienteSel = clientes.find(c => c.id === datos.cliente_id);
 
+      const infoMRes = extraerInfoMascotas(datos, fincaSel);
+      const obsReservaFinal = adjuntarMetaMascotasEnTexto(
+        datos.observaciones || null,
+        infoMRes.cantidadMascotas,
+        infoMRes.costoMascotas
+      );
+
       const payloadReserva: Reserva = {
         id: resId,
         cliente_id: datos.cliente_id || '',
@@ -1435,12 +1471,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fecha_inicio: datos.fecha_inicio || '',
         fecha_fin: datos.fecha_fin || '',
         personas: datos.personas || 1,
+        cantidad_mascotas: infoMRes.cantidadMascotas,
+        costo_mascotas: infoMRes.costoMascotas,
         valor_total: datos.valor_total || 0,
         separacion: datos.separacion || 0,
+        menu_id: datos.menu_id !== undefined ? datos.menu_id : null,
+        alimentacion: datos.alimentacion !== undefined ? datos.alimentacion : null,
+        costo_alimentacion: datos.costo_alimentacion !== undefined ? datos.costo_alimentacion : 0,
         estado: datos.estado || 'activa',
-        observaciones: datos.observaciones || null,
+        observaciones: obsReservaFinal,
         consecutivo: consecutivo || datos.consecutivo,
         cotizacion_id: datos.cotizacion_id || null,
+        cotizacion_snapshot: {
+          ...(datos.cotizacion_snapshot || {}),
+          cantidad_mascotas: infoMRes.cantidadMascotas,
+          costo_mascotas: infoMRes.costoMascotas,
+        },
         clientes: clienteSel ? {
           id: clienteSel.id,
           nombre: clienteSel.nombre,
@@ -1515,12 +1561,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         valor_total: datos.valor_total || 0,
         separacion: datos.separacion || 0,
         estado: datos.estado || 'activa',
-        observaciones: datos.observaciones || null,
+        observaciones: obsReservaFinal,
         consecutivo: payloadReserva.consecutivo,
         cotizacion_id: datos.cotizacion_id || null,
         menu_id: datos.menu_id !== undefined ? datos.menu_id : null,
         alimentacion: datos.alimentacion !== undefined ? datos.alimentacion : null,
         costo_alimentacion: datos.costo_alimentacion !== undefined ? datos.costo_alimentacion : 0,
+        cotizacion_snapshot: payloadReserva.cotizacion_snapshot,
       };
 
       try {
@@ -2048,6 +2095,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const fincaSel = fincas.find(f => f.id === datos.finca_id);
       const clienteSel = clientes.find(c => c.id === datos.cliente_id);
 
+      const infoM = extraerInfoMascotas(datos, fincaSel);
+      const notasFinal = adjuntarMetaMascotasEnTexto(
+        datos.notas || null,
+        infoM.cantidadMascotas,
+        infoM.costoMascotas
+      );
+
       const cotizacionObj: CotizacionDB = {
         id: cotId,
         cliente_id: datos.cliente_id || null,
@@ -2055,6 +2109,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fecha_inicio: datos.fecha_inicio || '',
         fecha_fin: datos.fecha_fin || '',
         personas: datos.personas || 1,
+        cantidad_mascotas: infoM.cantidadMascotas,
+        costo_mascotas: infoM.costoMascotas,
         alimentacion: datos.alimentacion || 'Sin alimentación',
         menu_id: datos.menu_id || null,
         cantidad_alimentacion: datos.cantidad_alimentacion ?? 1,
@@ -2066,7 +2122,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         total: datos.total || 0,
         consecutivo: consecutivo || datos.consecutivo,
         estado: datos.estado || 'borrador',
-        notas: datos.notas || null,
+        notas: notasFinal,
         created_at: new Date().toISOString(),
         clientes: clienteSel ? {
           id: clienteSel.id,
@@ -2105,7 +2161,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           total: datos.total || 0,
           consecutivo: cotizacionObj.consecutivo,
           estado: datos.estado || 'borrador',
-          notas: datos.notas || null,
+          notas: notasFinal,
         }, { onConflict: 'id' });
 
         if (error) console.warn('[guardarCotizacion] Aviso Supabase:', error);

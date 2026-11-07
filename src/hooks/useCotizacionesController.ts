@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { CotizacionDB, CotizacionEstado, Cliente, Finca, Menu, ConfiguracionGeneral } from '../types';
-import { calcularCotizacion } from '../utils/calcularCotizacion';
+import { extraerInfoMascotas, desglosarFinanzasCotizacion } from '../types';
+import { calcularCotizacion, resolverPlanesAlimentacionDetalle } from '../utils/calcularCotizacion';
 import { useApp } from '../context/AppContext';
 import { getConfiguracionGlobal } from '../services/configuracion';
 import {
@@ -33,6 +34,8 @@ export const VACIO_COTIZACION: Partial<CotizacionDB> = {
   fecha_inicio: '',
   fecha_fin: '',
   personas: 1,
+  cantidad_mascotas: 0,
+  costo_mascotas: 0,
   menu_id: null,
   cantidad_alimentacion: 1,
   alimentacion: 'Sin alimentación',
@@ -145,48 +148,82 @@ export function useCotizacionesController({
   }, []);
 
   const abrirEdicion = useCallback((c: CotizacionDB) => {
-    setForm({ ...c });
-    setModoAlimentacionPersonalizada(!c.menu_id && !!c.alimentacion && c.alimentacion !== 'Sin alimentación');
+    const fincaRef = fincas.find(x => x.id === c.finca_id);
+    const infoM = extraerInfoMascotas(c, fincaRef);
+    const esMultiOPersonalizada =
+      Boolean(c.alimentacion && c.alimentacion.includes(' + ')) ||
+      (!c.menu_id && !!c.alimentacion && c.alimentacion !== 'Sin alimentación');
+    setForm({
+      ...c,
+      cantidad_mascotas: infoM.cantidadMascotas,
+      costo_mascotas: infoM.costoMascotas,
+    });
+    setModoAlimentacionPersonalizada(esMultiOPersonalizada);
     setEditando(true);
-  }, []);
+  }, [fincas]);
 
   const cerrar = useCallback(() => {
     setForm(VACIO_COTIZACION);
     setEditando(false);
   }, []);
 
-  // Recálculo inteligente con la utilidad centralizada
-  const recalcular = useCallback((f: Partial<CotizacionDB>): Partial<CotizacionDB> => {
+  // Recálculo inteligente con la utilidad centralizada (incluyendo mascotas y multi-menús)
+  const recalcular = useCallback((f: Partial<CotizacionDB>, campoModificado?: keyof CotizacionDB): Partial<CotizacionDB> => {
     const n = noches(f.fecha_inicio || '', f.fecha_fin || '');
+    const fincaSel = fincas.find(x => x.id === f.finca_id);
+    const valorMascotaFinca = fincaSel?.politica_mascotas === 'con_costo' ? Number(fincaSel?.valor_mascota || 0) : 0;
+
+    const cantMascotas = Math.max(0, Math.round(Number(f.cantidad_mascotas || 0)));
+    let costoMascotas = Math.max(0, Number(f.costo_mascotas || 0));
+    if (campoModificado === 'cantidad_mascotas' || campoModificado === 'finca_id' || (cantMascotas > 0 && costoMascotas <= 0)) {
+      costoMascotas = cantMascotas * valorMascotaFinca;
+    } else if (cantMascotas === 0) {
+      costoMascotas = 0;
+    }
+
+    const tieneMultiMenu = Boolean(f.alimentacion && f.alimentacion.includes(' + '));
     let menuPrecioPp = 0;
-    if (f.menu_id && !modoAlimentacionPersonalizada) {
+    if (f.menu_id && !modoAlimentacionPersonalizada && !tieneMultiMenu) {
       const m = menus.find(x => x.id === f.menu_id);
       if (m) {
         menuPrecioPp = m.precio_pp || 0;
       }
     }
 
-    const { subtotalAlojamiento, costoAlimentacion, total } = calcularCotizacion({
+    const { subtotalAlojamiento, costoAlimentacion: costoAlimUnico } = calcularCotizacion({
       noches: n,
       personas: f.personas || 1,
       precioPp: f.precio_base_pp || 0,
       menuPrecioPp,
       cantidadServicios: f.cantidad_alimentacion || n,
+      cantidadMascotas: cantMascotas,
+      valorMascota: cantMascotas > 0 ? Math.round(costoMascotas / cantMascotas) : 0,
       descuento: f.descuento || 0,
       recargo: f.recargo || 0,
     });
 
+    const costoAlimentacionFinal = (modoAlimentacionPersonalizada || tieneMultiMenu)
+      ? Math.max(0, Number(f.costo_alimentacion || 0))
+      : costoAlimUnico;
+
+    const totalFinal = Math.max(
+      0,
+      subtotalAlojamiento + costoMascotas + costoAlimentacionFinal - Number(f.descuento || 0) + Number(f.recargo || 0)
+    );
+
     return {
       ...f,
       noches: n,
+      cantidad_mascotas: cantMascotas,
+      costo_mascotas: costoMascotas,
       subtotal_alojamiento: subtotalAlojamiento,
-      costo_alimentacion: costoAlimentacion,
-      total,
+      costo_alimentacion: costoAlimentacionFinal,
+      total: totalFinal,
     };
-  }, [menus, modoAlimentacionPersonalizada]);
+  }, [menus, fincas, modoAlimentacionPersonalizada]);
 
   const updateField = useCallback((campo: keyof CotizacionDB, valor: any) => {
-    setForm(prev => recalcular({ ...prev, [campo]: valor }));
+    setForm(prev => recalcular({ ...prev, [campo]: valor }, campo));
   }, [recalcular]);
 
   const handleMenuSelect = useCallback((menuId: string) => {
@@ -202,7 +239,7 @@ export function useCotizacionesController({
         menu_id: null,
         alimentacion: 'Sin alimentación',
         costo_alimentacion: 0,
-      }));
+      }, 'menu_id'));
       return;
     }
     const m = menus.find(x => x.id === menuId);
@@ -216,7 +253,7 @@ export function useCotizacionesController({
       alimentacion: `${m.categoria}: ${m.nombre}`,
       cantidad_alimentacion: cant,
       costo_alimentacion: costo,
-    }));
+    }, 'menu_id'));
   }, [menus, form.fecha_inicio, form.fecha_fin, form.cantidad_alimentacion, form.personas, recalcular]);
 
   const handleFincaChange = useCallback((fincaId: string) => {
@@ -227,13 +264,22 @@ export function useCotizacionesController({
       finca_id: fincaId,
       precio_base_pp: finca?.precio_pp || 0,
       personas: Math.max(minPers, prev.personas || 1),
-    }));
+    }, 'finca_id'));
   }, [fincas, recalcular]);
 
   const handleDescargarPdfAlimentacion = useCallback(async (c: CotizacionDB) => {
     const cantPersonas = c.personas || 4;
     const cantServ = c.cantidad_alimentacion || c.noches || 1;
-    const m = (c.menu_id && menus.find(x => x.id === c.menu_id)) || (c.alimentacion && c.alimentacion !== 'Sin alimentación' ? {
+    const resuelto = resolverPlanesAlimentacionDetalle({
+      alimentacionTexto: c.alimentacion,
+      costoTotalReal: c.costo_alimentacion,
+      menusCatalogo: menus,
+      menuIdFallback: c.menu_id,
+      personasDefault: cantPersonas,
+      serviciosDefault: cantServ,
+    });
+
+    const m = resuelto.items[0]?.menu || (c.menu_id && menus.find(x => x.id === c.menu_id)) || (c.alimentacion && c.alimentacion !== 'Sin alimentación' ? {
       id: 'custom',
       nombre: c.alimentacion,
       categoria: 'Almuerzo' as const,
@@ -248,6 +294,9 @@ export function useCotizacionesController({
     try {
       await generarPropuestaAlimentacion({
         menu: m,
+        menusCatalogo: menus,
+        alimentacionTexto: c.alimentacion,
+        costoTotalReal: c.costo_alimentacion,
         cliente: cl,
         finca: f,
         personas: cantPersonas,
@@ -306,10 +355,9 @@ export function useCotizacionesController({
   }, [configuracion, handleDescargarPdfAlimentacion]);
 
   const handleIniciarPasoAReserva = useCallback((c: CotizacionDB) => {
-    const valorAlojamiento = (c.subtotal_alojamiento && c.subtotal_alojamiento > 0)
-      ? c.subtotal_alojamiento
-      : Math.max(0, (c.total || 0) - (c.costo_alimentacion || 0));
-    const anticipoSugerido = Math.round(valorAlojamiento * 0.5);
+    const fincaRef = fincas.find(x => x.id === c.finca_id);
+    const finCot = desglosarFinanzasCotizacion(c, fincaRef);
+    const anticipoSugerido = finCot.abono50Propietario;
 
     setModalConfirmarReserva({
       abierto: true,
@@ -320,7 +368,7 @@ export function useCotizacionesController({
       metodoPagoAlimentacion: 'Transferencia Bancolombia / Nequi',
       guardando: false,
     });
-  }, []);
+  }, [fincas]);
 
   const handleConfirmarPasoAReserva = useCallback(async () => {
     if (!modalConfirmarReserva.cotizacion) return;
