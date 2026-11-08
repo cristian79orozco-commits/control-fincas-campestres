@@ -2540,7 +2540,46 @@ textarea:focus {
 
 .admin-cal-day-large.today {
   border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary-bg) 25%, var(--surface));
+  background: color-mix(in srgb, var(--primary-bg) 28%, var(--surface));
+  box-shadow: inset 0 0 0 1.5px var(--primary), 0 0 14px rgba(77, 168, 158, 0.22);
+}
+
+.admin-cal-day-large.past {
+  opacity: 0.52;
+  filter: grayscale(35%);
+  background: color-mix(in srgb, var(--surface-2) 75%, var(--surface)) !important;
+  border-color: color-mix(in srgb, var(--border) 55%, transparent) !important;
+  cursor: pointer;
+  position: relative;
+}
+
+.admin-cal-day-large.past::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent,
+    transparent 5px,
+    rgba(255, 255, 255, 0.015) 5px,
+    rgba(255, 255, 255, 0.015) 10px
+  );
+  pointer-events: none;
+}
+
+.admin-cal-day-large.past:hover {
+  opacity: 0.8;
+  filter: grayscale(10%);
+  border-color: var(--border) !important;
+  transform: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.admin-cal-day-large.past.selected {
+  outline: none !important;
 }
 
 .admin-cal-day-large.free {
@@ -2562,6 +2601,11 @@ textarea:focus {
   outline: 2.5px solid var(--primary);
   outline-offset: 1px;
   background: color-mix(in srgb, var(--primary-bg) 65%, var(--surface));
+}
+
+.legend-dot.past::before {
+  background: var(--text-muted);
+  opacity: 0.55;
 }
 
 /* Micro-indicadores para móvil */
@@ -2616,6 +2660,10 @@ textarea:focus {
 
   .cal-mobile-indicator {
     display: block;
+  }
+
+  .admin-cal-day-large.past .cal-mobile-indicator {
+    opacity: 0.35;
   }
 
   .admin-fincas-search-input {

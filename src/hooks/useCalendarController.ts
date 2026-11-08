@@ -3,6 +3,7 @@ import type {
   Finca, BloqueoDisponibilidad, Reserva, Cliente, CotizacionDB,
   Menu as MenuType, ConfiguracionGeneral, PagoTipo, Pago, CierreReserva
 } from '../types';
+import { getFechaHoyLocal } from '../utils/dashboardMetrics';
 
 export interface UseCalendarControllerParams {
   fincas: Finca[];
@@ -47,7 +48,7 @@ export const TIPOS_PAGO: { valor: PagoTipo; label: string }[] = [
 
 export const PAGO_VACIO = {
   tipo: 'abono' as PagoTipo,
-  fecha: new Date().toISOString().split('T')[0],
+  fecha: getFechaHoyLocal(),
   valor: 0,
   observacion: ''
 };
@@ -78,6 +79,7 @@ export interface DiaCalendarioModel {
   esOcupado: boolean;
   esSeleccionado: boolean;
   esHoy: boolean;
+  esPasado: boolean;
   reservaVinculada?: Reserva;
   bloqueoVinculado?: BloqueoDisponibilidad;
   clienteEtiqueta: string;
@@ -166,7 +168,7 @@ export function useCalendarController({
   const primerDiaSemana = useMemo(() => new Date(anio, mes, 1).getDay(), [anio, mes]);
   const offset = useMemo(() => (primerDiaSemana === 0 ? 6 : primerDiaSemana - 1), [primerDiaSemana]);
 
-  const hoyStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const hoyStr = useMemo(() => getFechaHoyLocal(), []);
 
   // Finca seleccionada actual
   const fincaActual = useMemo(() => {
@@ -188,7 +190,10 @@ export function useCalendarController({
         const d = new Date(b.fecha_inicio + 'T00:00:00');
         const fin = new Date(b.fecha_fin + 'T00:00:00');
         while (d <= fin) {
-          const iso = d.toISOString().split('T')[0];
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          const iso = `${y}-${m}-${day}`;
           set.add(iso);
           bloqMap.set(iso, b);
           d.setDate(d.getDate() + 1);
@@ -202,7 +207,10 @@ export function useCalendarController({
         const d = new Date(r.fecha_inicio + 'T00:00:00');
         const fin = new Date(r.fecha_fin + 'T00:00:00');
         while (d <= fin) {
-          const iso = d.toISOString().split('T')[0];
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          const iso = `${y}-${m}-${day}`;
           set.add(iso);
           resMap.set(iso, r);
           d.setDate(d.getDate() + 1);
@@ -262,6 +270,7 @@ export function useCalendarController({
       const esOcupado = ocupadosSet.has(fechaStr);
       const esSeleccionado = fechasSeleccionadas.has(fechaStr);
       const esHoy = fechaStr === hoyStr;
+      const esPasado = fechaStr < hoyStr;
 
       const reservaVinculada = reservasPorFecha.get(fechaStr);
       const bloqueoVinculado = bloqueosPorFecha.get(fechaStr);
@@ -280,6 +289,7 @@ export function useCalendarController({
       }
 
       let cls = 'admin-cal-day-large';
+      if (esPasado) cls += ' past';
       if (esSeleccionado) cls += ' selected';
       else if (bloqueoVinculado) cls += ' busy-admin';
       else if (esOcupado) cls += ' busy';
@@ -292,6 +302,7 @@ export function useCalendarController({
         esOcupado,
         esSeleccionado,
         esHoy,
+        esPasado,
         reservaVinculada,
         bloqueoVinculado,
         clienteEtiqueta,
@@ -302,16 +313,35 @@ export function useCalendarController({
   }, [diasMes, anio, mes, ocupadosSet, fechasSeleccionadas, hoyStr, reservasPorFecha, bloqueosPorFecha]);
 
   const toggleDia = useCallback((fechaStr: string) => {
+    const esPasado = fechaStr < hoyStr;
+
+    // Siempre actualizamos la fecha inspeccionada para que el administrador
+    // pueda ver la información de la reserva o estado del día que decidió ver
+    setFechaInspeccionada(fechaStr);
+
+    // Si la fecha ya es del pasado, no se permite su selección para bloquear o liberar
+    if (esPasado) {
+      setFechasSeleccionadas(prev => {
+        if (prev.has(fechaStr)) {
+          const next = new Set(prev);
+          next.delete(fechaStr);
+          return next;
+        }
+        return prev;
+      });
+      return;
+    }
+
+    // Para el día actual y fechas futuras, se permite la selección/deselección interactiva
     setFechasSeleccionadas(prev => {
       const next = new Set(prev);
       if (next.has(fechaStr)) next.delete(fechaStr);
       else next.add(fechaStr);
       return next;
     });
-    setFechaInspeccionada(fechaStr);
-  }, []);
+  }, [hoyStr]);
 
-  // Atajo: Seleccionar fines de semana (Viernes, Sábado y Domingo)
+  // Atajo: Seleccionar fines de semana (Viernes, Sábado y Domingo) sólo vigentes (hoy y futuro)
   const handleSeleccionarFinesDeSemana = useCallback(() => {
     const nuevos = new Set(fechasSeleccionadas);
     for (let dia = 1; dia <= diasMes; dia++) {
@@ -319,12 +349,15 @@ export function useCalendarController({
       const dayOfWeek = dateObj.getDay(); // 0 = Dom, 5 = Vie, 6 = Sáb
       if (dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0) {
         const fStr = `${anio}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-        nuevos.add(fStr);
+        // Solo seleccionar fechas presentes y futuras
+        if (fStr >= hoyStr) {
+          nuevos.add(fStr);
+        }
       }
     }
     setFechasSeleccionadas(nuevos);
-    showToast('Fines de semana (Vie-Sáb-Dom) seleccionados', 'info');
-  }, [fechasSeleccionadas, diasMes, anio, mes, showToast]);
+    showToast('Fines de semana vigentes (Vie-Sáb-Dom) seleccionados', 'info');
+  }, [fechasSeleccionadas, diasMes, anio, mes, hoyStr, showToast]);
 
   // Liberar fecha individual directamente desde el inspector de fecha
   const handleLiberarBloqueoRapido = useCallback(async (bloqueo: BloqueoDisponibilidad) => {
@@ -355,15 +388,16 @@ export function useCalendarController({
       showToast('Selecciona una finca primero', 'error');
       return;
     }
-    if (!fechasSeleccionadas.size) {
-      showToast('Selecciona al menos un día en el calendario', 'error');
+    const fechasValidas = Array.from(fechasSeleccionadas).filter(f => f >= hoyStr);
+    if (!fechasValidas.length) {
+      showToast('Selecciona al menos un día vigente (hoy o futuro) en el calendario', 'error');
       return;
     }
 
     setProcesando(true);
     const res = await onMarcarDias(
       selectedFincaId,
-      Array.from(fechasSeleccionadas),
+      fechasValidas,
       estado,
       nombreCliente.trim() || undefined
     );
@@ -376,7 +410,7 @@ export function useCalendarController({
     } else {
       showToast(`Error: ${res.error}`, 'error');
     }
-  }, [selectedFincaId, fechasSeleccionadas, onMarcarDias, nombreCliente, showToast]);
+  }, [selectedFincaId, fechasSeleccionadas, hoyStr, onMarcarDias, nombreCliente, showToast]);
 
   // Registrar abono desde el listado inferior
   const handleRegistrarPago = useCallback(async (e: React.FormEvent) => {

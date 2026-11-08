@@ -10,6 +10,7 @@ import type {
   Menu as MenuType, ConfiguracionGeneral, PagoTipo, Pago, CierreReserva
 } from '../types';
 import { calcularSaldo } from '../types';
+import { getFechaHoyLocal } from '../utils/dashboardMetrics';
 import { ConsecutivoBadge } from './AdminReservas';
 import { CurrencyInput } from '../components/CurrencyInput';
 import { WhatsAppModal } from '../components/WhatsAppModal';
@@ -341,6 +342,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
             <span className="legend-dot free">Libre</span>
             <span className="legend-dot busy">Reserva Huésped</span>
             <span className="legend-dot sel">Seleccionado ({fechasSeleccionadas.size})</span>
+            <span className="legend-dot past">Pasado (Solo lectura)</span>
           </div>
         </div>
 
@@ -380,25 +382,46 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
                 key={dia.fechaStr}
                 className={dia.className}
                 onClick={() => toggleDia(dia.fechaStr)}
-                title={`${dia.fechaStr}: ${dia.esOcupado ? `Ocupado (${dia.clienteEtiqueta || 'Bloqueado'})` : 'Disponible / Libre'}`}
+                title={`${dia.fechaStr}: ${dia.esPasado ? 'Fecha pasada (solo lectura)' : dia.esOcupado ? `Ocupado (${dia.clienteEtiqueta || 'Bloqueado'})` : 'Disponible / Libre'}`}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: dia.esPasado ? 'var(--text-muted)' : 'var(--text)' }}>
                     {dia.diaNum}
                   </span>
                   {dia.esHoy && (
                     <span
+                      className="cal-today-badge"
+                      title={`Día actual en curso (${formatFecha(dia.fechaStr)}) · Configurado en ciclo 24 horas`}
                       style={{
                         fontSize: '0.62rem',
-                        fontWeight: 700,
-                        padding: '0.1rem 0.35rem',
+                        fontWeight: 800,
+                        padding: '0.12rem 0.42rem',
                         borderRadius: '4px',
                         background: 'var(--primary)',
-                        color: '#fff',
-                        letterSpacing: '0.02em',
+                        color: '#ffffff',
+                        letterSpacing: '0.04em',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.2rem',
+                        boxShadow: '0 0 10px rgba(77, 168, 158, 0.45)',
                       }}
                     >
+                      <Clock size={10} style={{ strokeWidth: 2.5 }} />
                       HOY
+                    </span>
+                  )}
+                  {dia.esPasado && !dia.esHoy && (
+                    <span
+                      style={{
+                        fontSize: '0.58rem',
+                        fontWeight: 600,
+                        color: 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.03em',
+                        opacity: 0.75,
+                      }}
+                    >
+                      Pasado
                     </span>
                   )}
                 </div>
@@ -413,17 +436,18 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
                       style={{
                         padding: '0.2rem 0.35rem',
                         borderRadius: '4px',
-                        background: 'rgba(239, 68, 68, 0.15)',
-                        color: 'var(--danger)',
+                        background: dia.esPasado ? 'rgba(168, 160, 151, 0.12)' : 'rgba(239, 68, 68, 0.15)',
+                        color: dia.esPasado ? 'var(--text-muted)' : 'var(--danger)',
                         fontWeight: 600,
                         lineHeight: 1.2,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
                       }}
+                      title={`${dia.consecutivoTexto} ${dia.clienteEtiqueta} ${dia.esPasado ? '(Estancia finalizada)' : ''}`}
                     >
                       {dia.consecutivoTexto && (
-                        <span style={{ fontFamily: 'monospace', marginRight: '0.2rem' }}>
+                        <span style={{ fontFamily: 'monospace', marginRight: '0.2rem', opacity: dia.esPasado ? 0.75 : 1 }}>
                           {dia.consecutivoTexto}
                         </span>
                       )}
@@ -434,8 +458,8 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
                       style={{
                         padding: '0.2rem 0.35rem',
                         borderRadius: '4px',
-                        background: 'rgba(245, 158, 11, 0.18)',
-                        color: '#b45309',
+                        background: dia.esPasado ? 'rgba(168, 160, 151, 0.12)' : 'rgba(245, 158, 11, 0.18)',
+                        color: dia.esPasado ? 'var(--text-muted)' : '#b45309',
                         fontWeight: 600,
                         lineHeight: 1.2,
                         overflow: 'hidden',
@@ -443,19 +467,20 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      🔒 {dia.bloqueoVinculado.notas || 'Bloqueo'}
+                      🔒 {dia.bloqueoVinculado.notas || (dia.esPasado ? 'Bloqueo pasado' : 'Bloqueo')}
                     </div>
                   ) : (
                     <div
                       style={{
                         padding: '0.15rem 0.35rem',
                         borderRadius: '4px',
-                        color: 'var(--success)',
+                        color: dia.esPasado ? 'var(--text-muted)' : 'var(--success)',
                         fontWeight: 500,
                         fontSize: '0.68rem',
+                        opacity: dia.esPasado ? 0.6 : 1,
                       }}
                     >
-                      Disponible
+                      {dia.esPasado ? 'Finalizado' : 'Disponible'}
                     </div>
                   )}
                 </div>
@@ -470,80 +495,150 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
             {(() => {
               const resVin = reservasPorFecha.get(fechaInspeccionada);
               const bloqVin = bloqueosPorFecha.get(fechaInspeccionada);
+              const esHoyIns = fechaInspeccionada === getFechaHoyLocal();
+              const esPasadoIns = fechaInspeccionada < getFechaHoyLocal();
+              const saldo = resVin ? calcularSaldo(resVin) : 0;
               const nomCliente = resVin?.clientes
                 ? `${resVin.clientes.nombre} ${resVin.clientes.apellido || ''}`.trim()
                 : 'Reserva activa';
               const tel = resVin?.clientes?.whatsapp || resVin?.clientes?.telefono;
+              const tienePlanAlimentacion = Boolean(resVin?.menu_id || resVin?.alimentacion || (resVin?.costo_alimentacion && resVin.costo_alimentacion > 0));
+              const nombrePlan = resVin?.menus?.nombre || resVin?.alimentacion || 'Plan especial';
 
               return (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)' }}>
-                      📅 {formatFecha(fechaInspeccionada)}
-                    </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
+                  {/* Fila superior: fecha, badges informativos y botón cerrar */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '0.6rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.98rem', color: 'var(--text)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <Calendar size={16} style={{ color: 'var(--primary)' }} /> {formatFecha(fechaInspeccionada)}
+                      </span>
 
-                    {bloqVin ? (
-                      <span className="status-badge s-warn" style={{ gap: '0.3rem', fontSize: '0.74rem' }}>
-                        <Lock size={12} /> Bloqueo manual: <strong>{bloqVin.notas || 'Sin notas'}</strong>
-                      </span>
-                    ) : resVin ? (
-                      <span className="status-badge s-busy" style={{ gap: '0.35rem', fontSize: '0.74rem' }}>
-                        👤 <strong>{nomCliente}</strong> {resVin.consecutivo ? `(#${resVin.consecutivo})` : ''}
-                      </span>
-                    ) : (
-                      <span className="status-badge s-avail" style={{ gap: '0.35rem', fontSize: '0.74rem' }}>
-                        <CheckCircle size={12} /> Fecha disponible
-                      </span>
-                    )}
+                      {esHoyIns && (
+                        <span
+                          style={{
+                            fontSize: '0.65rem',
+                            fontWeight: 800,
+                            padding: '0.15rem 0.45rem',
+                            borderRadius: '4px',
+                            background: 'var(--primary)',
+                            color: '#fff',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                          }}
+                          title="Día en curso · Configurado en formato 24 horas"
+                        >
+                          <Clock size={10} /> HOY (24h)
+                        </span>
+                      )}
 
-                    {resVin && tel && (
-                      <a
-                        href={generarUrlWhatsApp(tel, '')}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          abrirWhatsApp(tel, '');
-                        }}
+                      {esPasadoIns && (
+                        <span className="status-badge" style={{ fontSize: '0.68rem', padding: '0.15rem 0.5rem', opacity: 0.8 }}>
+                          Pasado (Solo lectura)
+                        </span>
+                      )}
+
+                      {bloqVin ? (
+                        <span className="status-badge s-warn" style={{ gap: '0.3rem', fontSize: '0.74rem' }}>
+                          <Lock size={12} /> Bloqueo manual: <strong>{bloqVin.notas || 'Sin notas'}</strong>
+                        </span>
+                      ) : resVin ? (
+                        <span className="status-badge s-busy" style={{ gap: '0.35rem', fontSize: '0.74rem' }}>
+                          👤 <strong>{nomCliente}</strong> {resVin.consecutivo ? `(#${resVin.consecutivo})` : ''}
+                        </span>
+                      ) : (
+                        <span className="status-badge s-avail" style={{ gap: '0.35rem', fontSize: '0.74rem' }}>
+                          <CheckCircle size={12} /> Fecha disponible
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {bloqVin && !esPasadoIns && (
+                        <button
+                          className="btn btn-sm btn-danger"
+                          style={{ fontSize: '0.74rem', padding: '0.25rem 0.65rem' }}
+                          disabled={procesando}
+                          onClick={() => handleLiberarBloqueoRapido(bloqVin)}
+                        >
+                          <CheckCircle size={13} /> Liberar bloqueo ahora
+                        </button>
+                      )}
+                      <button
                         className="btn btn-sm"
-                        style={{ color: '#25d366', fontSize: '0.72rem', padding: '0.2rem 0.5rem', gap: '0.3rem', cursor: 'pointer' }}
-                        title="Abrir chat en WhatsApp (Desktop PC / Web)"
+                        style={{ fontSize: '0.72rem', padding: '0.25rem 0.55rem' }}
+                        onClick={() => setFechaInspeccionada(null)}
+                        title="Cerrar inspector"
                       >
-                        <MessageCircle size={12} /> Contactar WhatsApp
-                      </a>
-                    )}
+                        <X size={13} />
+                      </button>
+                    </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    {bloqVin && (
-                      <button
-                        className="btn btn-sm btn-danger"
-                        style={{ fontSize: '0.74rem', padding: '0.25rem 0.65rem' }}
-                        disabled={procesando}
-                        onClick={() => handleLiberarBloqueoRapido(bloqVin)}
-                      >
-                        <CheckCircle size={13} /> Liberar este día ahora
-                      </button>
-                    )}
-                    {resVin && (
-                      <button
-                        className="btn btn-sm btn-primary"
-                        style={{ fontSize: '0.74rem', padding: '0.25rem 0.65rem' }}
-                        onClick={() => {
-                          setFiltroFincaReservas('esta_finca');
-                          setReservaExpandida(resVin.id);
-                        }}
-                      >
-                        <FileText size={13} /> Ver reserva en lista
-                      </button>
-                    )}
-                    <button
-                      className="btn btn-sm"
-                      style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
-                      onClick={() => setFechaInspeccionada(null)}
-                      title="Cerrar inspector"
+                  {/* Si hay una reserva activa en este día: información pura y clara (sin botones operativos) */}
+                  {resVin && (
+                    <div
+                      style={{
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '8px',
+                        padding: '0.75rem 0.95rem',
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
+                        gap: '0.75rem',
+                        fontSize: '0.82rem',
+                      }}
                     >
-                      <X size={13} />
-                    </button>
-                  </div>
+                      <div>
+                        <div className="text-xs text-muted">Huésped Titular</div>
+                        <div style={{ fontWeight: 600, color: 'var(--text)', marginTop: '0.15rem' }}>{nomCliente}</div>
+                        {tel && (
+                          <div className="text-xs text-muted" style={{ marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <MessageCircle size={11} style={{ color: '#25d366' }} /> Contacto: {tel}
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted">Estancia y Capacidad</div>
+                        <div style={{ fontWeight: 600, color: 'var(--text)', marginTop: '0.15rem' }}>
+                          {formatFecha(resVin.fecha_inicio)} → {formatFecha(resVin.fecha_fin)}
+                        </div>
+                        <div className="text-xs text-muted" style={{ marginTop: '0.15rem' }}>
+                          👥 {resVin.personas} huéspedes
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted">Plan de Alimentación</div>
+                        <div style={{ marginTop: '0.2rem' }}>
+                          {tienePlanAlimentacion ? (
+                            <span className="food-plan-badge-pill" style={{ fontSize: '0.74rem' }}>
+                              <UtensilsCrossed size={11} /> {nombrePlan}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted">🍃 Sin plan adicional</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted">Estado Financiero (Informativo)</div>
+                        <div style={{ marginTop: '0.15rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span>Total: <strong>{formatCOP(resVin.valor_total)}</strong></span>
+                          <span>Saldo: <strong style={{ color: saldo > 0 ? 'var(--danger)' : 'var(--success)' }}>{formatCOP(saldo)}</strong></span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Si la fecha es pasada y no tiene reserva */}
+                  {esPasadoIns && !resVin && !bloqVin && (
+                    <div className="text-xs text-muted" style={{ fontStyle: 'italic' }}>
+                      🕒 Esta fecha pertenece al pasado. Es de solo lectura y no está disponible para selección ni modificaciones de disponibilidad.
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -631,10 +726,10 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
         <div className="panel-header" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
             <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <FileCheck size={18} style={{ color: 'var(--success)' }} /> Reservas Activas
+              <FileCheck size={18} style={{ color: 'var(--success)' }} /> Reservas Activas e Información de Ocupación
             </div>
             <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>
-              Listado detallado de reservas confirmadas con cliente, consecutivo, plan de alimentación y saldo.
+              Consulta informativa de reservas confirmadas, huéspedes asignados, planes de estancia y saldos.
             </div>
           </div>
 
@@ -642,14 +737,20 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               className={`btn btn-sm ${filtroFincaReservas === 'esta_finca' ? 'btn-primary' : ''}`}
-              onClick={() => setFiltroFincaReservas('esta_finca')}
+              onClick={() => {
+                setFiltroFincaReservas('esta_finca');
+                setFechaInspeccionada(null);
+              }}
               style={{ fontSize: '0.72rem', padding: '0.25rem 0.65rem' }}
             >
               Finca actual ({fincaActual?.nombre || 'Seleccionada'})
             </button>
             <button
               className={`btn btn-sm ${filtroFincaReservas === 'todas' ? 'btn-primary' : ''}`}
-              onClick={() => setFiltroFincaReservas('todas')}
+              onClick={() => {
+                setFiltroFincaReservas('todas');
+                setFechaInspeccionada(null);
+              }}
               style={{ fontSize: '0.72rem', padding: '0.25rem 0.65rem' }}
             >
               Todas las fincas ({reservas.filter(r => r.estado === 'activa').length})
@@ -657,20 +758,85 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
           </div>
         </div>
 
+        {/* Notificación contextual si el administrador seleccionó una fecha específica */}
+        {fechaInspeccionada && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.5rem',
+              marginBottom: '0.85rem',
+              padding: '0.55rem 0.85rem',
+              background: 'var(--surface-2)',
+              borderRadius: '8px',
+              border: '1px solid var(--border)',
+              flexWrap: 'wrap',
+            }}
+          >
+            <span style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text)', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Calendar size={15} style={{ color: 'var(--primary)' }} />
+              Mostrando información para el día seleccionado: <strong>{formatFecha(fechaInspeccionada)}</strong>
+              {reservasPorFecha.get(fechaInspeccionada) && (
+                <span className="status-badge s-busy" style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem' }}>
+                  Reserva encontrada
+                </span>
+              )}
+            </span>
+            <button
+              className="btn btn-sm"
+              style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}
+              onClick={() => setFechaInspeccionada(null)}
+            >
+              Ver todas las reservas activas
+            </button>
+          </div>
+        )}
+
         {/* Tabla o tarjetas de reservas activas */}
         <div className="avail-table">
-          {reservasActivas.length === 0 ? (
-            <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              <Calendar size={32} style={{ margin: '0 auto 0.65rem', opacity: 0.4 }} />
-              <p style={{ fontWeight: 600, fontSize: '0.95rem' }}>
-                No hay reservas activas registradas {filtroFincaReservas === 'esta_finca' ? `para ${fincaActual?.nombre || 'esta finca'}` : ''}.
-              </p>
-              <p className="text-xs text-muted">
-                Las fechas permanecen disponibles para nuevas cotizaciones y reservas.
-              </p>
-            </div>
-          ) : (
-            reservasActivas.map(r => {
+          {(() => {
+            const reservaDelDia = fechaInspeccionada ? reservasPorFecha.get(fechaInspeccionada) : null;
+            const listaReservas = fechaInspeccionada
+              ? (reservaDelDia ? [reservaDelDia] : [])
+              : reservasActivas;
+
+            if (fechaInspeccionada && !reservaDelDia) {
+              return (
+                <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <Calendar size={32} style={{ margin: '0 auto 0.65rem', opacity: 0.4 }} />
+                  <p style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                    No hay reservas activas registradas para el día {formatFecha(fechaInspeccionada)} en {fincaActual?.nombre || 'esta finca'}.
+                  </p>
+                  <p className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>
+                    La fecha permanece libre para nuevas solicitudes o bloqueos administrativos.
+                  </p>
+                  <button
+                    className="btn btn-sm"
+                    style={{ marginTop: '0.85rem', fontSize: '0.75rem' }}
+                    onClick={() => setFechaInspeccionada(null)}
+                  >
+                    Ver todas las reservas activas
+                  </button>
+                </div>
+              );
+            }
+
+            if (listaReservas.length === 0) {
+              return (
+                <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <Calendar size={32} style={{ margin: '0 auto 0.65rem', opacity: 0.4 }} />
+                  <p style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                    No hay reservas activas registradas {filtroFincaReservas === 'esta_finca' ? `para ${fincaActual?.nombre || 'esta finca'}` : ''}.
+                  </p>
+                  <p className="text-xs text-muted">
+                    Las fechas permanecen disponibles para nuevas cotizaciones y reservas.
+                  </p>
+                </div>
+              );
+            }
+
+            return listaReservas.map(r => {
               const saldo = calcularSaldo(r);
               const totalPagado = r.valor_total - saldo;
               const clienteNombre = r.clientes ? `${r.clientes.nombre} ${r.clientes.apellido || ''}`.trim() : '—';
@@ -678,23 +844,22 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
               const fincaNombre = r.fincas?.nombre || fincaActual?.nombre || '—';
               const expanded = reservaExpandida === r.id;
 
-              const hoy = new Date().toISOString().split('T')[0];
+              const hoy = getFechaHoyLocal();
               const estanciaVencida = r.estado === 'activa' && r.fecha_fin < hoy;
-              const pazYSalvoHabilitado = saldo <= 0 && (r.pagos?.length || 0) > 0;
 
               // Identificar plan de alimentación adjunto
               const tienePlanAlimentacion = Boolean(r.menu_id || r.alimentacion || (r.costo_alimentacion && r.costo_alimentacion > 0));
               const nombrePlan = r.menus?.nombre || r.alimentacion || 'Plan con menú especial';
 
               return (
-                <div key={r.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.65rem', paddingTop: '0.65rem' }}>
-                  {/* Alerta de estancia finalizada si aplica */}
+                <div key={r.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', paddingTop: '0.75rem' }}>
+                  {/* Alerta informativa de estancia finalizada si aplica */}
                   {estanciaVencida && (
                     <div
                       style={{
                         background: 'rgba(245, 158, 11, 0.12)',
                         borderLeft: '4px solid #f59e0b',
-                        padding: '0.35rem 0.75rem',
+                        padding: '0.4rem 0.75rem',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
@@ -707,21 +872,12 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
                       }}
                     >
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                        <AlertTriangle size={13} /> Estancia finalizada ({formatFecha(r.fecha_fin)}) · Lista para cerrar
+                        <AlertTriangle size={13} /> Estancia finalizada ({formatFecha(r.fecha_fin)}) · Pendiente de cierre y liquidación en módulo Reservas
                       </span>
-                      {onCerrarReserva && (
-                        <button
-                          className="btn btn-sm btn-primary"
-                          style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', backgroundColor: '#f59e0b', borderColor: '#f59e0b', color: '#fff' }}
-                          onClick={() => setReservaParaCierre(r)}
-                        >
-                          <CheckCircle size={11} /> Cerrar Reserva
-                        </button>
-                      )}
                     </div>
                   )}
 
-                  {/* Fila principal de datos */}
+                  {/* Fila principal de datos de la reserva */}
                   <div className="avail-row" style={{ borderBottom: 'none', flexWrap: 'wrap', gap: '0.75rem' }}>
                     <div style={{ flex: 1, minWidth: 'min(100%, 280px)' }}>
                       {/* Título: Finca, Consecutivo y Estado */}
@@ -735,35 +891,27 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
                       <div className="text-xs text-muted" style={{ marginTop: '0.25rem', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
                         <span>👤 <strong>{clienteNombre}</strong></span>
                         {clienteTel && (
-                          <a
-                            href={generarUrlWhatsApp(clienteTel, '')}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              abrirWhatsApp(clienteTel, '');
-                            }}
+                          <span
                             style={{
-                              color: '#25d366',
-                              textDecoration: 'none',
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '0.2rem',
+                              gap: '0.25rem',
                               fontWeight: 600,
+                              color: '#25d366',
                               background: 'rgba(37, 211, 102, 0.1)',
                               padding: '0.1rem 0.4rem',
                               borderRadius: '4px',
-                              cursor: 'pointer',
                             }}
-                            title="Abrir chat en WhatsApp (Desktop PC / Web)"
                           >
                             <MessageCircle size={11} /> {clienteTel}
-                          </a>
+                          </span>
                         )}
                         <span>·</span>
                         <span>
                           <Calendar size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> {formatFecha(r.fecha_inicio)} → {formatFecha(r.fecha_fin)}
                         </span>
                         <span>·</span>
-                        <span>{r.personas} personas</span>
+                        <span>👥 {r.personas} personas</span>
                       </div>
 
                       {/* Badge de Plan de Alimentación Adjunto */}
@@ -791,128 +939,39 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
                       </div>
                     </div>
 
-                    {/* Botones de acción unificados */}
-                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      {/* 1. Registrar Abono */}
-                      <button
-                        className="btn btn-sm btn-primary"
-                        title="Registrar un abono de pago"
-                        style={{ fontSize: '0.74rem', fontWeight: 600, gap: '0.35rem', padding: '0.3rem 0.65rem' }}
-                        onClick={() => {
-                          setPagoReservaId(r.id);
-                          setPagoForm(PAGO_VACIO);
+                    {/* Información de estado y detalle de abonos (sin botones de acción operativa) */}
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span
+                        className="status-badge"
+                        style={{
+                          fontSize: '0.74rem',
+                          padding: '0.25rem 0.6rem',
+                          background: saldo <= 0 ? 'rgba(77, 168, 158, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                          color: saldo <= 0 ? 'var(--primary)' : 'var(--danger)',
+                          borderColor: saldo <= 0 ? 'rgba(77, 168, 158, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+                          fontWeight: 600,
+                          gap: '0.35rem',
                         }}
                       >
-                        <CreditCard size={13} /> Registrar Abono
-                      </button>
+                        {saldo <= 0 ? '🏆 Al día / Paz y salvo' : `Saldo: ${formatCOP(saldo)}`}
+                      </span>
 
-                      {/* 2. Documentos Oficiales en PDF */}
-                      <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                        <select
-                          defaultValue=""
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            e.target.value = '';
-                            if (val === 'separacion') {
-                              setModalWaReserva({
-                                abierto: true,
-                                reserva: r,
-                                titulo: `Documento de Separación · ${r.fincas?.nombre || 'Finca'}`,
-                                nombreDoc: 'Documento Oficial de Separación (PDF)',
-                                mensaje: plantillaSeparacion(r),
-                                onGenerarPdf: () => generarDocSeparacion(r),
-                                tipo: 'separacion',
-                              });
-                            } else if (val === 'estado_cuenta') {
-                              setModalWaReserva({
-                                abierto: true,
-                                reserva: r,
-                                titulo: `Estado de Cuenta · ${r.fincas?.nombre || 'Finca'}`,
-                                nombreDoc: 'Estado de Cuenta (PDF)',
-                                mensaje: plantillaEstadoCuenta(r),
-                                onGenerarPdf: () => generarEstadoCuenta(r),
-                                tipo: 'estado_cuenta',
-                              });
-                            } else if (val === 'paz_salvo') {
-                              if (!pazYSalvoHabilitado) {
-                                showToast(`Requiere saldo en $0 para emitir Paz y Salvo (saldo actual: ${formatCOP(saldo)})`, 'info');
-                                return;
-                              }
-                              setModalWaReserva({
-                                abierto: true,
-                                reserva: r,
-                                titulo: `Certificado de Paz y Salvo · ${r.fincas?.nombre || 'Finca'}`,
-                                nombreDoc: 'Certificado de Paz y Salvo (PDF)',
-                                mensaje: plantillaPazYSalvo(r),
-                                onGenerarPdf: () => generarPazYSalvo(r),
-                                tipo: 'paz_salvo',
-                              });
-                            } else if (val === 'cierre' && onCerrarReserva) {
-                              setReservaParaCierre(r);
-                            }
-                          }}
-                          className="btn btn-sm"
-                          style={{ appearance: 'none', paddingRight: '1.4rem', cursor: 'pointer', fontSize: '0.72rem' }}
-                        >
-                          <option value="" disabled>📑 Documentos ▾</option>
-                          <option value="separacion">📄 Separación</option>
-                          <option value="estado_cuenta">📊 Estado de Cuenta</option>
-                          <option value="paz_salvo" disabled={!pazYSalvoHabilitado}>
-                            🏆 Paz y Salvo {pazYSalvoHabilitado ? '✓' : `(Saldo: ${formatCOP(saldo)})`}
-                          </option>
-                          {onCerrarReserva && <option value="cierre">🔒 Cerrar Reserva</option>}
-                        </select>
-                        <ChevronDown size={11} style={{ position: 'absolute', right: '0.35rem', pointerEvents: 'none', opacity: 0.6 }} />
-                      </div>
-
-                      {/* 3. WhatsApp Rápido */}
-                      <button
-                        className="btn btn-sm"
-                        title="Enviar mensaje por WhatsApp"
-                        style={{ color: '#25d366' }}
-                        onClick={() => {
-                          const tel = r.clientes?.whatsapp || r.clientes?.telefono;
-                          if (!tel) {
-                            showToast('El cliente no tiene teléfono registrado', 'info');
-                            return;
-                          }
-                          setModalWaReserva({
-                            abierto: true,
-                            reserva: r,
-                            titulo: `Notificación WhatsApp · ${clienteNombre}`,
-                            mensaje: saldo > 0 ? plantillaRecordatorioPago(r) : plantillaBienvenida(r),
-                            tipo: 'general',
-                          });
-                        }}
-                      >
-                        <MessageCircle size={13} />
-                      </button>
-
-                      {/* 4. Expediente Histórico */}
-                      <button
-                        className="btn btn-sm"
-                        title="Ver Expediente Histórico Completo"
-                        onClick={() => setReservaParaExpediente(r)}
-                      >
-                        <FileText size={13} />
-                      </button>
-
-                      {/* 5. Desplegar historial de pagos */}
                       <button
                         className="btn btn-sm"
                         onClick={() => setReservaExpandida(expanded ? null : r.id)}
-                        title={expanded ? 'Cerrar detalle' : 'Ver historial de pagos'}
+                        title={expanded ? 'Ocultar desglose de pagos' : 'Ver historial de pagos'}
+                        style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem', gap: '0.35rem' }}
                       >
-                        {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                        <CreditCard size={12} /> {r.pagos?.length || 0} abono(s) {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                       </button>
                     </div>
                   </div>
 
-                  {/* Panel expandido: historial de pagos */}
+                  {/* Panel expandido: historial informativo de pagos y abonos */}
                   {expanded && (
                     <div style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--border)', marginTop: '0.5rem', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.82rem' }}>
                       <div style={{ fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <FileCheck size={14} /> Historial de pagos y abonos
+                        <FileCheck size={14} style={{ color: 'var(--primary)' }} /> Historial informativo de abonos registrados
                       </div>
 
                       {(!r.pagos || r.pagos.length === 0) ? (
@@ -929,36 +988,25 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
                                 {p.tipo === 'devolucion' ? '−' : '+'}{formatCOP(p.valor)}
                               </span>
                               {p.observacion && <span className="text-muted" style={{ fontStyle: 'italic' }}>({p.observacion})</span>}
-                              {onEliminarPago && (
-                                <button
-                                  className="btn btn-sm btn-danger"
-                                  style={{ padding: '0.1rem 0.3rem', marginLeft: 'auto' }}
-                                  onClick={() => handleEliminarPagoClick(p)}
-                                  title="Eliminar este pago"
-                                >
-                                  <X size={11} />
-                                </button>
-                              )}
                             </div>
                           ))}
                         </div>
                       )}
 
-                      <div style={{ marginTop: '0.6rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
+                      <div style={{ marginTop: '0.6rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                         <span className="text-muted">Saldo restante por amortizar:</span>
                         <strong style={{ color: saldo > 0 ? 'var(--danger)' : 'var(--success)' }}>{formatCOP(saldo)}</strong>
-                      </div>
-
-                      {/* Generador de Documentos Oficiales en PDF */}
-                      <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
-                        <AdminDocumentos reserva={r} onRegistrarEnvio={onRegistrarComunicacion} showToast={showToast} />
                       </div>
                     </div>
                   )}
                 </div>
               );
-            })
-          )}
+            });
+          })()}
+        </div>
+
+        <div className="text-xs text-muted" style={{ padding: '0.75rem 1rem 0.25rem', borderTop: '1px solid var(--border)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          ℹ️ <strong>Módulo de Disponibilidad:</strong> Vista de inspección y ocupación en vivo. Para registrar abonos, emitir PDFs de contratos o liquidar reservas, accede al módulo principal de <strong>Reservas</strong>.
         </div>
       </div>
 
