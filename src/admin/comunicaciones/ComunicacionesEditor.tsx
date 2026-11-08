@@ -52,11 +52,15 @@ export const ComunicacionesEditor: React.FC<ComunicacionesEditorProps> = ({
     'fechas',
     'noches',
     'personas',
+    'abono_50',
     'saldo_finca',
     'saldo_alimentacion',
     'total',
     'cuenta_dueno',
+    'banco_dueno',
     'cuenta_admin',
+    'banco_admin',
+    'enlace_pdf',
   ];
 
   const prefijoDoc = (subTipoAccion === 'cobrar_alimentacion' ? 'menu' : tipoSeleccionado) as TipoDocumentoPrefijo;

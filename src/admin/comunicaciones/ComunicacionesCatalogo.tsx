@@ -140,16 +140,15 @@ export const CATALOGO_MENSAJES: TarjetaTipoMensaje[] = [
     icono: <Sparkles size={18} />,
   },
 
-  // FASE 5: LIBRE / BROCHURES
+  // FASE 5: WEB & PERSONALIZADO
   {
-    id: 'menu',
-    tipoReal: 'menu',
-    titulo: 'Catálogo de Menú y Gastronomía',
-    subtitulo: 'Catálogo de platos y costos para clientes que aún no eligen menú',
+    id: 'solicitud_cliente_publica' as any,
+    tipoReal: 'solicitud_cliente_publica' as any,
+    titulo: 'Cotización Web del Huésped',
+    subtitulo: 'Formato recibido cuando el huésped cotiza directamente desde el cotizador público',
     fase: 'fase_5_libre',
-    destinatarioCobro: 'admin',
-    prefijoDoc: 'menu',
-    icono: <Utensils size={18} />,
+    destinatarioCobro: 'info',
+    icono: <MessageCircle size={18} />,
   },
   {
     id: 'personalizado',
@@ -158,7 +157,7 @@ export const CATALOGO_MENSAJES: TarjetaTipoMensaje[] = [
     subtitulo: 'Texto libre con soporte de etiquetas y variables dinámicas',
     fase: 'fase_5_libre',
     destinatarioCobro: 'info',
-    icono: <MessageCircle size={18} />,
+    icono: <Sparkles size={18} />,
   },
 ];
 
@@ -180,7 +179,7 @@ export const ComunicacionesCatalogo: React.FC<ComunicacionesCatalogoProps> = ({
     { id: 'fase_2_reserva', label: '2. Reserva & Abonos' },
     { id: 'fase_3_saldos', label: '3. Saldos & Paz y Salvo' },
     { id: 'fase_4_llegada', label: '4. Llegada & Bienvenida' },
-    { id: 'fase_5_libre', label: '5. Libre' },
+    { id: 'fase_5_libre', label: '5. Web & Personalizado' },
   ];
 
   const mensajesFiltrados = CATALOGO_MENSAJES.filter((m) => m.fase === faseFiltro);
@@ -219,15 +218,13 @@ export const ComunicacionesCatalogo: React.FC<ComunicacionesCatalogoProps> = ({
       {/* Grid de Tarjetas de Mensajes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {mensajesFiltrados.map((tarjeta) => {
+          const esPedirAbono = tarjeta.id === 'pedir_abono';
           const esCobrarAlim =
-            tarjeta.id === 'cobrar_alimentacion' || tarjeta.id === 'cobrar_alimentacion_cotiz';
+            tarjeta.id === 'cobrar_alimentacion' || (tarjeta.id as string) === 'cobrar_alimentacion_cotiz';
           const esActivo =
-            tipoSeleccionado === tarjeta.tipoReal &&
-            ((tarjeta.id === 'pedir_abono' && subTipoAccion === 'pedir_abono') ||
-              (esCobrarAlim && subTipoAccion === 'cobrar_alimentacion') ||
-              (!esCobrarAlim &&
-                tarjeta.id !== 'pedir_abono' &&
-                subTipoAccion === 'normal'));
+            (esPedirAbono && subTipoAccion === 'pedir_abono') ||
+            (esCobrarAlim && subTipoAccion === 'cobrar_alimentacion') ||
+            (!esPedirAbono && !esCobrarAlim && subTipoAccion === 'normal' && tipoSeleccionado === tarjeta.tipoReal);
 
           return (
             <motion.div

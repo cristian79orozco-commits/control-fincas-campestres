@@ -352,48 +352,30 @@ export function useComunicacionesController({
       tel = cli.whatsapp || (cli as any).telefono || tel;
     }
 
-    if (subtipo === 'pedir_abono' && c) {
-      const fObj: any = f;
-      const bancosInfo = fObj?.banco_cuenta ? {
-        banco: fObj.banco_nombre || 'Bancolombia',
-        tipoCuenta: fObj.banco_tipo_cuenta || 'Ahorros',
-        cuenta: fObj.banco_cuenta,
-        titular: fObj.banco_titular || 'Propietario de la Finca',
-        nit: fObj.banco_identificacion || undefined,
-      } : null;
-      msg = plantillaPedirAbonoCotizacion(c, f, cli, bancosInfo, 50);
-      return { msg, tel, nom };
+    // Identificar la clave de plantilla centralizada (Sinergia Total Cliente ↔ Administrador)
+    let clavePlantilla: string = tipo;
+    if (subtipo === 'pedir_abono') {
+      clavePlantilla = 'pedir_abono';
+    } else if (subtipo === 'cobrar_alimentacion') {
+      clavePlantilla = 'cobrar_alimentacion';
     }
 
-    if (subtipo === 'cobrar_alimentacion') {
-      const item = (expedienteTipo === 'cotizacion' && c) ? c : (r || c);
-      if (item) {
-        const cfg = configuracion || getConfiguracionGlobal();
-        const iden = (cfg as any)?.banco_identificacion ? (cfg as any).banco_identificacion.trim() : undefined;
-        const bancosAdmin = cfg?.banco_cuenta ? {
-          banco: cfg.banco_nombre || 'Bancolombia',
-          tipoCuenta: cfg.banco_tipo_cuenta || 'Ahorros',
-          cuenta: cfg.banco_cuenta,
-          titular: cfg.banco_titular || 'Administración Paraíso Terrenal',
-          nit: iden || undefined,
-        } : null;
-        msg = plantillaCobroAlimentacion(item, f, cli, bancosAdmin);
-        return { msg, tel, nom };
-      }
-    }
+    const cfg = configuracion || getConfiguracionGlobal();
+    const plantillaCustom = cfg?.plantillas_comunicacion?.[clavePlantilla];
+    const plantillaEfectiva = plantillaCustom || PLANTILLAS_PREDETERMINADAS[clavePlantilla];
 
-    const plantillaCustom = configuracion?.plantillas_comunicacion?.[tipo];
-    if (plantillaCustom) {
+    if (plantillaEfectiva) {
       const tokens = obtenerTokensParaMensaje({
-        tipo,
+        tipo: clavePlantilla as any,
         cotizacion: c || undefined,
         reserva: r || undefined,
         cliente: cli,
         finca: f,
+        pago: (r?.pagos?.find(p => p.id === pagoId) || r?.pagos?.[0]),
         consecutivoBase,
-        configuracion,
+        configuracion: cfg,
       });
-      msg = renderizarPlantillaPersonalizada(plantillaCustom, tokens);
+      msg = renderizarPlantillaPersonalizada(plantillaEfectiva, tokens);
       return { msg, tel, nom };
     }
 
@@ -561,7 +543,7 @@ export function useComunicacionesController({
   }, [cotizacionId, reservaId, reservas, cotizaciones, setExpediente, aplicarMensaje]);
 
   // ---------------------------------------------------------------------------
-  // Catálogo de Mensajes por Fases del Negocio
+  // Catálogo de Mensajes por Fases del Negocio (Sinergia Total Cliente ↔ Administrador)
   // ---------------------------------------------------------------------------
   const CATALOGO_MENSAJES: TarjetaTipoMensaje[] = useMemo(() => [
     {
@@ -576,7 +558,7 @@ export function useComunicacionesController({
     },
     {
       id: 'pedir_abono',
-      tipoReal: 'cotizacion',
+      tipoReal: 'pedir_abono' as any,
       titulo: 'Solicitud de Anticipo (50% Finca)',
       subtitulo: 'Abono del 50% de los valores contratados de la finca para bloquear disponibilidad',
       fase: 'fase_1_cotizacion',
@@ -585,10 +567,10 @@ export function useComunicacionesController({
       icono: <Home size={18} />,
     },
     {
-      id: 'cobrar_alimentacion_cotiz',
-      tipoReal: 'cotizacion',
+      id: 'cobrar_alimentacion',
+      tipoReal: 'cobrar_alimentacion' as any,
       titulo: 'Cobro de Alimentación (Paraíso Terrenal)',
-      subtitulo: 'Solicitud anticipada del menú a la cuenta de la administración para insumos y cocina',
+      subtitulo: 'Solicitud de pago o saldo de menú a la cuenta de la administración para insumos y cocina',
       fase: 'fase_1_cotizacion',
       destinatarioCobro: 'admin',
       prefijoDoc: 'menu',
@@ -606,7 +588,7 @@ export function useComunicacionesController({
     },
     {
       id: 'cobrar_alimentacion',
-      tipoReal: 'cotizacion',
+      tipoReal: 'cobrar_alimentacion' as any,
       titulo: 'Cobro de Alimentación (Paraíso Terrenal)',
       subtitulo: 'Solicitud de pago o saldo de menú a la cuenta de la administración',
       fase: 'fase_2_reserva',
@@ -663,14 +645,13 @@ export function useComunicacionesController({
       icono: <Sparkles size={18} />,
     },
     {
-      id: 'menu',
-      tipoReal: 'menu',
-      titulo: 'Catálogo de Menú y Propuesta Gastronómica',
-      subtitulo: 'Catálogo de platos y costos para clientes que aún no eligen menú',
+      id: 'solicitud_cliente_publica' as any,
+      tipoReal: 'solicitud_cliente_publica' as any,
+      titulo: 'Cotización Web del Huésped',
+      subtitulo: 'Formato recibido cuando el huésped cotiza directamente desde el cotizador público',
       fase: 'fase_5_libre',
-      destinatarioCobro: 'admin',
-      prefijoDoc: 'menu',
-      icono: <Utensils size={18} />,
+      destinatarioCobro: 'info',
+      icono: <MessageCircle size={18} />,
     },
     {
       id: 'personalizado',
@@ -679,7 +660,7 @@ export function useComunicacionesController({
       subtitulo: 'Texto libre con soporte de etiquetas y variables dinámicas',
       fase: 'fase_5_libre',
       destinatarioCobro: 'info',
-      icono: <MessageCircle size={18} />,
+      icono: <Sparkles size={18} />,
     },
   ], []);
 
@@ -691,10 +672,13 @@ export function useComunicacionesController({
     setTipoSeleccionado(tarjeta.tipoReal);
     if (tarjeta.id === 'pedir_abono') {
       setSubTipoAccion('pedir_abono');
-      aplicarMensaje('cotizacion', 'pedir_abono');
-    } else if (tarjeta.id === 'cobrar_alimentacion' || tarjeta.id === 'cobrar_alimentacion_cotiz') {
+      aplicarMensaje('pedir_abono', 'pedir_abono');
+    } else if (tarjeta.id === 'cobrar_alimentacion' || (tarjeta.id as string) === 'cobrar_alimentacion_cotiz') {
       setSubTipoAccion('cobrar_alimentacion');
-      aplicarMensaje('cotizacion', 'cobrar_alimentacion');
+      aplicarMensaje('cobrar_alimentacion', 'cobrar_alimentacion');
+    } else if (tarjeta.id === 'solicitud_cliente_publica') {
+      setSubTipoAccion('normal');
+      aplicarMensaje('solicitud_cliente_publica', 'normal');
     } else {
       setSubTipoAccion('normal');
       aplicarMensaje(tarjeta.tipoReal, 'normal');

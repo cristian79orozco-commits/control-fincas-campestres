@@ -596,7 +596,10 @@ export type TipoComunicacion =
   | 'menu'
   | 'recordatorio_pago'
   | 'bienvenida'
-  | 'personalizado';
+  | 'personalizado'
+  | 'pedir_abono'
+  | 'cobrar_alimentacion'
+  | 'solicitud_cliente_publica';
 
 export interface Comunicacion {
   id: string;

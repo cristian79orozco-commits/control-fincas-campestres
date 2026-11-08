@@ -24,6 +24,7 @@ import {
 } from '../utils/consecutivos';
 import { type FaseMensaje, type TabComunicaciones } from '../store/useComunicacionesStore';
 import { ComunicacionesCharts } from './comunicaciones/ComunicacionesCharts';
+import { ComunicacionesPlantillasAdmin } from './comunicaciones/ComunicacionesPlantillasAdmin';
 import {
   useComunicacionesController,
   type UseComunicacionesControllerParams,
@@ -610,7 +611,7 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
                   { id: 'fase_2_reserva', label: '2. Reserva & Abonos' },
                   { id: 'fase_3_saldos', label: '3. Saldos & Paz y Salvo' },
                   { id: 'fase_4_llegada', label: '4. Llegada & Bienvenida' },
-                  { id: 'fase_5_libre', label: '5. Libre' },
+                  { id: 'fase_5_libre', label: '5. Web & Personalizado' },
                 ].map(f => (
                   <button
                     key={f.id}
@@ -633,12 +634,12 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
             {/* Grid animado de tarjetas de mensajes */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: '0.65rem' }}>
               {mensajesFiltrados.map(tarjeta => {
-                const esCobrarAlim = tarjeta.id === 'cobrar_alimentacion' || tarjeta.id === 'cobrar_alimentacion_cotiz';
+                const esPedirAbono = tarjeta.id === 'pedir_abono';
+                const esCobrarAlim = tarjeta.id === 'cobrar_alimentacion' || (tarjeta.id as string) === 'cobrar_alimentacion_cotiz';
                 const esActivo =
-                  tipoSeleccionado === tarjeta.tipoReal &&
-                  ((tarjeta.id === 'pedir_abono' && subTipoAccion === 'pedir_abono') ||
-                   (esCobrarAlim && subTipoAccion === 'cobrar_alimentacion') ||
-                   (!esCobrarAlim && tarjeta.id !== 'pedir_abono' && subTipoAccion === 'normal'));
+                  (esPedirAbono && subTipoAccion === 'pedir_abono') ||
+                  (esCobrarAlim && subTipoAccion === 'cobrar_alimentacion') ||
+                  (!esPedirAbono && !esCobrarAlim && subTipoAccion === 'normal' && tipoSeleccionado === tarjeta.tipoReal);
 
                 return (
                   <motion.div
@@ -1080,70 +1081,16 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
           PESTAÑA 3: EDITOR DE PLANTILLAS EN SUPABASE
           ===================================================================== */}
       {tabActiva === 'plantillas' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.88rem' }}>
-                <BookOpen size={18} style={{ color: 'var(--primary)' }} />
-                <span>Personalizar Plantilla Oficial en Supabase:</span>
-              </div>
-              <select
-                value={plantillaSeleccionada}
-                onChange={e => setPlantillaSeleccionada(e.target.value)}
-                style={{ fontSize: '0.82rem', padding: '0.35rem 0.75rem', minWidth: 'min(100%, 240px)', maxWidth: '100%' }}
-              >
-                <option value="cotizacion">📄 Cotización Oficial</option>
-                <option value="separacion">🎉 Documento de Separación</option>
-                <option value="abono">💳 Comprobante de Abono / Pago</option>
-                <option value="estado_cuenta">📊 Estado de Cuenta (Doble Balance)</option>
-                <option value="paz_salvo">🏅 Certificado de Paz y Salvo</option>
-                <option value="menu">🍽️ Propuesta de Menú / Alimentación</option>
-                <option value="recordatorio_pago">⏰ Recordatorio Amistoso de Saldo</option>
-                <option value="bienvenida">👋 Bienvenida e Instrucciones de Llegada</option>
-              </select>
-            </div>
-
-            <div className="field">
-              <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Cuerpo de la Plantilla:</label>
-              <textarea
-                rows={12}
-                value={textoEditorPlantilla}
-                onChange={e => setTextoEditorPlantilla(e.target.value)}
-                style={{
-                  fontFamily: 'monospace',
-                  fontSize: '0.82rem',
-                  lineHeight: '1.45',
-                  padding: '0.75rem',
-                  borderRadius: '8px',
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={handleRestablecerPlantilla}
-                disabled={guardandoPlantilla}
-                style={{ fontSize: '0.76rem', color: '#c0392b' }}
-              >
-                <RotateCcw size={12} /> Restablecer a plantilla oficial
-              </button>
-
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-primary"
-                  onClick={handleGuardarPlantilla}
-                  disabled={guardandoPlantilla}
-                  style={{ fontSize: '0.78rem', gap: '0.35rem' }}
-                >
-                  <Save size={13} /> {guardandoPlantilla ? 'Guardando en Supabase…' : 'Guardar en Supabase'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ComunicacionesPlantillasAdmin
+          configuracion={configuracion}
+          onGuardarConfiguracion={props.onGuardarConfiguracion}
+          showToast={showToast}
+          cotizacionEfectiva={cotizacionEfectiva}
+          reservaEfectiva={reservaEfectiva}
+          clienteActual={clienteActual}
+          fincaActual={fincaActual}
+          consecutivoBase={consecutivoBase}
+        />
       )}
 
       {/* =====================================================================
