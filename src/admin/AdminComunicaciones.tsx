@@ -113,7 +113,19 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
   } = useComunicacionesController(props);
 
   return (
-    <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div
+      className="panel"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1.25rem',
+        minWidth: 0,
+        maxWidth: '100%',
+        width: '100%',
+        boxSizing: 'border-box',
+        overflowX: 'hidden',
+      }}
+    >
       
       {/* =====================================================================
           1. HEADER DEL MÓDULO CON MICRO-NAVEGACIÓN NATIVA ELEVADA
@@ -1081,16 +1093,18 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
           PESTAÑA 3: EDITOR DE PLANTILLAS EN SUPABASE
           ===================================================================== */}
       {tabActiva === 'plantillas' && (
-        <ComunicacionesPlantillasAdmin
-          configuracion={configuracion}
-          onGuardarConfiguracion={props.onGuardarConfiguracion}
-          showToast={showToast}
-          cotizacionEfectiva={cotizacionEfectiva}
-          reservaEfectiva={reservaEfectiva}
-          clienteActual={clienteActual}
-          fincaActual={fincaActual}
-          consecutivoBase={consecutivoBase}
-        />
+        <div style={{ minWidth: 0, maxWidth: '100%', width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
+          <ComunicacionesPlantillasAdmin
+            configuracion={configuracion}
+            onGuardarConfiguracion={props.onGuardarConfiguracion}
+            showToast={showToast}
+            cotizacionEfectiva={cotizacionEfectiva}
+            reservaEfectiva={reservaEfectiva}
+            clienteActual={clienteActual}
+            fincaActual={fincaActual}
+            consecutivoBase={consecutivoBase}
+          />
+        </div>
       )}
 
       {/* =====================================================================
