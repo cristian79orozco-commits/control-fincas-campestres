@@ -53,6 +53,12 @@ export interface Finca {
   banco_cuenta?: string | null;
   banco_titular?: string | null;
   banco_identificacion?: string | null;
+  // Comisión del administrador / broker comercial y datos de contacto de propietario
+  porcentaje_comision?: number | null;
+  tipo_comision?: 'porcentaje' | 'monto_fijo' | null;
+  valor_comision_fija?: number | null;
+  propietario_nombre?: string | null;
+  propietario_telefono?: string | null;
   created_at?: string;
   updated_at?: string;
   finca_imagenes?: FincaImagen[];
@@ -177,6 +183,12 @@ export interface Reserva {
   saldo_pendiente_alimentacion?: number;
   fecha_pago_alimentacion?: string | null;
   metodo_pago_alimentacion?: string | null;
+  // Gestión de comisión de promotor y logística de alimentación
+  comision_porcentaje?: number | null;
+  comision_monto?: number | null;
+  comision_estado?: 'pendiente' | 'cobrada' | 'no_aplica' | null;
+  comision_fecha_cobro?: string | null;
+  alimentacion_compras_listas?: boolean | null;
   consecutivo?: string | null;  // Consecutivo numérico de seguimiento (ej: 1001, sin letras al inicio)
   estado: ReservaEstado;
   observaciones?: string | null;
@@ -285,6 +297,18 @@ export function resolverMetadatosFinca(
     banco_cuenta: finca?.banco_cuenta || extMeta?.banco_cuenta || cacheFinca?.banco_cuenta || null,
     banco_titular: finca?.banco_titular || extMeta?.banco_titular || cacheFinca?.banco_titular || null,
     banco_identificacion: finca?.banco_identificacion || extMeta?.banco_identificacion || cacheFinca?.banco_identificacion || null,
+    porcentaje_comision:
+      finca?.porcentaje_comision !== undefined && finca?.porcentaje_comision !== null
+        ? Number(finca.porcentaje_comision)
+        : extMeta?.porcentaje_comision !== undefined && extMeta?.porcentaje_comision !== null
+        ? Number(extMeta.porcentaje_comision)
+        : cacheFinca?.porcentaje_comision !== undefined && cacheFinca?.porcentaje_comision !== null
+        ? Number(cacheFinca.porcentaje_comision)
+        : 10, // Predeterminado: 10% de comisión estándar
+    tipo_comision: finca?.tipo_comision || extMeta?.tipo_comision || cacheFinca?.tipo_comision || 'porcentaje',
+    valor_comision_fija: Number(finca?.valor_comision_fija || extMeta?.valor_comision_fija || cacheFinca?.valor_comision_fija || 0),
+    propietario_nombre: finca?.propietario_nombre || extMeta?.propietario_nombre || cacheFinca?.propietario_nombre || finca?.banco_titular || 'Propietario',
+    propietario_telefono: finca?.propietario_telefono || extMeta?.propietario_telefono || cacheFinca?.propietario_telefono || finca?.whatsapp || null,
   };
 }
 

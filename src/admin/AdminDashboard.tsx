@@ -34,6 +34,7 @@ import {
   isSoundEnabled,
   setSoundEnabled,
   probarNotificacionAdmin,
+  toggleMasterNotificaciones,
 } from '../services/notificaciones';
 import type {
   Finca, BloqueoDisponibilidad, Cliente, CotizacionDB, CotizacionEstado,
@@ -205,25 +206,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
   }, []);
 
-  const handleSolicitarPermiso = async () => {
-    const res = await solicitarPermisoNotificaciones();
-    setNotifPermiso(res);
-    if (res === 'granted') {
-      showToast('✓ Notificaciones de escritorio activadas en tu computador', 'success');
-    } else if (res === 'denied') {
-      showToast('Las notificaciones fueron bloqueadas en los ajustes del navegador.', 'error');
-    }
-  };
-
-  const handleToggleSonido = () => {
-    const nuevo = !sonidoActivo;
-    setSonidoActivo(nuevo);
-    setSoundEnabled(nuevo);
-    showToast(nuevo ? '🔊 Sonido de alerta de cotizaciones activado' : '🔇 Sonido de alerta silenciado', 'info');
-  };
-
-  const handleProbarAlerta = () => {
-    probarNotificacionAdmin(showToast, () => navigateTo('cotizaciones'));
+  const handleMasterNotificaciones = async () => {
+    const res = await toggleMasterNotificaciones(showToast, () => navigateTo('dashboard'));
+    setNotifPermiso(res.permiso);
+    setSonidoActivo(res.soundEnabled);
   };
 
   const handleInstalarApp = async () => {
@@ -433,61 +419,57 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             )}
 
-            {/* Widget de Notificaciones de Escritorio / Windows */}
-            {notifPermiso === 'granted' ? (
-              <span
-                className="status-badge s-avail"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'default' }}
-                title="Las notificaciones nativas de Windows/PC están activas y listas"
-              >
-                <Bell size={12} /> Alertas PC Activas
-              </span>
-            ) : notifPermiso === 'default' ? (
-              <button
-                type="button"
-                className="btn btn-sm btn-primary"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}
-                onClick={handleSolicitarPermiso}
-                title="Haz clic para recibir alertas en Windows cuando entre una nueva cotización"
-              >
-                <BellRing size={13} /> Activar Notif. en PC
-              </button>
-            ) : (
-              <span
-                className="status-badge s-busy"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                title="Permiso bloqueado en el navegador. Actívalo haciendo clic en el candado de la barra de direcciones."
-              >
-                <BellOff size={12} /> Notif. Bloqueadas
-              </span>
-            )}
-
-            {/* Interruptor de sonido de alerta */}
+            {/* Botón Maestro Unificado de Alertas & Sonido en PC */}
             <button
               type="button"
               className="btn btn-sm"
-              onClick={handleToggleSonido}
-              title={sonidoActivo ? 'Silenciar alertas sonoras de cotizaciones' : 'Activar sonido de campana de cotizaciones'}
+              onClick={handleMasterNotificaciones}
+              title={
+                notifPermiso === 'granted' && sonidoActivo
+                  ? 'Alertas en Windows y sonido profesional activas. Clic para probar timbre.'
+                  : 'Activar notificaciones nativas en Windows y sonido profesional incluso con el navegador minimizado.'
+              }
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.3rem',
-                color: sonidoActivo ? 'var(--primary)' : 'var(--text-muted)',
+                gap: '0.4rem',
+                fontWeight: 700,
+                fontSize: '0.78rem',
+                minHeight: '44px',
+                padding: '0.45rem 0.85rem',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                background:
+                  notifPermiso === 'granted' && sonidoActivo
+                    ? 'color-mix(in srgb, #16a34a 16%, transparent)'
+                    : 'color-mix(in srgb, var(--primary) 18%, transparent)',
+                color:
+                  notifPermiso === 'granted' && sonidoActivo
+                    ? '#16a34a'
+                    : 'var(--primary)',
+                border: `1px solid ${
+                  notifPermiso === 'granted' && sonidoActivo
+                    ? 'color-mix(in srgb, #16a34a 35%, transparent)'
+                    : 'color-mix(in srgb, var(--primary) 40%, transparent)'
+                }`,
               }}
             >
-              {sonidoActivo ? <Volume2 size={14} /> : <VolumeX size={14} />}
-              <span className="text-xs">{sonidoActivo ? 'Sonido ON' : 'Mudo'}</span>
-            </button>
-
-            {/* Botón de prueba rápida de alertas */}
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={handleProbarAlerta}
-              title="Probar sonido y notificación de escritorio en tu computador"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-            >
-              <Bell size={13} /> Probar
+              {notifPermiso === 'granted' && sonidoActivo ? (
+                <>
+                  <BellRing size={15} className="animate-pulse" />
+                  <span>Alertas PC: Activas 🔊</span>
+                </>
+              ) : notifPermiso === 'denied' ? (
+                <>
+                  <BellOff size={15} />
+                  <span>Notif. Bloqueadas (Ajustes)</span>
+                </>
+              ) : (
+                <>
+                  <Bell size={15} />
+                  <span>Activar Alertas PC & Sonido</span>
+                </>
+              )}
             </button>
 
             <button
@@ -606,6 +588,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 metricasReservas={metricasReservas || { total: 0, activas: 0, llegasHoy: 0, salenHoy: 0 }}
                 navigateTo={navigateTo}
                 userEmail={userEmail}
+                onGuardarReserva={onGuardarReserva}
               />
             </ErrorBoundary>
           )}

@@ -99,6 +99,11 @@ export function useFincaFormController({
   const [bancoIdentificacion, setBancoIdentificacion] = useState('');
   const [copiadoCuenta, setCopiadoCuenta] = useState(false);
 
+  // Comisión del administrador / broker y contacto del propietario
+  const [porcentajeComision, setPorcentajeComision] = useState<number>(10);
+  const [propietarioNombre, setPropietarioNombre] = useState('');
+  const [propietarioTelefono, setPropietarioTelefono] = useState('');
+
   // Amenidades y Planes
   const [amenidades, setAmenidades] = useState<{ nombre: string; icono?: string }[]>([
     { nombre: 'Piscina privada', icono: 'waves' },
@@ -192,6 +197,9 @@ export function useFincaFormController({
       setBancoTitular('');
       setBancoIdentificacion('');
       setCopiadoCuenta(false);
+      setPorcentajeComision(10);
+      setPropietarioNombre('');
+      setPropietarioTelefono('');
       setAmenidades([
         { nombre: 'Piscina privada', icono: 'waves' },
         { nombre: 'Zona BBQ / Asador campestre', icono: 'flame' },
@@ -233,6 +241,9 @@ export function useFincaFormController({
         setBancoTitular(f.banco_titular || '');
         setBancoIdentificacion(f.banco_identificacion || '');
         setCopiadoCuenta(false);
+        setPorcentajeComision(typeof f.porcentaje_comision === 'number' ? f.porcentaje_comision : 10);
+        setPropietarioNombre(f.propietario_nombre || f.banco_titular || '');
+        setPropietarioTelefono(f.propietario_telefono || f.whatsapp || '');
 
         if (f.finca_amenidades && f.finca_amenidades.length > 0) {
           setAmenidades(f.finca_amenidades.map(a => ({ nombre: a.nombre, icono: a.icono || 'check' })));
@@ -509,6 +520,9 @@ export function useFincaFormController({
       banco_cuenta: bancoCuenta.trim() || null,
       banco_titular: bancoTitular.trim() || null,
       banco_identificacion: bancoIdentificacion.trim() || null,
+      porcentaje_comision: Number(porcentajeComision) || 10,
+      propietario_nombre: propietarioNombre.trim() || null,
+      propietario_telefono: propietarioTelefono ? propietarioTelefono.replace(/[^0-9]/g, '') : null,
     };
 
     if (selectedFincaId !== 'new') {
@@ -538,7 +552,7 @@ export function useFincaFormController({
     precio, precioFincaCompleta, depositoGarantia, estado, activo, descripcion,
     indicacionesLlegada, checkinHora, checkoutHora, politicaMascotas, valorMascota,
     politicaMusica, normas, waNumber, bancoNombre, bancoTipoCuenta, bancoCuenta,
-    bancoTitular, bancoIdentificacion, selectedFincaId, planesSeleccionados,
+    bancoTitular, bancoIdentificacion, porcentajeComision, propietarioNombre, propietarioTelefono, selectedFincaId, planesSeleccionados,
     imagenes, amenidades, onSave, showToast
   ]);
 
@@ -645,6 +659,11 @@ export function useFincaFormController({
     bancoTitular, setBancoTitular,
     bancoIdentificacion, setBancoIdentificacion,
     copiadoCuenta, handleCopiarCuenta,
+
+    // Comisión del broker y contacto del propietario
+    porcentajeComision, setPorcentajeComision,
+    propietarioNombre, setPropietarioNombre,
+    propietarioTelefono, setPropietarioTelefono,
 
     // Amenidades y Planes
     amenidades,

@@ -1283,6 +1283,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         infoMascotasCot.costoMascotas
       );
 
+      const pctComision = typeof fincaSel?.porcentaje_comision === 'number'
+        ? fincaSel.porcentaje_comision
+        : 10;
+      const subtotalAloj = Number(cotizacion.subtotal_alojamiento || cotizacion.total || 0);
+      const montoComision = Math.round(subtotalAloj * (pctComision / 100));
+
       const nuevaReserva: Reserva = {
         id: newResId,
         cotizacion_id: cotizacion.id,
@@ -1307,6 +1313,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         estado: 'activa',
         observaciones: obsConMascotas,
         created_at: new Date().toISOString(),
+        comision_porcentaje: pctComision,
+        comision_monto: montoComision,
+        comision_estado: 'pendiente',
+        comision_fecha_cobro: null,
+        alimentacion_compras_listas: false,
         clientes: clienteSel ? {
           id: clienteSel.id,
           nombre: clienteSel.nombre,
@@ -1390,6 +1401,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           saldo_pendiente_alimentacion: Math.max(0, costoAlim - abonoAlim),
           fecha_pago_alimentacion: fechaPagoAlim,
           metodo_pago_alimentacion: abonoAlim > 0 ? metodoPagoAlim : null,
+          comision_porcentaje: pctComision,
+          comision_monto: montoComision,
+          comision_estado: 'pendiente',
+          comision_fecha_cobro: null,
+          alimentacion_compras_listas: false,
         };
 
         const { error: insErr } = await supabase.from('reservas').insert(payloadConColumnas);
@@ -1452,40 +1468,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const isNew = !datos.id;
       const resId = datos.id || generarUUID();
-      const consecutivo = datos.consecutivo || (isNew ? await obtenerSiguienteConsecutivo('reserva') : undefined);
+      const reservaExistente = datos.id ? reservas.find(r => r.id === datos.id) : undefined;
+      const consecutivo = datos.consecutivo || reservaExistente?.consecutivo || (isNew ? await obtenerSiguienteConsecutivo('reserva') : undefined);
 
-      const fincaSel = fincas.find(f => f.id === datos.finca_id);
-      const clienteSel = clientes.find(c => c.id === datos.cliente_id);
+      const fincaIdFinal = datos.finca_id || reservaExistente?.finca_id || '';
+      const clienteIdFinal = datos.cliente_id || reservaExistente?.cliente_id || '';
+      const fincaSel = fincas.find(f => f.id === fincaIdFinal) || reservaExistente?.fincas;
+      const clienteSel = clientes.find(c => c.id === clienteIdFinal) || reservaExistente?.clientes;
 
       const infoMRes = extraerInfoMascotas(datos, fincaSel);
+      const obsBase = datos.observaciones !== undefined ? datos.observaciones : (reservaExistente?.observaciones || null);
       const obsReservaFinal = adjuntarMetaMascotasEnTexto(
-        datos.observaciones || null,
-        infoMRes.cantidadMascotas,
-        infoMRes.costoMascotas
+        obsBase,
+        infoMRes.cantidadMascotas || reservaExistente?.cantidad_mascotas || 0,
+        infoMRes.costoMascotas || reservaExistente?.costo_mascotas || 0
       );
 
       const payloadReserva: Reserva = {
+        ...(reservaExistente || {}),
+        ...datos,
         id: resId,
-        cliente_id: datos.cliente_id || '',
-        finca_id: datos.finca_id || '',
-        fecha_inicio: datos.fecha_inicio || '',
-        fecha_fin: datos.fecha_fin || '',
-        personas: datos.personas || 1,
-        cantidad_mascotas: infoMRes.cantidadMascotas,
-        costo_mascotas: infoMRes.costoMascotas,
-        valor_total: datos.valor_total || 0,
-        separacion: datos.separacion || 0,
-        menu_id: datos.menu_id !== undefined ? datos.menu_id : null,
-        alimentacion: datos.alimentacion !== undefined ? datos.alimentacion : null,
-        costo_alimentacion: datos.costo_alimentacion !== undefined ? datos.costo_alimentacion : 0,
-        estado: datos.estado || 'activa',
+        cliente_id: clienteIdFinal,
+        finca_id: fincaIdFinal,
+        fecha_inicio: datos.fecha_inicio !== undefined ? datos.fecha_inicio : (reservaExistente?.fecha_inicio || ''),
+        fecha_fin: datos.fecha_fin !== undefined ? datos.fecha_fin : (reservaExistente?.fecha_fin || ''),
+        personas: datos.personas !== undefined ? Number(datos.personas) : (reservaExistente?.personas || 1),
+        cantidad_mascotas: datos.cantidad_mascotas !== undefined ? Number(datos.cantidad_mascotas) : (infoMRes.cantidadMascotas || reservaExistente?.cantidad_mascotas || 0),
+        costo_mascotas: datos.costo_mascotas !== undefined ? Number(datos.costo_mascotas) : (infoMRes.costoMascotas || reservaExistente?.costo_mascotas || 0),
+        valor_total: datos.valor_total !== undefined ? Number(datos.valor_total) : (reservaExistente?.valor_total || 0),
+        separacion: datos.separacion !== undefined ? Number(datos.separacion) : (reservaExistente?.separacion || 0),
+        menu_id: datos.menu_id !== undefined ? datos.menu_id : (reservaExistente?.menu_id ?? null),
+        alimentacion: datos.alimentacion !== undefined ? datos.alimentacion : (reservaExistente?.alimentacion ?? null),
+        costo_alimentacion: datos.costo_alimentacion !== undefined ? Number(datos.costo_alimentacion) : (reservaExistente?.costo_alimentacion || 0),
+        estado: datos.estado || reservaExistente?.estado || 'activa',
         observaciones: obsReservaFinal,
-        consecutivo: consecutivo || datos.consecutivo,
-        cotizacion_id: datos.cotizacion_id || null,
+        consecutivo: consecutivo || datos.consecutivo || reservaExistente?.consecutivo,
+        cotizacion_id: datos.cotizacion_id !== undefined ? datos.cotizacion_id : (reservaExistente?.cotizacion_id ?? null),
+        // Comisión del broker y logística de compras
+        comision_porcentaje: datos.comision_porcentaje !== undefined ? datos.comision_porcentaje : reservaExistente?.comision_porcentaje,
+        comision_monto: datos.comision_monto !== undefined ? datos.comision_monto : reservaExistente?.comision_monto,
+        comision_estado: datos.comision_estado || reservaExistente?.comision_estado || 'pendiente',
+        comision_fecha_cobro: datos.comision_fecha_cobro !== undefined ? datos.comision_fecha_cobro : reservaExistente?.comision_fecha_cobro,
+        alimentacion_compras_listas: datos.alimentacion_compras_listas !== undefined ? datos.alimentacion_compras_listas : (reservaExistente?.alimentacion_compras_listas || false),
         cotizacion_snapshot: {
+          ...(reservaExistente?.cotizacion_snapshot || {}),
           ...(datos.cotizacion_snapshot || {}),
-          cantidad_mascotas: infoMRes.cantidadMascotas,
-          costo_mascotas: infoMRes.costoMascotas,
+          cantidad_mascotas: infoMRes.cantidadMascotas || reservaExistente?.cantidad_mascotas,
+          costo_mascotas: infoMRes.costoMascotas || reservaExistente?.costo_mascotas,
         },
         clientes: clienteSel ? {
           id: clienteSel.id,
@@ -1498,14 +1527,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           id: fincaSel.id,
           nombre: fincaSel.nombre,
         } : undefined,
-        pagos: isNew && datos.separacion && datos.separacion > 0 ? [{
+        pagos: reservaExistente?.pagos || (isNew && datos.separacion && datos.separacion > 0 ? [{
           id: `pago-${Date.now()}`,
           reserva_id: resId,
           tipo: 'separacion',
           fecha: new Date().toISOString().split('T')[0],
           valor: datos.separacion,
           observacion: 'Separación registrada al crear reserva',
-        }] : [],
+        }] : []),
       };
 
       // Actualización optimista y persistencia en cache local
@@ -1516,20 +1545,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
 
       // Sincronizar bloqueo en disponibilidad de la finca
-      if (datos.finca_id && datos.fecha_inicio && datos.fecha_fin) {
+      if (payloadReserva.finca_id && payloadReserva.fecha_inicio && payloadReserva.fecha_fin) {
         setBloquesAdmin(prev => {
           const filtrados = prev.filter(b => !(
-            b.finca_id === datos.finca_id &&
-            ((b.fecha_inicio === datos.fecha_inicio && b.fecha_fin === datos.fecha_fin) ||
+            b.finca_id === payloadReserva.finca_id &&
+            ((b.fecha_inicio === payloadReserva.fecha_inicio && b.fecha_fin === payloadReserva.fecha_fin) ||
              (payloadReserva.consecutivo && b.notas && b.notas.includes(payloadReserva.consecutivo)))
           ));
           const nuevoBloqueo: BloqueoDisponibilidad = {
             id: Date.now(),
-            finca_id: datos.finca_id!,
-            fecha_inicio: datos.fecha_inicio!,
-            fecha_fin: datos.fecha_fin!,
+            finca_id: payloadReserva.finca_id!,
+            fecha_inicio: payloadReserva.fecha_inicio!,
+            fecha_fin: payloadReserva.fecha_fin!,
             estado: 'ocupado',
-            personas: datos.personas || 1,
+            personas: payloadReserva.personas || 1,
             notas: `Reserva ${payloadReserva.consecutivo || resId}`,
             fincas: { nombre: fincaSel?.nombre || 'Finca' },
           };
@@ -1540,39 +1569,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         try {
           await supabase.from('disponibilidad').insert({
-            finca_id: datos.finca_id,
-            fecha_inicio: datos.fecha_inicio,
-            fecha_fin: datos.fecha_fin,
+            finca_id: payloadReserva.finca_id,
+            fecha_inicio: payloadReserva.fecha_inicio,
+            fecha_fin: payloadReserva.fecha_fin,
             estado: 'ocupado',
-            personas: datos.personas || 1,
+            personas: payloadReserva.personas || 1,
             notas: `Reserva ${payloadReserva.consecutivo || resId}`,
           });
         } catch { /* silent */ }
       }
 
-      // Persistir en Supabase
+      // Persistir en Supabase con auto-recuperación ante columnas pendientes de migración
       const dbPayload: any = {
         id: resId,
-        cliente_id: datos.cliente_id,
-        finca_id: datos.finca_id,
-        fecha_inicio: datos.fecha_inicio,
-        fecha_fin: datos.fecha_fin,
-        personas: datos.personas || 1,
-        valor_total: datos.valor_total || 0,
-        separacion: datos.separacion || 0,
-        estado: datos.estado || 'activa',
-        observaciones: obsReservaFinal,
+        cliente_id: payloadReserva.cliente_id,
+        finca_id: payloadReserva.finca_id,
+        fecha_inicio: payloadReserva.fecha_inicio,
+        fecha_fin: payloadReserva.fecha_fin,
+        personas: payloadReserva.personas,
+        valor_total: payloadReserva.valor_total,
+        separacion: payloadReserva.separacion,
+        estado: payloadReserva.estado,
+        observaciones: payloadReserva.observaciones,
         consecutivo: payloadReserva.consecutivo,
-        cotizacion_id: datos.cotizacion_id || null,
-        menu_id: datos.menu_id !== undefined ? datos.menu_id : null,
-        alimentacion: datos.alimentacion !== undefined ? datos.alimentacion : null,
-        costo_alimentacion: datos.costo_alimentacion !== undefined ? datos.costo_alimentacion : 0,
+        cotizacion_id: payloadReserva.cotizacion_id || null,
+        menu_id: payloadReserva.menu_id !== undefined ? payloadReserva.menu_id : null,
+        alimentacion: payloadReserva.alimentacion !== undefined ? payloadReserva.alimentacion : null,
+        costo_alimentacion: payloadReserva.costo_alimentacion !== undefined ? payloadReserva.costo_alimentacion : 0,
         cotizacion_snapshot: payloadReserva.cotizacion_snapshot,
+        ...(payloadReserva.comision_porcentaje !== undefined && payloadReserva.comision_porcentaje !== null ? { comision_porcentaje: Number(payloadReserva.comision_porcentaje) } : {}),
+        ...(payloadReserva.comision_monto !== undefined && payloadReserva.comision_monto !== null ? { comision_monto: Number(payloadReserva.comision_monto) } : {}),
+        ...(payloadReserva.comision_estado ? { comision_estado: payloadReserva.comision_estado } : {}),
+        ...(payloadReserva.comision_fecha_cobro !== undefined ? { comision_fecha_cobro: payloadReserva.comision_fecha_cobro } : {}),
+        ...(payloadReserva.alimentacion_compras_listas !== undefined ? { alimentacion_compras_listas: Boolean(payloadReserva.alimentacion_compras_listas) } : {}),
       };
 
       try {
-        const { error } = await supabase.from('reservas').upsert(dbPayload, { onConflict: 'id' });
-        if (error) console.warn('[guardarReserva] Supabase error:', error);
+        const payloadSeguro = { ...dbPayload };
+        let intentos = 0;
+        let resUpsert: any;
+        while (intentos < 10) {
+          intentos++;
+          resUpsert = await supabase.from('reservas').upsert(payloadSeguro, { onConflict: 'id' });
+          if (!resUpsert.error) break;
+
+          const matchCol = resUpsert.error.message?.match(/Could not find the '([^']+)' column/i) ||
+                           resUpsert.error.message?.match(/'([^']+)' column of 'reservas'/i) ||
+                           resUpsert.error.message?.match(/'([^']+)' column/i) ||
+                           resUpsert.error.message?.match(/column "([^"]+)" of relation/i) ||
+                           resUpsert.error.message?.match(/column "?([a-zA-Z0-9_]+)"? does not exist/i);
+
+          if (matchCol && matchCol[1] && payloadSeguro[matchCol[1]] !== undefined) {
+            console.warn(`[guardarReserva] Columna '${matchCol[1]}' no presente en Supabase. Omitiendo y reintentando upsert...`);
+            delete payloadSeguro[matchCol[1]];
+          } else if (resUpsert.error.message?.includes('column') || resUpsert.error.message?.includes('schema cache') || resUpsert.error.code === 'PGRST204') {
+            const coreCols = ['id', 'cliente_id', 'finca_id', 'fecha_inicio', 'fecha_fin', 'personas', 'valor_total', 'separacion', 'estado', 'observaciones', 'consecutivo', 'cotizacion_id', 'menu_id', 'alimentacion', 'costo_alimentacion', 'cotizacion_snapshot'];
+            Object.keys(payloadSeguro).forEach(k => {
+              if (!coreCols.includes(k)) delete payloadSeguro[k];
+            });
+          } else {
+            console.warn('[guardarReserva] Error no recuperable en reservas:', resUpsert.error);
+            break;
+          }
+        }
 
         if (isNew && datos.separacion && datos.separacion > 0) {
           await supabase.from('pagos').insert({
@@ -2254,6 +2313,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         banco_cuenta: fincaData.banco_cuenta || null,
         banco_titular: fincaData.banco_titular || null,
         banco_identificacion: fincaData.banco_identificacion || null,
+        // Comisión del broker y contacto del propietario
+        ...(fincaData.porcentaje_comision !== undefined && fincaData.porcentaje_comision !== null
+          ? { porcentaje_comision: Number(fincaData.porcentaje_comision) }
+          : {}),
+        ...(fincaData.tipo_comision ? { tipo_comision: fincaData.tipo_comision } : {}),
+        ...(fincaData.valor_comision_fija !== undefined && fincaData.valor_comision_fija !== null
+          ? { valor_comision_fija: Number(fincaData.valor_comision_fija) }
+          : {}),
+        ...(fincaData.propietario_nombre ? { propietario_nombre: fincaData.propietario_nombre } : {}),
+        ...(fincaData.propietario_telefono ? { propietario_telefono: fincaData.propietario_telefono } : {}),
       };
 
       if (targetId) {

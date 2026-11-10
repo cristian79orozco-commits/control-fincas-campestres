@@ -87,6 +87,11 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
     bancoIdentificacion, setBancoIdentificacion,
     copiadoCuenta, handleCopiarCuenta,
 
+    // Comisión del broker y contacto del propietario
+    porcentajeComision, setPorcentajeComision,
+    propietarioNombre, setPropietarioNombre,
+    propietarioTelefono, setPropietarioTelefono,
+
     // Amenidades y Planes
     amenidades,
     nuevaAmenidadTexto, setNuevaAmenidadTexto,
@@ -822,6 +827,70 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                     (Al completar los datos de cuenta arriba, se visualizará aquí el bloque exacto que recibirá el cliente.)
                   </span>
                 )}
+              </div>
+            </div>
+
+            {/* SECCIÓN: COMISIÓN DEL BROKER & CONTACTO CON PROPIETARIO */}
+            <div className="rounded-[var(--rad-sm,12px)] bg-[var(--surface,#1a1814)] border border-[var(--border,#312e28)] p-4 sm:p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-base">💼</span>
+                <div>
+                  <div className="font-bold text-xs text-[var(--text,#f0eae0)]">
+                    Comisión del Administrador & Contacto del Propietario (Uso Interno)
+                  </div>
+                  <p className="m-0 text-[11px] text-[var(--text-muted,#a8a097)] leading-relaxed">
+                    Parámetros comerciales para calcular tu ganancia en el Dashboard y enviarle el cobro amigable por WhatsApp al terminar la estadía.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                    % de Comisión Acordada *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      value={porcentajeComision}
+                      onChange={e => setPorcentajeComision(parseFloat(e.target.value) || 0)}
+                      className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--primary,#4da89e)]"
+                    />
+                    <span className="absolute right-3 top-2.5 text-xs text-[var(--text-muted,#a8a097)] font-bold">%</span>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted,#a8a097)] mt-1 block">Estándar habitual: 10% a 15%</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                    Nombre del Dueño / Propietario
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej: Don Hernando o Carlos"
+                    value={propietarioNombre}
+                    onChange={e => setPropietarioNombre(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--primary,#4da89e)]"
+                  />
+                  <span className="text-[10px] text-[var(--text-muted,#a8a097)] mt-1 block">Para el saludo en WhatsApp</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--text,#f0eae0)] mb-1.5">
+                    WhatsApp del Propietario
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej: 3001234567 o 57300..."
+                    value={propietarioTelefono}
+                    onChange={e => setPropietarioTelefono(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--primary,#4da89e)]"
+                  />
+                  <span className="text-[10px] text-[var(--text-muted,#a8a097)] mt-1 block">Para cobrar comisión en 1 clic</span>
+                </div>
               </div>
             </div>
           </div>

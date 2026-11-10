@@ -94,6 +94,26 @@ export function soportaNotificacionesEscritorio(): boolean {
   return typeof window !== 'undefined' && 'Notification' in window;
 }
 
+// Singleton de AudioContext desbloqueado por interacción del usuario
+let sharedAudioContext: AudioContext | null = null;
+
+export function desbloquearAudioContext(): AudioContext | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return null;
+    if (!sharedAudioContext || sharedAudioContext.state === 'closed') {
+      sharedAudioContext = new AudioContextClass();
+    }
+    if (sharedAudioContext.state === 'suspended') {
+      sharedAudioContext.resume().catch(() => {});
+    }
+    return sharedAudioContext;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Obtiene el estado actual del permiso de notificaciones en el navegador.
  */
@@ -126,13 +146,8 @@ export async function solicitarPermisoNotificaciones(): Promise<NotificationPerm
 export function reproducirSonidoNotificacion(): void {
   if (!isSoundEnabled()) return;
   try {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContextClass) return;
-
-    const ctx = new AudioContextClass();
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
+    const ctx = desbloquearAudioContext();
+    if (!ctx) return;
 
     const t0 = ctx.currentTime;
 
@@ -141,31 +156,24 @@ export function reproducirSonidoNotificacion(): void {
     const gain1 = ctx.createGain();
     osc1.type = 'sine';
     osc1.frequency.setValueAtTime(587.33, t0);
-    gain1.gain.setValueAtTime(0.28, t0);
+    gain1.gain.setValueAtTime(0.30, t0);
     gain1.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.7);
     osc1.connect(gain1);
     gain1.connect(ctx.destination);
     osc1.start(t0);
     osc1.stop(t0 + 0.7);
 
-    // Segundo tono: La5 (880.00 Hz) con ligero retraso para efecto de campana doble
+    // Segundo tono armónico: La5 (880.00 Hz) con ligero retraso para efecto campana limpia
     const osc2 = ctx.createOscillator();
     const gain2 = ctx.createGain();
     osc2.type = 'sine';
     osc2.frequency.setValueAtTime(880.00, t0 + 0.12);
-    gain2.gain.setValueAtTime(0.32, t0 + 0.12);
-    gain2.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.2);
+    gain2.gain.setValueAtTime(0.34, t0 + 0.12);
+    gain2.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.25);
     osc2.connect(gain2);
     gain2.connect(ctx.destination);
     osc2.start(t0 + 0.12);
-    osc2.stop(t0 + 1.2);
-
-    // Liberar contexto tras finalizar
-    setTimeout(() => {
-      try {
-        if (ctx.state !== 'closed') ctx.close();
-      } catch {}
-    }, 1500);
+    osc2.stop(t0 + 1.25);
   } catch (err) {
     console.warn('[notificaciones] No se pudo reproducir sonido de notificación:', err);
   }
@@ -330,3 +338,102 @@ export function probarNotificacionAdmin(
     }
   }
 }
+
+/**
+ * Interruptor Maestro Unificado de Notificaciones:
+ * En un solo clic solicita permiso nativo de Windows si falta, desbloquea el Web Audio API
+ * y emite una alerta de prueba audiovisual para confirmar que el PC está armado.
+ */
+export async function toggleMasterNotificaciones(
+  showToast?: (mensaje: string, tipo?: 'success' | 'error' | 'info') => void,
+  onNavigate?: () => void
+): Promise<{ permiso: NotificationPermission | 'unsupported'; soundEnabled: boolean }> {
+  // 1. Desbloquear el contexto de audio nativo mediante el gesto del clic
+  desbloquearAudioContext();
+
+  // 2. Comprobar / solicitar permiso de notificaciones nativas en el OS
+  let permiso = obtenerEstadoPermisoNotificaciones();
+  if (permiso === 'default') {
+    permiso = await solicitarPermisoNotificaciones();
+  }
+
+  // 3. Activar sonido
+  setSoundEnabled(true);
+
+  // 4. Reproducir timbre armónico de confirmación
+  reproducirSonidoNotificacion();
+
+  // 5. Emitir notificación nativa de Windows de confirmación
+  if (permiso === 'granted') {
+    mostrarNotificacionEscritorio('🔔 Alertas PC & Sonido Activadas', {
+      body: 'Tu computador te notificará nuevas cotizaciones, comisiones listas para cobrar y compras de alimentación aún con la ventana minimizada.',
+      tag: 'master-notif-confirm',
+      onClick: onNavigate,
+    });
+    if (showToast) {
+      showToast('✓ Alertas de PC y sonido profesional activados con éxito', 'success');
+    }
+  } else if (permiso === 'denied') {
+    if (showToast) {
+      showToast('🔊 Sonido activado. Las notificaciones nativas están bloqueadas en tu navegador: haz clic en el candado de la barra de direcciones para permitirlas.', 'info');
+    }
+  } else {
+    if (showToast) {
+      showToast('🔊 Sonido activado. Para recibir alertas en Windows, confirma el permiso emergente.', 'info');
+    }
+  }
+
+  return { permiso, soundEnabled: true };
+}
+
+/**
+ * Notifica al administrador que una estadía terminó y su comisión está lista para cobro con el dueño.
+ */
+export function notificarComisionPendienteCobro({
+  dueñoNombre,
+  fincaNombre,
+  comisionCOP,
+  onClick,
+}: {
+  dueñoNombre: string;
+  fincaNombre: string;
+  comisionCOP: number;
+  onClick?: () => void;
+}): void {
+  if (!esAdminAutenticado()) return;
+  reproducirSonidoNotificacion();
+  mostrarNotificacionEscritorio('💰 ¡Comisión lista para cobrar!', {
+    body: `La estadía en ${fincaNombre} ha finalizado. Tu comisión con ${dueñoNombre} es de $${comisionCOP.toLocaleString('es-CO')} COP.`,
+    tag: `comision-${fincaNombre}-${Date.now()}`,
+    onClick,
+  });
+}
+
+/**
+ * Notifica al administrador con anticipación (48h/72h) que debe preparar compras de menú.
+ */
+export function notificarAlertaComprasAlimentacion({
+  fincaNombre,
+  clienteNombre,
+  comensales,
+  diasFaltantes,
+  menuNombre,
+  onClick,
+}: {
+  fincaNombre: string;
+  clienteNombre: string;
+  comensales: number;
+  diasFaltantes: number;
+  menuNombre?: string;
+  onClick?: () => void;
+}): void {
+  if (!esAdminAutenticado()) return;
+  reproducirSonidoNotificacion();
+  const tiempoStr = diasFaltantes === 0 ? '¡Llegan HOY!' : `Llegan en ${diasFaltantes} días`;
+  mostrarNotificacionEscritorio(`🛒 Alerta de Compras: ${tiempoStr}`, {
+    body: `${fincaNombre} · ${clienteNombre} (${comensales} personas) - Menú: ${menuNombre || 'Alimentación'}. Preparar insumos.`,
+    tag: `compras-${fincaNombre}-${Date.now()}`,
+    onClick,
+  });
+}
+
