@@ -182,6 +182,8 @@ export function reproducirSonidoNotificacion(): void {
 /**
  * Muestra una notificación nativa en el sistema operativo (Windows, Mac, etc.)
  * o en la ventana independiente de la PWA instalada.
+ * Utiliza prioritariamente el Service Worker registrado para garantizar que
+ * Windows despierte la alerta y emita sonido aun con la app minimizada.
  */
 export function mostrarNotificacionEscritorio(
   titulo: string,
@@ -195,35 +197,67 @@ export function mostrarNotificacionEscritorio(
   if (!soportaNotificacionesEscritorio()) return false;
   if (Notification.permission !== 'granted') return false;
 
+  const notifOptions: NotificationOptions = {
+    body: opciones?.body,
+    tag: opciones?.tag || `notif-${Date.now()}`,
+    icon: opciones?.icon || './icon-192.png?v=2',
+    badge: opciones?.icon || './icon-192.png?v=2',
+    silent: false, // silent: false permite que Windows reproduzca su sonido nativo de notificación en segundo plano
+    requireInteraction: true, // Mantiene la notificación visible en pantalla hasta que el usuario interactúe
+  };
+
+  // 1. Prioridad: Service Worker (Estándar obligatorio para PWAs y segundo plano en Windows / Chrome)
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+    try {
+      navigator.serviceWorker.ready.then((reg) => {
+        if (reg && 'showNotification' in reg) {
+          reg.showNotification(titulo, notifOptions).catch(() => {
+            crearNotificacionDirecta(titulo, notifOptions, opciones?.onClick);
+          });
+        } else {
+          crearNotificacionDirecta(titulo, notifOptions, opciones?.onClick);
+        }
+      }).catch(() => {
+        crearNotificacionDirecta(titulo, notifOptions, opciones?.onClick);
+      });
+      return true;
+    } catch {
+      // Continuar con fallback directo
+    }
+  }
+
+  // 2. Fallback: Constructor directo de Notification
+  return crearNotificacionDirecta(titulo, notifOptions, opciones?.onClick);
+}
+
+function crearNotificacionDirecta(
+  titulo: string,
+  options: NotificationOptions,
+  onClick?: () => void
+): boolean {
   try {
-    const notif = new Notification(titulo, {
-      body: opciones?.body,
-      tag: opciones?.tag || 'cotizacion-notif',
-      icon: opciones?.icon || './icon-192.png?v=2',
-      badge: opciones?.icon || './icon-192.png?v=2',
-      silent: true, // El sonido lo gestionamos nosotros con Web Audio para consistencia
-    });
+    const notif = new Notification(titulo, options);
 
     notif.onclick = () => {
       try {
         window.focus();
       } catch {}
-      if (opciones?.onClick) {
-        opciones.onClick();
+      if (onClick) {
+        onClick();
       }
       notif.close();
     };
 
-    // Auto-cierre tras 10 segundos
+    // Auto-cierre tras 15 segundos
     setTimeout(() => {
       try {
         notif.close();
       } catch {}
-    }, 10000);
+    }, 15000);
 
     return true;
   } catch (err) {
-    console.warn('[notificaciones] Error emitiendo notificación de escritorio:', err);
+    console.warn('[notificaciones] Error emitiendo notificación directa:', err);
     return false;
   }
 }

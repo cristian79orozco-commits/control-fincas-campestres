@@ -917,12 +917,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     window.addEventListener('storage', handleStorage);
 
-    // 4. Polling inteligente suave (cada 10 segundos) cuando la pestaña está activa
+    // 4. Polling inteligente de vigilancia: activo cada 15s incluso en segundo plano/minimizada
     const intervalId = setInterval(() => {
-      if (!document.hidden) {
-        cargarCotizaciones(true);
-      }
-    }, 10000);
+      cargarCotizaciones(true);
+    }, 15000);
 
     // 5. Refresco inmediato cuando el usuario vuelve a enfocar la pestaña
     const handleReenfoque = () => {
