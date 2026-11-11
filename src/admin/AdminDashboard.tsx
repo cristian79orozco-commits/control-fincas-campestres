@@ -408,15 +408,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
             <div
               style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: '12px',
+                width: '40px',
+                height: '40px',
+                borderRadius: '11px',
                 background: 'linear-gradient(145deg, #FFFDF9 0%, #FAF6EC 100%)',
                 border: '1.5px solid color-mix(in srgb, var(--accent) 45%, var(--border))',
                 overflow: 'hidden',
                 flexShrink: 0,
                 padding: '2px',
-                boxShadow: '0 2px 10px rgba(212, 146, 74, 0.16)',
+                boxShadow: '0 2px 8px rgba(212, 146, 74, 0.16)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -612,7 +612,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         {/* SIDEBAR PRO: FIJO SIN SCROLL, 100% VISIBLE */}
         <nav
-          className={`panel admin-sidebar${sidebarOpen ? ' open' : ''}`}
+          className={`admin-sidebar${sidebarOpen ? ' open' : ''}`}
           aria-label="Menú principal de módulos de administración"
         >
           {/* Botón cerrar en móvil */}

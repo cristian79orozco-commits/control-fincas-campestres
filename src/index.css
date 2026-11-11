@@ -988,9 +988,15 @@ ul, ol {
 }
 
 /* ADMIN DASHBOARD */
+.admin-main-content {
+  margin-top: 0 !important;
+  padding-top: 0.5rem !important;
+}
+
 .admin-shell {
   display: grid;
-  gap: 1.25rem;
+  gap: 0;
+  width: 100%;
 }
 
 .admin-stats-row {
@@ -2040,15 +2046,34 @@ ul, ol {
   position: sticky;
   top: 0.5rem;
   z-index: 40;
+  box-sizing: border-box;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   border: 1px solid var(--border);
   border-radius: var(--rad-md, 16px);
-  padding: 0.75rem 1.15rem;
+  padding: 0.55rem 1.15rem;
   box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.06);
   transition: background 0.3s ease, border-color 0.3s ease;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+@media (min-width: 861px) {
+  .admin-dashboard-topbar {
+    height: 64px;
+    padding: 0 1.15rem;
+    display: flex;
+    align-items: center;
+  }
+  .admin-topbar {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+  }
 }
 
 /* Grid del Layout Administrativo */
@@ -2063,7 +2088,7 @@ ul, ol {
 /* Sidebar Fijo sin scroll en Escritorio (High-End Pro) */
 .admin-sidebar {
   position: sticky;
-  top: 5.25rem;
+  top: calc(0.5rem + 64px + 0.85rem); /* Exactamente 86px: coincide con su inicio y queda 100% fijo sin moverse */
   height: fit-content;
   max-height: none;
   overflow: hidden;

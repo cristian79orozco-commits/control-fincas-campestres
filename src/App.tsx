@@ -376,7 +376,7 @@ export const App: React.FC = () => {
       )}
 
       {view === 'admin' && (
-        <main className="main-content admin-main-content" style={{ marginTop: '0.75rem' }}>
+        <main className="main-content admin-main-content">
           <ErrorBoundary fallbackTitle="Panel de Administración">
             <AdminDashboard
               theme={theme}
