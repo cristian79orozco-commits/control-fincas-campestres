@@ -2085,23 +2085,49 @@ ul, ol {
   width: 100%;
 }
 
-/* Sidebar Fijo sin scroll en Escritorio (High-End Pro) */
-.admin-sidebar {
-  position: sticky;
-  top: calc(0.5rem + 64px + 0.85rem); /* Exactamente 86px: coincide con su inicio y queda 100% fijo sin moverse */
-  height: fit-content;
-  max-height: none;
-  overflow: hidden;
-  padding: 0.65rem 0.55rem !important;
-  border-radius: var(--rad-md, 16px);
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  z-index: 25;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+.admin-sidebar-col {
+  width: 228px;
+  min-width: 228px;
+  flex-shrink: 0;
+}
+
+/* Sidebar Totalmente Fijo en Escritorio (Position Fixed Pro — Inamovible ante scroll o fin de página) */
+@media (min-width: 861px) {
+  .admin-sidebar-col {
+    width: 228px;
+    min-width: 228px;
+    flex-shrink: 0;
+  }
+
+  .admin-sidebar {
+    position: fixed;
+    top: calc(0.5rem + 64px + 0.85rem); /* Exactamente 86px bajo la barra superior */
+    left: max(var(--sp-5, 20px), calc((100vw - 1360px) / 2 + var(--sp-5, 20px)));
+    width: 228px;
+    height: fit-content;
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+    padding: 0.65rem 0.55rem !important;
+    border-radius: var(--rad-md, 16px);
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    z-index: 25;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .admin-sidebar::-webkit-scrollbar {
+    width: 3px;
+  }
+  .admin-sidebar::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
 }
 
 .admin-nav-group {
@@ -2270,6 +2296,10 @@ ul, ol {
   .admin-layout-grid {
     grid-template-columns: 1fr !important;
     gap: 1rem;
+  }
+  .admin-sidebar-col {
+    display: contents;
+    width: 0;
   }
   .admin-sidebar {
     display: none;

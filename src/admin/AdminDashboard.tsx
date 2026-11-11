@@ -610,60 +610,63 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* ===== LAYOUT: SIDEBAR + CONTENIDO ===== */}
       <div className="admin-layout-grid">
 
-        {/* SIDEBAR PRO: FIJO SIN SCROLL, 100% VISIBLE */}
-        <nav
-          className={`admin-sidebar${sidebarOpen ? ' open' : ''}`}
-          aria-label="Menú principal de módulos de administración"
-        >
-          {/* Botón cerrar en móvil */}
-          {sidebarOpen && (
-            <button
-              className="btn btn-sm"
-              style={{ position: 'absolute', top: '0.65rem', right: '0.65rem', minWidth: '36px', minHeight: '36px' }}
-              onClick={() => setSidebarOpen(false)}
-              aria-label="Cerrar menú lateral"
-            >
-              <X size={16} />
-            </button>
-          )}
+        {/* COLUMNA DE LA BARRA LATERAL (Reserva el espacio en la grilla y fija la navegación) */}
+        <aside className="admin-sidebar-col">
+          {/* SIDEBAR PRO: TOTALMENTE FIJO (POSITION FIXED), 100% VISIBLE */}
+          <nav
+            className={`admin-sidebar${sidebarOpen ? ' open' : ''}`}
+            aria-label="Menú principal de módulos de administración"
+          >
+            {/* Botón cerrar en móvil */}
+            {sidebarOpen && (
+              <button
+                className="btn btn-sm"
+                style={{ position: 'absolute', top: '0.65rem', right: '0.65rem', minWidth: '36px', minHeight: '36px' }}
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Cerrar menú lateral"
+              >
+                <X size={16} />
+              </button>
+            )}
 
-          {(['Operación', 'CRM & Clientes', 'Sistema'] as const).map(groupName => {
-            const items = NAV_ITEMS.filter(it => it.group === groupName);
-            return (
-              <div key={groupName} className="admin-nav-group">
-                <div className="admin-nav-group-title">{groupName}</div>
-                {items.map(item => {
-                  const isActive = activeSection === item.section;
-                  const isCotizaciones = item.section === 'cotizaciones' && cotizacionesPendientes > 0;
-                  const isReservas = item.section === 'reservas' && metricasReservas.activas > 0;
-                  const badgeCount = isCotizaciones ? cotizacionesPendientes : isReservas ? metricasReservas.activas : 0;
+            {(['Operación', 'CRM & Clientes', 'Sistema'] as const).map(groupName => {
+              const items = NAV_ITEMS.filter(it => it.group === groupName);
+              return (
+                <div key={groupName} className="admin-nav-group">
+                  <div className="admin-nav-group-title">{groupName}</div>
+                  {items.map(item => {
+                    const isActive = activeSection === item.section;
+                    const isCotizaciones = item.section === 'cotizaciones' && cotizacionesPendientes > 0;
+                    const isReservas = item.section === 'reservas' && metricasReservas.activas > 0;
+                    const badgeCount = isCotizaciones ? cotizacionesPendientes : isReservas ? metricasReservas.activas : 0;
 
-                  return (
-                    <button
-                      key={item.section}
-                      type="button"
-                      onClick={() => navigateTo(item.section)}
-                      className={`admin-nav-btn${isActive ? ' active' : ''}`}
-                      title={item.label}
-                    >
-                      {isActive && <span className="admin-nav-active-pip" />}
-                      <span className="admin-nav-icon">{item.icon}</span>
-                      <span className="admin-nav-label">{item.label}</span>
-                      {/* Badges */}
-                      {badgeCount > 0 && (
-                        <span
-                          className={`admin-nav-badge${isCotizaciones ? ' badge-cotiz' : ' badge-reservas'}`}
-                        >
-                          {badgeCount}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </nav>
+                    return (
+                      <button
+                        key={item.section}
+                        type="button"
+                        onClick={() => navigateTo(item.section)}
+                        className={`admin-nav-btn${isActive ? ' active' : ''}`}
+                        title={item.label}
+                      >
+                        {isActive && <span className="admin-nav-active-pip" />}
+                        <span className="admin-nav-icon">{item.icon}</span>
+                        <span className="admin-nav-label">{item.label}</span>
+                        {/* Badges */}
+                        {badgeCount > 0 && (
+                          <span
+                            className={`admin-nav-badge${isCotizaciones ? ' badge-cotiz' : ' badge-reservas'}`}
+                          >
+                            {badgeCount}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </nav>
+        </aside>
 
         {/* CONTENIDO PRINCIPAL */}
         <div style={{ minWidth: 0 }}>
