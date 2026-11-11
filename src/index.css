@@ -3566,7 +3566,7 @@ textarea:focus {
 
 @media (max-width: 860px) {
   /* 1. Contención estricta del shell de administración para cero desbordamiento horizontal */
-  .main-content:has(.admin-shell) {
+  .admin-main-content {
     margin-top: 0.65rem !important;
     padding: 0 0.65rem !important;
     width: 100% !important;
@@ -3809,7 +3809,7 @@ textarea:focus {
 }
 
 @media (max-width: 640px) {
-  .main-content:has(.admin-shell) {
+  .admin-main-content {
     margin-top: 0.5rem !important;
     padding: 0 0.5rem !important;
   }
