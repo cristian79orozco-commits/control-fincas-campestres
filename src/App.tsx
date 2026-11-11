@@ -301,24 +301,29 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-wrapper">
-      {/* Banner de anuncio superior */}
-      <BannerPromocional
-        visible={contenidoSitio.banner_visible}
-        texto={contenidoSitio.banner_texto}
-        linkTexto={contenidoSitio.banner_link_texto}
-        linkUrl={contenidoSitio.banner_link_url}
-        tipo={contenidoSitio.banner_tipo}
-      />
+      {/* Banner de anuncio superior (solo visible en vista cliente/detalle, oculto en panel de administración) */}
+      {view !== 'admin' && (
+        <BannerPromocional
+          visible={contenidoSitio.banner_visible}
+          texto={contenidoSitio.banner_texto}
+          linkTexto={contenidoSitio.banner_link_texto}
+          linkUrl={contenidoSitio.banner_link_url}
+          tipo={contenidoSitio.banner_tipo}
+        />
+      )}
 
-      <Navbar
-        currentView={view}
-        onViewChange={handleViewChange}
-        theme={theme}
-        onThemeToggle={toggleTheme}
-        isAdminLoggedIn={isAdminLoggedIn}
-        onOpenAdminLoginModal={() => setAdminLoginModalOpen(true)}
-        hasSelectedFinca={!!selectedFinca}
-      />
+      {/* Barra de navegación pública (solo visible en vista cliente/detalle, oculta en panel de administración) */}
+      {view !== 'admin' && (
+        <Navbar
+          currentView={view}
+          onViewChange={handleViewChange}
+          theme={theme}
+          onThemeToggle={toggleTheme}
+          isAdminLoggedIn={isAdminLoggedIn}
+          onOpenAdminLoginModal={() => setAdminLoginModalOpen(true)}
+          hasSelectedFinca={!!selectedFinca}
+        />
+      )}
 
       {view === 'cliente' && (
         <>
@@ -371,9 +376,11 @@ export const App: React.FC = () => {
       )}
 
       {view === 'admin' && (
-        <main className="main-content" style={{ marginTop: '1.5rem' }}>
+        <main className="main-content admin-main-content" style={{ marginTop: '0.75rem' }}>
           <ErrorBoundary fallbackTitle="Panel de Administración">
             <AdminDashboard
+              theme={theme}
+              onThemeToggle={toggleTheme}
               isAdminLoggedIn={isAdminLoggedIn}
               userEmail={user?.email}
               fincas={todasLasFincas}

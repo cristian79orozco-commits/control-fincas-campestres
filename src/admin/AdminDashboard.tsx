@@ -3,7 +3,7 @@ import {
   LayoutDashboard, LogOut, Lock, LogIn, ShieldCheck, Database,
   Home, Users, FileText, ClipboardList, Calendar, MessageCircle,
   Menu, X, TrendingUp, CheckCircle, AlertTriangle, Clock, UtensilsCrossed, Settings,
-  Palette, History, Globe, Bell, BellRing, BellOff, Volume2, VolumeX, Laptop
+  Palette, History, Globe, Bell, BellRing, BellOff, Volume2, VolumeX, Laptop, Sun, Moon
 } from 'lucide-react';
 import { AdminFincaForm } from './AdminFincaForm';
 import { AdminWaConfig } from './AdminWaConfig';
@@ -44,6 +44,8 @@ import type {
 import { desglosarFinanzasReserva } from '../types';
 
 interface AdminDashboardProps {
+  theme?: 'light' | 'dark';
+  onThemeToggle?: () => void;
   isAdminLoggedIn: boolean;
   userEmail?: string | null;
   fincas: Finca[];
@@ -135,6 +137,8 @@ const NAV_ITEMS: NavItemConfig[] = [
 function formatCOP(v: number) { return '$' + v.toLocaleString('es-CO'); }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
+  theme,
+  onThemeToggle,
   isAdminLoggedIn,
   userEmail,
   fincas,
@@ -258,6 +262,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   if (!isAdminLoggedIn) {
     return (
       <div className="login-box">
+        {/* Cabecera de navegación pública / tema en login */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', width: '100%' }}>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={onVerSitioPublico || (() => navegarACliente())}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem' }}
+          >
+            <Globe size={14} /> Volver al Catálogo
+          </button>
+          {onThemeToggle && (
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={onThemeToggle}
+              title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+              style={{
+                borderRadius: '8px',
+                border: '1px solid var(--border)',
+                background: 'var(--surface-2)',
+                minWidth: '36px',
+                minHeight: '36px',
+                color: theme === 'dark' ? 'var(--accent)' : 'var(--text)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+          )}
+        </div>
         <div
           style={{
             width: '72px',
@@ -355,10 +392,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="admin-shell">
-      {/* ===== TOPBAR ===== */}
-      <div className="panel" style={{ marginBottom: '1rem' }}>
-        <div className="flex admin-topbar" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', minWidth: 0 }}>
+      {/* ===== TOPBAR ADMINISTRATIVA PRO (ÚNICA BARRA SUPERIOR EN ADMIN) ===== */}
+      <header className="admin-dashboard-topbar">
+        <div className="flex admin-topbar" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', minWidth: 0 }}>
             {/* Hamburguesa móvil */}
             <button
               className="btn btn-sm"
@@ -367,7 +404,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               onClick={() => setSidebarOpen(o => !o)}
               aria-label="Abrir menú lateral"
             >
-              <Menu size={16} />
+              <Menu size={18} />
             </button>
             <div
               style={{
@@ -392,8 +429,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               />
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Paraíso Terrenal · Administración</div>
-              <div className="text-xs text-muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userEmail || 'admin@fincas.com'} · Sesión activa</div>
+              <div style={{ fontWeight: 700, fontSize: '0.96rem', letterSpacing: '-0.015em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>
+                Paraíso Terrenal · Administración
+              </div>
+              <div className="text-xs text-muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span>{userEmail || 'admin@fincas.com'}</span>
+                <span style={{ opacity: 0.4 }}>•</span>
+                <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Sesión activa</span>
+              </div>
             </div>
           </div>
 
@@ -411,6 +454,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   color: 'var(--primary)',
                   borderColor: 'var(--primary)',
                   fontWeight: 600,
+                  minHeight: '38px',
                 }}
                 onClick={handleInstalarApp}
                 title="Descargar e instalar el panel de control como aplicación en tu computador"
@@ -435,7 +479,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 gap: '0.4rem',
                 fontWeight: 700,
                 fontSize: '0.78rem',
-                minHeight: '44px',
+                minHeight: '38px',
                 padding: '0.45rem 0.85rem',
                 borderRadius: '8px',
                 cursor: 'pointer',
@@ -472,6 +516,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               )}
             </button>
 
+            {/* Explorar como cliente */}
             <button
               type="button"
               className="btn btn-sm"
@@ -483,21 +528,57 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 color: 'var(--primary)',
                 borderColor: 'var(--primary)',
                 fontWeight: 600,
+                minHeight: '38px',
               }}
               onClick={onVerSitioPublico || (() => navegarACliente())}
               title="Ver cómo lo ve el cliente en vivo"
             >
               <Globe size={14} /> Explorar como cliente
             </button>
-            <span className="status-badge s-avail">
+
+            {/* Supabase conectado */}
+            <span className="status-badge s-avail" style={{ minHeight: '38px', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" style={{ display: 'inline-block' }} />
               <Database size={12} style={{ display: 'inline' }} /> Supabase conectado
             </span>
-            <button className="btn btn-sm btn-danger" onClick={onLogout}>
+
+            {/* Alternador de Modo Claro / Oscuro */}
+            {onThemeToggle && (
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={onThemeToggle}
+                title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+                style={{
+                  borderRadius: 'var(--rad-xs, 8px)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface-2)',
+                  minWidth: '38px',
+                  minHeight: '38px',
+                  color: theme === 'dark' ? 'var(--accent)' : 'var(--text)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'transform 0.25s ease, background 0.2s ease',
+                }}
+              >
+                {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+              </button>
+            )}
+
+            {/* Salir */}
+            <button
+              type="button"
+              className="btn btn-sm btn-danger"
+              onClick={onLogout}
+              style={{ minHeight: '38px', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+            >
               <LogOut size={14} /> Salir
             </button>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* ===== CINTA DE MÓDULOS TÁCTIL SUPERIOR (SOLO MÓVIL <= 860px) ===== */}
       <div className="admin-mobile-module-strip" role="tablist" aria-label="Módulos de administración">
@@ -529,19 +610,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* ===== LAYOUT: SIDEBAR + CONTENIDO ===== */}
       <div className="admin-layout-grid">
 
-        {/* SIDEBAR */}
+        {/* SIDEBAR PRO: FIJO SIN SCROLL, 100% VISIBLE */}
         <nav
           className={`panel admin-sidebar${sidebarOpen ? ' open' : ''}`}
-          aria-label="Menú principal de administración"
+          aria-label="Menú principal de módulos de administración"
         >
           {/* Botón cerrar en móvil */}
           {sidebarOpen && (
             <button
               className="btn btn-sm"
-              style={{ position: 'absolute', top: '0.5rem', right: '0.5rem' }}
+              style={{ position: 'absolute', top: '0.65rem', right: '0.65rem', minWidth: '36px', minHeight: '36px' }}
               onClick={() => setSidebarOpen(false)}
+              aria-label="Cerrar menú lateral"
             >
-              <X size={14} />
+              <X size={16} />
             </button>
           )}
 
@@ -550,24 +632,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             return (
               <div key={groupName} className="admin-nav-group">
                 <div className="admin-nav-group-title">{groupName}</div>
-                {items.map(item => (
-                  <button
-                    key={item.section}
-                    onClick={() => navigateTo(item.section)}
-                    className={`admin-nav-btn${activeSection === item.section ? ' active' : ''}`}
-                    title={item.label}
-                  >
-                    <span className="admin-nav-icon">{item.icon}</span>
-                    <span className="admin-nav-label">{item.label}</span>
-                    {/* Badges */}
-                    {item.section === 'cotizaciones' && cotizacionesPendientes > 0 && (
-                      <span className="admin-nav-badge">{cotizacionesPendientes}</span>
-                    )}
-                    {item.section === 'reservas' && metricasReservas.activas > 0 && (
-                      <span className="admin-nav-badge">{metricasReservas.activas}</span>
-                    )}
-                  </button>
-                ))}
+                {items.map(item => {
+                  const isActive = activeSection === item.section;
+                  const isCotizaciones = item.section === 'cotizaciones' && cotizacionesPendientes > 0;
+                  const isReservas = item.section === 'reservas' && metricasReservas.activas > 0;
+                  const badgeCount = isCotizaciones ? cotizacionesPendientes : isReservas ? metricasReservas.activas : 0;
+
+                  return (
+                    <button
+                      key={item.section}
+                      type="button"
+                      onClick={() => navigateTo(item.section)}
+                      className={`admin-nav-btn${isActive ? ' active' : ''}`}
+                      title={item.label}
+                    >
+                      {isActive && <span className="admin-nav-active-pip" />}
+                      <span className="admin-nav-icon">{item.icon}</span>
+                      <span className="admin-nav-label">{item.label}</span>
+                      {/* Badges */}
+                      {badgeCount > 0 && (
+                        <span
+                          className={`admin-nav-badge${isCotizaciones ? ' badge-cotiz' : ' badge-reservas'}`}
+                        >
+                          {badgeCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             );
           })}
