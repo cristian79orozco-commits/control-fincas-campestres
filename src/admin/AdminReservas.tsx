@@ -796,21 +796,25 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
                             <Utensils size={10} /> Menú Admin: {formatCOP(r.costo_alimentacion || 0)} (Pagado ✅)
                           </span>
                         ) : r.estado_alimentacion === 'parcial' ? (
-                          <span
+                          <button
+                            type="button"
+                            onClick={() => abrirComunicacionesConExpediente('reserva', r.id)}
                             className="status-badge"
-                            style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#c2410c', background: 'rgba(234, 88, 12, 0.12)', borderColor: 'rgba(234, 88, 12, 0.35)', fontWeight: 600 }}
-                            title={`Abono registrado: ${formatCOP(desglose.pagadoAlimentacion)} · Pendiente por cobrar: ${formatCOP(desglose.saldoAlimentacionAdmin)}`}
+                            style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#c2410c', background: 'rgba(234, 88, 12, 0.12)', borderColor: 'rgba(234, 88, 12, 0.35)', fontWeight: 600, cursor: 'pointer' }}
+                            title={`Abonado: ${formatCOP(desglose.pagadoAlimentacion)} · Clic para abrir Comunicaciones y cobrar el saldo: ${formatCOP(desglose.saldoAlimentacionAdmin)}`}
                           >
                             <Utensils size={10} /> Menú Admin: {formatCOP(r.costo_alimentacion || 0)} (Abonado: {formatCOP(desglose.pagadoAlimentacion)} · Saldo: {formatCOP(desglose.saldoAlimentacionAdmin)} ⚠️)
-                          </span>
+                          </button>
                         ) : (
-                          <span
+                          <button
+                            type="button"
+                            onClick={() => abrirComunicacionesConExpediente('reserva', r.id)}
                             className="status-badge"
-                            style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#c2410c', background: 'rgba(234, 88, 12, 0.12)', borderColor: 'rgba(234, 88, 12, 0.35)', fontWeight: 600 }}
-                            title="Servicio de alimentación pendiente de pago para la administración"
+                            style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#c2410c', background: 'rgba(234, 88, 12, 0.12)', borderColor: 'rgba(234, 88, 12, 0.35)', fontWeight: 600, cursor: 'pointer' }}
+                            title="Servicio de alimentación pendiente · Clic para abrir Comunicaciones y cobrar el menú"
                           >
                             <Utensils size={10} /> Menú Admin: {formatCOP(r.costo_alimentacion || 0)} (Pendiente Cobro ⚠️)
-                          </span>
+                          </button>
                         )
                       )}
                     </div>
@@ -914,7 +918,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
                             <CreditCard size={13} /> Registrar Abono
                           </button>
 
-                          {/* 2. Recordatorio Ágil por WhatsApp */}
+                          {/* 2. Recordatorio / Cobro por Comunicaciones */}
                           <button
                             className="btn btn-sm"
                             style={{
@@ -929,16 +933,8 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
                               padding: '0.32rem 0.75rem',
                               minHeight: '34px',
                             }}
-                            title="Enviar recordatorio de saldo pendiente por WhatsApp"
-                            onClick={() => {
-                              setModalWaReserva({
-                                abierto: true,
-                                reserva: r,
-                                titulo: `Recordatorio de Saldo · ${r.fincas?.nombre || 'Finca'}`,
-                                mensaje: plantillaRecordatorioPago(r),
-                                tipo: 'recordatorio_pago',
-                              });
-                            }}
+                            title="Abrir en Centro de Comunicaciones para seleccionar plantilla de cobro (Alquiler o Alimentación)"
+                            onClick={() => abrirComunicacionesConExpediente('reserva', r.id)}
                           >
                             <MessageCircle size={13} /> Cobro WhatsApp
                           </button>
@@ -984,7 +980,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
                             </button>
                           )}
 
-                          {/* Mensaje de Bienvenida / Paz y Salvo */}
+                          {/* Mensaje de Bienvenida / Paz y Salvo en Comunicaciones */}
                           <button
                             className="btn btn-sm"
                             style={{
@@ -999,16 +995,8 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
                               padding: '0.32rem 0.75rem',
                               minHeight: '34px',
                             }}
-                            title="Enviar mensaje de bienvenida y confirmación por WhatsApp"
-                            onClick={() => {
-                              setModalWaReserva({
-                                abierto: true,
-                                reserva: r,
-                                titulo: `Bienvenida e Instrucciones · ${r.fincas?.nombre || 'Finca'}`,
-                                mensaje: plantillaBienvenida(r),
-                                tipo: 'bienvenida',
-                              });
-                            }}
+                            title="Abrir en Centro de Comunicaciones para enviar mensaje de bienvenida o paz y salvo"
+                            onClick={() => abrirComunicacionesConExpediente('reserva', r.id)}
                           >
                             <MessageCircle size={13} /> WhatsApp
                           </button>

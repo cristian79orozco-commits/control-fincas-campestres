@@ -617,6 +617,16 @@ export function useComunicacionesController({
       icono: <Tag size={18} />,
     },
     {
+      id: 'cobrar_alimentacion',
+      tipoReal: 'cobrar_alimentacion' as any,
+      titulo: 'Cobro de Alimentación (Paraíso Terrenal)',
+      subtitulo: 'Cobro exclusivo del menú a la cuenta de la administración para insumos y cocina',
+      fase: 'fase_3_saldos',
+      destinatarioCobro: 'admin',
+      prefijoDoc: 'menu',
+      icono: <Utensils size={18} />,
+    },
+    {
       id: 'recordatorio_pago',
       tipoReal: 'recordatorio_pago',
       titulo: 'Recordatorio Amistoso de Saldos',
