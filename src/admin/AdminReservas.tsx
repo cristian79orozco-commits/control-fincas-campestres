@@ -155,6 +155,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
     onRegistrarComunicacion,
     showToast,
     abrirComunicacionesConExpediente,
+    navegarAAdmin,
   } = useReservasController(props);
 
   return (
@@ -761,6 +762,33 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
                         </span>
                       )}
                       {r.consecutivo && <ConsecutivoBadge consecutivo={r.consecutivo} />}
+                      {r.cotizacion_id && (() => {
+                        const cotizAsociada = cotizaciones.find(c => c.id === r.cotizacion_id);
+                        const numCotiz = cotizAsociada?.consecutivo || r.cotizacion_id.slice(0, 8);
+                        return (
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            onClick={() => navegarAAdmin?.('cotizaciones')}
+                            title={`Ver Cotización original #${numCotiz} en el módulo de Cotizaciones`}
+                            style={{
+                              fontSize: '0.68rem',
+                              padding: '0.12rem 0.45rem',
+                              gap: '0.25rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              background: 'rgba(59, 130, 246, 0.08)',
+                              borderColor: 'rgba(59, 130, 246, 0.25)',
+                              color: '#3b82f6',
+                              borderRadius: '6px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <FileText size={10} /> Cotiz #{numCotiz}
+                          </button>
+                        );
+                      })()}
                       {desglose.cantidadMascotas > 0 && (
                         <span className="status-badge s-avail" style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                           🐾 {desglose.cantidadMascotas} mascota{desglose.cantidadMascotas !== 1 ? 's' : ''}{desglose.costoMascotas > 0 ? ` (+${formatCOP(desglose.costoMascotas)} · Dueño)` : ''}
@@ -816,170 +844,219 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
                       <span>Total: <strong>{formatCOP(r.valor_total)}</strong></span>
                       <span>Pagado: <strong style={{ color: 'var(--success)' }}>{formatCOP(totalPagado)}</strong></span>
                       <span>Saldo: <strong style={{ color: saldo > 0 ? 'var(--danger)' : 'var(--success)' }}>{formatCOP(saldo)}</strong></span>
-                      {desglose.costoAlimentacion > 0 && (
-                        <span className="text-muted" style={{ fontSize: '0.74rem' }}>
-                          (Check-in dueño: <strong>{formatCOP(desglose.saldoFincaCheckIn)}</strong> · Menú admin: <strong>{formatCOP(desglose.saldoAlimentacionAdmin)}</strong>)
-                        </span>
-                      )}
                     </div>
+
+                    {/* Desglose Informativo Destacado: Propietario vs Administración */}
+                    {desglose.costoAlimentacion > 0 ? (
+                      <div
+                        style={{
+                          marginTop: '0.35rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.45rem',
+                          padding: '0.22rem 0.65rem',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 500,
+                          background: 'color-mix(in srgb, var(--accent) 8%, var(--surface-2))',
+                          border: '1px solid color-mix(in srgb, var(--accent) 24%, var(--border))',
+                          color: 'var(--text)',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <span style={{ color: 'var(--text-muted)' }}>Desglose:</span>
+                        <span>Check-in dueño: <strong style={{ color: 'var(--text)', fontWeight: 700 }}>{formatCOP(desglose.saldoFincaCheckIn)}</strong></span>
+                        <span style={{ opacity: 0.35 }}>·</span>
+                        <span>Menú admin: <strong style={{ color: desglose.saldoAlimentacionAdmin > 0 ? '#ea580c' : 'var(--success)', fontWeight: 700 }}>{formatCOP(desglose.saldoAlimentacionAdmin)}</strong></span>
+                      </div>
+                    ) : (
+                      desglose.saldoFincaCheckIn > 0 && saldo > 0 && (
+                        <div
+                          style={{
+                            marginTop: '0.35rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.2rem 0.55rem',
+                            borderRadius: '6px',
+                            fontSize: '0.74rem',
+                            background: 'var(--surface-2)',
+                            border: '1px solid var(--border)',
+                            color: 'var(--text-muted)',
+                          }}
+                        >
+                          <span>Check-in dueño: <strong style={{ color: 'var(--text)', fontWeight: 700 }}>{formatCOP(desglose.saldoFincaCheckIn)}</strong></span>
+                        </div>
+                      )
+                    )}
                   </div>
 
-                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {/* 1. Único Botón Principal de Pago / Abono */}
-                    {r.estado === 'activa' && (
-                      <button
-                        className="btn btn-sm btn-primary"
-                        title="Registrar abono de alojamiento o alimentación"
-                        style={{ fontSize: '0.74rem', fontWeight: 600, gap: '0.35rem', padding: '0.28rem 0.75rem' }}
-                        onClick={() => handleAbrirModalPago(r)}
-                      >
-                        <CreditCard size={13} /> Registrar Abono
-                      </button>
+                  {/* BOTONERA AUTOMATIZADA SEGÚN ESTADO Y SALDO */}
+                  <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {r.estado === 'activa' ? (
+                      saldo > 0 ? (
+                        <>
+                          {/* 1. Acción Principal: Registrar Abono */}
+                          <button
+                            className="btn btn-sm btn-primary"
+                            title="Registrar abono de alojamiento o alimentación"
+                            style={{
+                              fontSize: '0.74rem',
+                              fontWeight: 600,
+                              gap: '0.35rem',
+                              padding: '0.32rem 0.8rem',
+                              minHeight: '34px',
+                            }}
+                            onClick={() => handleAbrirModalPago(r)}
+                          >
+                            <CreditCard size={13} /> Registrar Abono
+                          </button>
+
+                          {/* 2. Recordatorio Ágil por WhatsApp */}
+                          <button
+                            className="btn btn-sm"
+                            style={{
+                              fontSize: '0.74rem',
+                              fontWeight: 600,
+                              color: '#15803d',
+                              background: 'rgba(34, 197, 94, 0.10)',
+                              borderColor: 'rgba(34, 197, 94, 0.35)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              padding: '0.32rem 0.75rem',
+                              minHeight: '34px',
+                            }}
+                            title="Enviar recordatorio de saldo pendiente por WhatsApp"
+                            onClick={() => {
+                              setModalWaReserva({
+                                abierto: true,
+                                reserva: r,
+                                titulo: `Recordatorio de Saldo · ${r.fincas?.nombre || 'Finca'}`,
+                                mensaje: plantillaRecordatorioPago(r),
+                                tipo: 'recordatorio_pago',
+                              });
+                            }}
+                          >
+                            <MessageCircle size={13} /> Cobro WhatsApp
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          {/* Saldo en $0: Badge de Totalmente Pagado */}
+                          <span
+                            className="status-badge s-avail"
+                            style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              padding: '0.3rem 0.65rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              border: '1px solid rgba(34, 197, 94, 0.35)',
+                            }}
+                            title="Reserva liquidada en su totalidad sin saldo pendiente"
+                          >
+                            <CheckCircle size={12} /> Pagado 100%
+                          </span>
+
+                          {/* Botón Cerrar Reserva: Solo se muestra cuando saldo == 0 */}
+                          {onCerrarReserva && (
+                            <button
+                              className="btn btn-sm btn-primary"
+                              style={{
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                gap: '0.35rem',
+                                padding: '0.32rem 0.85rem',
+                                background: estanciaVencida ? '#f59e0b' : 'var(--accent)',
+                                borderColor: estanciaVencida ? '#f59e0b' : 'var(--accent)',
+                                color: '#141210',
+                                boxShadow: '0 2px 8px rgba(212, 146, 74, 0.25)',
+                                minHeight: '34px',
+                              }}
+                              title={estanciaVencida ? 'Estancia finalizada y saldo en $0. Efectuar check-out y archivar' : 'Saldo liquidado en $0. Efectuar check-out y archivar en Historial'}
+                              onClick={() => setReservaParaCierre(r)}
+                            >
+                              <CheckCircle size={13} /> Cerrar Reserva
+                            </button>
+                          )}
+
+                          {/* Mensaje de Bienvenida / Paz y Salvo */}
+                          <button
+                            className="btn btn-sm"
+                            style={{
+                              fontSize: '0.74rem',
+                              fontWeight: 600,
+                              color: '#15803d',
+                              background: 'rgba(34, 197, 94, 0.10)',
+                              borderColor: 'rgba(34, 197, 94, 0.35)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              padding: '0.32rem 0.75rem',
+                              minHeight: '34px',
+                            }}
+                            title="Enviar mensaje de bienvenida y confirmación por WhatsApp"
+                            onClick={() => {
+                              setModalWaReserva({
+                                abierto: true,
+                                reserva: r,
+                                titulo: `Bienvenida e Instrucciones · ${r.fincas?.nombre || 'Finca'}`,
+                                mensaje: plantillaBienvenida(r),
+                                tipo: 'bienvenida',
+                              });
+                            }}
+                          >
+                            <MessageCircle size={13} /> WhatsApp
+                          </button>
+                        </>
+                      )
+                    ) : (
+                      /* Estados no activos (Completada, Cancelada) */
+                      r.estado === 'completada' ? (
+                        <span
+                          className="status-badge"
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            background: 'rgba(59, 130, 246, 0.12)',
+                            color: '#2563eb',
+                            borderColor: '#2563eb',
+                            padding: '0.3rem 0.65rem',
+                          }}
+                        >
+                          🏁 Archivada en Historial
+                        </span>
+                      ) : null
                     )}
 
-                    {/* 2. Botón de Check-out y Cierre */}
-                    {r.estado === 'activa' && onCerrarReserva && (
-                      <button
-                        className="btn btn-sm"
-                        style={{
-                          fontSize: '0.74rem',
-                          fontWeight: 600,
-                          gap: '0.35rem',
-                          padding: '0.28rem 0.75rem',
-                          background: 'rgba(234, 88, 12, 0.12)',
-                          borderColor: 'rgba(234, 88, 12, 0.35)',
-                          color: '#c2410c',
-                        }}
-                        title="Verificar saldo en $0, efectuar check-out y generar Paz y Salvo"
-                        onClick={() => setReservaParaCierre(r)}
-                      >
-                        <CheckCircle size={13} /> Cerrar Reserva
-                      </button>
-                    )}
-
-                    {/* 3. Menú de Documentos Oficiales en PDF */}
-                    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                      <select
-                        defaultValue=""
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          e.target.value = '';
-                          if (val === 'separacion') {
-                            const f = fincas.find(x => x.id === r.finca_id) || r.fincas;
-                            setModalWaReserva({
-                              abierto: true,
-                              reserva: r,
-                              titulo: `Documento de Separación · ${f?.nombre || r.fincas?.nombre || 'Finca'}`,
-                              nombreDoc: 'Documento Oficial de Separación (PDF)',
-                              mensaje: plantillaSeparacion(r),
-                              onGenerarPdf: () => generarDocSeparacion(r, configuracion, f),
-                              tipo: 'separacion',
-                            });
-                          } else if (val === 'estado_cuenta') {
-                            setModalWaReserva({
-                              abierto: true,
-                              reserva: r,
-                              titulo: `Estado de Cuenta · ${r.fincas?.nombre || 'Finca'}`,
-                              nombreDoc: 'Estado de Cuenta (PDF)',
-                              mensaje: plantillaEstadoCuenta(r),
-                              onGenerarPdf: () => generarEstadoCuenta(r),
-                              tipo: 'estado_cuenta',
-                            });
-                          } else if (val === 'paz_salvo') {
-                            if (!pazYSalvoHabilitado) {
-                              showToast(`Requiere saldo en $0 para emitir Paz y Salvo (saldo actual: ${formatCOP(saldo)})`, 'info');
-                              return;
-                            }
-                            setModalWaReserva({
-                              abierto: true,
-                              reserva: r,
-                              titulo: `Certificado de Paz y Salvo · ${r.fincas?.nombre || 'Finca'}`,
-                              nombreDoc: 'Certificado de Paz y Salvo (PDF)',
-                              mensaje: plantillaPazYSalvo(r),
-                              onGenerarPdf: () => generarPazYSalvo(r),
-                              tipo: 'paz_salvo',
-                            });
-                          }
-                        }}
-                        className="btn btn-sm"
-                        style={{ appearance: 'none', paddingRight: '1.4rem', cursor: 'pointer', fontSize: '0.72rem' }}
-                      >
-                        <option value="" disabled>📑 Documentos ▾</option>
-                        <option value="separacion">📄 Documento de Separación</option>
-                        <option value="estado_cuenta">📊 Estado de Cuenta</option>
-                        <option value="paz_salvo" disabled={!pazYSalvoHabilitado}>
-                          🏆 Paz y Salvo {pazYSalvoHabilitado ? '✓' : `(Saldo: ${formatCOP(saldo)})`}
-                        </option>
-                      </select>
-                      <ChevronDown size={11} style={{ position: 'absolute', right: '0.35rem', pointerEvents: 'none' }} />
-                    </div>
-
-                    {/* 3. Mensaje WhatsApp Directo */}
+                    {/* Acciones Secundarias Limpias: Editar */}
                     <button
                       className="btn btn-sm"
-                      style={{ color: '#25d366', borderColor: '#25d366' }}
-                      title="Enviar mensaje rápido de WhatsApp al cliente"
-                      onClick={() => {
-                        if (saldo > 0) {
-                          setModalWaReserva({
-                            abierto: true,
-                            reserva: r,
-                            titulo: `Recordatorio de Saldo · ${r.fincas?.nombre || 'Finca'}`,
-                            mensaje: plantillaRecordatorioPago(r),
-                            tipo: 'recordatorio_pago',
-                          });
-                        } else {
-                          setModalWaReserva({
-                            abierto: true,
-                            reserva: r,
-                            titulo: `Bienvenida e Instrucciones · ${r.fincas?.nombre || 'Finca'}`,
-                            mensaje: plantillaBienvenida(r),
-                            tipo: 'bienvenida',
-                          });
-                        }
-                      }}
+                      onClick={() => abrirEdicion(r)}
+                      title="Editar detalles de la reserva"
+                      style={{ minHeight: '34px', minWidth: '34px', padding: '0.3rem 0.5rem' }}
                     >
-                      <MessageCircle size={13} />
+                      <Edit3 size={13} />
                     </button>
 
-                    {/* 3.1 Abrir en Centro de Comunicaciones Completo */}
+                    {/* Eliminar (libera calendario con confirmación) */}
                     <button
-                      type="button"
-                      className="btn btn-sm"
-                      style={{
-                        fontSize: '0.72rem',
-                        gap: '0.25rem',
-                        padding: '0.3rem 0.55rem',
-                        color: '#15803d',
-                        background: 'rgba(34, 197, 94, 0.08)',
-                        borderColor: 'rgba(34, 197, 94, 0.3)',
-                      }}
-                      title="Abrir esta reserva en el Centro Inteligente de Comunicaciones"
-                      onClick={() => abrirComunicacionesConExpediente('reserva', r.id)}
+                      className="btn btn-sm btn-danger"
+                      onClick={() => handleEliminar(r)}
+                      title="Eliminar reserva y liberar calendario"
+                      style={{ minHeight: '34px', minWidth: '34px', padding: '0.3rem 0.5rem' }}
                     >
-                      <MessageCircle size={12} /> Chat
+                      <Trash2 size={13} />
                     </button>
 
-                    {/* 4. Expediente Histórico */}
-                    <button
-                      className="btn btn-sm"
-                      title="Ver Expediente Histórico Completo"
-                      onClick={() => setReservaParaExpediente(r)}
-                    >
-                      <FileText size={13} />
-                    </button>
-
-                    {/* 5. Editar */}
-                    <button className="btn btn-sm" onClick={() => abrirEdicion(r)} title="Editar"><Edit3 size={13} /></button>
-
-                    {/* 6. Eliminar (libera calendario automáticamente) */}
-                    <button className="btn btn-sm btn-danger" onClick={() => handleEliminar(r)} title="Eliminar reserva y liberar calendario"><Trash2 size={13} /></button>
-
-                    {/* 7. Desplegar pagos */}
+                    {/* Desplegar historial de pagos y documentos */}
                     <button
                       className="btn btn-sm"
                       onClick={() => setReservaExpandida(expanded ? null : r.id)}
-                      title={expanded ? 'Cerrar detalle' : 'Ver historial de pagos'}
+                      title={expanded ? 'Ocultar desglose de pagos' : 'Ver desglose de pagos y recibos'}
+                      style={{ minHeight: '34px', minWidth: '34px', padding: '0.3rem 0.5rem' }}
                     >
                       {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                     </button>

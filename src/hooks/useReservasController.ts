@@ -117,7 +117,7 @@ export function useReservasController({
   cotizacionInicial,
   onCotizacionInicialUsada,
 }: UseReservasControllerParams) {
-  const { abrirComunicacionesConExpediente, cambiarEstadoAlimentacionReserva, menus } = useApp();
+  const { abrirComunicacionesConExpediente, cambiarEstadoAlimentacionReserva, menus, navegarAAdmin } = useApp();
 
   // Estado local reactivo optimista (< 16ms)
   const [reservasState, setReservasState] = useState<Reserva[]>(() => reservas || []);
@@ -564,6 +564,7 @@ export function useReservasController({
     onRegistrarComunicacion,
     showToast,
     abrirComunicacionesConExpediente,
+    navegarAAdmin,
   };
 }
 

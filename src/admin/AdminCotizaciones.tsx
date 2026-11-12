@@ -94,6 +94,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
     openConfirm,
     previsualizarFinca,
     abrirComunicacionesConExpediente,
+    navegarAAdmin,
   } = useCotizacionesController(props);
 
   const fincaSeleccionada = fincas.find(f => f.id === form.finca_id);
@@ -478,8 +479,42 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
 
                 {/* ACCIONES INTELIGENTES Y AUTOMATIZADAS */}
                 <div className="admin-row-actions" style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap', alignSelf: 'center' }}>
-                  {/* Botón 1: Pedir Abono Finca (50% a cuenta de propietario) */}
-                  {c.estado !== 'cancelada' && (
+                  {/* Sinergia: Si ya está confirmada, acceso directo a la Reserva Activa */}
+                  {c.estado === 'confirmada' && (
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        gap: '0.35rem',
+                        padding: '0.32rem 0.8rem',
+                        background: 'rgba(59, 130, 246, 0.12)',
+                        color: '#2563eb',
+                        borderColor: 'rgba(59, 130, 246, 0.35)',
+                        minHeight: '34px',
+                      }}
+                      title="Ir al módulo de Reservas para gestionar esta reserva activa"
+                      onClick={() => navegarAAdmin?.('reservas')}
+                    >
+                      <ArrowRight size={13} /> Ver Reserva Activa
+                    </button>
+                  )}
+
+                  {/* Botón 1: Pasar a Reserva con confirmación de pago del 50% (Solo si pendiente) */}
+                  {esPendiente && (
+                    <button
+                      className="btn btn-sm btn-primary"
+                      title="Confirmar recepción del abono del 50% y crear la Reserva Activa (bloquea calendario)"
+                      style={{ fontSize: '0.74rem', fontWeight: 600, gap: '0.35rem', padding: '0.32rem 0.8rem', minHeight: '34px' }}
+                      onClick={() => handleIniciarPasoAReserva(c)}
+                    >
+                      <ArrowRight size={13} /> Pasar a Reserva
+                    </button>
+                  )}
+
+                  {/* Botón 2: Pedir Abono Finca (Solo si pendiente) */}
+                  {esPendiente && (
                     <button
                       className="btn btn-sm"
                       style={{
@@ -490,6 +525,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                         color: '#15803d',
                         background: 'rgba(34, 197, 94, 0.12)',
                         borderColor: 'rgba(34, 197, 94, 0.35)',
+                        minHeight: '34px',
                       }}
                       title="Solicitar por WhatsApp el 50% de la separación del alojamiento para la cuenta del propietario"
                       onClick={() => handleAbrirPedirAbono(c)}
@@ -498,8 +534,8 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                     </button>
                   )}
 
-                  {/* Botón 2: Cobrar Alimentación (solo si incluye menú -> cuenta del admin) */}
-                  {tieneAlimentacion && c.estado !== 'cancelada' && (
+                  {/* Botón 3: Cobrar Alimentación (solo si incluye menú y está pendiente) */}
+                  {tieneAlimentacion && esPendiente && (
                     <button
                       className="btn btn-sm"
                       style={{
@@ -510,23 +546,12 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                         color: '#c2410c',
                         background: 'rgba(234, 88, 12, 0.12)',
                         borderColor: 'rgba(234, 88, 12, 0.35)',
+                        minHeight: '34px',
                       }}
                       title="Solicitar por WhatsApp el pago de la alimentación para la cuenta de la administración"
                       onClick={() => handleAbrirCobroAlimentacion(c)}
                     >
-                      <Utensils size={13} /> Cobrar Alimentación
-                    </button>
-                  )}
-
-                  {/* Botón 3: Pasar a Reserva con confirmación de pago del 50% */}
-                  {esPendiente && (
-                    <button
-                      className="btn btn-sm btn-primary"
-                      title="Confirmar recepción del abono del 50% y crear la Reserva Activa (bloquea calendario)"
-                      style={{ fontSize: '0.74rem', fontWeight: 600, gap: '0.35rem', padding: '0.32rem 0.8rem' }}
-                      onClick={() => handleIniciarPasoAReserva(c)}
-                    >
-                      <ArrowRight size={13} /> Pasar a Reserva
+                      <Utensils size={13} /> Cobrar Menú
                     </button>
                   )}
 

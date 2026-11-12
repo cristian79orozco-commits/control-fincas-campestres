@@ -559,6 +559,7 @@ export function useCotizacionesController({
     openConfirm,
     previsualizarFinca,
     abrirComunicacionesConExpediente,
+    navegarAAdmin,
   };
 }
 
