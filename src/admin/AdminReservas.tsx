@@ -706,7 +706,17 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
             const pazYSalvoHabilitado = saldo <= 0 && (r.pagos?.length || 0) > 0;
 
             return (
-              <div key={r.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+              <div
+                key={r.id}
+                style={{
+                  borderRadius: '10px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  marginBottom: '0.75rem',
+                  overflow: 'hidden',
+                  transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+                }}
+              >
                 {/* Alerta de Fecha Cumplida / Estancia Finalizada */}
                 {estanciaVencida && (
                   <div
@@ -739,9 +749,18 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
                   </div>
                 )}
 
-                {/* Fila principal */}
-                <div className="avail-row" style={{ borderBottom: 'none', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Fila principal compacta, simétrica y responsive */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    flexWrap: 'wrap',
+                    padding: '0.95rem 1.15rem',
+                  }}
+                >
+                  <div style={{ flex: '1 1 340px', minWidth: 0 }}>
                     <div style={{ fontWeight: 600, display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                       {fincaNombre}
                       {r.estado === 'activa' ? (
@@ -762,33 +781,6 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
                         </span>
                       )}
                       {r.consecutivo && <ConsecutivoBadge consecutivo={r.consecutivo} />}
-                      {r.cotizacion_id && (() => {
-                        const cotizAsociada = cotizaciones.find(c => c.id === r.cotizacion_id);
-                        const numCotiz = cotizAsociada?.consecutivo || r.cotizacion_id.slice(0, 8);
-                        return (
-                          <button
-                            type="button"
-                            className="btn btn-sm"
-                            onClick={() => navegarAAdmin?.('cotizaciones')}
-                            title={`Ver Cotización original #${numCotiz} en el módulo de Cotizaciones`}
-                            style={{
-                              fontSize: '0.68rem',
-                              padding: '0.12rem 0.45rem',
-                              gap: '0.25rem',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              background: 'rgba(59, 130, 246, 0.08)',
-                              borderColor: 'rgba(59, 130, 246, 0.25)',
-                              color: '#3b82f6',
-                              borderRadius: '6px',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <FileText size={10} /> Cotiz #{numCotiz}
-                          </button>
-                        );
-                      })()}
                       {desglose.cantidadMascotas > 0 && (
                         <span className="status-badge s-avail" style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                           🐾 {desglose.cantidadMascotas} mascota{desglose.cantidadMascotas !== 1 ? 's' : ''}{desglose.costoMascotas > 0 ? ` (+${formatCOP(desglose.costoMascotas)} · Dueño)` : ''}
@@ -892,7 +884,17 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
                   </div>
 
                   {/* BOTONERA AUTOMATIZADA SEGÚN ESTADO Y SALDO */}
-                  <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div
+                    style={{
+                      flex: '0 0 auto',
+                      display: 'flex',
+                      gap: '0.45rem',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      justifyContent: 'flex-end',
+                      marginLeft: 'auto',
+                    }}
+                  >
                     {r.estado === 'activa' ? (
                       saldo > 0 ? (
                         <>

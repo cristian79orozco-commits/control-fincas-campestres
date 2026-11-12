@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import {
   FileText, Plus, Edit3, Trash2, X, Save, ArrowRight,
-  Calendar, Users, Utensils, Tag, MessageCircle, Download, Hash, Copy, Check, Eye, XCircle, AlertCircle, Dog
+  Calendar, Users, Utensils, Tag, MessageCircle, Hash, Copy, Check, XCircle, AlertCircle, Dog
 } from 'lucide-react';
 import type { CotizacionDB, CotizacionEstado, Cliente, Finca, Menu, ConfiguracionGeneral } from '../types';
 import { desglosarFinanzasCotizacion } from '../types';
-import { generarDocCotizacion } from '../services/documentos';
 import { WhatsAppModal } from '../components/WhatsAppModal';
 import { abrirWhatsApp, generarUrlWhatsApp } from '../services/whatsapp';
 import { CurrencyInput } from '../components/CurrencyInput';
@@ -359,19 +358,22 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
             return (
               <div
                 key={c.id}
-                className="avail-row"
                 style={{
-                  alignItems: 'flex-start',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '1rem',
                   flexWrap: 'wrap',
-                  gap: '0.75rem',
-                  borderLeft: esReciente ? '3px solid var(--accent, #ea580c)' : undefined,
-                  background: esReciente ? 'color-mix(in srgb, var(--accent, #ea580c) 3%, var(--surface))' : undefined,
-                  padding: '1rem',
                   borderRadius: '10px',
+                  border: '1px solid var(--border)',
+                  borderLeft: esReciente ? '3px solid var(--accent, #ea580c)' : '1px solid var(--border)',
+                  background: esReciente ? 'color-mix(in srgb, var(--accent, #ea580c) 3%, var(--surface))' : 'var(--surface)',
+                  padding: '0.95rem 1.15rem',
                   marginBottom: '0.75rem',
+                  transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
                 }}
               >
-                <div style={{ flex: 1, minWidth: 'min(100%, 280px)' }}>
+                <div style={{ flex: '1 1 340px', minWidth: 0 }}>
                   <div style={{ fontWeight: 600, display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <Tag size={13} style={{ color: 'var(--primary)' }} />
                     <span style={{ fontSize: '0.95rem', fontWeight: 700 }}>{fincaNombre}</span>
@@ -478,7 +480,18 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                 </div>
 
                 {/* ACCIONES INTELIGENTES Y AUTOMATIZADAS */}
-                <div className="admin-row-actions" style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap', alignSelf: 'center' }}>
+                <div
+                  className="admin-row-actions"
+                  style={{
+                    flex: '0 0 auto',
+                    display: 'flex',
+                    gap: '0.45rem',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    justifyContent: 'flex-end',
+                    marginLeft: 'auto',
+                  }}
+                >
                   {/* Sinergia: Si ya está confirmada, acceso directo a la Reserva Activa */}
                   {c.estado === 'confirmada' && (
                     <button
@@ -555,51 +568,13 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                     </button>
                   )}
 
-                  {/* Botón: Abrir en Comunicaciones */}
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    style={{
-                      fontSize: '0.72rem',
-                      gap: '0.25rem',
-                      padding: '0.3rem 0.55rem',
-                      color: '#15803d',
-                      background: 'rgba(34, 197, 94, 0.08)',
-                      borderColor: 'rgba(34, 197, 94, 0.3)',
-                    }}
-                    title="Abrir esta cotización en el Centro Inteligente de Comunicaciones"
-                    onClick={() => abrirComunicacionesConExpediente('cotizacion', c.id)}
-                  >
-                    <MessageCircle size={12} /> Chat
-                  </button>
-
-                  {/* Botón 4: Descargar PDF */}
-                  <button
-                    className="btn btn-sm"
-                    style={{ fontSize: '0.72rem', gap: '0.25rem', padding: '0.3rem 0.55rem' }}
-                    title="Descargar Cotización Formal en PDF"
-                    onClick={() => {
-                      const f = fincas.find(x => x.id === c.finca_id) || (c.fincas as any);
-                      generarDocCotizacion(c, configuracion, f);
-                      showToast('Cotización descargada en PDF ✅', 'success');
-                    }}
-                  >
-                    <Download size={12} /> PDF
-                  </button>
-
-                  {/* Vista de Finca en portal cliente */}
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    style={{ fontSize: '0.72rem', gap: '0.25rem', padding: '0.3rem 0.55rem' }}
-                    title="Ver finca en portal público"
-                    onClick={() => previsualizarFinca(c.finca_id)}
-                  >
-                    <Eye size={12} /> Finca
-                  </button>
-
                   {/* Editar */}
-                  <button className="btn btn-sm" onClick={() => abrirEdicion(c)} title="Editar cotización">
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => abrirEdicion(c)}
+                    title="Editar cotización"
+                    style={{ minHeight: '34px', minWidth: '34px', padding: '0.3rem 0.5rem' }}
+                  >
                     <Edit3 size={13} />
                   </button>
 
@@ -607,7 +582,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                   {c.estado !== 'cancelada' ? (
                     <button
                       className="btn btn-sm"
-                      style={{ color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                      style={{ color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.3)', minHeight: '34px', minWidth: '34px', padding: '0.3rem 0.5rem' }}
                       onClick={() => handleCancelarCotizacion(c)}
                       title="Cancelar cotización si el cliente no consignó el dinero (se archiva en historial)"
                     >
@@ -618,6 +593,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                       className="btn btn-sm btn-danger"
                       onClick={() => handleEliminarDefinitivo(c)}
                       title="Eliminar definitivamente del historial"
+                      style={{ minHeight: '34px', minWidth: '34px', padding: '0.3rem 0.5rem' }}
                     >
                       <Trash2 size={13} />
                     </button>
