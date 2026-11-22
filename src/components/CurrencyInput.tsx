@@ -222,6 +222,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
         className={className}
         style={{
           width: '100%',
+          minHeight: '44px',
           paddingLeft: prefix ? '1.85rem' : '0.95rem',
           paddingRight: suffix ? '3.5rem' : '0.95rem',
           fontWeight: 600,

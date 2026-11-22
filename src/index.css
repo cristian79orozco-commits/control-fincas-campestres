@@ -259,8 +259,10 @@ ul, ol {
 
 /* ICON BTN */
 .icon-btn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 12px;
   flex-shrink: 0;
   background: var(--surface);
@@ -283,7 +285,7 @@ ul, ol {
   align-items: center;
   gap: 0.5rem;
   justify-content: center;
-  min-height: 42px;
+  min-height: 44px;
   padding: 0 1.15rem;
   border-radius: var(--rad-xs, 8px);
   border: 1px solid var(--border);
@@ -366,7 +368,7 @@ ul, ol {
   align-items: center;
   gap: 0.5rem;
   justify-content: center;
-  min-height: 42px;
+  min-height: 44px;
   padding: 0 1.15rem;
   border-radius: var(--rad-xs, 8px);
   border: 1.5px solid var(--border);
@@ -3421,6 +3423,7 @@ textarea:focus {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  min-height: 44px;
   padding: 0.65rem 1.4rem;
   border-radius: var(--rad-xs, 8px);
   background: var(--accent);
@@ -3453,6 +3456,7 @@ textarea:focus {
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
+  min-height: 44px;
   padding: 0.6rem 1.25rem;
   border-radius: var(--rad-xs, 8px);
   background: var(--surface-2);
@@ -3476,6 +3480,7 @@ textarea:focus {
 
 .input-pro {
   width: 100%;
+  min-height: 44px;
   padding: 0.7rem 0.95rem;
   border-radius: var(--rad-xs, 8px);
   background: var(--surface-2);
@@ -3634,7 +3639,7 @@ textarea:focus {
     display: inline-flex;
     align-items: center;
     gap: 0.38rem;
-    padding: 0.48rem 0.78rem;
+    padding: 0.48rem 0.85rem;
     border-radius: var(--rad-xs, 8px);
     font-size: 0.76rem;
     font-weight: 600;
@@ -3645,7 +3650,7 @@ textarea:focus {
     color: var(--text-muted);
     cursor: pointer;
     transition: all 0.18s ease;
-    min-height: 38px;
+    min-height: 44px;
   }
 
   .admin-mobile-module-pill.active {
@@ -3787,24 +3792,108 @@ textarea:focus {
     padding-top: 1rem;
   }
 
-  /* 7. Modales del Administrador adaptados al 100% de pantallas móviles */
-  .modal-overlay {
-    padding: 0.5rem !important;
+  /* 7. Prevención estricta de Auto-Zoom en iOS Safari (16px mínimo en móvil) y Áreas Táctiles 44x44px */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  select,
+  textarea,
+  .input-pro,
+  .field input,
+  .field select,
+  .field textarea,
+  .admin-fincas-search-input,
+  .numeric-input-wrapper input {
+    font-size: 16px !important;
   }
 
-  .modal-box {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  select,
+  .input-pro,
+  .field input,
+  .field select,
+  .admin-fincas-search-input,
+  .numeric-input-wrapper {
+    min-height: 44px;
+  }
+
+  .btn,
+  .btn-sm,
+  .btn-outline,
+  .btn-pro-primary,
+  .btn-pro-secondary,
+  .seg-btn,
+  .admin-row-actions .btn {
+    min-height: 44px !important;
+  }
+
+  .icon-btn,
+  .toast-dismiss-btn,
+  .lightbox-close,
+  .mobile-carousel-arrow {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  /* 8. Modales Adaptativos: Bottom Sheet ergonómico en Móvil con indicador táctil superior */
+  .modal-overlay,
+  .admin-modal-overlay,
+  .cliente-portal-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .modal-box,
+  .modal,
+  .admin-modal-box,
+  .cliente-portal-sheet {
     width: 100% !important;
-    max-width: calc(100vw - 1rem) !important;
-    max-height: 90dvh !important;
-    margin: auto !important;
+    max-width: 100vw !important;
+    max-height: 92dvh !important;
+    margin: 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+    border-bottom: none !important;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
     box-sizing: border-box !important;
     overflow-x: hidden !important;
+    animation: bottomSheetSlideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+
+  /* Indicador táctil superior (Pull Handle) en todos los Bottom Sheets móviles */
+  .modal-box::before,
+  .modal::before,
+  .admin-modal-box::before,
+  .cliente-portal-sheet::before {
+    content: '';
+    display: block;
+    width: 44px;
+    height: 5px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--text-muted) 45%, var(--border));
+    margin: 0.65rem auto 0.25rem;
+    flex-shrink: 0;
   }
 
   .modal-header {
     flex-wrap: wrap !important;
     gap: 0.5rem !important;
-    padding: 0.9rem 1rem !important;
+    padding: 0.75rem 1rem 0.9rem !important;
+  }
+
+  /* Margen inferior de protección para formularios frente al teclado virtual móvil */
+  .modal-body,
+  .modal-box form,
+  .admin-modal-box form {
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@keyframes bottomSheetSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -3900,6 +3989,11 @@ textarea:focus {
   .quote-row {
     flex-wrap: wrap !important;
     gap: 0.25rem !important;
+  }
+
+  /* Buscador apilado en Portal del Huésped en móvil */
+  .cliente-portal-search-form {
+    grid-template-columns: 1fr !important;
   }
 }
 

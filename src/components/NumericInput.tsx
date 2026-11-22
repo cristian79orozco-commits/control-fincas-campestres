@@ -128,6 +128,7 @@ export const NumericInput: React.FC<NumericInputProps> = ({
         borderRadius: 'var(--rad-xs, 8px)',
         overflow: 'hidden',
         width: '100%',
+        minHeight: '44px',
         transition: 'border-color 0.2s, box-shadow 0.2s',
         boxShadow: isFocused ? '0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent)' : 'none',
         borderColor: isFocused ? 'var(--primary)' : 'var(--border)',
@@ -157,6 +158,8 @@ export const NumericInput: React.FC<NumericInputProps> = ({
           style={{
             border: 'none',
             background: 'transparent',
+            minWidth: '44px',
+            minHeight: '44px',
             padding: '0.5rem 0.65rem',
             color: 'var(--text-muted)',
             cursor: disabled ? 'not-allowed' : 'pointer',
@@ -170,7 +173,7 @@ export const NumericInput: React.FC<NumericInputProps> = ({
           onMouseEnter={e => { (e.currentTarget.style.background = 'var(--surface-3)'); }}
           onMouseLeave={e => { (e.currentTarget.style.background = 'transparent'); }}
         >
-          <Minus size={13} />
+          <Minus size={14} />
         </button>
       )}
 
@@ -193,6 +196,7 @@ export const NumericInput: React.FC<NumericInputProps> = ({
           outline: 'none',
           textAlign: showSteppers ? 'center' : 'left',
           width: '100%',
+          minHeight: '44px',
           padding: showSteppers ? '0.55rem 0.2rem' : '0.55rem 0.85rem',
           fontWeight: 600,
           color: 'var(--text)',
@@ -225,6 +229,8 @@ export const NumericInput: React.FC<NumericInputProps> = ({
           style={{
             border: 'none',
             background: 'transparent',
+            minWidth: '44px',
+            minHeight: '44px',
             padding: '0.5rem 0.65rem',
             color: 'var(--text-muted)',
             cursor: disabled ? 'not-allowed' : 'pointer',
@@ -238,7 +244,7 @@ export const NumericInput: React.FC<NumericInputProps> = ({
           onMouseEnter={e => { (e.currentTarget.style.background = 'var(--surface-3)'); }}
           onMouseLeave={e => { (e.currentTarget.style.background = 'transparent'); }}
         >
-          <Plus size={13} />
+          <Plus size={14} />
         </button>
       )}
     </div>

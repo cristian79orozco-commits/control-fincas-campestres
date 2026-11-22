@@ -122,6 +122,7 @@ export const ClientePortalModal: React.FC<ClientePortalModalProps> = ({
 
   return (
     <div
+      className="cliente-portal-overlay"
       style={{
         position: 'fixed',
         inset: 0,
@@ -141,7 +142,7 @@ export const ClientePortalModal: React.FC<ClientePortalModalProps> = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.94, y: 15 }}
         onClick={(e) => e.stopPropagation()}
-        className="card-pro"
+        className="card-pro cliente-portal-sheet"
         style={{
           width: '100%',
           maxWidth: '640px',
@@ -212,6 +213,8 @@ export const ClientePortalModal: React.FC<ClientePortalModalProps> = ({
               border: '1px solid var(--border)',
               color: 'var(--text-muted)',
               cursor: 'pointer',
+              minWidth: '44px',
+              minHeight: '44px',
               padding: '0.45rem',
               borderRadius: '50%',
               display: 'flex',
@@ -226,7 +229,7 @@ export const ClientePortalModal: React.FC<ClientePortalModalProps> = ({
 
         {/* Buscador de Reserva con Focus Glow */}
         <div style={{ padding: '1.35rem 1.5rem', borderBottom: '1px solid var(--border)', position: 'relative', zIndex: 1 }}>
-          <form onSubmit={handleBuscar} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.65rem' }}>
+          <form onSubmit={handleBuscar} className="cliente-portal-search-form" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.65rem' }}>
             <div style={{ position: 'relative' }}>
               <input
                 type="text"

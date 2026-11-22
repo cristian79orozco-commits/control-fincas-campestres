@@ -160,7 +160,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
               <button
                 type="button"
                 onClick={() => handleSelectFinca(fincas.length > 0 ? fincas[0].id : 'new')}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-[var(--rad-sm,10px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs font-semibold border border-[var(--border,#312e28)] transition-all hover:border-[var(--accent,#d4924a)] hover:text-[var(--accent,#d4924a)]"
+                className="inline-flex items-center gap-2 min-h-[44px] px-4 py-2 rounded-[var(--rad-sm,10px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs font-semibold border border-[var(--border,#312e28)] transition-all hover:border-[var(--accent,#d4924a)] hover:text-[var(--accent,#d4924a)] active:scale-[0.98]"
               >
                 <ArrowLeft size={14} /> Volver a la lista
               </button>
@@ -169,7 +169,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                 <button
                   type="button"
                   onClick={handleVerEnCliente}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-[var(--rad-sm,10px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs font-semibold border border-[var(--border,#312e28)] transition-all hover:border-[var(--primary,#4da89e)] hover:text-[var(--primary,#4da89e)]"
+                  className="inline-flex items-center gap-2 min-h-[44px] px-4 py-2 rounded-[var(--rad-sm,10px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs font-semibold border border-[var(--border,#312e28)] transition-all hover:border-[var(--primary,#4da89e)] hover:text-[var(--primary,#4da89e)] active:scale-[0.98]"
                   title="Ver cómo lo ve el cliente en el catálogo público"
                 >
                   <Eye size={14} /> Ver en cliente
@@ -178,7 +178,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                 <button
                   type="button"
                   onClick={handleNuevaFinca}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-[var(--rad-sm,10px)] bg-[var(--accent,#d4924a)] text-[#141210] text-xs font-bold tracking-wide shadow-[0_2px_10px_rgba(212,146,74,0.25)] transition-all hover:brightness-110 hover:shadow-[0_4px_16px_rgba(212,146,74,0.35)] active:scale-[0.98]"
+                  className="inline-flex items-center gap-2 min-h-[44px] px-5 py-2 rounded-[var(--rad-sm,10px)] bg-[var(--accent,#d4924a)] text-[#141210] text-xs font-bold tracking-wide shadow-[0_2px_10px_rgba(212,146,74,0.25)] transition-all hover:brightness-110 hover:shadow-[0_4px_16px_rgba(212,146,74,0.35)] active:scale-[0.98]"
                 >
                   <Plus size={15} /> Nueva finca
                 </button>
@@ -275,7 +275,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                   placeholder="Buscar finca por nombre o zona…"
                   value={busquedaFinca}
                   onChange={e => setBusquedaFinca(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 rounded-[var(--rad-xs,8px)] bg-[var(--surface-3,#272420)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                  className="w-full min-h-[44px] pl-9 pr-4 py-2 rounded-[var(--rad-xs,8px)] bg-[var(--surface-3,#272420)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
                   autoFocus
                 />
               </div>
@@ -368,7 +368,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id as FincaFormTabId)}
-              className={`inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[var(--rad-xs,8px)] text-xs font-semibold transition-all border ${
+              className={`inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 py-2.5 rounded-[var(--rad-xs,8px)] text-xs font-semibold transition-all border active:scale-[0.98] ${
                 isActive
                   ? 'bg-[var(--accent,#d4924a)] text-[#141210] border-[var(--accent,#d4924a)] shadow-[0_2px_12px_rgba(212,146,74,0.3)] font-bold'
                   : 'bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] border-[var(--border,#312e28)] hover:border-[var(--accent,#d4924a)]/50 hover:text-[var(--accent,#d4924a)]'
@@ -410,7 +410,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                 placeholder="Ej: Finca Campestre El Edén de las Mercedes"
                 value={nombre}
                 onChange={e => setNombre(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-sm font-semibold border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)] focus:shadow-[0_0_12px_rgba(212,146,74,0.2)]"
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-sm font-semibold border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)] focus:shadow-[0_0_12px_rgba(212,146,74,0.2)]"
               />
             </div>
 
@@ -453,7 +453,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                 placeholder="Ej: Santa Elena, El Cerrito, Valle del Cauca"
                 value={zona}
                 onChange={e => setZona(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
               />
             </div>
 
@@ -464,7 +464,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
               <select
                 value={estado}
                 onChange={e => setEstado(e.target.value as FincaEstado)}
-                className="w-full px-3.5 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                className="w-full min-h-[44px] px-3.5 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
               >
                 <option value="disponible">🟢 Disponible para reservas</option>
                 <option value="alta_demanda">🟠 Alta demanda / Temporada</option>
@@ -482,7 +482,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                 placeholder="Ej: 573176827093"
                 value={waNumber}
                 onChange={e => setWaNumber(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
               />
               <span className="text-[11px] text-[var(--text-muted,#a8a097)] mt-1 block">
                 Si lo dejas vacío, el sistema utilizará el número de WhatsApp central configurado.
@@ -503,7 +503,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                 placeholder="Describe el ambiente, la vista, privacidad, zonas verdes, si el clima es cálido o templado, y las características que enamoran a los huéspedes…&#10;&#10;Ejemplo:&#10;• Casa principal con amplios ventanales&#10;• Kiosko y asador al lado de la piscina&#10;• Clima cálido con brisa fresca en la tarde"
                 value={descripcion}
                 onChange={e => setDescripcion(e.target.value)}
-                className="w-full p-3.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all leading-relaxed focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)] focus:shadow-[0_0_12px_rgba(212,146,74,0.2)]"
+                className="w-full p-3.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all leading-relaxed focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)] focus:shadow-[0_0_12px_rgba(212,146,74,0.2)]"
               />
               <span className="text-[11px] text-[var(--text-muted,#a8a097)] mt-1 block">
                 💡 <strong>Visualización exacta:</strong> Los saltos de línea (Enter) y viñetas se respetan fielmente en la ficha pública.
@@ -519,7 +519,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                 placeholder="Ej: A 5 minutos del parque principal de Santa Elena, entrada por el callejón de los guaduales, portón blanco número 12."
                 value={indicacionesLlegada}
                 onChange={e => setIndicacionesLlegada(e.target.value)}
-                className="w-full p-3 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                className="w-full p-3 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] placeholder:text-[var(--text-muted,#a8a097)]/60 outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
               />
             </div>
           </div>
@@ -728,7 +728,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                   placeholder="Ej: Bancolombia, Nequi, etc."
                   value={bancoNombre}
                   onChange={e => setBancoNombre(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                  className="w-full min-h-[44px] px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
                 />
               </div>
 
@@ -739,7 +739,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                 <select
                   value={bancoTipoCuenta}
                   onChange={e => setBancoTipoCuenta(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                  className="w-full min-h-[44px] px-3.5 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
                 >
                   <option value="Ahorros">Cuenta de Ahorros</option>
                   <option value="Corriente">Cuenta Corriente</option>
@@ -769,7 +769,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                   placeholder="Ej: 123-456789-01 o 3151234567"
                   value={bancoCuenta}
                   onChange={e => setBancoCuenta(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs tracking-wider border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                  className="w-full min-h-[44px] px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs tracking-wider border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
                 />
               </div>
 
@@ -782,7 +782,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                   placeholder="Ej: Carlos Gómez"
                   value={bancoTitular}
                   onChange={e => setBancoTitular(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                  className="w-full min-h-[44px] px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
                 />
               </div>
 
@@ -795,7 +795,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                   placeholder="Ej: CC 16.789.012"
                   value={bancoIdentificacion}
                   onChange={e => setBancoIdentificacion(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                  className="w-full min-h-[44px] px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
                 />
               </div>
             </div>
@@ -857,7 +857,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                       step={0.5}
                       value={porcentajeComision}
                       onChange={e => setPorcentajeComision(parseFloat(e.target.value) || 0)}
-                      className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--primary,#4da89e)]"
+                      className="w-full min-h-[44px] px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--primary,#4da89e)]"
                     />
                     <span className="absolute right-3 top-2.5 text-xs text-[var(--text-muted,#a8a097)] font-bold">%</span>
                   </div>
@@ -873,7 +873,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                     placeholder="Ej: Don Hernando o Carlos"
                     value={propietarioNombre}
                     onChange={e => setPropietarioNombre(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--primary,#4da89e)]"
+                    className="w-full min-h-[44px] px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--primary,#4da89e)]"
                   />
                   <span className="text-[10px] text-[var(--text-muted,#a8a097)] mt-1 block">Para el saludo en WhatsApp</span>
                 </div>
@@ -887,7 +887,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                     placeholder="Ej: 3001234567 o 57300..."
                     value={propietarioTelefono}
                     onChange={e => setPropietarioTelefono(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--primary,#4da89e)]"
+                    className="w-full min-h-[44px] px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none transition-all focus:border-[var(--primary,#4da89e)]"
                   />
                   <span className="text-[10px] text-[var(--text-muted,#a8a097)] mt-1 block">Para cobrar comisión en 1 clic</span>
                 </div>
@@ -1079,7 +1079,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                     type="button"
                     onClick={() => setEmojiPickerOpen(v => !v)}
                     title="Clic para cambiar el emoji"
-                    className="h-10 px-3 rounded-[var(--rad-xs,8px)] bg-[var(--surface,#1a1814)] border border-[var(--accent,#d4924a)]/60 text-[var(--accent,#d4924a)] flex items-center gap-1.5 shrink-0 hover:border-[var(--accent,#d4924a)] transition-all cursor-pointer shadow-sm"
+                    className="min-h-[44px] px-3 rounded-[var(--rad-xs,8px)] bg-[var(--surface,#1a1814)] border border-[var(--accent,#d4924a)]/60 text-[var(--accent,#d4924a)] flex items-center gap-1.5 shrink-0 hover:border-[var(--accent,#d4924a)] transition-all cursor-pointer shadow-sm"
                   >
                     <span className="text-base select-none">{amenidadEmoji}</span>
                     <Smile size={13} className="text-[var(--text-muted,#a8a097)]" />
@@ -1096,14 +1096,14 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                         handleAgregarAmenidadPersonalizada();
                       }
                     }}
-                    className="flex-1 h-10 px-3.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface,#1a1814)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)] shadow-inner transition-all"
+                    className="flex-1 min-h-[44px] px-3.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface,#1a1814)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)] shadow-inner transition-all"
                   />
                 </div>
 
                 <button
                   type="button"
                   onClick={() => handleAgregarAmenidadPersonalizada()}
-                  className="h-10 px-5 rounded-[var(--rad-xs,8px)] bg-[var(--accent,#d4924a)] text-[#141210] font-bold text-xs shrink-0 transition-all hover:brightness-110 active:scale-[0.98] inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-[0_2px_10px_rgba(212,146,74,0.25)]"
+                  className="min-h-[44px] px-5 rounded-[var(--rad-xs,8px)] bg-[var(--accent,#d4924a)] text-[#141210] font-bold text-xs shrink-0 transition-all hover:brightness-110 active:scale-[0.98] inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-[0_2px_10px_rgba(212,146,74,0.25)]"
                 >
                   <Plus size={15} /> Añadir Comodidad
                 </button>
@@ -1125,7 +1125,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                 placeholder="15:00 o 3:00 PM"
                 value={checkinHora}
                 onChange={e => setCheckinHora(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
               />
             </div>
 
@@ -1139,7 +1139,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                 placeholder="13:00 o 1:00 PM"
                 value={checkoutHora}
                 onChange={e => setCheckoutHora(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
               />
             </div>
 
@@ -1151,7 +1151,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
               <select
                 value={politicaMascotas}
                 onChange={e => setPoliticaMascotas(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                className="w-full min-h-[44px] px-3.5 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
               >
                 <option value="permitido">🐶 Mascotas permitidas sin costo adicional</option>
                 <option value="con_costo">🐾 Se aceptan mascotas con tarifa adicional</option>
@@ -1181,7 +1181,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                 <select
                   value={politicaMusica}
                   onChange={e => setPoliticaMusica(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                  className="w-full min-h-[44px] px-3.5 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
                 >
                   <option value="moderada">🎵 Música moderada (tranquilidad campestre)</option>
                   <option value="hasta_medianoche">🔊 Música permitida hasta medianoche (12:00 AM)</option>
@@ -1200,7 +1200,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                 <select
                   value={politicaMusica}
                   onChange={e => setPoliticaMusica(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                  className="w-full min-h-[44px] px-3.5 py-2.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
                 >
                   <option value="moderada">🎵 Música moderada (tranquilidad campestre)</option>
                   <option value="hasta_medianoche">🔊 Música permitida hasta medianoche (12:00 AM)</option>
@@ -1220,7 +1220,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                 placeholder="Ej: Uso de traje de baño obligatorio en piscina. Apagar luces exteriores al dormir. Prohibido fumar dentro de las habitaciones."
                 value={normas}
                 onChange={e => setNormas(e.target.value)}
-                className="w-full p-3 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
+                className="w-full p-3 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none focus:border-[var(--accent,#d4924a)] focus:ring-1 focus:ring-[var(--accent,#d4924a)]"
               />
             </div>
 
@@ -1237,7 +1237,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                       key={plan}
                       type="button"
                       onClick={() => togglePlan(plan)}
-                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-[var(--rad-xs,6px)] text-xs font-semibold transition-all border ${
+                      className={`inline-flex items-center gap-1 min-h-[38px] px-3 py-1.5 rounded-[var(--rad-xs,6px)] text-xs font-semibold transition-all border ${
                         activoPlan
                           ? 'bg-[var(--primary,#4da89e)]/15 border-[var(--primary,#4da89e)] text-[var(--primary,#4da89e)]'
                           : 'bg-[var(--surface-2,#201e19)] border-[var(--border,#312e28)] text-[var(--text-muted,#a8a097)] hover:text-[var(--text,#f0eae0)]'
@@ -1262,12 +1262,12 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                       handleAgregarPlanPersonalizado();
                     }
                   }}
-                  className="flex-1 px-3 py-1.5 rounded-[var(--rad-xs,6px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs border border-[var(--border,#312e28)] outline-none"
+                  className="flex-1 min-h-[44px] px-3 py-1.5 rounded-[var(--rad-xs,6px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-base md:text-xs border border-[var(--border,#312e28)] outline-none"
                 />
                 <button
                   type="button"
                   onClick={handleAgregarPlanPersonalizado}
-                  className="px-3 py-1.5 rounded-[var(--rad-xs,6px)] bg-[var(--surface-3,#272420)] border border-[var(--border,#312e28)] text-xs text-[var(--text,#f0eae0)] font-semibold"
+                  className="min-h-[44px] px-4 py-1.5 rounded-[var(--rad-xs,6px)] bg-[var(--surface-3,#272420)] border border-[var(--border,#312e28)] text-xs text-[var(--text,#f0eae0)] font-semibold active:scale-[0.98]"
                 >
                   Añadir
                 </button>
@@ -1293,7 +1293,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                 <button
                   type="button"
                   onClick={handleAgregarUrl}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs font-semibold border border-[var(--border,#312e28)] hover:border-[var(--accent,#d4924a)]"
+                  className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-1.5 rounded-[var(--rad-xs,8px)] bg-[var(--surface-2,#201e19)] text-[var(--text,#f0eae0)] text-xs font-semibold border border-[var(--border,#312e28)] hover:border-[var(--accent,#d4924a)] active:scale-[0.98]"
                 >
                   <LinkIcon size={12} /> Añadir URL
                 </button>
@@ -1302,7 +1302,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
                   <button
                     type="button"
                     onClick={handleEliminarSeleccionadas}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--rad-xs,8px)] bg-red-500/15 text-red-400 text-xs font-bold border border-red-500/30 hover:bg-red-500/25"
+                    className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-1.5 rounded-[var(--rad-xs,8px)] bg-red-500/15 text-red-400 text-xs font-bold border border-red-500/30 hover:bg-red-500/25 active:scale-[0.98]"
                   >
                     <Trash2 size={12} /> Eliminar ({selectedThumbs.size})
                   </button>
@@ -1396,7 +1396,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
             type="button"
             onClick={handleGuardar}
             disabled={guardando}
-            className={`inline-flex items-center justify-center gap-2 px-7 py-3 rounded-[var(--rad-sm,10px)] font-bold text-sm tracking-wide shadow-lg transition-all active:scale-[0.98] ${
+            className={`inline-flex items-center justify-center gap-2 min-h-[44px] px-7 py-3 rounded-[var(--rad-sm,10px)] font-bold text-sm tracking-wide shadow-lg transition-all active:scale-[0.98] ${
               isNew
                 ? 'bg-[var(--accent,#d4924a)] text-[#141210] shadow-[0_4px_20px_rgba(212,146,74,0.35)] hover:brightness-110'
                 : 'bg-[var(--primary,#4da89e)] text-[#141210] shadow-[0_4px_20px_rgba(77,168,158,0.35)] hover:brightness-110'
@@ -1422,7 +1422,7 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
           <button
             type="button"
             onClick={handleEliminarDefinitivo}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[var(--rad-sm,10px)] text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-all"
+            className="inline-flex items-center gap-1.5 min-h-[44px] px-4 py-2.5 rounded-[var(--rad-sm,10px)] text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-all active:scale-[0.98]"
             title="Borrar permanentemente de la base de datos"
           >
             <Trash2 size={14} /> Eliminar finca
