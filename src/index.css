@@ -538,7 +538,10 @@ ul, ol {
 
 .field {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.35rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .field label {
@@ -547,10 +550,16 @@ ul, ol {
   color: var(--text-muted);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .field input:not([type="checkbox"]):not([type="radio"]), .field select, .field textarea {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   min-height: 44px;
   padding: 0 0.95rem;
   background: var(--surface-2);
@@ -871,14 +880,23 @@ ul, ol {
   border-radius: var(--rad-md);
   padding: 1rem;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.65rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .quote-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
   font-size: var(--text-sm);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .quote-total {
@@ -1872,13 +1890,38 @@ ul, ol {
   gap: 0.7rem;
   padding-bottom: 2.5rem;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
-/* Grilla 2x2 compacta para parámetros del cotizador en móvil y PC */
+/* Grilla 2x2 compacta y 100% contenida para parámetros del cotizador en móvil y PC */
 .quote-params-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.quote-params-grid .field input:not([type="checkbox"]):not([type="radio"]),
+.quote-params-grid .field select {
+  padding: 0 0.55rem !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+input[type="date"] {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 @media (min-width: 860px) {
@@ -2015,10 +2058,15 @@ ul, ol {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--rad-md);
-  padding: 1rem;
+  padding: 0.9rem;
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: 0.85rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .mobile-spec-grid {

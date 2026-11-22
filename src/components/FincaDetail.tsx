@@ -551,6 +551,7 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
                 onPersonasChange={setPersonas}
                 onPlanChange={setPlan}
                 onGuardarCotizacion={onGuardarCotizacion}
+                onReturnToCatalog={onBackToCatalog}
                 onOpenCalendario={() => {
                   setActiveMobileTab('disponibilidad');
                   scrollToTabs();
@@ -886,6 +887,7 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
               onPersonasChange={setPersonas}
               onPlanChange={setPlan}
               onGuardarCotizacion={onGuardarCotizacion}
+              onReturnToCatalog={onBackToCatalog}
             />
           </div>
         </div>

@@ -120,7 +120,7 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
   }, [soloAlojamiento, planesSeleccionados, personas]);
 
   return (
-    <div style={{ display: 'grid', gap: '0.65rem' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '0.65rem', width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
       {/* ──────────────────────────────────────────────────────────────────────── */}
       {/* 1. ESTADO CONTRAÍDO / COLAPSADO (Banner Persuasivo y Cristalino)        */}
       {/* ──────────────────────────────────────────────────────────────────────── */}
@@ -169,13 +169,13 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
                 <Utensils size={16} />
               </div>
 
-              <div style={{ minWidth: 0 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontWeight: 800, fontSize: '0.84rem', color: 'var(--text-main)', lineHeight: 1.25 }}>
                   Alimentación en la finca (Opcional)
                 </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.1rem', lineHeight: 1.3, wordBreak: 'break-word' }}>
                   {soloAlojamiento || totalPlanesElegidos === 0
-                    ? '🏠 Actual: Solo alojamiento (cocinan en la finca)'
+                    ? '🏠 Actual: Solo alojamiento'
                     : `🍽️ ${totalPlanesElegidos} menú${totalPlanesElegidos !== 1 ? 's' : ''} (${totalPlatosCalculados} platos) · +${formatCOP(costoTotalAlimentacion)}`}
                 </div>
               </div>

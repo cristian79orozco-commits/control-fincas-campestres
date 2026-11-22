@@ -25,10 +25,19 @@ interface QuoteCalculatorProps {
   onGuardarCotizacion?: (datos: DatosCotizacionPublica) => Promise<ResultadoCotizacionPublica>;
   /** Permite volver al calendario interactivo en móvil en 1 toque */
   onOpenCalendario?: () => void;
+  /** Redirige automáticamente al catálogo tras confirmar y solicitar por WhatsApp */
+  onReturnToCatalog?: () => void;
 }
 
 function formatCOP(v: number) {
   return '$' + (v || 0).toLocaleString('es-CO') + ' COP';
+}
+
+function formatFechaCorta(f?: string): string {
+  if (!f) return '';
+  const partes = f.split('-');
+  if (partes.length !== 3) return f;
+  return `${partes[2]}/${partes[1]}/${partes[0]}`;
 }
 
 export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
@@ -44,6 +53,7 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
   onPersonasChange,
   onGuardarCotizacion,
   onOpenCalendario,
+  onReturnToCatalog,
 }) => {
   // Selección múltiple de planes de alimentación complementaria
   const [planesSeleccionados, setPlanesSeleccionados] = useState<PlanAlimentacionSeleccionado[]>([]);
@@ -314,9 +324,12 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
       return;
     }
 
-    // Si no hay callback de Supabase, abrir WhatsApp directo
+    // Si no hay callback de Supabase, abrir WhatsApp directo y regresar al catálogo
     if (!onGuardarCotizacion) {
       window.open(waUrl, '_blank', 'noopener,noreferrer');
+      if (onReturnToCatalog) {
+        setTimeout(() => onReturnToCatalog(), 150);
+      }
       return;
     }
 
@@ -348,7 +361,7 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
       if (resultado.success && resultado.consecutivo && resultado.cotizacionId) {
         setCotGuardada({ consecutivo: resultado.consecutivo, id: resultado.cotizacionId });
 
-        // Intentar abrir WhatsApp inmediatamente
+        // Abrir WhatsApp inmediatamente y devolver al cliente al catálogo de fincas
         try {
           const template = configuracion?.plantillas_comunicacion?.solicitud_cliente_publica
             || PLANTILLAS_PREDETERMINADAS.solicitud_cliente_publica;
@@ -397,7 +410,11 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
           const directUrl = `https://wa.me/${waNum}?text=${encodeURIComponent(directMsg)}`;
           window.open(directUrl, '_blank', 'noopener,noreferrer');
         } catch {
-          // El botón verde queda listo
+          // Fallback silencioso
+        }
+
+        if (onReturnToCatalog) {
+          setTimeout(() => onReturnToCatalog(), 150);
         }
       } else {
         setErrorGuardado(resultado.error || 'No se pudo registrar la cotización, pero puedes contactarnos directamente por WhatsApp.');
@@ -408,59 +425,98 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
   };
 
   return (
-    <div style={{ display: 'grid', gap: '0.9rem' }}>
-      {/* 1. Selección compacta de fechas, personas y mascotas (2 columnas paralelas incluso en móvil) */}
-      <div>
-        {onOpenCalendario && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
-            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)' }}>
-              1. Configura tu estadía
-            </span>
-            <button
-              type="button"
-              onClick={onOpenCalendario}
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '0.85rem', width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', overflow: 'hidden' }}>
+      {/* 1. Selección compacta de fechas, personas y mascotas (100% contenida sin desborde en móvil) */}
+      <div style={{ minWidth: 0, maxWidth: '100%' }}>
+        {onOpenCalendario ? (
+          /* En móvil: barra compacta de fechas vinculada al calendario del Paso 2 (evita inputs date anchos que desbordan pantallas de 360px) */
+          <div
+            onClick={onOpenCalendario}
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpenCalendario();
+              }
+            }}
+            style={{
+              background: fechaInicio && fechaFin
+                ? 'color-mix(in srgb, var(--primary) 10%, var(--surface-2))'
+                : 'var(--surface-2)',
+              border: `1px solid ${fechaInicio && fechaFin ? 'color-mix(in srgb, var(--primary) 35%, transparent)' : 'var(--border)'}`,
+              borderRadius: 'var(--rad-xs, 8px)',
+              padding: '0.6rem 0.8rem',
+              marginBottom: '0.6rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.5rem',
+              cursor: 'pointer',
+              minWidth: 0,
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+              <Calendar size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                  Fechas de estadía {fechaInicio && fechaFin ? `(${noches} noche${noches !== 1 ? 's' : ''})` : ''}
+                </div>
+                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {fechaInicio && fechaFin
+                    ? `${formatFechaCorta(fechaInicio)} → ${formatFechaCorta(fechaFin)}`
+                    : 'Toca para elegir llegada y salida'}
+                </div>
+              </div>
+            </div>
+
+            <span
               style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--primary)',
-                fontSize: '0.74rem',
+                fontSize: '0.72rem',
                 fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-                padding: 0,
+                color: 'var(--primary)',
+                background: 'var(--surface)',
+                border: '1px solid color-mix(in srgb, var(--primary) 30%, var(--border))',
+                padding: '0.25rem 0.55rem',
+                borderRadius: '6px',
+                flexShrink: 0,
               }}
             >
-              <Calendar size={12} /> Ver calendario
-            </button>
+              {fechaInicio && fechaFin ? 'Cambiar' : 'Elegir'}
+            </span>
           </div>
-        )}
+        ) : null}
 
         <div className="quote-params-grid">
-          <div className="field">
-            <label style={{ fontSize: '0.72rem', fontWeight: 600 }}>
-              <Calendar size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> Llegada
-            </label>
-            <input
-              type="date"
-              value={fechaInicio}
-              min={new Date().toISOString().split('T')[0]}
-              onChange={e => onFechaInicioChange(e.target.value)}
-            />
-          </div>
+          {!onOpenCalendario && (
+            <>
+              <div className="field">
+                <label style={{ fontSize: '0.72rem', fontWeight: 600 }}>
+                  <Calendar size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> Llegada
+                </label>
+                <input
+                  type="date"
+                  value={fechaInicio}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={e => onFechaInicioChange(e.target.value)}
+                />
+              </div>
 
-          <div className="field">
-            <label style={{ fontSize: '0.72rem', fontWeight: 600 }}>
-              <Calendar size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> Salida
-            </label>
-            <input
-              type="date"
-              value={fechaFin}
-              min={fechaInicio || new Date().toISOString().split('T')[0]}
-              onChange={e => onFechaFinChange(e.target.value)}
-            />
-          </div>
+              <div className="field">
+                <label style={{ fontSize: '0.72rem', fontWeight: 600 }}>
+                  <Calendar size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> Salida
+                </label>
+                <input
+                  type="date"
+                  value={fechaFin}
+                  min={fechaInicio || new Date().toISOString().split('T')[0]}
+                  onChange={e => onFechaFinChange(e.target.value)}
+                />
+              </div>
+            </>
+          )}
 
           <div className="field">
             <label style={{ fontSize: '0.72rem', fontWeight: 600 }}>
@@ -501,7 +557,6 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
                   return (
                     <option key={val} value={val}>
                       {val} mascota{val !== 1 ? 's' : ''}
-                      {valorMascotaUnitario > 0 ? ` (+$${(val * valorMascotaUnitario).toLocaleString('es-CO')})` : ''}
                     </option>
                   );
                 })}
