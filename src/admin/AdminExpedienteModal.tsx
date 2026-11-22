@@ -85,9 +85,9 @@ export const AdminExpedienteModal: React.FC<AdminExpedienteModalProps> = ({
   const pagos: Pago[] = reserva.pagos || [];
   const cierre = reserva.cierre;
 
-  const consecLimpio = reserva.consecutivo
-    ? formatearConsecutivoSimple(reserva.consecutivo)
-    : reserva.id.slice(0, 8).toUpperCase();
+  const consecLimpio = formatearConsecutivoSimple(
+    reserva.consecutivo || (reserva as any).cotizacion_snapshot?.consecutivo
+  );
   const numExpediente = `EXP-${consecLimpio}`;
 
   const ejecutarDescarga = (tipo: string, fn: () => void) => {

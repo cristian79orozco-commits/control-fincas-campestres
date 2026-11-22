@@ -4,6 +4,7 @@ import { resolverMetadatosFinca, desglosarFinanzasReserva, obtenerNombreClienteH
 import { useAdminDashboardStore, DashboardPeriodo, DashboardTab } from '../store/useAdminDashboardStore';
 import { useApp } from '../context/AppContext';
 import { abrirWhatsApp } from '../services/whatsapp';
+import { formatearConsecutivoSimple } from '../utils/consecutivos';
 import {
   toggleMasterNotificaciones,
   obtenerEstadoPermisoNotificaciones,
@@ -343,7 +344,7 @@ export function useAdminOverviewController({
 
           alertas.push({
             reservaId: r.id,
-            consecutivo: r.consecutivo ? `#${r.consecutivo}` : `#${r.id.slice(0, 6)}`,
+            consecutivo: `#${formatearConsecutivoSimple(r.consecutivo || (r as any).cotizacion_snapshot?.consecutivo)}`,
             fincaId: r.finca_id,
             fincaNombre: finNombre,
             propietarioNombre: propNombre,
@@ -417,7 +418,7 @@ export function useAdminOverviewController({
 
         return {
           id: r.id,
-          consecutivo: r.consecutivo ? `#${r.consecutivo}` : `#${r.id.slice(0, 6)}`,
+          consecutivo: `#${formatearConsecutivoSimple(r.consecutivo || (r as any).cotizacion_snapshot?.consecutivo)}`,
           fincaNombre: fincaMeta.nombre || 'Finca',
           clienteNombre: cliNombre,
           clienteTelefono: cliTel,

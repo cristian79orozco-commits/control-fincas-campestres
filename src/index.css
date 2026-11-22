@@ -549,7 +549,7 @@ ul, ol {
   text-transform: uppercase;
 }
 
-.field input, .field select, .field textarea {
+.field input:not([type="checkbox"]):not([type="radio"]), .field select, .field textarea {
   width: 100%;
   min-height: 44px;
   padding: 0 0.95rem;
@@ -562,7 +562,7 @@ ul, ol {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.field input:focus, .field select:focus, .field textarea:focus {
+.field input:not([type="checkbox"]):not([type="radio"]):focus, .field select:focus, .field textarea:focus {
   border-color: var(--accent) !important;
   box-shadow: 0 0 0 1px var(--accent), 0 0 14px rgba(212, 146, 74, 0.22) !important;
   background: var(--surface) !important;

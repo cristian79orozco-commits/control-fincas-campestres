@@ -1926,9 +1926,9 @@ export function generarExpedienteCompleto(
   const saldo = finanzas.saldoConsolidado;
   const totalPagado = finanzas.totalPagado;
 
-  const consecSimple = reserva.consecutivo
-    ? formatearConsecutivoSimple(reserva.consecutivo)
-    : reserva.id.slice(0, 8).toUpperCase();
+  const consecSimple = formatearConsecutivoSimple(
+    reserva.consecutivo || (reserva as any).cotizacion_snapshot?.consecutivo
+  );
   const numExpediente = `EXP-${consecSimple}`;
 
   encabezado(doc, 'EXPEDIENTE DE RESERVA Y LIQUIDACIÓN', `#${consecSimple}`, config);

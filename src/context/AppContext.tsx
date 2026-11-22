@@ -601,6 +601,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const infoM = extraerInfoMascotas(r);
         return {
           ...r,
+          consecutivo: r.consecutivo || r.cotizacion_snapshot?.consecutivo || null,
           cierre,
           costo_alimentacion: costoAlim,
           cantidad_mascotas: r.cantidad_mascotas ?? infoM.cantidadMascotas,

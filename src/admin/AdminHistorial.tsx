@@ -554,7 +554,9 @@ export const AdminHistorial: React.FC<AdminHistorialProps> = (props) => {
                 const finNombre = obtenerNombreFincaHistorico(r);
                 const contacto = obtenerContactoClienteHistorico(r);
                 const tel = contacto.whatsapp || contacto.telefono || '—';
-                const consecLimpio = r.consecutivo ? formatearConsecutivoSimple(r.consecutivo) : r.id.slice(0, 8).toUpperCase();
+                const consecLimpio = formatearConsecutivoSimple(
+                  r.consecutivo || (r as any).cotizacion_snapshot?.consecutivo
+                );
                 const infoMascotas = extraerInfoMascotas(r, (r.fincas as any) || r.finca_snapshot);
 
                 const esCerrada = r.estado === 'completada' || r.estado === 'cancelada' || r.estado === 'no_show';

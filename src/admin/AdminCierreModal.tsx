@@ -9,6 +9,7 @@ import {
   obtenerNombreClienteHistorico,
   obtenerNombreFincaHistorico,
 } from '../types';
+import { formatearConsecutivoSimple } from '../utils/consecutivos';
 import { CurrencyInput } from '../components/CurrencyInput';
 
 interface AdminCierreModalProps {
@@ -46,6 +47,9 @@ export const AdminCierreModal: React.FC<AdminCierreModalProps> = ({
   const saldo = calcularSaldo(reserva);
   const clienteNombre = obtenerNombreClienteHistorico(reserva);
   const fincaNombre = obtenerNombreFincaHistorico(reserva);
+  const consecutivoLimpio = formatearConsecutivoSimple(
+    reserva.consecutivo || (reserva as any).cotizacion_snapshot?.consecutivo
+  );
 
   // Formulario de cierre
   const [estadoFinal, setEstadoFinal] = useState<ReservaEstado>('completada');
@@ -131,9 +135,14 @@ export const AdminCierreModal: React.FC<AdminCierreModalProps> = ({
               fontSize: '0.82rem',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
               <span style={{ fontWeight: 600, fontSize: '0.92rem' }}>{fincaNombre}</span>
-              <span className="status-badge s-avail" style={{ fontSize: '0.7rem' }}>Reserva {reserva.id.slice(0, 8)}</span>
+              <span
+                className="status-badge s-avail"
+                style={{ fontSize: '0.72rem', fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.02em' }}
+              >
+                Reserva #{consecutivoLimpio}
+              </span>
             </div>
             <div className="text-muted">
               Huésped titular: <strong>{clienteNombre}</strong> · {reserva.personas} personas
@@ -261,14 +270,27 @@ export const AdminCierreModal: React.FC<AdminCierreModalProps> = ({
             {/* Depósito de garantía */}
             <div className="field">
               <label>Depósito de garantía</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', height: '36px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minHeight: '44px' }}>
+                <label
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    color: 'var(--text)',
+                    textTransform: 'none',
+                    letterSpacing: 'normal',
+                    cursor: 'pointer',
+                  }}
+                >
                   <input
                     type="checkbox"
                     checked={depositoDevuelto}
                     onChange={e => setDepositoDevuelto(e.target.checked)}
+                    style={{ width: '18px', height: '18px', minHeight: '18px', accentColor: 'var(--primary)', flexShrink: 0, cursor: 'pointer' }}
                   />
-                  Depósito devuelto a conformidad
+                  <span>Depósito devuelto a conformidad</span>
                 </label>
               </div>
             </div>

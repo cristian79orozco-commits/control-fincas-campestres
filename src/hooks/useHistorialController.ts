@@ -195,7 +195,9 @@ export function useHistorialController({
       const tel = (obtenerContactoClienteHistorico(r).whatsapp || obtenerContactoClienteHistorico(r).telefono || '').replace(/"/g, '""');
       const responsable = (r.cerrada_por || r.cierre?.responsable || '').replace(/"/g, '""');
 
-      const consecLimpio = r.consecutivo ? formatearConsecutivoSimple(r.consecutivo) : r.id.slice(0, 8).toUpperCase();
+      const consecLimpio = formatearConsecutivoSimple(
+        r.consecutivo || (r as any).cotizacion_snapshot?.consecutivo
+      );
 
       return [
         `"EXP-${consecLimpio} (#${consecLimpio})"`,
