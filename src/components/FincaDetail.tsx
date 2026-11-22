@@ -11,6 +11,14 @@ import { CollapsibleSection } from './CollapsibleSection';
 import type { Finca, BloqueoDisponibilidad, Menu, ConfiguracionGeneral } from '../types';
 import type { DatosCotizacionPublica, ResultadoCotizacionPublica } from '../hooks/useCotizadorPublico';
 import { getAmenidadInfo } from '../utils/amenidades';
+import { useClientStore } from '../store/useClientStore';
+
+function formatFechaCorta(f?: string): string {
+  if (!f) return '';
+  const partes = f.split('-');
+  if (partes.length !== 3) return f;
+  return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
 
 interface FincaDetailProps {
   finca: Finca;
@@ -47,11 +55,20 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
   onBackToCatalog,
   onGuardarCotizacion,
 }) => {
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin, setFechaFin] = useState('');
+  // Sincronización con filtros previos del catálogo (Estado Centralizado Zustand)
+  const storeFechaEntrada = useClientStore(s => s.fechaEntrada);
+  const storeFechaSalida = useClientStore(s => s.fechaSalida);
+  const storePersonas = useClientStore(s => s.personas);
+
+  const [fechaInicio, setFechaInicio] = useState(() => storeFechaEntrada || '');
+  const [fechaFin, setFechaFin] = useState(() => storeFechaSalida || '');
   const minCapacidad = Math.max(1, finca.capacidad_minima || 1);
   const maxCapacidad = Math.max(minCapacidad, finca.capacidad || 10);
-  const [personas, setPersonas] = useState(Math.max(minCapacidad, Math.min(maxCapacidad, 10)));
+  const [personas, setPersonas] = useState(() => {
+    const parsed = parseInt(storePersonas, 10);
+    const inicial = !isNaN(parsed) && parsed > 0 ? parsed : 10;
+    return Math.max(minCapacidad, Math.min(maxCapacidad, inicial));
+  });
   const [plan, setPlan] = useState('Todo incluido');
 
   // Detección responsive para dispositivos móviles
@@ -131,9 +148,13 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
   }, [imagesList.length]);
 
   const scrollToTabs = useCallback(() => {
+    if (typeof window === 'undefined') return;
     const el = document.getElementById('mobile-tabs-bar');
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const topbarEl = document.querySelector('.topbar') as HTMLElement | null;
+      const offset = (topbarEl ? topbarEl.offsetHeight : 84) + 8;
+      const y = el.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
     }
   }, []);
 
@@ -224,7 +245,7 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
             </div>
           </div>
 
-          {/* Barra de Pestañas Táctiles Segmentadas */}
+          {/* Barra de Recorrido Guiado en 3 Pasos (Siempre visible bajo la navbar) */}
           <div id="mobile-tabs-bar" className="mobile-detail-tabs">
             <button
               type="button"
@@ -234,8 +255,8 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
                 scrollToTabs();
               }}
             >
-              <Home size={15} />
-              <span>Finca</span>
+              <Home size={14} />
+              <span>1. Finca</span>
             </button>
 
             <button
@@ -246,8 +267,8 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
                 scrollToTabs();
               }}
             >
-              <Calendar size={15} />
-              <span>Fechas</span>
+              <Calendar size={14} />
+              <span>2. Fechas</span>
               {nochesEstadia > 0 && (
                 <span className="mobile-tab-badge">{nochesEstadia}n</span>
               )}
@@ -261,8 +282,8 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
                 scrollToTabs();
               }}
             >
-              <Calculator size={15} />
-              <span>Cotizar</span>
+              <Calculator size={14} />
+              <span>3. Reservar</span>
             </button>
           </div>
 
@@ -481,32 +502,26 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
                   </div>
                 )}
               </CollapsibleSection>
-
-              {/* Botón de acción al pie de la pestaña */}
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  setActiveMobileTab('disponibilidad');
-                  scrollToTabs();
-                }}
-                style={{ width: '100%', padding: '0.8rem', marginTop: '0.2rem', fontWeight: 700 }}
-              >
-                <Calendar size={16} /> Consultar disponibilidad y fechas →
-              </button>
             </div>
           )}
 
-          {/* Pestaña 2: Calendario y Disponibilidad */}
+          {/* Pestaña 2: Calendario y Disponibilidad (Compacto y sin botones duplicados) */}
           {activeMobileTab === 'disponibilidad' && (
             <div className="mobile-tab-card">
-              <div>
-                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)' }}>
-                  Fechas de estadía
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-main)' }}>
+                    Selecciona tus fechas de estadía
+                  </div>
+                  <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+                    Toca en el calendario tu llegada y luego tu salida
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
-                  Toca primero tu día de llegada y luego el día de salida:
-                </div>
+                {nochesEstadia > 0 && (
+                  <span className="status-badge s-avail" style={{ fontSize: '0.7rem', fontWeight: 700 }}>
+                    ✓ {nochesEstadia} noche{nochesEstadia !== 1 ? 's' : ''}
+                  </span>
+                )}
               </div>
 
               <CalendarPicker
@@ -516,54 +531,6 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
                 onRangeSelect={handleRangeSelect}
                 onClearRange={handleClearRange}
               />
-
-              {/* Resumen de fechas elegidas */}
-              {fechaInicio && fechaFin ? (
-                <div
-                  style={{
-                    background: 'rgba(34, 197, 94, 0.08)',
-                    border: '1px solid rgba(34, 197, 94, 0.3)',
-                    borderRadius: 'var(--rad-xs, 6px)',
-                    padding: '0.75rem 0.85rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.5rem',
-                  }}
-                >
-                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#16a34a' }}>
-                    ✓ Fechas seleccionadas: {nochesEstadia} noche{nochesEstadia !== 1 ? 's' : ''}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-main)' }}>
-                    Llegada: <strong>{fechaInicio}</strong> · Salida: <strong>{fechaFin}</strong>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => {
-                      setActiveMobileTab('cotizar');
-                      scrollToTabs();
-                    }}
-                    style={{ width: '100%', marginTop: '0.2rem', padding: '0.75rem', fontWeight: 700 }}
-                  >
-                    <Calculator size={16} /> Continuar al cotizador con estas fechas →
-                  </button>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    background: 'var(--surface-sunken)',
-                    border: '1px dashed var(--border)',
-                    borderRadius: 'var(--rad-xs, 6px)',
-                    padding: '0.75rem 0.85rem',
-                    fontSize: '0.76rem',
-                    color: 'var(--text-muted)',
-                    textAlign: 'center',
-                  }}
-                >
-                  Selecciona en el calendario de arriba para fijar tus fechas de estadía.
-                </div>
-              )}
             </div>
           )}
 
@@ -584,73 +551,71 @@ const FincaDetailComponent: React.FC<FincaDetailProps> = ({
                 onPersonasChange={setPersonas}
                 onPlanChange={setPlan}
                 onGuardarCotizacion={onGuardarCotizacion}
+                onOpenCalendario={() => {
+                  setActiveMobileTab('disponibilidad');
+                  scrollToTabs();
+                }}
               />
             </div>
           )}
 
-          {/* Barra Flotante Inferior Móvil (Sticky Booking Bar) */}
-          <div className="mobile-booking-bar">
-            <div>
-              <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
-                {fechaInicio && fechaFin ? `Total estadía (${nochesEstadia}n · ${personas}p)` : 'Tarifa directa /pp'}
+          {/* Barra Flotante Inferior Móvil (Único CTA en pasos 1 y 2; se oculta en paso 3 para no duplicar con el botón de WhatsApp ni tapar inputs) */}
+          {activeMobileTab !== 'cotizar' && (
+            <div className="mobile-booking-bar">
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {fechaInicio && fechaFin
+                    ? `${formatFechaCorta(fechaInicio)} → ${formatFechaCorta(fechaFin)} (${nochesEstadia}n · ${personas}p)`
+                    : 'Tarifa directa / persona'}
+                </div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--primary)', lineHeight: 1.15 }}>
+                  {fechaInicio && fechaFin
+                    ? `$${subtotalEstimadoAlojamiento.toLocaleString('es-CO')}`
+                    : `$${precioFormatted}`}
+                  <span style={{ fontSize: '0.68rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '3px' }}>
+                    {fechaInicio && fechaFin ? 'COP' : '/noche'}
+                  </span>
+                </div>
               </div>
-              <div style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--primary)', lineHeight: 1.1 }}>
-                {fechaInicio && fechaFin
-                  ? `$${subtotalEstimadoAlojamiento.toLocaleString('es-CO')}`
-                  : `$${precioFormatted}`}
-                <span style={{ fontSize: '0.68rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '2px' }}>
-                  {fechaInicio && fechaFin ? 'COP' : '/noche'}
-                </span>
+
+              <div style={{ flexShrink: 0 }}>
+                {activeMobileTab === 'finca' && (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setActiveMobileTab('disponibilidad');
+                      scrollToTabs();
+                    }}
+                    style={{ padding: '0.65rem 1.05rem', fontSize: '0.82rem', fontWeight: 700 }}
+                  >
+                    <Calendar size={15} /> Elegir fechas →
+                  </button>
+                )}
+
+                {activeMobileTab === 'disponibilidad' && (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setActiveMobileTab('cotizar');
+                      scrollToTabs();
+                    }}
+                    style={{
+                      padding: '0.65rem 1.05rem',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      background: fechaInicio && fechaFin ? 'var(--primary)' : 'var(--accent)',
+                      borderColor: fechaInicio && fechaFin ? 'var(--primary)' : 'var(--accent)',
+                      color: fechaInicio && fechaFin ? '#fff' : '#141210',
+                    }}
+                  >
+                    <Calculator size={15} /> {fechaInicio && fechaFin ? 'Continuar →' : 'Ir a cotizar →'}
+                  </button>
+                )}
               </div>
             </div>
-
-            <div>
-              {activeMobileTab === 'finca' && (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => {
-                    setActiveMobileTab('disponibilidad');
-                    scrollToTabs();
-                  }}
-                  style={{ padding: '0.65rem 0.95rem', fontSize: '0.82rem', fontWeight: 700 }}
-                >
-                  <Calendar size={14} /> Fechas
-                </button>
-              )}
-
-              {activeMobileTab === 'disponibilidad' && (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => {
-                    setActiveMobileTab('cotizar');
-                    scrollToTabs();
-                  }}
-                  style={{ padding: '0.65rem 0.95rem', fontSize: '0.82rem', fontWeight: 700 }}
-                >
-                  <Calculator size={14} /> Cotizar
-                </button>
-              )}
-
-              {activeMobileTab === 'cotizar' && (
-                <button
-                  type="button"
-                  className="btn wa-btn"
-                  onClick={() => {
-                    const btn = document.getElementById('cotizador-btn-generar');
-                    if (btn) {
-                      btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      btn.focus();
-                    }
-                  }}
-                  style={{ padding: '0.65rem 0.95rem', fontSize: '0.82rem', fontWeight: 700 }}
-                >
-                  Ir a reservar
-                </button>
-              )}
-            </div>
-          </div>
+          )}
         </div>
       ) : (
         /* ============================================================== */

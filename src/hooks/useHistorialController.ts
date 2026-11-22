@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import type {
   Reserva, Finca, Cliente, ConfiguracionGeneral,
-  CierreReserva, PagoTipo, FiltrosHistorial
+  CierreReserva, PagoTipo
 } from '../types';
 import {
   calcularSaldo,
@@ -9,7 +9,7 @@ import {
   obtenerNombreFincaHistorico,
   obtenerContactoClienteHistorico,
 } from '../types';
-import { useHistorial, FILTROS_HISTORIAL_DEFECTO } from './useHistorial';
+import { useHistorial } from './useHistorial';
 import { useApp } from '../context/AppContext';
 import { useAdminHistorialStore } from '../store/useAdminHistorialStore';
 import {

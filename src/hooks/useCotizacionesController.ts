@@ -5,7 +5,6 @@ import { calcularCotizacion, resolverPlanesAlimentacionDetalle } from '../utils/
 import { useApp } from '../context/AppContext';
 import { getConfiguracionGlobal } from '../services/configuracion';
 import {
-  plantillaCotizacion,
   plantillaPedirAbonoCotizacion,
   plantillaCobroAlimentacion,
 } from '../services/whatsapp';

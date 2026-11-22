@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import {
-  FileText, X, Download, ShieldCheck, Calendar, Users, Home,
-  CreditCard, DollarSign, Star, CheckCircle, AlertTriangle,
-  RotateCcw, MessageCircle, Printer, ExternalLink, Award
+  X, Download, ShieldCheck, Calendar, Users, Home,
+  DollarSign, Star, CheckCircle, AlertTriangle,
+  RotateCcw, MessageCircle, Award
 } from 'lucide-react';
 import type { Reserva, ConfiguracionGeneral, Pago } from '../types';
 import {
-  calcularSaldo,
   desglosarFinanzasReserva,
   obtenerNombreClienteHistorico,
   obtenerNombreFincaHistorico,

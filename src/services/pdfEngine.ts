@@ -7,8 +7,7 @@
  * y un motor nativo ultra-rápido para ejecución a 60 FPS sin dependencias comerciales obligatorias.
  */
 
-import { PDFDocument, rgb, StandardFonts, degrees, PDFPage } from 'pdf-lib';
-import type { PlantillasPdfPersonalizadas, ConfiguracionGeneral } from '../types';
+import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
 
 // Factor de conversión milímetros a puntos PostScript (1 pulgada = 25.4 mm = 72 pt)
 export const MM_TO_PT = 2.83465;
@@ -157,7 +156,7 @@ export async function estamparFirmaEnPdfDocument(
 
   const targetPageIndex = paginaDestinoIndex < 0 ? pages.length - 1 : Math.min(paginaDestinoIndex, pages.length - 1);
   const page = pages[targetPageIndex];
-  const { width: pageWidth, height: pageHeight } = page.getSize();
+  const { width: pageWidth } = page.getSize();
 
   // Obtener imagen de firma
   const imgData = await extraerBytesImagen(firmaUrl);
@@ -411,7 +410,7 @@ export class ApryseWebViewerAdapter {
  * Interfaz para registro de clave y renderizado con streaming.
  */
 export class SyncfusionPdfViewerAdapter {
-  private static isAvailable(): boolean {
+  public static isAvailable(): boolean {
     return typeof (window as any).ej?.pdfviewer?.PdfViewer !== 'undefined';
   }
 

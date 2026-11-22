@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import {
   FileText, Plus, Edit3, Trash2, X, Save, ArrowRight,
-  Calendar, Users, Utensils, Tag, MessageCircle, Hash, Copy, Check, XCircle, AlertCircle, Dog
+  Calendar, Users, Utensils, Tag, MessageCircle, Hash, Copy, Check, XCircle, Dog
 } from 'lucide-react';
-import type { CotizacionDB, CotizacionEstado, Cliente, Finca, Menu, ConfiguracionGeneral } from '../types';
 import { desglosarFinanzasCotizacion } from '../types';
 import { WhatsAppModal } from '../components/WhatsAppModal';
 import { abrirWhatsApp, generarUrlWhatsApp } from '../services/whatsapp';
@@ -59,7 +58,6 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
     clientes,
     fincas,
     menus,
-    configuracion,
     conteoPendientes,
     conteoConfirmadas,
     conteoCanceladas,
@@ -78,21 +76,16 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
     setModalConfirmarReserva,
     modalWaCotiz,
     setModalWaCotiz,
-    handleCambiarEstado,
     handleCancelarCotizacion,
     handleEliminarDefinitivo,
     handleIniciarPasoAReserva,
     handleConfirmarPasoAReserva,
     handleAbrirPedirAbono,
     handleAbrirCobroAlimentacion,
-    handleDescargarPdfAlimentacion,
     tabActiva,
     setTabActiva,
     onRegistrarComunicacion,
     showToast,
-    openConfirm,
-    previsualizarFinca,
-    abrirComunicacionesConExpediente,
     navegarAAdmin,
   } = useCotizacionesController(props);
 

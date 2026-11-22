@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import debounce from 'lodash/debounce';
 import sortBy from 'lodash/sortBy';
 import filter from 'lodash/filter';
 import type { Finca, BloqueoDisponibilidad } from '../types';

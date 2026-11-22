@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Building2, FileText, CreditCard, Check, Save, RotateCcw,
-  Download, Eye, Globe, Phone, Mail, MapPin, Share2, Sparkles,
-  ShieldCheck, AlertCircle, Info, ExternalLink, UtensilsCrossed,
-  CheckCircle2, HelpCircle, ArrowRight, Layers, Sliders, Hash,
-  Upload, Trash2, PenTool, Image as ImageIcon
+  Phone, Share2, Sparkles,
+  ShieldCheck, AlertCircle, Info, UtensilsCrossed,
+  CheckCircle2, Layers, Sliders
 } from 'lucide-react';
 import type { ConfiguracionGeneral, PlantillasPdfPersonalizadas } from '../types';
 import {

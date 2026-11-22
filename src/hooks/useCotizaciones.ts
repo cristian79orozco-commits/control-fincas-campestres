@@ -1,5 +1,4 @@
 import { useApp } from '../context/AppContext';
-import type { CotizacionDB, CotizacionEstado } from '../types';
 
 export function useCotizaciones() {
   const {

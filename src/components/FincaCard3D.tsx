@@ -10,7 +10,6 @@ import {
   ArrowRight,
   Heart,
   Scale,
-  Sparkles,
   Check
 } from 'lucide-react';
 import type { Finca } from '../types';

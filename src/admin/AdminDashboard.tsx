@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import {
-  LayoutDashboard, LogOut, Lock, LogIn, ShieldCheck, Database,
+  LayoutDashboard, LogOut, LogIn, Database,
   Home, Users, FileText, ClipboardList, Calendar, MessageCircle,
-  Menu, X, TrendingUp, CheckCircle, AlertTriangle, Clock, UtensilsCrossed, Settings,
-  Palette, History, Globe, Bell, BellRing, BellOff, Volume2, VolumeX, Laptop, Sun, Moon
+  Menu, X, UtensilsCrossed, Settings,
+  Palette, History, Globe, Bell, BellRing, BellOff, Laptop, Sun, Moon
 } from 'lucide-react';
 import { AdminFincaForm } from './AdminFincaForm';
-import { AdminWaConfig } from './AdminWaConfig';
 import { AdminClientes } from './AdminClientes';
 import { AdminCotizaciones } from './AdminCotizaciones';
 import { AdminReservas } from './AdminReservas';
@@ -30,10 +29,7 @@ const AdminConfiguracion = lazy(() =>
 import { useApp } from '../context/AppContext';
 import {
   obtenerEstadoPermisoNotificaciones,
-  solicitarPermisoNotificaciones,
   isSoundEnabled,
-  setSoundEnabled,
-  probarNotificacionAdmin,
   toggleMasterNotificaciones,
 } from '../services/notificaciones';
 import type {
@@ -41,7 +37,6 @@ import type {
   Reserva, ReservaEstado, PagoTipo, AdminSection, Menu as MenuType, Comunicacion,
   ConfiguracionGeneral, ContenidoSitio, CierreReserva
 } from '../types';
-import { desglosarFinanzasReserva } from '../types';
 
 interface AdminDashboardProps {
   theme?: 'light' | 'dark';
@@ -133,8 +128,6 @@ const NAV_ITEMS: NavItemConfig[] = [
   { section: 'personalizacion', label: 'Personalización',       shortLabel: 'Diseño',    icon: <Palette size={18} />,         group: 'Sistema' },
   { section: 'configuracion',   label: 'Configuración',         shortLabel: 'Ajustes',   icon: <Settings size={18} />,        group: 'Sistema' },
 ];
-
-function formatCOP(v: number) { return '$' + v.toLocaleString('es-CO'); }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   theme,
@@ -342,39 +335,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }
 
   // ---- Dashboard de métricas ----
-  const hoy = new Date().toISOString().split('T')[0];
-  const cotizacionesPendientes = cotizaciones.filter(c => ['borrador', 'cotizada', 'pendiente'].includes(c.estado)).length;
-  const reservasActivas = reservas.filter(r => r.estado === 'activa');
-
-  let saldoPendienteFincasDueños = 0;
-  let saldoPendienteAdminAlimentacion = 0;
-
-  reservasActivas.forEach(r => {
-    const fin = desglosarFinanzasReserva(r);
-    saldoPendienteFincasDueños += fin.saldoFincaCheckIn;
-    saldoPendienteAdminAlimentacion += fin.saldoAlimentacionAdmin;
-  });
-
-  const totalSaldoPendiente = saldoPendienteFincasDueños + saldoPendienteAdminAlimentacion;
-
-  // Métricas del servicio de alimentación (suministrado directamente por el Administrador)
-  const reservasConMenu = reservas.filter(
-    r => (r.costo_alimentacion || 0) > 0 || (r.alimentacion && r.alimentacion !== 'Sin alimentación')
-  );
-  // 1. Alimentación cobrada y recaudada a la cuenta del admin (totales y abonos parciales)
-  const ingresosAlimentacionLiquidados = reservas.reduce((acc, r) => {
-    const fin = desglosarFinanzasReserva(r);
-    return acc + fin.pagadoAlimentacion;
-  }, 0);
-  // 2. Alimentación pendiente de cobro en reservas activas
-  const ingresosAlimentacionPorCobrar = saldoPendienteAdminAlimentacion;
-  // 3. Proyección en cotizaciones aún no confirmadas
-  const ingresosAlimentacionEnCotizaciones = cotizaciones
-    .filter(c => ['borrador', 'cotizada', 'pendiente'].includes(c.estado))
-    .reduce((acc, c) => acc + (c.costo_alimentacion || 0), 0);
-  const totalPersonasAlimentadas = reservas
-    .filter(r => ['activa', 'completada'].includes(r.estado) && (r.costo_alimentacion || 0) > 0)
-    .reduce((acc, r) => acc + (r.personas || 1), 0);
+  const cotizacionesPendientes = cotizaciones.filter(c => {
+    if (!['borrador', 'cotizada', 'pendiente'].includes(c.estado)) return false;
+    // Si ya existe una reserva vinculada a esta cotización, ya no es una cotización pendiente
+    const tieneReservaVinculada = reservas.some(
+      r => r.cotizacion_id === c.id || (r.consecutivo && c.consecutivo && r.consecutivo === c.consecutivo)
+    );
+    return !tieneReservaVinculada;
+  }).length;
 
   const navigateTo = (section: AdminSection) => {
     setActiveSection(section);

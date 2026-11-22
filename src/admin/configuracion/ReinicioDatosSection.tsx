@@ -14,16 +14,15 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  RotateCcw, Trash2, ShieldAlert, CheckCircle2, AlertTriangle,
+  Trash2, ShieldAlert, CheckCircle2, AlertTriangle,
   RefreshCw, Calendar, ClipboardList, FileText, Users,
-  MessageCircle, Home, UtensilsCrossed, Hash, Lock, Check,
-  AlertCircle, X, ShieldCheck, Sparkles, Database
+  Home, UtensilsCrossed, Lock, Check,
+  X, ShieldCheck, Sparkles, Database
 } from 'lucide-react';
 import {
   useReinicioDatosController,
   type UseReinicioDatosControllerProps,
 } from '../../hooks/useReinicioDatosController';
-import type { OpcionesReinicioDatos } from '../../types';
 
 export interface ReinicioDatosSectionProps extends UseReinicioDatosControllerProps {}
 
@@ -38,7 +37,6 @@ export const ReinicioDatosSection: React.FC<ReinicioDatosSectionProps> = ({
     ejecutando,
     modalSeguridadAbierto,
     palabraConfirmacion,
-    ultimoResultado,
     totalRegistrosAfectados,
     hayAlgunaOpcionSeleccionada,
     setPalabraConfirmacion,

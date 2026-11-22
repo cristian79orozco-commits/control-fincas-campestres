@@ -10,7 +10,6 @@ import {
   Copy,
   Check,
   CheckCircle2,
-  HelpCircle,
   Layers,
   MessageCircle,
   Home,
@@ -20,7 +19,7 @@ import {
   Clock,
   ShieldCheck,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   PLANTILLAS_PREDETERMINADAS,
   renderizarPlantillaPersonalizada,

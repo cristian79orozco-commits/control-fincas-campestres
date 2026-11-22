@@ -157,7 +157,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
     });
   };
 
-  const handleFocusInternal = (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleFocusInternal = (_e: React.FocusEvent<HTMLInputElement>) => {
     setIsFocused(true);
     // Si el valor es '0', seleccionar todo para facilitar reemplazo inmediato al teclear
     if (displayValue === '0') {
@@ -168,7 +168,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
     onFocus?.();
   };
 
-  const handleBlurInternal = (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleBlurInternal = (_e: React.FocusEvent<HTMLInputElement>) => {
     setIsFocused(false);
     if (!displayValue || displayValue.trim() === '') {
       setDisplayValue(value ? formatCurrencyValue(value, allowDecimals) : '0');

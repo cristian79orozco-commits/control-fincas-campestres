@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   ClipboardList, Plus, Edit3, Trash2, X, Save, CreditCard,
   Calendar, Users, DollarSign, ChevronDown, ChevronUp, FileCheck, MessageCircle,
-  FileText, CheckCircle, Hash, Copy, Check, Award, AlertTriangle, ArrowRight, Utensils
+  CheckCircle, Hash, Copy, Check, AlertTriangle, Utensils
 } from 'lucide-react';
 import type { Reserva, ReservaEstado, Cliente, Finca, Pago, PagoTipo, CotizacionDB, CierreReserva, ConfiguracionGeneral } from '../types';
 import { calcularSaldo, desglosarFinanzasReserva } from '../types';
@@ -11,28 +11,18 @@ import { WhatsAppModal } from '../components/WhatsAppModal';
 import { AdminCierreModal } from './AdminCierreModal';
 import { AdminExpedienteModal } from './AdminExpedienteModal';
 import {
-  plantillaRecordatorioPago,
-  plantillaBienvenida,
-  plantillaSeparacion,
   plantillaPazYSalvo,
-  plantillaEstadoCuenta,
-  plantillaCobroAlimentacion,
   abrirWhatsApp,
   generarUrlWhatsApp,
 } from '../services/whatsapp';
-import { generarDocSeparacion, generarPazYSalvo, generarEstadoCuenta, generarPropuestaAlimentacion } from '../services/documentos';
+import { generarPazYSalvo } from '../services/documentos';
 import { CurrencyInput } from '../components/CurrencyInput';
-import { useApp } from '../context/AppContext';
-import { getConfiguracionGlobal } from '../services/configuracion';
 import {
   useReservasController,
   ESTADOS_RESERVA,
   TIPOS_PAGO,
-  ESTADO_COLORS,
   formatCOP,
   formatFecha,
-  FORM_VACIO,
-  PAGO_VACIO,
 } from './useReservasController';
 
 interface AdminReservasProps {
@@ -131,9 +121,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
     handleAbrirModalPago,
 
     // Estado & Acciones Optimistas
-    handleEstado,
     handleEliminar,
-    handleAbrirCobroAlimentacion,
 
     // Pestañas y vistas
     tabReservaActiva,
@@ -155,7 +143,6 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
     onRegistrarComunicacion,
     showToast,
     abrirComunicacionesConExpediente,
-    navegarAAdmin,
   } = useReservasController(props);
 
   return (
@@ -703,7 +690,6 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
 
             const hoy = new Date().toISOString().split('T')[0];
             const estanciaVencida = r.estado === 'activa' && r.fecha_fin < hoy;
-            const pazYSalvoHabilitado = saldo <= 0 && (r.pagos?.length || 0) > 0;
 
             return (
               <div

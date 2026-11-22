@@ -1,23 +1,16 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   Search,
   X,
-  FileCheck2,
-  Calendar,
-  Users,
   MessageCircle,
-  Clock,
   AlertCircle,
   Home,
-  CheckCircle2,
-  ArrowRight,
   Loader2,
   ShieldCheck,
   Phone
 } from 'lucide-react';
 import type { Reserva, CotizacionDB, Finca } from '../types';
-import { desglosarFinanzasReserva } from '../types';
 import { supabase } from '../services/supabase';
 
 interface ClientePortalModalProps {
@@ -55,8 +48,8 @@ export const ClientePortalModal: React.FC<ClientePortalModalProps> = ({
   isOpen,
   onClose,
   reservas = [],
-  cotizaciones = [],
-  fincas,
+  cotizaciones: _cotizaciones = [],
+  fincas: _fincas,
   waNumber,
 }) => {
   const [consecutivoInput, setConsecutivoInput] = useState('');

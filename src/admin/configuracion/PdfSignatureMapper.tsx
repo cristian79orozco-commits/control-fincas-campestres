@@ -8,7 +8,7 @@
 import React from 'react';
 import {
   PenTool, Upload, Trash2, AlignCenter, AlignLeft, AlignRight,
-  Maximize2, Sparkles, CheckCircle2, ShieldCheck, Sliders, Check
+  Sparkles, CheckCircle2
 } from 'lucide-react';
 import type { PlantillasPdfPersonalizadas } from '../../types';
 

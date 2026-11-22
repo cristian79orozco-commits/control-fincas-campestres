@@ -11,7 +11,6 @@ import {
   TrendingUp,
   MessageCircle,
   ShieldCheck,
-  CheckCircle,
   FileText,
 } from 'lucide-react';
 import type { Comunicacion } from '../../types';

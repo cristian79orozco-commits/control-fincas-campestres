@@ -1,15 +1,11 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
-  History, Search, Filter, Calendar, Home, Users, DollarSign,
+  History, Search, Filter, DollarSign,
   Download, FileText, CheckCircle, AlertTriangle, ShieldCheck,
-  ChevronRight, RefreshCw, X, Award, ExternalLink, RotateCcw,
-  BarChart3, Sparkles, Clock, CheckCircle2
+  RefreshCw, RotateCcw,
+  BarChart3, Clock, CheckCircle2
 } from 'lucide-react';
-import type {
-  Reserva, Finca, Cliente, ConfiguracionGeneral,
-  CierreReserva, PagoTipo, ReservaEstado
-} from '../types';
 import {
   calcularSaldo,
   obtenerNombreClienteHistorico,

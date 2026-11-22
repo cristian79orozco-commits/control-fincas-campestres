@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Settings,
   CheckCircle,
   Phone,
-  ShieldCheck,
   Scale,
   Hash,
   Laptop,

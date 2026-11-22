@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import {
   UtensilsCrossed, Plus, Edit3, Trash2, X, Save, Image as ImageIcon,
-  Upload, FileText, CheckCircle, Eye, EyeOff, Search, DollarSign,
-  Coffee, Flame, Sunset, Apple, Sparkles, Package, Download, UserCheck,
+  Upload, FileText, Eye, EyeOff, Search, DollarSign,
+  Coffee, Flame, Sunset, Apple, Sparkles, Package, Download,
   CreditCard, Building, Copy, Check
 } from 'lucide-react';
 import { supabase } from '../services/supabase';

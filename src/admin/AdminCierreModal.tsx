@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
-  CheckCircle2, X, AlertTriangle, Star, Home, DollarSign,
-  CreditCard, ShieldCheck, FileCheck, Check
+  CheckCircle2, X, AlertTriangle, Star, ShieldCheck, Check
 } from 'lucide-react';
 import type { Reserva, ReservaEstado, CierreReserva, EstadoEntregaFinca, PagoTipo } from '../types';
 import {

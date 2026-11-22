@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Eye, Users, MapPin, Sparkles, ChevronDown, ChevronUp,
-  Bed, Bath, Clock, Check, Dog, Volume2, Image as ImageIcon, ArrowRight
+  Eye, Users, MapPin, ChevronDown, ChevronUp,
+  Bed, Bath, Clock, Dog, Image as ImageIcon, ArrowRight
 } from 'lucide-react';
 import type { Finca } from '../types';
 import { getAmenidadInfo } from '../utils/amenidades';
@@ -38,7 +38,6 @@ export const FincaCard = React.memo<FincaCardProps>(({ finca, onSelect, defaultE
 
   const precioFormatted = finca.precio_pp ? Number(finca.precio_pp).toLocaleString('es-CO') : null;
   const estadoInfo = estadoMap[finca.estado] || { cls: 's-info', lbl: finca.estado, dot: 'var(--primary)' };
-  const planesStr = (finca.finca_planes || []).map(p => p.nombre).join(' · ');
 
   return (
     <article

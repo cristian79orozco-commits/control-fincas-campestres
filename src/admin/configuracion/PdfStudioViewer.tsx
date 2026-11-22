@@ -9,12 +9,12 @@
  */
 
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
-  ZoomIn, ZoomOut, RotateCcw, RefreshCw, Download, Eye, FileText,
-  CheckCircle2, Sparkles, Layers, ShieldCheck, Check, Maximize2, ExternalLink
+  ZoomIn, ZoomOut, RotateCcw, RefreshCw, Download, Eye,
+  Sparkles
 } from 'lucide-react';
-import type { ConfiguracionGeneral, PlantillasPdfPersonalizadas } from '../../types';
+import type { ConfiguracionGeneral } from '../../types';
 import type { DocumentoSubTab } from '../../hooks/usePdfConfigController';
 import { resolverLogoUrl, LOGO_OFICIAL_PATH } from '../../services/configuracion';
 

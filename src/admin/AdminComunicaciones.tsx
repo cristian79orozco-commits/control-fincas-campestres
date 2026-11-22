@@ -1,24 +1,18 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  MessageCircle, Send, FileText, CheckCircle, Clock, Copy, Check,
-  Download, Trash2, Settings, Phone, BookOpen,
-  Search, RotateCcw, Save, Sparkles, Tag,
-  CreditCard, Utensils, Home, BarChart3,
-  ShieldCheck, Eye, Edit3, Laptop, Globe, Info
+  MessageCircle, Send, CheckCircle, Clock, Copy, Check,
+  Download, Trash2, Settings, BookOpen,
+  Search, RotateCcw, Sparkles,
+  Utensils, Home, BarChart3,
+  Eye, Edit3, Laptop, Globe, Info
 } from 'lucide-react';
-import type {
-  Cliente, Finca, Reserva, CotizacionDB, Menu, Pago, TipoComunicacion, Comunicacion, ConfiguracionGeneral, MetodoEnvioWhatsApp
-} from '../types';
 import {
   formatCOP,
-  formatFecha,
   abrirWhatsApp,
   copiarAlPortapapeles,
-  PLANTILLAS_PREDETERMINADAS,
 } from '../services/whatsapp';
 import {
-  formatearConsecutivoSimple,
   formatearConsecutivoConPrefijo,
   type TipoDocumentoPrefijo,
 } from '../utils/consecutivos';
@@ -28,7 +22,6 @@ import { ComunicacionesPlantillasAdmin } from './comunicaciones/ComunicacionesPl
 import {
   useComunicacionesController,
   type UseComunicacionesControllerParams,
-  type TarjetaTipoMensaje,
 } from './useComunicacionesController';
 
 export type AdminComunicacionesProps = UseComunicacionesControllerParams;
@@ -42,7 +35,6 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
     tipoSeleccionado,
     setTipoSeleccionado,
     subTipoAccion,
-    expedienteTipo,
     cotizacionId,
     reservaId,
     setExpediente,
@@ -62,11 +54,6 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
     procesando,
     copiadoBancoDueno,
     copiadoBancoAdmin,
-    plantillaSeleccionada,
-    setPlantillaSeleccionada,
-    textoEditorPlantilla,
-    setTextoEditorPlantilla,
-    guardandoPlantilla,
     filtroTipoHistorial,
     setFiltroTipoHistorial,
     waGlobalInput,
@@ -74,25 +61,17 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
     metodoWhatsApp,
     setMetodoWhatsApp,
     currentWaNumber,
-    clientes,
-    fincas,
-    reservas,
-    cotizaciones,
-    menus,
     comunicaciones,
     comunicacionesFiltradas,
     configuracion,
     onLimpiarHistorial,
     showToast,
-    reservaActual,
-    cotizacionActual,
     cotizacionEfectiva,
     reservaEfectiva,
     fincaActual,
     clienteActual,
     consecutivoBase,
     finanzasDoble,
-    CATALOGO_MENSAJES,
     mensajesFiltrados,
     expedientesRecientes,
     listaResultadosFinder,
@@ -107,8 +86,6 @@ export const AdminComunicaciones: React.FC<AdminComunicacionesProps> = (props) =
     ejecutarDescargaPdf,
     copiarCuentaDueno,
     copiarCuentaAdmin,
-    handleGuardarPlantilla,
-    handleRestablecerPlantilla,
     handleGuardarWaGlobal,
   } = useComunicacionesController(props);
 

@@ -7,7 +7,6 @@ import {
   BookOpen,
   Clock,
   Settings,
-  Phone,
 } from 'lucide-react';
 import {
   TabComunicaciones,
@@ -20,7 +19,7 @@ interface ComunicacionesHeaderProps {
 }
 
 export const ComunicacionesHeader: React.FC<ComunicacionesHeaderProps> = ({
-  currentWaNumber,
+  currentWaNumber: _currentWaNumber,
   totalComunicaciones,
 }) => {
   const { tabActiva, setTabActiva } = useComunicacionesStore();

@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import type { BloqueoDisponibilidad } from '../types';
 
 export function useDisponibilidad(fincaIdSeleccionada?: string | null) {
   const {

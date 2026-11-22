@@ -1,11 +1,11 @@
 import React, { useMemo, useEffect, useCallback } from 'react';
 import {
   Filter, X, Search, Sparkles, Dog, Check, ChevronDown, ChevronUp,
-  MapPin, Users, Bed, Bath, Calendar, MessageCircle, ArrowRight,
-  ShieldCheck, Image as ImageIcon, Home, LayoutGrid, List, SlidersHorizontal,
+  MapPin, Users, Bed, Calendar, ArrowRight,
+  Image as ImageIcon, Home, LayoutGrid, List,
   Scale
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import type { Finca, BloqueoDisponibilidad, ContenidoSitio } from '../types';
 import { useClientStore, filtrarFincasCliente } from '../store/useClientStore';
 import { FincaCard3D } from './FincaCard3D';
@@ -274,7 +274,7 @@ const CatalogComponent: React.FC<CatalogProps> = ({
   bloquesAdmin,
   onSelectFinca,
   contenido,
-  waNumber,
+  waNumber: _waNumber,
   onOpenPortalHuesped: _onOpenPortalHuesped,
 }) => {
   // Selectores atómicos de Zustand para eliminar re-renders masivos

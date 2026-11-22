@@ -1,5 +1,4 @@
 import { useApp } from '../context/AppContext';
-import type { Finca } from '../types';
 
 export function useFincas() {
   const {

@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
-  Palette, Save, RotateCcw, Eye, ArrowUp, ArrowDown, Check,
-  AlertCircle, Plus, Trash2, HelpCircle, Sparkles, Layout,
+  Palette, Save, RotateCcw, Eye, ArrowUp, ArrowDown,
+  Plus, Trash2, HelpCircle, Sparkles, Layout,
   Layers, MessageSquare, Utensils, HelpCircle as FaqIcon, Globe,
-  CheckCircle2, X, TrendingUp, Scale, FileCheck2, Smartphone, Monitor,
-  Sliders, LayoutGrid, List
+  X, TrendingUp, Scale, FileCheck2, Smartphone, Monitor
 } from 'lucide-react';
-import type { ContenidoSitio, SeccionClave, BeneficioItem, FaqItem } from '../types';
+import type { ContenidoSitio, SeccionClave } from '../types';
 import { usePersonalizacionController } from '../hooks/usePersonalizacionController';
 
 interface AdminPersonalizacionProps {

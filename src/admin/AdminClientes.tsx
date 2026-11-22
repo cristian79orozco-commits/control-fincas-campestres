@@ -14,7 +14,6 @@ export type AdminClientesProps = UseClientesControllerParams;
 
 export const AdminClientes: React.FC<AdminClientesProps> = (props) => {
   const {
-    clientes,
     clientesConHistorial,
     filtrados,
     clienteSeleccionado,

@@ -1,5 +1,4 @@
 import { useApp } from '../context/AppContext';
-import type { Cliente } from '../types';
 
 export function useClientes() {
   const {

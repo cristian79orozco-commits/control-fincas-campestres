@@ -1,5 +1,4 @@
 import groupBy from 'lodash/groupBy';
-import sumBy from 'lodash/sumBy';
 import orderBy from 'lodash/orderBy';
 import countBy from 'lodash/countBy';
 import round from 'lodash/round';
@@ -74,7 +73,7 @@ export function generarSerieHistorialTiempo(reservas: Reserva[] = []): SerieHist
  * Calcula la recaudación histórica consolidada por finca
  */
 export function generarDistribucionHistorialFincas(
-  fincas: Finca[] = [],
+  _fincas: Finca[] = [],
   reservas: Reserva[] = []
 ): FincaHistorialItem[] {
   const safeReservas = Array.isArray(reservas) ? reservas : [];

@@ -15,6 +15,13 @@ const MESES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
+function formatFechaLegible(f?: string): string {
+  if (!f) return '';
+  const partes = f.split('-');
+  if (partes.length !== 3) return f;
+  return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
+
 export const CalendarPicker = React.memo<CalendarPickerProps>(({
   bloques,
   fechaInicio,
@@ -131,7 +138,7 @@ export const CalendarPicker = React.memo<CalendarPickerProps>(({
 
   return (
     <div>
-      {/* Guía visual paso a paso para el cliente */}
+      {/* Guía visual unificada paso a paso para el cliente (sin duplicación inferior) */}
       <div
         style={{
           background: fechaInicio && fechaFin
@@ -139,18 +146,18 @@ export const CalendarPicker = React.memo<CalendarPickerProps>(({
             : 'var(--surface-2)',
           border: `1px solid ${fechaInicio && fechaFin ? 'color-mix(in srgb, var(--primary) 32%, transparent)' : 'var(--border)'}`,
           borderRadius: 'var(--rad-xs, 8px)',
-          padding: '0.7rem 0.95rem',
-          marginBottom: '0.85rem',
+          padding: '0.6rem 0.85rem',
+          marginBottom: '0.75rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '0.5rem',
           flexWrap: 'wrap',
-          fontSize: '0.82rem',
+          fontSize: '0.78rem',
           boxShadow: 'var(--sh-sm)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
           <span
             style={{
               display: 'inline-flex',
@@ -161,19 +168,22 @@ export const CalendarPicker = React.memo<CalendarPickerProps>(({
               borderRadius: '50%',
               background: 'var(--primary)',
               color: '#fff',
-              fontSize: '0.72rem',
+              fontSize: '0.7rem',
               fontWeight: 700,
+              flexShrink: 0,
             }}
           >
             {!fechaInicio ? '1' : !fechaFin ? '2' : '✓'}
           </span>
-          <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-            {!fechaInicio
-              ? 'Paso 1: Toca el día de llegada en el calendario'
-              : !fechaFin
-              ? 'Paso 2: Toca el día de salida (mínimo 1 noche)'
-              : `${nochesSeleccionadas} noche${nochesSeleccionadas !== 1 ? 's' : ''} seleccionada${nochesSeleccionadas !== 1 ? 's' : ''}`}
-          </span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.25 }}>
+              {!fechaInicio
+                ? 'Paso 1: Toca el día de llegada'
+                : !fechaFin
+                ? `Llegada: ${formatFechaLegible(fechaInicio)} · Toca el día de salida`
+                : `${nochesSeleccionadas} noche${nochesSeleccionadas !== 1 ? 's' : ''}: ${formatFechaLegible(fechaInicio)} → ${formatFechaLegible(fechaFin)}`}
+            </div>
+          </div>
         </div>
 
         {fechaInicio && (
@@ -181,9 +191,9 @@ export const CalendarPicker = React.memo<CalendarPickerProps>(({
             type="button"
             className="btn btn-sm"
             onClick={onClearRange}
-            style={{ padding: '0.2rem 0.55rem', fontSize: '0.72rem', height: '26px' }}
+            style={{ padding: '0.2rem 0.6rem', fontSize: '0.72rem', minHeight: '30px', height: '30px' }}
           >
-            Cambiar fechas
+            Cambiar
           </button>
         )}
       </div>
@@ -263,17 +273,6 @@ export const CalendarPicker = React.memo<CalendarPickerProps>(({
         <div style={{ marginTop: '0.6rem', color: 'var(--danger)', fontSize: 'var(--text-xs)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <AlertTriangle size={14} style={{ flexShrink: 0 }} />
           <span>{rangeWarning}</span>
-        </div>
-      )}
-
-      {fechaInicio && (
-        <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
-          <div>
-            <strong>Llegada:</strong> {fechaInicio} {fechaFin ? <>· <strong>Salida:</strong> {fechaFin} ({nochesSeleccionadas} noche{nochesSeleccionadas !== 1 ? 's' : ''})</> : '· (Toca tu fecha de salida)'}
-          </div>
-          <button className="btn btn-sm" onClick={onClearRange} style={{ padding: '0.2rem 0.6rem', height: '28px' }}>
-            Limpiar
-          </button>
         </div>
       )}
     </div>

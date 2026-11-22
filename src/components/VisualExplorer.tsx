@@ -17,7 +17,6 @@ import {
   Users,
   Calendar,
   Utensils,
-  Sparkles,
   ShieldCheck,
   TrendingUp,
   ArrowRight,

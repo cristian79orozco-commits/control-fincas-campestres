@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Calendar,
   Users,
   Clock,
   UtensilsCrossed,
   MessageCircle,
-  Home,
   ChevronRight,
-  Filter,
-  CheckCircle,
 } from 'lucide-react';
 import type { RadarLlegadaItem } from '../../hooks/useAdminOverviewController';
 import { abrirWhatsApp } from '../../services/whatsapp';
@@ -23,7 +19,7 @@ interface DashboardRadarLlegadasProps {
 export const DashboardRadarLlegadas: React.FC<DashboardRadarLlegadasProps> = ({
   radarLlegadas,
   onVerTodasReservas,
-  formatCOP,
+  formatCOP: _formatCOP,
 }) => {
   const [filtro, setFiltro] = useState<'todas' | 'urgentes' | 'con_menu'>('todas');
 

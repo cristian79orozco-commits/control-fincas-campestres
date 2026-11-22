@@ -3,10 +3,7 @@ import { motion } from 'framer-motion';
 import {
   DollarSign,
   AlertTriangle,
-  Clock,
   UtensilsCrossed,
-  Users,
-  CheckCircle,
   FileText,
   ClipboardList,
   RotateCcw,
@@ -53,7 +50,6 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = (pr
     fechaHoyLegible,
     sincronizando,
     metricas,
-    totalReservasActivas,
     serieFinanzas,
     rendimientoFincas,
     embudoCotizaciones,

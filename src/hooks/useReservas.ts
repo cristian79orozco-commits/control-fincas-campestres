@@ -1,5 +1,4 @@
 import { useApp } from '../context/AppContext';
-import type { Reserva, ReservaEstado, PagoTipo, CierreReserva } from '../types';
 
 export function useReservas() {
   const {

@@ -11,8 +11,6 @@ import { calcularSaldo, desglosarFinanzasReserva, desglosarFinanzasCotizacion } 
 import { resolverPlanesAlimentacionDetalle } from '../utils/calcularCotizacion';
 import {
   plantillaCotizacion,
-  plantillaPedirAbonoCotizacion,
-  plantillaCobroAlimentacion,
   plantillaSeparacion,
   plantillaComprobantePago,
   plantillaEstadoCuenta,
@@ -23,7 +21,6 @@ import {
   abrirWhatsApp,
   copiarAlPortapapeles,
   formatearTelefonoWhatsApp,
-  formatCOP,
   formatFecha,
   calcularNoches,
   renderizarPlantillaPersonalizada,
@@ -43,7 +40,7 @@ import {
   type TipoDocumentoPrefijo
 } from '../utils/consecutivos';
 import { getConfiguracionGlobal } from '../services/configuracion';
-import { useComunicacionesStore, type FaseMensaje, type TabComunicaciones } from '../store/useComunicacionesStore';
+import { useComunicacionesStore, type FaseMensaje } from '../store/useComunicacionesStore';
 
 export interface UseComunicacionesControllerParams {
   currentWaNumber: string;

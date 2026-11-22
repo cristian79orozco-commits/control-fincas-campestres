@@ -19,8 +19,8 @@ export const FILTROS_HISTORIAL_DEFECTO: FiltrosHistorial = {
 
 export function useHistorial(
   reservas: Reserva[],
-  fincas: Finca[],
-  clientes: Cliente[]
+  _fincas: Finca[],
+  _clientes: Cliente[]
 ) {
   const [filtros, setFiltros] = useState<FiltrosHistorial>(FILTROS_HISTORIAL_DEFECTO);
 

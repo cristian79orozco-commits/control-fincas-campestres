@@ -3,7 +3,7 @@ import {
   Save, Trash2, Plus, Upload, Link as LinkIcon, Loader, Image as ImageIcon,
   Eye, ChevronDown, ChevronUp, Search, Check, Sparkles, MapPin, Users,
   Bed, Bath, Clock, ShieldAlert, Volume2, Dog, Home,
-  CreditCard, Copy, Building, DollarSign, ArrowLeft, Smile, X
+  CreditCard, Copy, DollarSign, ArrowLeft, Smile, X
 } from 'lucide-react';
 import type { Finca, FincaEstado } from '../types';
 import { CurrencyInput } from '../components/CurrencyInput';
@@ -45,7 +45,6 @@ export const AdminFincaForm: React.FC<AdminFincaFormProps> = ({
   const {
     selectedFincaId,
     isNew,
-    fincaActual,
     fincasFiltradas,
     listaDesplegada,
     toggleListaDesplegada,

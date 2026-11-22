@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, MessageSquare, Check, X, FileText, Calendar } from 'lucide-react';
+import { Search, MessageSquare, X, FileText, Calendar } from 'lucide-react';
 import type { CotizacionDB, Reserva } from '../../types';
 import { formatearConsecutivoSimple } from '../../utils/consecutivos';
 import { formatCOP, formatFecha } from '../../services/whatsapp';

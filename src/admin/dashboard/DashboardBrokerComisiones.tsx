@@ -7,13 +7,9 @@ import {
   MessageCircle,
   CheckCircle,
   Clock,
-  UserCheck,
   ChevronDown,
   ChevronUp,
   Check,
-  Building2,
-  Calendar,
-  Sparkles,
 } from 'lucide-react';
 import type { BrokerAlertaComision, ResumenComisionesBroker } from '../../hooks/useAdminOverviewController';
 

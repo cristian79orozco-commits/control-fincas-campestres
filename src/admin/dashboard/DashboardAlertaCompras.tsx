@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { UtensilsCrossed, AlertCircle, Check, ShoppingBag, Clock } from 'lucide-react';
+import { Check, ShoppingBag, Clock } from 'lucide-react';
 import type { AlertaCompraAlimentacion } from '../../hooks/useAdminOverviewController';
 
 interface DashboardAlertaComprasProps {

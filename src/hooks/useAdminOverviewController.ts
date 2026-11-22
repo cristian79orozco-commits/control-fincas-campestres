@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { Finca, Cliente, CotizacionDB, Reserva, AdminSection, Menu as MenuType } from '../types';
 import { resolverMetadatosFinca, desglosarFinanzasReserva, obtenerNombreClienteHistorico } from '../types';
 import { useAdminDashboardStore, DashboardPeriodo, DashboardTab } from '../store/useAdminDashboardStore';
@@ -9,8 +9,6 @@ import {
   toggleMasterNotificaciones,
   obtenerEstadoPermisoNotificaciones,
   isSoundEnabled,
-  notificarComisionPendienteCobro,
-  notificarAlertaComprasAlimentacion,
 } from '../services/notificaciones';
 import {
   filtrarDatosPorPeriodoYFinca,
@@ -184,8 +182,8 @@ export function useAdminOverviewController({
   fincas = [],
   reservas = [],
   cotizaciones = [],
-  clientes = [],
-  menus = [],
+  clientes: _clientes = [],
+  menus: _menus = [],
   metricasReservas = { total: 0, activas: 0, llegasHoy: 0, salenHoy: 0 },
   navigateTo,
   onGuardarReserva,

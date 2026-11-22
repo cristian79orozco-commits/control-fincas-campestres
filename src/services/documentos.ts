@@ -23,7 +23,6 @@ import {
   calcularSaldo,
   desglosarFinanzasReserva,
   desglosarFinanzasCotizacion,
-  extraerInfoMascotas,
   resolverMetadatosFinca,
   obtenerNombreClienteHistorico,
   obtenerNombreFincaHistorico,
@@ -303,7 +302,7 @@ export function parseHexRgb(hex?: string | null, fallback: [number, number, numb
  */
 function dibujarBloqueFirmaAdmin(
   doc: jsPDF,
-  x: number,
+  _x: number,
   y: number,
   anchoLinea: number = 80,
   tituloEncabezado?: string,

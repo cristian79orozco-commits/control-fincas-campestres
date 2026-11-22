@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { Palette, Sparkles, Droplets, Stamp, Check, Sliders } from 'lucide-react';
+import { Palette, Sparkles, Stamp, Check } from 'lucide-react';
 import type { PlantillasPdfPersonalizadas, ConfiguracionGeneral } from '../../types';
 
 interface PdfStyleCustomizerProps {
@@ -25,9 +25,9 @@ const PALETAS_PREDEFINIDAS = [
 ];
 
 export const PdfStyleCustomizer: React.FC<PdfStyleCustomizerProps> = ({
-  formData,
+  formData: _formData,
   plantillas,
-  onChangeCampo,
+  onChangeCampo: _onChangeCampo,
   onChangePlantilla,
 }) => {
   const colorPrimario = plantillas.tema_color_primario || '#1a6b5e';

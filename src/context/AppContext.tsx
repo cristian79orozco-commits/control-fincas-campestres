@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase, DEFAULT_WA_NUMBER } from '../services/supabase';
+import { supabase } from '../services/supabase';
 import type {
   Finca, Cliente, CotizacionDB, Reserva, Pago, PagoTipo,
   ReservaEstado, CotizacionEstado, BloqueoDisponibilidad,
@@ -8,7 +8,7 @@ import type {
   EstadoAlimentacion, OpcionesReinicioDatos, ResultadoReinicioDatos
 } from '../types';
 import type { ToastMessage } from '../components/Toast';
-import { calcularSaldo, extraerInfoMascotas, adjuntarMetaMascotasEnTexto } from '../types';
+import { extraerInfoMascotas, adjuntarMetaMascotasEnTexto } from '../types';
 import { obtenerSiguienteConsecutivo } from '../utils/consecutivos';
 import { generarUUID, esUUID } from '../utils/uuid';
 import { CONFIGURACION_DEFAULT, setConfiguracionGlobal, resolverLogoUrl } from '../services/configuracion';
@@ -498,7 +498,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  const cargarCotizaciones = useCallback(async (silencioso: boolean = false) => {
+  const cargarCotizaciones = useCallback(async (_silencioso: boolean = false) => {
     if (!esAdminAutenticado()) {
       setCotizaciones([]);
       return;
@@ -583,7 +583,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const procesadas: Reserva[] = (data || []).map((r: any) => {
         const cierreRaw = r.cierres_reservas;
-        const cierre = Array.isArray(cierreRaw) ? (cierreRaw[0] || null) : (cierreRaw || null);
+        const cierreTabla = Array.isArray(cierreRaw) ? (cierreRaw[0] || null) : (cierreRaw || null);
+        const cierreSnap = r.cotizacion_snapshot?.cierre || null;
+        const cierre = cierreTabla || cierreSnap || null;
+        const fechaCierreResuelta = r.fecha_cierre || r.cotizacion_snapshot?.fecha_cierre || cierre?.fecha_cierre || null;
+        const cerradaPorResuelta = r.cerrada_por || r.cotizacion_snapshot?.cerrada_por || cierre?.responsable || null;
+        const notasCierreResueltas = r.notas_cierre || r.cotizacion_snapshot?.notas_cierre || cierre?.notas_cierre || null;
+        const estadoResuelto: ReservaEstado = r.estado || r.cotizacion_snapshot?.estado_cierre || (cierre?.estado_cierre as ReservaEstado) || 'activa';
         const costoAlim = Number(r.costo_alimentacion || r.cotizacion_snapshot?.costo_alimentacion || 0);
         const estadoAlimentacion = r.estado_alimentacion || r.cotizacion_snapshot?.estado_alimentacion || (costoAlim > 0 ? 'pendiente' : null);
         const fechaPagoAlim = r.fecha_pago_alimentacion || r.cotizacion_snapshot?.fecha_pago_alimentacion || null;
@@ -601,8 +607,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const infoM = extraerInfoMascotas(r);
         return {
           ...r,
+          estado: estadoResuelto,
           consecutivo: r.consecutivo || r.cotizacion_snapshot?.consecutivo || null,
           cierre,
+          fecha_cierre: fechaCierreResuelta,
+          cerrada_por: cerradaPorResuelta,
+          notas_cierre: notasCierreResueltas,
           costo_alimentacion: costoAlim,
           cantidad_mascotas: r.cantidad_mascotas ?? infoM.cantidadMascotas,
           costo_mascotas: r.costo_mascotas ?? infoM.costoMascotas,
@@ -1658,12 +1668,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ? new Date().toISOString()
         : null;
 
+      let snapActualizado: any = null;
       // Actualización optimista inmediata
-      setReservas(prev =>
-        prev.map(r => (r.id === id ? { ...r, estado, fecha_cierre: fechaCierre } : r))
-      );
+      setReservas(prev => {
+        const up = prev.map(r => {
+          if (r.id === id) {
+            snapActualizado = {
+              ...(r.cotizacion_snapshot || {}),
+              estado_cierre: estado,
+              fecha_cierre: fechaCierre,
+            };
+            return { ...r, estado, fecha_cierre: fechaCierre, cotizacion_snapshot: snapActualizado };
+          }
+          return r;
+        });
+        guardarCache('fc_cache_reservas', up);
+        return up;
+      });
 
-      const updateData: any = { estado };
+      const updateData: any = { estado, cotizacion_snapshot: snapActualizado };
       if (fechaCierre) updateData.fecha_cierre = fechaCierre;
       else {
         updateData.fecha_cierre = null;
@@ -1672,7 +1695,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       const { error } = await supabase.from('reservas').update(updateData).eq('id', id);
-      if (error) throw error;
+      if (error) {
+        const { error: errFallback } = await supabase
+          .from('reservas')
+          .update({ estado, ...(snapActualizado ? { cotizacion_snapshot: snapActualizado } : {}) })
+          .eq('id', id);
+        if (errFallback) {
+          await supabase.from('reservas').update({ estado }).eq('id', id);
+        }
+      }
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -1703,9 +1734,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       }
 
+      let snapConCierre: any = null;
       // Actualización optimista de reserva a Historial
-      setReservas(prev =>
-        prev.map(r => {
+      setReservas(prev => {
+        const up = prev.map(r => {
           if (r.id === reservaId) {
             const pagosActualizados = nuevoPago ? [...(r.pagos || []), nuevoPago] : (r.pagos || []);
             const cierreObj: CierreReserva = {
@@ -1721,6 +1753,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               notas_cierre: notas,
               observaciones_entrega: datosCierre.observaciones_entrega,
             };
+            snapConCierre = {
+              ...(r.cotizacion_snapshot || {}),
+              cierre: cierreObj,
+              estado_cierre: estadoFinal,
+              fecha_cierre: fechaCierreIso,
+              cerrada_por: responsable,
+              notas_cierre: notas,
+            };
             return {
               ...r,
               estado: estadoFinal,
@@ -1729,13 +1769,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               notas_cierre: notas,
               cierre: cierreObj,
               pagos: pagosActualizados,
+              cotizacion_snapshot: snapConCierre,
             };
           }
           return r;
-        })
-      );
+        });
+        guardarCache('fc_cache_reservas', up);
+        return up;
+      });
 
-      // Persistir en Supabase
+      // Persistir en Supabase con fallback resiliente si las columnas de cierre aún no están migradas
       if (nuevoPago) {
         await supabase.from('pagos').insert({
           reserva_id: reservaId,
@@ -1746,12 +1789,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       }
 
-      await supabase.from('reservas').update({
+      const { error: errUpd } = await supabase.from('reservas').update({
         estado: estadoFinal,
         fecha_cierre: fechaCierreIso,
         cerrada_por: responsable,
         notas_cierre: notas,
+        ...(snapConCierre ? { cotizacion_snapshot: snapConCierre } : {}),
       }).eq('id', reservaId);
+
+      if (errUpd) {
+        const { error: errFallback } = await supabase.from('reservas').update({
+          estado: estadoFinal,
+          ...(snapConCierre ? { cotizacion_snapshot: snapConCierre } : {}),
+        }).eq('id', reservaId);
+        if (errFallback) {
+          await supabase.from('reservas').update({ estado: estadoFinal }).eq('id', reservaId);
+        }
+      }
 
       try {
         await supabase.from('cierres_reservas').upsert({
@@ -1777,16 +1831,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const reabrirReserva = async (reservaId: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      setReservas(prev =>
-        prev.map(r => (r.id === reservaId ? { ...r, estado: 'activa', fecha_cierre: null, cierre: null } : r))
-      );
+      let snapLimpio: any = null;
+      setReservas(prev => {
+        const up = prev.map(r => {
+          if (r.id === reservaId) {
+            const snap = { ...(r.cotizacion_snapshot || {}) };
+            delete snap.cierre;
+            delete snap.estado_cierre;
+            delete snap.fecha_cierre;
+            delete snap.cerrada_por;
+            delete snap.notas_cierre;
+            snapLimpio = snap;
+            return { ...r, estado: 'activa' as const, fecha_cierre: null, cierre: null, cotizacion_snapshot: snap };
+          }
+          return r;
+        });
+        guardarCache('fc_cache_reservas', up);
+        return up;
+      });
 
-      await supabase.from('reservas').update({
+      const { error: errUpd } = await supabase.from('reservas').update({
         estado: 'activa',
         fecha_cierre: null,
         cerrada_por: null,
         notas_cierre: null,
+        ...(snapLimpio ? { cotizacion_snapshot: snapLimpio } : {}),
       }).eq('id', reservaId);
+
+      if (errUpd) {
+        const { error: errFallback } = await supabase.from('reservas').update({
+          estado: 'activa',
+          ...(snapLimpio ? { cotizacion_snapshot: snapLimpio } : {}),
+        }).eq('id', reservaId);
+        if (errFallback) {
+          await supabase.from('reservas').update({ estado: 'activa' }).eq('id', reservaId);
+        }
+      }
 
       try {
         await supabase.from('cierres_reservas').delete().eq('reserva_id', reservaId);

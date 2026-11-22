@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { Check, ChevronDown, ChevronUp, Utensils, Plus, Minus, Info, Sparkles, ZoomIn } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Utensils, Plus, Minus, Sparkles, ZoomIn } from 'lucide-react';
 import type { Menu } from '../types';
 import { obtenerFotoMenu, obtenerGaleriaFotosMenu } from '../utils/menuUtils';
 import { GalleryLightbox } from './GalleryLightbox';
@@ -131,12 +131,12 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
             background: 'var(--surface)',
             border: `1.5px solid ${totalPlanesElegidos > 0 ? 'var(--primary)' : 'var(--border)'}`,
             borderRadius: 'var(--rad-sm, 10px)',
-            padding: '0.9rem 1.1rem',
+            padding: '0.75rem 0.9rem',
             boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
             cursor: 'pointer',
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.75rem',
+            gap: '0.55rem',
             transition: 'border-color 0.18s ease, box-shadow 0.18s ease',
           }}
           role="button"
@@ -148,13 +148,13 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
             }
           }}
         >
-          {/* Título explicativo con Icono amigable */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.7rem' }}>
+          {/* Fila superior compacta: Icono + Título + Estado actual */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
               <div
                 style={{
-                  width: '38px',
-                  height: '38px',
+                  width: '34px',
+                  height: '34px',
                   borderRadius: '8px',
                   background: totalPlanesElegidos > 0
                     ? 'color-mix(in srgb, var(--primary) 15%, transparent)'
@@ -166,101 +166,21 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
                   color: 'var(--primary)',
                 }}
               >
-                <Utensils size={18} />
+                <Utensils size={16} />
               </div>
 
-              <div>
-                <div style={{ fontWeight: 800, fontSize: '0.94rem', color: 'var(--text-main)', lineHeight: 1.3 }}>
-                  ¿Deseas incluir servicio de alimentación en tu estadía?
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: '0.84rem', color: 'var(--text-main)', lineHeight: 1.25 }}>
+                  Alimentación en la finca (Opcional)
                 </div>
-                <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '0.15rem', lineHeight: 1.4 }}>
-                  Opcional: Menús caseros, desayunos típicos, almuerzos campestres o asados preparados en la finca.
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {soloAlojamiento || totalPlanesElegidos === 0
+                    ? '🏠 Actual: Solo alojamiento (cocinan en la finca)'
+                    : `🍽️ ${totalPlanesElegidos} menú${totalPlanesElegidos !== 1 ? 's' : ''} (${totalPlatosCalculados} platos) · +${formatCOP(costoTotalAlimentacion)}`}
                 </div>
               </div>
             </div>
 
-            <ChevronDown size={18} style={{ color: 'var(--text-muted)', flexShrink: 0, marginTop: '2px' }} />
-          </div>
-
-          {/* Advertencia si aplica regla operativa y no se cumple */}
-          {reglaAlimentacion?.aplica && !reglaAlimentacion.cumple && (
-            <div
-              style={{
-                background: 'rgba(245, 158, 11, 0.1)',
-                border: '1px solid rgba(245, 158, 11, 0.4)',
-                borderRadius: '6px',
-                padding: '0.45rem 0.65rem',
-                fontSize: '0.74rem',
-                color: '#b45309',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-              }}
-            >
-              <span>⚠️</span>
-              <span>
-                Grupos de hasta {reglaAlimentacion.maxPersonas} pers. requieren al menos {reglaAlimentacion.minServicios} servicios de alimentación. Haz clic abajo para agregarlos.
-              </span>
-            </div>
-          )}
-
-          {/* Barra inferior: Estado actual del plan + Botón de acción directo */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '0.75rem',
-              flexWrap: 'wrap',
-              paddingTop: '0.5rem',
-              borderTop: '1px solid var(--border-subtle)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                Selección actual:
-              </span>
-
-              {soloAlojamiento || totalPlanesElegidos === 0 ? (
-                <span
-                  style={{
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    background: 'var(--surface-sunken)',
-                    color: 'var(--text-main)',
-                    border: '1px solid var(--border)',
-                    padding: '0.2rem 0.6rem',
-                    borderRadius: '20px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                  }}
-                >
-                  <span>🏠 Solo alojamiento (cocinan en la finca)</span>
-                </span>
-              ) : (
-                <span
-                  style={{
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    background: 'color-mix(in srgb, var(--primary) 14%, transparent)',
-                    color: 'var(--primary)',
-                    border: '1px solid var(--primary)',
-                    padding: '0.2rem 0.6rem',
-                    borderRadius: '20px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                  }}
-                >
-                  <span>
-                    🍽️ {totalPlanesElegidos} menú{totalPlanesElegidos !== 1 ? 's' : ''} incluido{totalPlanesElegidos !== 1 ? 's' : ''} ({totalPlatosCalculados} platos) · +{formatCOP(costoTotalAlimentacion)}
-                  </span>
-                </span>
-              )}
-            </div>
-
-            {/* Botón visual para desplegar */}
             <button
               type="button"
               onClick={e => {
@@ -270,32 +190,45 @@ export const MenuSelectorCards: React.FC<MenuSelectorCardsProps> = ({
               style={{
                 background: totalPlanesElegidos > 0 ? 'var(--primary)' : 'color-mix(in srgb, var(--primary) 12%, var(--surface))',
                 color: totalPlanesElegidos > 0 ? '#fff' : 'var(--primary)',
-                border: totalPlanesElegidos > 0 ? 'none' : '1.5px solid var(--primary)',
+                border: totalPlanesElegidos > 0 ? 'none' : '1px solid var(--primary)',
                 borderRadius: '6px',
-                padding: '0.45rem 0.85rem',
-                fontSize: '0.78rem',
+                padding: '0.35rem 0.65rem',
+                fontSize: '0.73rem',
                 fontWeight: 700,
                 cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                flexShrink: 0,
+                minHeight: '34px',
+              }}
+            >
+              <span>{soloAlojamiento || totalPlanesElegidos === 0 ? '+ Menús' : 'Editar'}</span>
+              <ChevronDown size={13} />
+            </button>
+          </div>
+
+          {/* Advertencia si aplica regla operativa y no se cumple */}
+          {reglaAlimentacion?.aplica && !reglaAlimentacion.cumple && (
+            <div
+              style={{
+                background: 'rgba(245, 158, 11, 0.1)',
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                borderRadius: '6px',
+                padding: '0.4rem 0.6rem',
+                fontSize: '0.72rem',
+                color: '#b45309',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.4rem',
-                boxShadow: totalPlanesElegidos > 0 ? '0 2px 6px rgba(26, 107, 94, 0.25)' : 'none',
-                transition: 'all 0.15s ease',
               }}
             >
-              {soloAlojamiento || totalPlanesElegidos === 0 ? (
-                <>
-                  <span>+ Ver menús y agregar alimentación</span>
-                  <ChevronDown size={14} />
-                </>
-              ) : (
-                <>
-                  <span>Modificar menús y comensales</span>
-                  <ChevronDown size={14} />
-                </>
-              )}
-            </button>
-          </div>
+              <span>⚠️</span>
+              <span>
+                Grupos de hasta {reglaAlimentacion.maxPersonas} pers. requieren mín. {reglaAlimentacion.minServicios} servicios de alimentación. Toca para elegir.
+              </span>
+            </div>
+          )}
         </div>
       )}
 

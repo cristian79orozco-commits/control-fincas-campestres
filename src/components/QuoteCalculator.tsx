@@ -1,12 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  MessageCircle, Calculator, Calendar, Users, Utensils,
-  Check, User, Phone, Loader2, BadgeCheck, AlertCircle, Sparkles, ShieldCheck, Dog
+  MessageCircle, Calculator, Calendar, Users,
+  User, Phone, Loader2, BadgeCheck, AlertCircle, ShieldCheck, Dog
 } from 'lucide-react';
-import type { Finca, Cotizacion, Menu, ConfiguracionGeneral } from '../types';
+import type { Finca, Menu, ConfiguracionGeneral } from '../types';
 import type { DatosCotizacionPublica, ResultadoCotizacionPublica } from '../hooks/useCotizadorPublico';
 import { MenuSelectorCards, PlanAlimentacionSeleccionado } from './MenuSelectorCards';
-import { NumericStepper } from './NumericStepper';
 import { PLANTILLAS_PREDETERMINADAS, renderizarPlantillaPersonalizada } from '../services/whatsapp';
 
 interface QuoteCalculatorProps {
@@ -24,6 +23,8 @@ interface QuoteCalculatorProps {
   onPlanChange?: (val: string) => void;
   /** Prop de Etapa 2: conecta el guardado a Supabase vía useCotizadorPublico */
   onGuardarCotizacion?: (datos: DatosCotizacionPublica) => Promise<ResultadoCotizacionPublica>;
+  /** Permite volver al calendario interactivo en móvil en 1 toque */
+  onOpenCalendario?: () => void;
 }
 
 function formatCOP(v: number) {
@@ -42,6 +43,7 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
   onFechaFinChange,
   onPersonasChange,
   onGuardarCotizacion,
+  onOpenCalendario,
 }) => {
   // Selección múltiple de planes de alimentación complementaria
   const [planesSeleccionados, setPlanesSeleccionados] = useState<PlanAlimentacionSeleccionado[]>([]);
@@ -79,6 +81,7 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
   const [guardandoCot, setGuardandoCot] = useState(false);
   const [cotGuardada, setCotGuardada] = useState<{ consecutivo: string; id: string } | null>(null);
   const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
+  const [verPreviewWa, setVerPreviewWa] = useState(false);
 
   // Manejo de alternancia en planes de alimentación
   const handleToggleSoloAlojamiento = () => {
@@ -405,84 +408,112 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
   };
 
   return (
-    <div style={{ display: 'grid', gap: '1.25rem' }}>
-      {/* 1. Selección básica de fechas, personas y mascotas */}
-      <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', gap: '0.65rem' }}>
-        <div className="field">
-          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>
-            <Calendar size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> Llegada
-          </label>
-          <input
-            type="date"
-            value={fechaInicio}
-            min={new Date().toISOString().split('T')[0]}
-            onChange={e => onFechaInicioChange(e.target.value)}
-          />
-        </div>
-
-        <div className="field">
-          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>
-            <Calendar size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> Salida
-          </label>
-          <input
-            type="date"
-            value={fechaFin}
-            min={fechaInicio || new Date().toISOString().split('T')[0]}
-            onChange={e => onFechaFinChange(e.target.value)}
-          />
-        </div>
-
-        <div className="field">
-          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>
-            <Users size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> Huéspedes
-          </label>
-          <select
-            value={personas}
-            onChange={e => onPersonasChange(Number(e.target.value))}
-          >
-            {Array.from({ length: maxPersonas - minPersonas + 1 }).map((_, i) => {
-              const val = minPersonas + i;
-              return (
-                <option key={val} value={val}>
-                  {val} persona{val !== 1 ? 's' : ''}
-                </option>
-              );
-            })}
-          </select>
-          {minPersonas > 1 && (
-            <span className="text-xs text-muted" style={{ display: 'block', marginTop: '0.2rem', fontSize: '0.68rem' }}>
-              Mínimo {minPersonas} personas requerido
+    <div style={{ display: 'grid', gap: '0.9rem' }}>
+      {/* 1. Selección compacta de fechas, personas y mascotas (2 columnas paralelas incluso en móvil) */}
+      <div>
+        {onOpenCalendario && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)' }}>
+              1. Configura tu estadía
             </span>
-          )}
-        </div>
+            <button
+              type="button"
+              onClick={onOpenCalendario}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--primary)',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                padding: 0,
+              }}
+            >
+              <Calendar size={12} /> Ver calendario
+            </button>
+          </div>
+        )}
 
-        {permiteMascotas && (
+        <div className="quote-params-grid">
           <div className="field">
-            <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>
-              <Dog size={12} style={{ display: 'inline', verticalAlign: '-1px', color: 'var(--primary)' }} /> Mascotas
+            <label style={{ fontSize: '0.72rem', fontWeight: 600 }}>
+              <Calendar size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> Llegada
+            </label>
+            <input
+              type="date"
+              value={fechaInicio}
+              min={new Date().toISOString().split('T')[0]}
+              onChange={e => onFechaInicioChange(e.target.value)}
+            />
+          </div>
+
+          <div className="field">
+            <label style={{ fontSize: '0.72rem', fontWeight: 600 }}>
+              <Calendar size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> Salida
+            </label>
+            <input
+              type="date"
+              value={fechaFin}
+              min={fechaInicio || new Date().toISOString().split('T')[0]}
+              onChange={e => onFechaFinChange(e.target.value)}
+            />
+          </div>
+
+          <div className="field">
+            <label style={{ fontSize: '0.72rem', fontWeight: 600 }}>
+              <Users size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> Huéspedes
             </label>
             <select
-              value={cantidadMascotas}
-              onChange={e => setCantidadMascotas(Number(e.target.value))}
+              value={personas}
+              onChange={e => onPersonasChange(Number(e.target.value))}
             >
-              <option value={0}>Sin mascotas</option>
-              {Array.from({ length: 10 }).map((_, i) => {
-                const val = i + 1;
+              {Array.from({ length: maxPersonas - minPersonas + 1 }).map((_, i) => {
+                const val = minPersonas + i;
                 return (
                   <option key={val} value={val}>
-                    {val} mascota{val !== 1 ? 's' : ''}
-                    {valorMascotaUnitario > 0 ? ` (+$${(val * valorMascotaUnitario).toLocaleString('es-CO')})` : ''}
+                    {val} persona{val !== 1 ? 's' : ''}
                   </option>
                 );
               })}
             </select>
-            <span className="text-xs text-muted" style={{ display: 'block', marginTop: '0.2rem', fontSize: '0.68rem' }}>
-              {valorMascotaUnitario > 0
-                ? `$${valorMascotaUnitario.toLocaleString('es-CO')} c/u`
-                : 'Bienvenidas sin costo'}
-            </span>
+            {minPersonas > 1 && (
+              <span className="text-xs text-muted" style={{ display: 'block', marginTop: '0.15rem', fontSize: '0.66rem' }}>
+                Mín. {minPersonas} pers.
+              </span>
+            )}
           </div>
-        )}
+
+          {permiteMascotas && (
+            <div className="field">
+              <label style={{ fontSize: '0.72rem', fontWeight: 600 }}>
+                <Dog size={11} style={{ display: 'inline', verticalAlign: '-1px', color: 'var(--primary)' }} /> Mascotas
+              </label>
+              <select
+                value={cantidadMascotas}
+                onChange={e => setCantidadMascotas(Number(e.target.value))}
+              >
+                <option value={0}>Sin mascotas</option>
+                {Array.from({ length: 10 }).map((_, i) => {
+                  const val = i + 1;
+                  return (
+                    <option key={val} value={val}>
+                      {val} mascota{val !== 1 ? 's' : ''}
+                      {valorMascotaUnitario > 0 ? ` (+$${(val * valorMascotaUnitario).toLocaleString('es-CO')})` : ''}
+                    </option>
+                  );
+                })}
+              </select>
+              <span className="text-xs text-muted" style={{ display: 'block', marginTop: '0.15rem', fontSize: '0.66rem' }}>
+                {valorMascotaUnitario > 0
+                  ? `$${valorMascotaUnitario.toLocaleString('es-CO')} c/u`
+                  : 'Sin costo'}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 2. Selector múltiple de planes de alimentación complementaria */}
@@ -506,36 +537,36 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
         }}
       />
 
-      {/* 3. Resumen y Desglose de Valores Transparente */}
-      <div className="quote-card" style={{ padding: '1rem', borderRadius: 'var(--rad-sm, 10px)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--primary)' }}>
-            <Calculator size={16} /> Resumen de valores de estadía
+      {/* 3. Resumen y Desglose de Valores Compacto y Transparente */}
+      <div className="quote-card" style={{ padding: '0.85rem 0.95rem', borderRadius: 'var(--rad-sm, 10px)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.4rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700, fontSize: '0.84rem', color: 'var(--primary)' }}>
+            <Calculator size={15} /> Resumen de tu estadía
           </div>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-            <ShieldCheck size={12} style={{ color: 'var(--success)' }} /> Tarifa directa garantizada
+          <span style={{ fontSize: '0.68rem', color: 'var(--success)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}>
+            <ShieldCheck size={12} /> Tarifa directa
           </span>
         </div>
 
-        <div className="quote-row">
+        <div className="quote-row" style={{ fontSize: '0.78rem' }}>
           <span className="text-muted">Estadía:</span>
-          <span>
-            {noches} noche{noches !== 1 ? 's' : ''} × {personas} personas ({noches * personas} estancias)
+          <span style={{ fontWeight: 600 }}>
+            {noches} noche{noches !== 1 ? 's' : ''} × {personas} pers. ({noches * personas} estancias)
           </span>
         </div>
 
-        <div className="quote-row">
+        <div className="quote-row" style={{ fontSize: '0.78rem' }}>
           <span className="text-muted">
-            Alojamiento ({formatCOP(Number(finca.precio_pp) || 0)} /pp noche):
+            Alojamiento (${(Number(finca.precio_pp) || 0).toLocaleString('es-CO')} /pp):
           </span>
-          <span style={{ fontWeight: 600 }}>{formatCOP(subtotalAlojamiento)}</span>
+          <span style={{ fontWeight: 700 }}>{formatCOP(subtotalAlojamiento)}</span>
         </div>
 
         {permiteMascotas && cantidadMascotas > 0 && (
-          <div className="quote-row">
+          <div className="quote-row" style={{ fontSize: '0.78rem' }}>
             <span className="text-muted" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Dog size={13} style={{ color: 'var(--primary)' }} />
-              Mascotas ({cantidadMascotas}{valorMascotaUnitario > 0 ? ` × $${valorMascotaUnitario.toLocaleString('es-CO')}` : ''}):
+              <Dog size={12} style={{ color: 'var(--primary)' }} />
+              Mascotas ({cantidadMascotas}):
             </span>
             <span style={{ fontWeight: 600, color: costoMascotas > 0 ? 'var(--text-main)' : 'var(--success)' }}>
               {costoMascotas > 0 ? formatCOP(costoMascotas) : 'Sin costo'}
@@ -544,8 +575,8 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
         )}
 
         {costoMascotas > 0 && (
-          <div className="quote-row" style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--primary)' }}>
-            <span>Subtotal Finca (Alojamiento + Mascotas):</span>
+          <div className="quote-row" style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--primary)' }}>
+            <span>Subtotal Finca:</span>
             <span>{formatCOP(subtotalPropietario)}</span>
           </div>
         )}
@@ -554,40 +585,40 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
         {!soloAlojamiento && planesSeleccionados.map(p => {
           const persPlan = p.personasAlimentacion ?? personas;
           return (
-            <div key={p.menuId} className="quote-row" style={{ fontSize: '0.8rem' }}>
-              <span className="text-muted" style={{ paddingLeft: '0.5rem' }}>
-                • {p.nombre} ({p.cantidadServicios} serv. × {persPlan} pers.):
+            <div key={p.menuId} className="quote-row" style={{ fontSize: '0.76rem' }}>
+              <span className="text-muted">
+                • {p.nombre} ({p.cantidadServicios}×{persPlan}p):
               </span>
-              <span>+ {formatCOP(p.precioPp * p.cantidadServicios * persPlan)}</span>
+              <span style={{ fontWeight: 600 }}>+ {formatCOP(p.precioPp * p.cantidadServicios * persPlan)}</span>
             </div>
           );
         })}
 
         {costoTotalAlimentacion > 0 && planesSeleccionados.length > 1 && (
-          <div className="quote-row" style={{ fontWeight: 600, color: 'var(--primary)' }}>
+          <div className="quote-row" style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--primary)' }}>
             <span>Subtotal alimentación:</span>
             <span>+ {formatCOP(costoTotalAlimentacion)}</span>
           </div>
         )}
 
-        <div className="quote-row quote-total" style={{ marginTop: '0.5rem', paddingTop: '0.65rem', borderTop: '2px dashed var(--border)' }}>
-          <div style={{ display: 'grid' }}>
-            <span style={{ fontWeight: 800, fontSize: '1rem' }}>Total Estimado:</span>
-            <span style={{ fontSize: '0.7rem', fontWeight: 400, color: 'var(--text-muted)' }}>
-              Sin cobros sorpresa ni comisiones de plataformas
-            </span>
+        <div className="quote-row quote-total" style={{ marginTop: '0.4rem', paddingTop: '0.5rem', borderTop: '1.5px dashed var(--border)', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-main)' }}>Total Estimado:</div>
+            <div style={{ fontSize: '0.66rem', fontWeight: 400, color: 'var(--text-muted)' }}>
+              Sin comisiones de plataformas
+            </div>
           </div>
-          <span style={{ fontWeight: 900, fontSize: '1.25rem', color: 'var(--primary)' }}>
+          <span style={{ fontWeight: 900, fontSize: '1.15rem', color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>
             {formatCOP(totalEstimado)}
           </span>
         </div>
 
         {depositoGarantia > 0 && (
-          <div className="quote-row" style={{ fontSize: '0.76rem', marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+          <div className="quote-row" style={{ fontSize: '0.73rem', marginTop: '0.3rem', paddingTop: '0.3rem', borderTop: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <ShieldCheck size={13} style={{ color: 'var(--primary)' }} /> Depósito reembolsable (Garantía):
+              <ShieldCheck size={12} style={{ color: 'var(--primary)' }} /> Depósito reembolsable:
             </span>
-            <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+            <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>
               {formatCOP(depositoGarantia)}
             </span>
           </div>
@@ -596,27 +627,28 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
 
       {/* 4. Datos obligatorios del cliente */}
       <div
+        id="bloque-confirmar-reserva"
         style={{
           background: 'var(--surface-sunken)',
           borderRadius: 'var(--rad-xs, 8px)',
-          padding: '1rem',
+          padding: '0.85rem 0.95rem',
           display: 'grid',
-          gap: '0.75rem',
+          gap: '0.65rem',
           border: '1px solid var(--border-subtle)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <User size={15} style={{ color: 'var(--primary)' }} /> Tus datos de reserva
+          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <User size={14} style={{ color: 'var(--primary)' }} /> Tus datos de reserva
           </div>
-          <span style={{ fontSize: '0.68rem', color: 'var(--danger)', fontWeight: 600 }}>
-            * Campos obligatorios
+          <span style={{ fontSize: '0.66rem', color: 'var(--danger)', fontWeight: 600 }}>
+            * Obligatorios
           </span>
         </div>
 
-        <div className="form-grid two-cols" style={{ gap: '0.75rem' }}>
+        <div className="form-grid two-cols" style={{ gap: '0.6rem' }}>
           <div className="field" style={{ margin: 0 }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+            <label style={{ fontSize: '0.72rem', fontWeight: 600 }}>
               <User size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> Nombre completo <span style={{ color: 'var(--danger)' }}>*</span>
             </label>
             <input
@@ -631,8 +663,8 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
           </div>
 
           <div className="field" style={{ margin: 0 }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>
-              <Phone size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> Celular <span style={{ color: 'var(--danger)' }}>*</span>
+            <label style={{ fontSize: '0.72rem', fontWeight: 600 }}>
+              <Phone size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> Celular / WhatsApp <span style={{ color: 'var(--danger)' }}>*</span>
             </label>
             <input
               id="cotizador-celular"
@@ -647,21 +679,21 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
         </div>
 
         {/* Checkbox: ¿Mismo número WhatsApp? */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', userSelect: 'none' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none' }}>
           <input
             id="cotizador-mismo-wa"
             type="checkbox"
             checked={mismoWa}
             onChange={e => setMismoWa(e.target.checked)}
-            style={{ width: '15px', height: '15px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+            style={{ width: '16px', height: '16px', minHeight: '16px', accentColor: 'var(--primary)', cursor: 'pointer', flexShrink: 0 }}
           />
-          <span style={{ color: 'var(--text-muted)' }}>El celular anterior también es mi WhatsApp</span>
+          <span style={{ color: 'var(--text-muted)' }}>Este número también es mi WhatsApp</span>
         </label>
 
         {/* Campo WhatsApp alternativo */}
         {!mismoWa && (
           <div className="field" style={{ margin: 0 }}>
-            <label style={{ fontSize: '0.75rem' }}>
+            <label style={{ fontSize: '0.72rem' }}>
               <MessageCircle size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /> WhatsApp alternativo
             </label>
             <input
@@ -679,11 +711,11 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
       {errorGuardado && (
         <div
           style={{
-            padding: '0.65rem 0.9rem',
+            padding: '0.65rem 0.85rem',
             borderRadius: 'var(--rad-xs, 6px)',
             background: 'rgba(239,68,68,0.08)',
             border: '1px solid rgba(239,68,68,0.3)',
-            fontSize: '0.8rem',
+            fontSize: '0.78rem',
             color: '#ef4444',
             display: 'flex',
             alignItems: 'center',
@@ -699,7 +731,7 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
       {cotGuardada && (
         <div
           style={{
-            padding: '0.85rem 1rem',
+            padding: '0.8rem 0.95rem',
             borderRadius: 'var(--rad-xs, 6px)',
             background: 'rgba(34,197,94,0.08)',
             border: '1px solid rgba(34,197,94,0.35)',
@@ -708,39 +740,24 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
             gap: '0.6rem',
           }}
         >
-          <BadgeCheck size={24} style={{ color: '#22c55e', flexShrink: 0 }} />
+          <BadgeCheck size={22} style={{ color: '#22c55e', flexShrink: 0 }} />
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#16a34a' }}>
+            <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#16a34a' }}>
               ✓ Solicitud de cotización registrada con éxito
             </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
-              Código oficial asignado: <strong style={{ fontFamily: 'monospace', color: 'var(--text-main)' }}>{cotGuardada.consecutivo}</strong>.
-              Toca el botón a continuación para abrir WhatsApp y confirmar tu separación.
+            <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+              Código asignado: <strong style={{ fontFamily: 'monospace', color: 'var(--text-main)' }}>#{cotGuardada.consecutivo}</strong>.
+              Toca el botón verde para abrir WhatsApp.
             </div>
           </div>
         </div>
       )}
 
-      {/* Vista previa del mensaje de WhatsApp editable */}
-      <div>
-        <div className="wa-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <MessageCircle size={14} style={{ color: '#25d366' }} /> Previsualización del mensaje para el Administrador:
-          </span>
-          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-            Plantilla oficial sincronizada
-          </span>
-        </div>
-        <div className="wa-bubble" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-          {waMensaje}
-        </div>
-      </div>
-
       {/* Recordatorio de requisito pendiente de alimentación */}
       {reglaAplica && !cumpleRegla && (
         <div
           style={{
-            fontSize: '0.78rem',
+            fontSize: '0.76rem',
             color: '#b45309',
             display: 'flex',
             alignItems: 'center',
@@ -758,13 +775,13 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
         </div>
       )}
 
-      {/* Botón principal de acción */}
+      {/* Botón principal único de acción (Inmediatamente debajo de los datos del cliente) */}
       {!cotGuardada ? (
         <button
           id="cotizador-btn-generar"
           type="button"
           className="btn wa-btn"
-          style={{ width: '100%', marginTop: '0.2rem', opacity: guardandoCot ? 0.75 : 1, padding: '0.85rem' }}
+          style={{ width: '100%', opacity: guardandoCot ? 0.75 : 1, padding: '0.85rem', fontWeight: 700 }}
           disabled={guardandoCot}
           onClick={handleGenerarCotizacion}
         >
@@ -776,7 +793,7 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
           ) : (
             <>
               <MessageCircle size={18} />
-              Solicitar cotización por WhatsApp
+              Confirmar y Solicitar por WhatsApp
             </>
           )}
         </button>
@@ -786,13 +803,47 @@ export const QuoteCalculator = React.memo<QuoteCalculatorProps>(({
           target="_blank"
           rel="noopener noreferrer"
           className="btn wa-btn"
-          style={{ width: '100%', marginTop: '0.2rem', padding: '0.85rem' }}
+          style={{ width: '100%', padding: '0.85rem', fontWeight: 700 }}
         >
           <span className="wa-pulse" />
           <MessageCircle size={18} />
-          Abrir WhatsApp con código {cotGuardada.consecutivo}
+          Abrir WhatsApp con código #{cotGuardada.consecutivo}
         </a>
       )}
+
+      {/* Vista previa colapsable del mensaje de WhatsApp (Discreta para no alargar el scroll móvil) */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setVerPreviewWa(v => !v)}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '0.2rem 0',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '0.73rem',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+          }}
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
+            <MessageCircle size={13} style={{ color: '#25d366' }} />
+            {verPreviewWa ? 'Ocultar vista previa del mensaje de WhatsApp' : 'Ver vista previa del mensaje que se enviará'}
+          </span>
+          <span style={{ fontWeight: 700, color: 'var(--primary)' }}>
+            {verPreviewWa ? '▲' : '▼'}
+          </span>
+        </button>
+
+        {verPreviewWa && (
+          <div className="wa-bubble" style={{ maxHeight: '160px', overflowY: 'auto', marginTop: '0.35rem', fontSize: '0.76rem' }}>
+            {waMensaje}
+          </div>
+        )}
+      </div>
     </div>
   );
 });

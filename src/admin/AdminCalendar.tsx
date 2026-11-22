@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   ChevronLeft, ChevronRight, CheckCircle, XCircle, User, Lock, Calendar,
-  CreditCard, FileText, MessageCircle, FileCheck, Check,
+  CreditCard, MessageCircle, FileCheck, Check,
   ChevronDown, ChevronUp, AlertTriangle, UtensilsCrossed, Sparkles, Building2,
   Clock, X, Save, Search, Percent, CheckSquare
 } from 'lucide-react';
@@ -16,23 +16,11 @@ import { CurrencyInput } from '../components/CurrencyInput';
 import { WhatsAppModal } from '../components/WhatsAppModal';
 import { AdminCierreModal } from './AdminCierreModal';
 import { AdminExpedienteModal } from './AdminExpedienteModal';
-import { AdminDocumentos } from './AdminDocumentos';
-import {
-  plantillaRecordatorioPago,
-  plantillaBienvenida,
-  plantillaSeparacion,
-  plantillaPazYSalvo,
-  plantillaEstadoCuenta,
-  abrirWhatsApp,
-  generarUrlWhatsApp,
-} from '../services/whatsapp';
-import { generarDocSeparacion, generarPazYSalvo, generarEstadoCuenta } from '../services/documentos';
 import {
   useCalendarController,
   MESES,
   DIAS_SEMANA,
   TIPOS_PAGO,
-  PAGO_VACIO,
   formatCOP,
   formatFecha,
 } from './useCalendarController';
@@ -124,7 +112,6 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
     setPagoForm,
     guardandoPago,
     handleRegistrarPago,
-    handleEliminarPagoClick,
 
     // Modales
     reservaParaCierre,
@@ -137,7 +124,6 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
     // Callbacks y dependencias
     onCerrarReserva,
     onReabrirReserva,
-    onEliminarPago,
     onRegistrarComunicacion,
     showToast,
     userEmail,

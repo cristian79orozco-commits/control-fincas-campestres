@@ -5,15 +5,7 @@ import {
   X,
   Check,
   Minus,
-  Users,
-  Bed,
-  Bath,
-  Clock,
-  Dog,
-  Volume2,
   ArrowRight,
-  Sparkles,
-  Info
 } from 'lucide-react';
 import type { Finca } from '../types';
 import { useClientStore } from '../store/useClientStore';
@@ -40,8 +32,6 @@ export const FincaComparator: React.FC<FincaComparatorProps> = ({
     fincasComparar,
     toggleCompararFinca,
     limpiarComparador,
-    comparadorModalOpen,
-    setComparadorModalOpen,
   } = useClientStore();
 
   const fincasSeleccionadas = fincas.filter((f) => fincasComparar.includes(f.id));

@@ -7,7 +7,6 @@ import {
   Check,
   Calendar,
   Phone,
-  ExternalLink,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import _ from 'lodash';

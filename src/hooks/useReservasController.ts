@@ -3,22 +3,14 @@ import type {
   Reserva, ReservaEstado, Cliente, Finca, Pago, PagoTipo,
   CotizacionDB, CierreReserva, ConfiguracionGeneral
 } from '../types';
-import { calcularSaldo, desglosarFinanzasReserva, extraerInfoMascotas } from '../types';
+import { calcularSaldo, desglosarFinanzasReserva } from '../types';
 import { resolverPlanesAlimentacionDetalle } from '../utils/calcularCotizacion';
 import { useApp } from '../context/AppContext';
 import { getConfiguracionGlobal } from '../services/configuracion';
 import {
   plantillaCobroAlimentacion,
-  plantillaRecordatorioPago,
-  plantillaBienvenida,
-  plantillaSeparacion,
-  plantillaPazYSalvo,
-  plantillaEstadoCuenta,
 } from '../services/whatsapp';
 import {
-  generarDocSeparacion,
-  generarPazYSalvo,
-  generarEstadoCuenta,
   generarPropuestaAlimentacion,
 } from '../services/documentos';
 
