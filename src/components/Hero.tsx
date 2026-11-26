@@ -91,32 +91,41 @@ export const Hero: React.FC<HeroProps> = ({
         )}
 
         <div className="hero-content" style={{ position: 'relative', zIndex: 2 }}>
-          {/* Eyebrow con micro-animación */}
-          <motion.div
-            initial={{ scale: 0.95 }}
-            animate={{ scale: 1 }}
-            transition={{ repeat: Infinity, repeatType: 'reverse', duration: 2.5 }}
-            style={{ display: 'inline-flex' }}
-          >
-            <span
-              className="hero-eyebrow"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.35rem 0.85rem',
-                borderRadius: '999px',
-                background: 'var(--primary-bg)',
-                color: 'var(--primary)',
-                fontWeight: 800,
-                fontSize: '0.8rem',
-                letterSpacing: '0.02em',
-                boxShadow: '0 2px 8px rgba(26, 107, 94, 0.15)',
-              }}
+          {/* Fila superior: Eyebrow + Ubicación compacta en móvil */}
+          <div className="hero-badges-row">
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              transition={{ repeat: Infinity, repeatType: 'reverse', duration: 2.5 }}
+              style={{ display: 'inline-flex' }}
             >
-              <Sparkles size={14} /> {eyebrow}
-            </span>
-          </motion.div>
+              <span
+                className="hero-eyebrow"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  padding: '0.35rem 0.85rem',
+                  borderRadius: '999px',
+                  background: 'var(--primary-bg)',
+                  color: 'var(--primary)',
+                  fontWeight: 800,
+                  fontSize: '0.78rem',
+                  letterSpacing: '0.02em',
+                  boxShadow: '0 2px 8px rgba(26, 107, 94, 0.15)',
+                }}
+              >
+                <Sparkles size={14} /> {eyebrow}
+              </span>
+            </motion.div>
+
+            {badgeUbicacion && (
+              <span className="hero-location-inline">
+                <MapPinned size={12} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                <span>{badgeUbicacion}</span>
+              </span>
+            )}
+          </div>
 
           {/* Título Principal */}
           <h1
@@ -147,66 +156,37 @@ export const Hero: React.FC<HeroProps> = ({
             {subtitulo}
           </p>
 
-          {/* Botones de Acción Rápida (CTAs de Alto Impacto) */}
-          <div
-            className="hero-ctas"
-            style={{
-              display: 'flex',
-              gap: '0.65rem',
-              flexWrap: 'wrap',
-              marginTop: '1.5rem',
-              alignItems: 'center',
-            }}
-          >
+          {/* Botones de Acción Rápida (CTAs uniformes y estructurados) */}
+          <div className="hero-ctas hero-ctas--uniform">
             <button
-              className="btn btn-primary min-h-[44px] active:scale-[0.98]"
+              className="btn btn-primary hero-cta-btn min-h-[46px] active:scale-[0.98]"
               onClick={onExploreClick}
               style={{
-                padding: '0.75rem 1.4rem',
-                fontSize: '0.9rem',
                 fontWeight: 800,
                 borderRadius: 'var(--rad-sm, 12px)',
-                boxShadow: '0 4px 14px rgba(26, 107, 94, 0.35)',
+                boxShadow: '0 4px 14px rgba(26, 107, 94, 0.3)',
               }}
             >
-              <Search size={17} /> {ctaTexto}
+              <Search size={16} /> <span>{ctaTexto}</span>
             </button>
 
             {onVisualClick && (
               <button
                 type="button"
-                className="btn btn-outline min-h-[44px] active:scale-[0.98]"
+                className="btn btn-outline hero-cta-btn hero-cta-btn--secondary min-h-[46px] active:scale-[0.98]"
                 onClick={onVisualClick}
-                style={{
-                  padding: '0.75rem 1.25rem',
-                  fontSize: '0.88rem',
-                  fontWeight: 700,
-                  borderRadius: 'var(--rad-sm, 12px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  borderColor: 'var(--primary)',
-                  color: 'var(--primary)',
-                  background: 'color-mix(in srgb, var(--surface) 78%, transparent)',
-                }}
               >
-                <TrendingUp size={16} /> Ver Análisis & Presupuesto
+                <TrendingUp size={16} /> <span>Análisis & Presupuesto</span>
               </button>
             )}
 
             {ctaSecTexto && onMenusClick && (
               <button
-                className="btn btn-outline min-h-[44px] active:scale-[0.98]"
+                type="button"
+                className="btn btn-outline hero-cta-btn hero-cta-btn--secondary min-h-[46px] active:scale-[0.98]"
                 onClick={onMenusClick}
-                style={{
-                  padding: '0.75rem 1.15rem',
-                  fontSize: '0.88rem',
-                  fontWeight: 600,
-                  borderRadius: 'var(--rad-sm, 12px)',
-                  background: 'color-mix(in srgb, var(--surface) 78%, transparent)',
-                }}
               >
-                <UtensilsCrossed size={16} /> {ctaSecTexto}
+                <UtensilsCrossed size={16} /> <span>{ctaSecTexto}</span>
               </button>
             )}
           </div>
