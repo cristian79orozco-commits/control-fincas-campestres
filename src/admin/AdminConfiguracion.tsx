@@ -24,8 +24,11 @@ import { PdfStudioViewer } from './configuracion/PdfStudioViewer';
 import { PdfSignatureMapper } from './configuracion/PdfSignatureMapper';
 import { PdfStyleCustomizer } from './configuracion/PdfStyleCustomizer';
 import { ReinicioDatosSection } from './configuracion/ReinicioDatosSection';
+import { HeroImageConfigCard } from './configuracion/HeroImageConfigCard';
 import { usePdfConfigController, type DocumentoSubTab } from '../hooks/usePdfConfigController';
+import { useHeroImagenController } from '../hooks/useHeroImagenController';
 import { resolverLogoUrl, LOGO_OFICIAL_PATH } from '../services/configuracion';
+import type { ContenidoSitio } from '../types';
 
 interface AdminConfiguracionProps {
   config: ConfiguracionGeneral;
@@ -33,6 +36,8 @@ interface AdminConfiguracionProps {
   onGuardar: (datos: Partial<ConfiguracionGeneral>) => Promise<{ success: boolean; error?: string }>;
   onRestablecer: () => Promise<{ success: boolean; error?: string }>;
   onSaveWaNumber?: (num: string) => void;
+  heroImagenUrl?: string | null;
+  onGuardarContenido?: (datos: Partial<ContenidoSitio>) => Promise<{ success: boolean; error?: string }>;
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   openConfirm: (title: string, message: string, onConfirm: () => void) => void;
 }
@@ -45,9 +50,16 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
   onGuardar,
   onRestablecer,
   onSaveWaNumber,
+  heroImagenUrl,
+  onGuardarContenido,
   showToast,
   openConfirm,
 }) => {
+  const heroImgCtrl = useHeroImagenController({
+    imagenActual: heroImagenUrl,
+    onGuardarContenido,
+    showToast,
+  });
   // Navegación principal en 3 pilares
   const [activeTab, setActiveTab] = useState<MainTab>('empresa');
 
@@ -900,6 +912,19 @@ export const AdminConfiguracion: React.FC<AdminConfiguracionProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Tarjeta: Imagen Protagonista del Panel Cliente (Hero) */}
+            <HeroImageConfigCard
+              imagenUrl={heroImgCtrl.imagenUrl}
+              urlInput={heroImgCtrl.urlInput}
+              onUrlInputChange={heroImgCtrl.setUrlInput}
+              subiendo={heroImgCtrl.subiendo}
+              guardandoUrl={heroImgCtrl.guardandoUrl}
+              infoOptimizacion={heroImgCtrl.infoOptimizacion}
+              onSubirImagen={heroImgCtrl.handleSubirImagen}
+              onGuardarUrlManual={heroImgCtrl.handleGuardarUrlManual}
+              onEliminarImagen={heroImgCtrl.handleEliminarImagen}
+            />
           </motion.div>
         )}
 

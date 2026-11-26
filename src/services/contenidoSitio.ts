@@ -176,6 +176,7 @@ export const CAMPOS_EXTENDIDOS_PERSONALIZACION = [
   'catalogo_mostrar_badges',
   'catalogo_mostrar_precio_total',
   'personalizacion_visual',
+  'hero_imagen_url',
 ] as const;
 
 export function extraerCamposExtendidos(datos: Partial<ContenidoSitio>): Record<string, any> {

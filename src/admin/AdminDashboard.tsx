@@ -823,6 +823,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   onGuardar={onGuardarConfiguracion || (async () => ({ success: false, error: 'No configurado' }))}
                   onRestablecer={onRestablecerConfiguracion || (async () => ({ success: false, error: 'No configurado' }))}
                   onSaveWaNumber={onSaveWaNumber}
+                  heroImagenUrl={contenidoSitio?.hero_imagen_url || ''}
+                  onGuardarContenido={onGuardarContenido}
                   showToast={showToast}
                   openConfirm={openConfirm}
                 />

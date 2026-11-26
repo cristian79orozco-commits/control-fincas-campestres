@@ -41,30 +41,56 @@ export const Hero: React.FC<HeroProps> = ({
   const paso2 = contenido?.hero_paso_2 || 'Consulta el calendario';
   const paso3 = contenido?.hero_paso_3 || 'Cotiza por WhatsApp';
   const badgeUbicacion = contenido?.hero_badge_ubicacion || 'Santa Elena, Valle del Cauca';
+  const heroImagenUrl = (contenido?.hero_imagen_url || '').trim();
+  const tieneImagen = Boolean(heroImagenUrl);
 
   return (
     <motion.section
       initial={{ opacity: 0, y: -15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: 'easeOut' }}
-      className="hero"
+      className="hero w-full max-w-full overflow-x-hidden"
       style={{
         position: 'relative',
         overflow: 'hidden',
       }}
     >
       <div
-        className="hero-card"
+        className={`hero-card${tieneImagen ? ' hero-card--with-image' : ''}${
+          tieneImagen && !mostrarMetricas ? ' hero-card--editorial' : ''
+        }`}
         style={{
-          background: 'color-mix(in srgb, var(--surface) 92%, var(--primary-bg))',
+          position: 'relative',
+          background: tieneImagen
+            ? 'var(--surface)'
+            : 'color-mix(in srgb, var(--surface) 92%, var(--primary-bg))',
           border: '1.5px solid var(--border)',
           borderRadius: 'var(--rad-lg, 24px)',
           boxShadow: 'var(--sh-lg)',
           backdropFilter: 'blur(10px)',
-          padding: '2rem',
         }}
       >
-        <div style={{ zIndex: 2 }}>
+        {/* Imagen protagonista a la derecha (PC) / arriba (Móvil) con degradado de fusión */}
+        {tieneImagen && (
+          <div className="hero-media-wrap" aria-hidden="true">
+            <img
+              src={heroImagenUrl}
+              alt=""
+              loading="eager"
+              decoding="async"
+              className="hero-media-img"
+            />
+            <div className="hero-media-fade" />
+            {!mostrarMetricas && badgeUbicacion && (
+              <div className="hero-location-pill">
+                <MapPinned size={13} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                <span>{badgeUbicacion}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="hero-content" style={{ position: 'relative', zIndex: 2 }}>
           {/* Eyebrow con micro-animación */}
           <motion.div
             initial={{ scale: 0.95 }}
@@ -133,7 +159,7 @@ export const Hero: React.FC<HeroProps> = ({
             }}
           >
             <button
-              className="btn btn-primary"
+              className="btn btn-primary min-h-[44px] active:scale-[0.98]"
               onClick={onExploreClick}
               style={{
                 padding: '0.75rem 1.4rem',
@@ -149,7 +175,7 @@ export const Hero: React.FC<HeroProps> = ({
             {onVisualClick && (
               <button
                 type="button"
-                className="btn btn-outline"
+                className="btn btn-outline min-h-[44px] active:scale-[0.98]"
                 onClick={onVisualClick}
                 style={{
                   padding: '0.75rem 1.25rem',
@@ -161,6 +187,7 @@ export const Hero: React.FC<HeroProps> = ({
                   gap: '0.45rem',
                   borderColor: 'var(--primary)',
                   color: 'var(--primary)',
+                  background: 'color-mix(in srgb, var(--surface) 78%, transparent)',
                 }}
               >
                 <TrendingUp size={16} /> Ver Análisis & Presupuesto
@@ -169,13 +196,14 @@ export const Hero: React.FC<HeroProps> = ({
 
             {ctaSecTexto && onMenusClick && (
               <button
-                className="btn btn-outline"
+                className="btn btn-outline min-h-[44px] active:scale-[0.98]"
                 onClick={onMenusClick}
                 style={{
                   padding: '0.75rem 1.15rem',
                   fontSize: '0.88rem',
                   fontWeight: 600,
                   borderRadius: 'var(--rad-sm, 12px)',
+                  background: 'color-mix(in srgb, var(--surface) 78%, transparent)',
                 }}
               >
                 <UtensilsCrossed size={16} /> {ctaSecTexto}
@@ -192,6 +220,8 @@ export const Hero: React.FC<HeroProps> = ({
             transition={{ duration: 0.4, delay: 0.2 }}
             className="hero-status-panel"
             style={{
+              position: 'relative',
+              zIndex: 2,
               background: 'var(--surface)',
               border: '1.5px solid var(--border)',
               borderRadius: 'var(--rad-md, 18px)',
