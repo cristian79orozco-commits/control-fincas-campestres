@@ -9,7 +9,7 @@ import type {
   Finca, BloqueoDisponibilidad, Reserva, Cliente, CotizacionDB,
   Menu as MenuType, ConfiguracionGeneral, PagoTipo, Pago, CierreReserva
 } from '../types';
-import { calcularSaldo } from '../types';
+import { calcularSaldo, tienePlanAlimentacionActivo } from '../types';
 import { getFechaHoyLocal } from '../utils/dashboardMetrics';
 import { ConsecutivoBadge } from './AdminReservas';
 import { CurrencyInput } from '../components/CurrencyInput';
@@ -488,7 +488,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
                 ? `${resVin.clientes.nombre} ${resVin.clientes.apellido || ''}`.trim()
                 : 'Reserva activa';
               const tel = resVin?.clientes?.whatsapp || resVin?.clientes?.telefono;
-              const tienePlanAlimentacion = Boolean(resVin?.menu_id || resVin?.alimentacion || (resVin?.costo_alimentacion && resVin.costo_alimentacion > 0));
+              const tienePlanAlimentacion = tienePlanAlimentacionActivo(resVin);
               const nombrePlan = resVin?.menus?.nombre || resVin?.alimentacion || 'Plan especial';
 
               return (
@@ -834,7 +834,7 @@ export const AdminCalendar: React.FC<AdminCalendarProps> = (props) => {
               const estanciaVencida = r.estado === 'activa' && r.fecha_fin < hoy;
 
               // Identificar plan de alimentación adjunto
-              const tienePlanAlimentacion = Boolean(r.menu_id || r.alimentacion || (r.costo_alimentacion && r.costo_alimentacion > 0));
+              const tienePlanAlimentacion = tienePlanAlimentacionActivo(r);
               const nombrePlan = r.menus?.nombre || r.alimentacion || 'Plan con menú especial';
 
               return (

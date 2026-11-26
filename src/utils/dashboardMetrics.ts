@@ -4,7 +4,7 @@ import orderBy from 'lodash/orderBy';
 import countBy from 'lodash/countBy';
 import round from 'lodash/round';
 import type { Reserva, CotizacionDB, Finca } from '../types';
-import { desglosarFinanzasReserva } from '../types';
+import { desglosarFinanzasReserva, tienePlanAlimentacionActivo } from '../types';
 import type { DashboardPeriodo } from '../store/useAdminDashboardStore';
 
 export interface MetricasKPIResumen {
@@ -174,7 +174,7 @@ export function calcularMetricasDashboard(
 
       if (['activa', 'completada'].includes(r.estado)) {
         totalHuespedes += (r.personas || 1);
-        if ((r.costo_alimentacion || 0) > 0 || (r.alimentacion && r.alimentacion !== 'Sin alimentación')) {
+        if (tienePlanAlimentacionActivo(r)) {
           totalComensales += (r.personas || 1);
         }
       }

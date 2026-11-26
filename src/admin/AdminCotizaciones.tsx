@@ -3,7 +3,7 @@ import {
   FileText, Plus, Edit3, Trash2, X, Save, ArrowRight,
   Calendar, Users, Utensils, Tag, MessageCircle, Hash, Copy, Check, XCircle, Dog
 } from 'lucide-react';
-import { desglosarFinanzasCotizacion } from '../types';
+import { desglosarFinanzasCotizacion, tienePlanAlimentacionActivo } from '../types';
 import { WhatsAppModal } from '../components/WhatsAppModal';
 import { abrirWhatsApp, generarUrlWhatsApp } from '../services/whatsapp';
 import { CurrencyInput } from '../components/CurrencyInput';
@@ -340,7 +340,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
             const clienteNombre = c.clientes ? `${c.clientes.nombre} ${c.clientes.apellido || ''}`.trim() : '—';
             const fincaRef = fincas.find(f => f.id === c.finca_id);
             const fincaNombre = fincaRef?.nombre || c.fincas?.nombre || '—';
-            const tieneAlimentacion = (c.costo_alimentacion || 0) > 0 || (c.alimentacion && c.alimentacion !== 'Sin alimentación');
+            const tieneAlimentacion = tienePlanAlimentacionActivo(c);
             const finCot = desglosarFinanzasCotizacion(c, fincaRef);
             const valorAlojamiento = finCot.totalPropietarioFinca;
 
@@ -420,9 +420,26 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
                       </span>
                     )}
 
-                    {tieneAlimentacion && (
+                    {tieneAlimentacion ? (
                       <span className="status-badge s-avail" style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                         <Utensils size={10} /> {c.alimentacion || 'Con alimentación'}
+                      </span>
+                    ) : (
+                      <span
+                        className="status-badge"
+                        style={{
+                          fontSize: '0.68rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          background: 'var(--surface-2)',
+                          color: 'var(--text-muted)',
+                          borderColor: 'var(--border)',
+                          fontWeight: 600,
+                        }}
+                        title="Solo alojamiento · Sin planes de alimentación vinculados"
+                      >
+                        🍃 Sin Plan de Alimentación
                       </span>
                     )}
                   </div>
@@ -605,7 +622,7 @@ export const AdminCotizaciones: React.FC<AdminCotizacionesProps> = (props) => {
         const finCotModal = desglosarFinanzasCotizacion(cModal, fincaModalRef);
         const valorAlojamientoModal = finCotModal.totalPropietarioFinca;
         const costoAlimModal = cModal.costo_alimentacion || 0;
-        const tieneAlimModal = costoAlimModal > 0 || (cModal.alimentacion && cModal.alimentacion !== 'Sin alimentación');
+        const tieneAlimModal = tienePlanAlimentacionActivo(cModal);
 
         // Saldos en tiempo real
         const saldoFincaCheckIn = Math.max(0, valorAlojamientoModal - modalConfirmarReserva.anticipoFinca);

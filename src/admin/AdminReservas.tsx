@@ -5,7 +5,7 @@ import {
   CheckCircle, Hash, Copy, Check, AlertTriangle, Utensils
 } from 'lucide-react';
 import type { Reserva, ReservaEstado, Cliente, Finca, Pago, PagoTipo, CotizacionDB, CierreReserva, ConfiguracionGeneral } from '../types';
-import { calcularSaldo, desglosarFinanzasReserva } from '../types';
+import { calcularSaldo, desglosarFinanzasReserva, tienePlanAlimentacionActivo } from '../types';
 import { AdminDocumentos } from './AdminDocumentos';
 import { WhatsAppModal } from '../components/WhatsAppModal';
 import { AdminCierreModal } from './AdminCierreModal';
@@ -772,7 +772,7 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
                           🐾 {desglose.cantidadMascotas} mascota{desglose.cantidadMascotas !== 1 ? 's' : ''}{desglose.costoMascotas > 0 ? ` (+${formatCOP(desglose.costoMascotas)} · Dueño)` : ''}
                         </span>
                       )}
-                      {((r.costo_alimentacion || 0) > 0 || (r.alimentacion && r.alimentacion !== 'Sin alimentación')) && (
+                      {tienePlanAlimentacionActivo(r) ? (
                         r.estado_alimentacion === 'pagada' ? (
                           <span
                             className="status-badge s-avail"
@@ -802,6 +802,23 @@ export const AdminReservas: React.FC<AdminReservasProps> = (props) => {
                             <Utensils size={10} /> Menú Admin: {formatCOP(r.costo_alimentacion || 0)} (Pendiente Cobro ⚠️)
                           </button>
                         )
+                      ) : (
+                        <span
+                          className="status-badge"
+                          style={{
+                            fontSize: '0.68rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            background: 'var(--surface-2)',
+                            color: 'var(--text-muted)',
+                            borderColor: 'var(--border)',
+                            fontWeight: 600,
+                          }}
+                          title="Solo alojamiento · Esta reserva no tiene planes de alimentación activos"
+                        >
+                          🍃 Sin Plan de Alimentación
+                        </span>
                       )}
                     </div>
                     <div className="text-xs text-muted" style={{ marginTop: '0.2rem' }}>

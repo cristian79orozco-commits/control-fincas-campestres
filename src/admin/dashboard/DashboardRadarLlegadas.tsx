@@ -292,10 +292,10 @@ export const DashboardRadarLlegadas: React.FC<DashboardRadarLlegadasProps> = ({
 
                 {/* Logística de Menú & Botón WhatsApp al Huésped */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                  {item.tieneAlimentacion && (
+                  {item.tieneAlimentacion ? (
                     <div
                       style={{
-                        padding: '0.25rem 0.55rem',
+                        padding: '0.3rem 0.6rem',
                         borderRadius: '6px',
                         background: item.comprasAlimentacionListas
                           ? 'rgba(22, 163, 74, 0.12)'
@@ -312,6 +312,24 @@ export const DashboardRadarLlegadas: React.FC<DashboardRadarLlegadasProps> = ({
                     >
                       <UtensilsCrossed size={12} />
                       <span>{item.comprasAlimentacionListas ? 'Menú Listo' : 'Menú Pendiente'}</span>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        padding: '0.3rem 0.6rem',
+                        borderRadius: '6px',
+                        background: 'var(--surface)',
+                        color: 'var(--text-muted)',
+                        border: '1px solid var(--border)',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                      }}
+                      title="Reserva de solo alojamiento sin planes de alimentación vinculados"
+                    >
+                      <span>Solo Alojamiento</span>
                     </div>
                   )}
 

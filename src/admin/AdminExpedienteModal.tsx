@@ -10,6 +10,7 @@ import {
   obtenerNombreClienteHistorico,
   obtenerNombreFincaHistorico,
   obtenerContactoClienteHistorico,
+  tienePlanAlimentacionActivo,
 } from '../types';
 import { formatearConsecutivoSimple } from '../utils/consecutivos';
 import {
@@ -257,7 +258,7 @@ export const AdminExpedienteModal: React.FC<AdminExpedienteModalProps> = ({
                   {finanzas.cantidadMascotas > 0 && (
                     <div><span className="text-muted">Mascotas:</span> <br /><strong>🐾 {finanzas.cantidadMascotas} mascota(s)</strong></div>
                   )}
-                  <div><span className="text-muted">Alimentación:</span> <br /><strong>{reserva.alimentacion || 'Sin alimentación'}</strong></div>
+                  <div><span className="text-muted">Alimentación:</span> <br /><strong>{tienePlanAlimentacionActivo(reserva) ? reserva.alimentacion : 'Sin plan de alimentación (Solo alojamiento)'}</strong></div>
                 </div>
               </div>
 

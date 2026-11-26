@@ -556,6 +556,49 @@ export function desglosarFinanzasReserva(reserva: Reserva, finca?: Partial<Finca
   };
 }
 
+const TEXTOS_SIN_ALIMENTACION = [
+  'sin alimentación',
+  'sin alimentacion',
+  'solo alojamiento',
+  'sin plan de alimentación',
+  'sin plan de alimentacion',
+  'sin servicio de alimentación',
+  'sin servicio de alimentacion',
+  'ninguno',
+  'ninguna',
+  'no aplica',
+  'n/a',
+  '-',
+  '—',
+];
+
+/**
+ * Determina si el texto de alimentación representa ausencia de plan gastronómico.
+ */
+export function esTextoSinAlimentacion(texto?: string | null): boolean {
+  const norm = (texto || '').trim().toLowerCase();
+  if (!norm) return true;
+  return TEXTOS_SIN_ALIMENTACION.some(
+    (t) => norm === t || norm.startsWith(`${t} (`) || norm.startsWith(`${t} -`)
+  );
+}
+
+/**
+ * Fuente única de verdad para determinar si una Reserva o Cotización tiene
+ * un plan de alimentación activo vinculado (evita falsos positivos con "Solo alojamiento").
+ */
+export function tienePlanAlimentacionActivo(item?: {
+  costo_alimentacion?: number | null;
+  alimentacion?: string | null;
+  menu_id?: string | null;
+} | null): boolean {
+  if (!item) return false;
+  if ((item.costo_alimentacion || 0) > 0) return true;
+  if (!esTextoSinAlimentacion(item.alimentacion)) return true;
+  if (item.menu_id && item.menu_id !== 'ninguno' && !item.alimentacion) return true;
+  return false;
+}
+
 // ---------------------------------------------------------------
 // FASE 2 — Tipos de Menús y Alimentación
 // ---------------------------------------------------------------

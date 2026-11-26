@@ -3,7 +3,7 @@ import type {
   Reserva, ReservaEstado, Cliente, Finca, Pago, PagoTipo,
   CotizacionDB, CierreReserva, ConfiguracionGeneral
 } from '../types';
-import { calcularSaldo, desglosarFinanzasReserva } from '../types';
+import { calcularSaldo, desglosarFinanzasReserva, tienePlanAlimentacionActivo } from '../types';
 import { resolverPlanesAlimentacionDetalle } from '../utils/calcularCotizacion';
 import { useApp } from '../context/AppContext';
 import { getConfiguracionGlobal } from '../services/configuracion';
@@ -171,7 +171,7 @@ export function useReservasController({
         alimentacion: cotizacionInicial.alimentacion || null,
         costo_alimentacion: cotizacionInicial.costo_alimentacion || 0,
         estado: 'activa',
-        observaciones: cotizacionInicial.alimentacion && cotizacionInicial.alimentacion !== 'Sin alimentación'
+        observaciones: tienePlanAlimentacionActivo(cotizacionInicial)
           ? `Incluye menú: ${cotizacionInicial.alimentacion}`
           : '',
       });
@@ -387,7 +387,7 @@ export function useReservasController({
         serviciosDefault: cantServ,
       });
 
-      const m = resuelto.items[0]?.menu || (r.alimentacion && r.alimentacion !== 'Sin alimentación' ? {
+      const m = resuelto.items[0]?.menu || (tienePlanAlimentacionActivo(r) && r.alimentacion ? {
         id: 'res-menu',
         nombre: r.alimentacion,
         categoria: 'Almuerzo' as const,

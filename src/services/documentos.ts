@@ -23,6 +23,7 @@ import {
   calcularSaldo,
   desglosarFinanzasReserva,
   desglosarFinanzasCotizacion,
+  esTextoSinAlimentacion,
   resolverMetadatosFinca,
   obtenerNombreClienteHistorico,
   obtenerNombreFincaHistorico,
@@ -825,7 +826,7 @@ export function generarDocSeparacion(
   if (finanzas.depositoGarantia > 0) {
     y = fila(doc, y, 'Depósito reembolsable (Garantía):', formatCOP(finanzas.depositoGarantia));
   }
-  if (reserva.alimentacion && reserva.alimentacion !== 'Sin alimentación') {
+  if (!esTextoSinAlimentacion(reserva.alimentacion) && reserva.alimentacion) {
     y = fila(doc, y, 'Servicio gastronómico:', reserva.alimentacion);
   }
   y += 4;
@@ -2029,7 +2030,7 @@ export function generarExpedienteCompleto(
   y += 4.5;
 
   const costoAlim = finanzas.costoAlimentacion;
-  const servAlim = reserva.alimentacion && reserva.alimentacion !== 'Sin alimentación'
+  const servAlim = !esTextoSinAlimentacion(reserva.alimentacion) && reserva.alimentacion
     ? reserva.alimentacion
     : 'Menú campestre seleccionado';
 

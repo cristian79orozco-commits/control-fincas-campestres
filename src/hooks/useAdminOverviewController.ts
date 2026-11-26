@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import type { Finca, Cliente, CotizacionDB, Reserva, AdminSection, Menu as MenuType } from '../types';
-import { resolverMetadatosFinca, desglosarFinanzasReserva, obtenerNombreClienteHistorico } from '../types';
+import { resolverMetadatosFinca, desglosarFinanzasReserva, obtenerNombreClienteHistorico, tienePlanAlimentacionActivo, esTextoSinAlimentacion } from '../types';
 import { useAdminDashboardStore, DashboardPeriodo, DashboardTab } from '../store/useAdminDashboardStore';
 import { useApp } from '../context/AppContext';
 import { abrirWhatsApp } from '../services/whatsapp';
@@ -410,8 +410,10 @@ export function useAdminOverviewController({
           }
         }
 
-        const tieneAlim = (r.costo_alimentacion || 0) > 0 || (!!r.alimentacion && r.alimentacion !== 'Sin alimentación') || !!r.menu_id;
-        const menuNombre = r.menus?.nombre || r.alimentacion || 'Menú Especial';
+        const tieneAlim = tienePlanAlimentacionActivo(r);
+        const menuNombre = tieneAlim
+          ? (r.menus?.nombre || (!esTextoSinAlimentacion(r.alimentacion) ? r.alimentacion : '') || 'Menú Especial')
+          : 'Solo alojamiento';
         const comprasListas = r.alimentacion_compras_listas || comprasListasIds.has(r.id);
 
         return {

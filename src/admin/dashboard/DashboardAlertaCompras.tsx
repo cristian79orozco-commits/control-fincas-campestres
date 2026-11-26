@@ -92,6 +92,22 @@ export const DashboardAlertaCompras: React.FC<DashboardAlertaComprasProps> = ({
                   <span style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text)' }}>
                     {item.fincaNombre}
                   </span>
+                  {item.consecutivo && (
+                    <span
+                      style={{
+                        fontSize: '0.68rem',
+                        fontFamily: 'monospace',
+                        fontWeight: 700,
+                        padding: '0.05rem 0.4rem',
+                        borderRadius: '4px',
+                        background: 'var(--surface-2)',
+                        color: 'var(--text-muted)',
+                        border: '1px solid var(--border)',
+                      }}
+                    >
+                      {item.consecutivo}
+                    </span>
+                  )}
                   <span
                     style={{
                       fontSize: '0.72rem',
